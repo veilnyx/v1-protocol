@@ -1,0 +1,30 @@
+{
+  "name": "js-ffi",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "genZTx": "npx ts-node src/genZTx.ts",
+    "genZTxAndHash": "npx ts-node src/genZTxAndHash.ts",
+    "genAccount": "npx ts-node src/genAccount.ts"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@zkfi-tech/account": "0.1.2",
+    "@zkfi-tech/transaction": "0.1.2",
+    "@zkfi-tech/shared-types": "^1.0.0",
+    "@zkfi-tech/core": "0.2.0",
+    "@zkfi-tech/babyjubjub": "^1.0.2",
+    "@zkfi-tech/services": "^0.2.0",
+    "fixed-merkle-tree": "^0.7.3",
+    "snarkjs": "^0.7.3",
+    "viem": "^2.7.6"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.16",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.3"
+  }
+}
