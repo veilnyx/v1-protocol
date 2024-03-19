@@ -3,7 +3,6 @@ import {
   decodeAbiParameters,
   parseAbiParameter,
   size,
-  zeroAddress,
 } from "viem";
 import { ShieldedAddress } from "@zkfi-tech/account";
 import {
@@ -11,7 +10,6 @@ import {
   TransactionRequest,
   TransactionType,
 } from "@zkfi-tech/shared-types";
-import { randomHex } from "@zkfi-tech/utils";
 
 const reqTypes = [
   "uint8 txType",
@@ -57,7 +55,7 @@ export function parseTransactionRequest() {
 
 const ztxTypes = [
   { name: "txType", type: "uint8" },
-  { name: "proof", type: "uint256[8]" },
+  { name: "proof", type: "bytes" },
   { name: "merkleRoot", type: "uint256" },
   { name: "pubAssetIds", type: "uint24[]" },
   { name: "pubValues", type: "uint256[]" },
@@ -111,6 +109,6 @@ export function decodeZTransaction(data: HexString) {
     "ZTransaction ztx",
     `struct ZTransaction {${types.join(";")}}`,
   ]);
+
   return decodeAbiParameters([abiParam], data)[0];
-  // return decodeAbiParameters(ztxTypes, data);
 }
