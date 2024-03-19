@@ -15,7 +15,7 @@ enum ZTransactionType {
 
 struct ZTransaction {
     ZTransactionType txType;
-    uint256[8] proof;
+    bytes proof;
     uint256 merkleRoot;
     // Public data
     uint24[] pubAssetIds; // First index is always fee asset
@@ -121,16 +121,8 @@ library ZTransactionLogic {
             }
         }
 
-        uint256[2] memory proofA = [self.proof[0], self.proof[1]];
-        uint256[2][2] memory proofB = [
-            [self.proof[2], self.proof[3]],
-            [self.proof[4], self.proof[5]]
-        ];
-        uint256[2] memory proofC = [self.proof[6], self.proof[7]];
-
-        bytes memory encodedProof = abi.encode(proofA, proofB, proofC);
         bytes memory packdPubInp = toPackedPubInp(pubInputs);
-        bytes memory data = bytes.concat(selector, encodedProof, packdPubInp);
+        bytes memory data = bytes.concat(selector, self.proof, packdPubInp);
 
         return data;
     }
