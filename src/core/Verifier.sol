@@ -55,53 +55,6 @@ contract Verifier is IVerifier {
         return uint8(result[31]) == 1;
     }
 
-    function verifyTransactionProof2(
-        ZTransaction memory ztx
-    ) public view returns (bool) {
-        VerifierInfo memory vInfo = getVerifier(
-            ztx.nullifiers.length,
-            ztx.commitments.length
-        );
-
-        if (vInfo.addr == address(0)) {
-            revert("Verifier: verifier not found");
-        }
-
-        uint256[2] memory proofA = [ztx.proof[0], ztx.proof[1]];
-        uint256[2][2] memory proofB = [
-            [ztx.proof[2], ztx.proof[3]],
-            [ztx.proof[4], ztx.proof[5]]
-        ];
-        uint256[2] memory proofC = [ztx.proof[6], ztx.proof[7]];
-
-        bool isValid = Verifier22(vInfo.addr).verifyProof(
-            proofA,
-            proofB,
-            proofC,
-            [
-                ztx.merkleRoot,
-                ztx.hash(),
-                ztx.txType == ZTransactionType.DEPOSIT ? 0 : 1,
-                ztx.pubAssetIds[0],
-                0,
-                ztx.pubValues[0],
-                0,
-                ztx.nullifiers[0],
-                ztx.nullifiers[1],
-                ztx.commitments[0],
-                ztx.commitments[1],
-                ztx.ephPubKey[0],
-                ztx.ephPubKey[1],
-                ENC_PUB_KEY_X,
-                ENC_PUB_KEY_Y,
-                ztx.encAssets[0],
-                ztx.encAssets[1]
-            ]
-        );
-
-        return isValid;
-    }
-
     function getVerifier(
         uint256 nIns,
         uint256 nOuts
