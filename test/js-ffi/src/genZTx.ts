@@ -13,7 +13,10 @@ import {
 } from "./helpers/tx";
 
 async function mockDeposit(zkfi: Core) {
-  const encoded = readFileSync("../fixtures/deps.txt", "utf-8") as HexString;
+  const encoded = readFileSync(
+    "../fixtures/mock-deposit.txt",
+    "utf-8"
+  ) as HexString;
 
   const ztx = decodeZTransaction(encoded) as any;
 

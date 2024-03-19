@@ -96,7 +96,7 @@ contract PoolFixture is BaseFixture {
     function _mockDeposit() internal {
         string memory path = string.concat(
             vm.projectRoot(),
-            "/test/fixtures/deps.txt"
+            "/test/fixtures/mock-deposit.txt"
         );
         string memory file = vm.readFile(path);
         bytes memory data = vm.parseBytes(file);
