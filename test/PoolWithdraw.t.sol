@@ -18,15 +18,8 @@ contract PoolWithdrawTest is PoolFixture {
     Verifier internal _verifier;
 
     function setUp() public {
-        Verifier22 v22 = new Verifier22();
-        uint256[] memory ids = new uint256[](1);
-        VerifierInfo[] memory vInfos = new VerifierInfo[](1);
-        ids[0] = 2 * 10 + 2;
-        vInfos[0] = VerifierInfo({
-            addr: address(v22),
-            selector: v22.verifyProof.selector
-        });
-        _verifier = new Verifier(ids, vInfos);
+        _initFixture();
+        _mockDeposit();
     }
 
     function test_withdrawTx() public {
