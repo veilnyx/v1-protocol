@@ -1,10 +1,10 @@
 import { encodeAbiParameters, parseAbiParameter } from "viem";
-import { Account } from "@zkfi-tech/account";
+import { ShieldedAccount } from "@zkfi-tech/account";
 
 async function main() {
   const arg = process.argv[2];
   const seed = BigInt(arg);
-  const account = Account.generate(seed);
+  const account = ShieldedAccount.generate(seed);
   const abiParam = parseAbiParameter([
     "ZAccount acc",
     "struct ZAccount { uint256 seed; uint256 signPublicKey; uint256 viewPublicKey; }",
