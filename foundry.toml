@@ -1,7 +1,9 @@
 [profile.default]
 ffi = true
-fs_permissions = [{ access = "read", path = "./" }]
+fs_permissions = [{ access = "read-write", path = "./" }]
 
 [profile.ci.fuzz]
 runs = 10_000
 
+[rpc_endpoints]
+op_sepolia = "${RPC_OPTIMISM_SEPOLIA}"
