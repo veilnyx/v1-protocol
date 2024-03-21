@@ -31,8 +31,7 @@ struct ZTransaction {
     address target;
     bytes targetPayload;
     // Compliance params
-    uint256[2] ephPubKey;
-    uint256[] encAssets;
+    bytes complianceMemo;
 }
 
 library ZTransactionLogic {
@@ -83,7 +82,6 @@ library ZTransactionLogic {
         for (uint8 i = 0; i < nOuts; ) {
             pubInputs[3 + i] = i < nPubs ? self.pubAssetIds[i] : 0;
             pubInputs[3 + nOuts + i] = i < nPubs ? self.pubValues[i] : 0;
-
             unchecked {
                 ++i;
             }
@@ -105,17 +103,21 @@ library ZTransactionLogic {
             }
         }
 
-        // Compliance ephemeral key: (Index: (3 + nIns + 3 * nOuts) to (5 + nIns + 3 * nOuts))
-        pubInputs[3 + nIns + 3 * nOuts] = self.ephPubKey[0];
-        pubInputs[3 + nIns + 3 * nOuts + 1] = self.ephPubKey[1];
+        // Compliance encryption key: (Index: (3 + nIns + 3 * nOuts) to (5 + nIns + 3 * nOuts))
+        pubInputs[3 + nIns + 3 * nOuts] = ENC_PUB_KEY_X;
+        pubInputs[4 + nIns + 3 * nOuts] = ENC_PUB_KEY_Y;
 
-        // Compliance encryption key: (Index: (5 + nIns + 3 * nOuts) to (7 + nIns + 3 * nOuts))
-        pubInputs[3 + nIns + 3 * nOuts + 2] = ENC_PUB_KEY_X;
-        pubInputs[3 + nIns + 3 * nOuts + 3] = ENC_PUB_KEY_Y;
-
-        // Encrypted assets: (Index: (7 + nIns + 3 * nOuts) to (7 + nIns + 4 * nOuts))
-        for (uint8 i = 0; i < nOuts; ) {
-            pubInputs[7 + nIns + 3 * nOuts + i] = self.encAssets[i];
+        // Compliance memo: (Index: (5 + nIns + 3 * nOuts) to (9 + nIns + 4 * nOuts))
+        // [5 + nIns + 3 * nOuts]: ephemeral pub key x
+        // [6 + nIns + 3 * nOuts]: ephemeral pub key y
+        // [7 + nIns + 3 * nOuts...7 + nIns + 4 * nOuts]: encrypted assets
+        bytes memory complianceMemo = self.complianceMemo;
+        uint256 tmp;
+        for (uint8 i = 0; i < nOuts + 2; ) {
+            assembly {
+                tmp := mload(add(complianceMemo, add(0x20, mul(0x20, i))))
+            }
+            pubInputs[5 + nIns + 3 * nOuts + i] = tmp;
             unchecked {
                 ++i;
             }

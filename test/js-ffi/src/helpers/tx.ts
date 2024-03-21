@@ -67,8 +67,7 @@ const ztxTypes = [
   { name: "beneficiaryMemo", type: "bytes" },
   { name: "target", type: "address" },
   { name: "targetPayload", type: "bytes" },
-  { name: "ephPubKey", type: "uint256[2]" },
-  { name: "encAssets", type: "uint256[]" },
+  { name: "complianceMemo", type: "bytes" },
 ];
 
 export function encodeZTransaction(ztx: any) {
@@ -86,8 +85,7 @@ export function encodeZTransaction(ztx: any) {
     ztx.beneficiaryMemo,
     ztx.target,
     ztx.targetPayload,
-    ztx.ephPubKey,
-    ztx.encAssets,
+    ztx.complianceMemo,
   ];
   const vals = {};
   ztxTypes.forEach((t, i) => {
