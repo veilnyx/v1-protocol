@@ -13,3 +13,6 @@
 [submodule "lib/poseidon-solidity"]
 	path = lib/poseidon-solidity
 	url = https://github.com/vimwitch/poseidon-solidity
+[submodule "lib/openzeppelin-foundry-upgrades"]
+	path = lib/openzeppelin-foundry-upgrades
+	url = https://github.com/OpenZeppelin/openzeppelin-foundry-upgrades
