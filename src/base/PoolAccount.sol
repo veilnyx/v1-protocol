@@ -9,13 +9,7 @@ abstract contract PoolAccount is IAccount {
     uint256 internal constant VALIDATION_SUCCEEDED = 0;
     uint256 internal constant VALIDATION_FAILED = 1;
 
-    address private immutable _entryPoint;
-
     error InvalidEntryPoint(address entryPoint);
-
-    constructor(address entryPoint_) payable {
-        _entryPoint = entryPoint_;
-    }
 
     /// @dev `missingAccountFunds` is always expected to be 0 since paymaster
     /// pays for the tx and extracts gas+protocol fee
@@ -24,7 +18,7 @@ abstract contract PoolAccount is IAccount {
         bytes32,
         uint256
     ) external virtual override returns (uint256 validationData) {
-        if (msg.sender != _entryPoint) {
+        if (msg.sender != _entryPoint()) {
             revert InvalidEntryPoint(msg.sender);
         }
         return VALIDATION_SUCCEEDED;
@@ -36,8 +30,10 @@ abstract contract PoolAccount is IAccount {
         uint256 amount
     ) public {
         _authorizeWithdrawAccountDeposit();
-        IEntryPoint(_entryPoint).withdrawTo(withdrawAddress, amount);
+        IEntryPoint(_entryPoint()).withdrawTo(withdrawAddress, amount);
     }
+
+    function _entryPoint() internal virtual returns (address);
 
     function _authorizeWithdrawAccountDeposit() internal virtual;
 }

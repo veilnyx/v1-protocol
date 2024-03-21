@@ -10,6 +10,7 @@ contract PoolStorage {
     uint256 public constant ZERO_LEAF = uint256(keccak256("zkFi")) % FIELD_SIZE;
     uint8 public constant ROOT_HISTORY_SIZE = 100;
 
+    address public entryPoint;
     address public verifier;
     address public convertor;
 
