@@ -10,6 +10,7 @@
 [submodule "lib/account-abstraction"]
 	path = lib/account-abstraction
 	url = https://github.com/eth-infinitism/account-abstraction
+	branch = main
 [submodule "lib/poseidon-solidity"]
 	path = lib/poseidon-solidity
 	url = https://github.com/vimwitch/poseidon-solidity
