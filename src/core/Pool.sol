@@ -27,12 +27,15 @@ contract Pool is
 {
     using MerkleTreeLogic for MerkleTree;
 
-    constructor(address entryPoint_) PoolAccount(entryPoint_) {}
+    // constructor() {
+    //     _disableInitializers();
+    // }
 
     function initialize(
         uint256 treeDepth,
         address verifier_,
         address convertor_,
+        address entryPoint_,
         AssetType[] calldata initAssetTypes,
         address[] calldata initAssetAddresses
     ) external initializer {
@@ -43,6 +46,7 @@ contract Pool is
 
         verifier = verifier_;
         convertor = convertor_;
+        entryPoint = entryPoint_;
 
         _tree.init(treeDepth);
         _counter = PoolLogic.addAssets(
@@ -139,6 +143,10 @@ contract Pool is
 
     function isKnownRoot(uint256 root) public view returns (bool) {
         return _tree.isKnownRoot(root, ROOT_HISTORY_SIZE);
+    }
+
+    function _entryPoint() internal view override returns (address) {
+        return entryPoint;
     }
 
     function _authorizeUpgrade(

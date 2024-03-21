@@ -40,7 +40,7 @@ contract PoolFixture is BaseFixture {
         convertor = new Convertor();
         entryPoint = address(0);
 
-        pool = new Pool(address(entryPoint));
+        pool = new Pool();
 
         // Assets
         token1 = new MockERC20(address(this));
@@ -67,6 +67,7 @@ contract PoolFixture is BaseFixture {
             treeDepth,
             address(verifier),
             address(convertor),
+            address(entryPoint),
             assetTypes,
             assetAddresses
         );
