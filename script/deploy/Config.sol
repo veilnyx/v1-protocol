@@ -4,6 +4,7 @@ pragma solidity 0.8.23;
 import {AssetType} from "src/libraries/DataTypes.sol";
 
 contract Config {
+    uint256 public constant TREE_DEPTH = 32;
     mapping(uint256 => address) entryPoints;
     mapping(uint256 => AssetType[]) initialAssetTypes;
     mapping(uint256 => address[]) initialAssetAddresses;
@@ -12,8 +13,8 @@ contract Config {
         //@todo set deployment configs
     }
 
-    function treeDepth() external view returns (uint256) {
-        return 32;
+    function treeDepth() external pure returns (uint256) {
+        return TREE_DEPTH;
     }
 
     function entryPoint() external view returns (address) {

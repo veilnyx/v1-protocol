@@ -18,11 +18,12 @@ contract PoolDeploy is DeployScript {
         AssetType[] memory initAssetTypes = _config.initalAssetTypes();
         address[] memory initAssetAddresses = _config.initalAssetAddresses();
 
-        Pool pool = new Pool(entryPoint);
+        Pool pool = new Pool();
         pool.initialize(
             treeDepth,
             verifier,
             convertor,
+            entryPoint,
             initAssetTypes,
             initAssetAddresses
         );
