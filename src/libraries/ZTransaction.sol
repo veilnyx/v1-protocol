@@ -69,7 +69,7 @@ library ZTransactionLogic {
         uint256 nIns = self.nullifiers.length;
         uint256 nOuts = self.commitments.length;
         uint256 nPubs = self.pubAssetIds.length;
-        uint256 pubInputCount = 7 + nIns + (4 * nOuts);
+        uint256 pubInputCount = 7 + nIns + (6 * nOuts);
 
         uint256[] memory pubInputs = new uint256[](pubInputCount);
 
@@ -111,9 +111,11 @@ library ZTransactionLogic {
         // [5 + nIns + 3 * nOuts]: ephemeral pub key x
         // [6 + nIns + 3 * nOuts]: ephemeral pub key y
         // [7 + nIns + 3 * nOuts...7 + nIns + 4 * nOuts]: encrypted assets
+        // [7 + nIns + 4 * nOuts...7 + nIns + 5 * nOuts]: encrypted blindings
+        // [7 + nIns + 5 * nOuts...7 + nIns + 6 * nOuts]: encrypted pubKeyXs
         bytes memory complianceMemo = self.complianceMemo;
         uint256 tmp;
-        for (uint8 i = 0; i < nOuts + 2; ) {
+        for (uint8 i = 0; i < nOuts + 6; ) {
             assembly {
                 tmp := mload(add(complianceMemo, add(0x20, mul(0x20, i))))
             }
