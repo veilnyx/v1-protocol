@@ -3,8 +3,8 @@ pragma solidity 0.8.23;
 
 interface IPool {
     event NullifierMarked(uint256 indexed nullifier);
-
     event Announcement(uint256 leafIndex, uint256 commitment, bytes memo);
+    event ComplianceMemo(bytes complianceMemo);
 
     error InvalidProof();
     error UnexpectedFee();
