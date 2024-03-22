@@ -61,6 +61,8 @@ library PoolLogic {
         }
 
         _mintNotes(tree, ztx.commitments, ztx.memos);
+
+        emit IPool.ComplianceMemo(ztx.complianceMemo);
     }
 
     function _convert(
