@@ -18,17 +18,29 @@ contract VerifierTest is BaseFixture {
     function setUp() public {
         _initFixture();
         Verifier22 verifier22 = new Verifier22();
-        uint256[] memory ids = new uint256[](1);
         VerifierInfo[] memory vInfos = new VerifierInfo[](1);
-        ids[0] = 2 * 10 + 2;
         vInfos[0] = VerifierInfo({
+            id: 2 * 10 + 2,
             addr: address(verifier22),
             selector: verifier22.verifyProof.selector
         });
-        _verifier = new Verifier(ids, vInfos);
+        _verifier = new Verifier(
+            vInfos,
+            [REVOKER_PUBLIC_KEY_X, REVOKER_PUBLIC_KEY_Y],
+            [ENCRYPTION_PUBLIC_KEY_X, ENCRYPTION_PUBLIC_KEY_Y]
+        );
     }
 
-    function test_getVerifierId() public {
+    function test_PublicKeys() public view {
+        uint256[2] memory revokerPubKey = _verifier.getRevokerPublicKey();
+        uint256[2] memory encryptionPubKey = _verifier.getEncryptionPublicKey();
+        assertEq(revokerPubKey[0], REVOKER_PUBLIC_KEY_X);
+        assertEq(revokerPubKey[1], REVOKER_PUBLIC_KEY_Y);
+        assertEq(encryptionPubKey[0], ENCRYPTION_PUBLIC_KEY_X);
+        assertEq(encryptionPubKey[1], ENCRYPTION_PUBLIC_KEY_Y);
+    }
+
+    function test_getVerifierId() public view {
         uint256 id = _verifier.getVerifierId(2, 2);
         assertEq(id, 22);
     }

@@ -17,7 +17,7 @@ contract PoolFixture is BaseFixture {
     Convertor public convertor;
     Pool public pool;
 
-    uint256 public treeDepth = 24;
+    uint256 public treeDepth = 32;
     address public entryPoint;
 
     MockERC20 public token1;
@@ -29,14 +29,17 @@ contract PoolFixture is BaseFixture {
     function _initFixture() internal virtual override {
         BaseFixture._initFixture();
         Verifier22 v22 = new Verifier22();
-        uint256[] memory ids = new uint256[](1);
         VerifierInfo[] memory vInfos = new VerifierInfo[](1);
-        ids[0] = 2 * 10 + 2;
         vInfos[0] = VerifierInfo({
+            id: 2 * 10 + 2,
             addr: address(v22),
             selector: v22.verifyProof.selector
         });
-        verifier = new Verifier(ids, vInfos);
+        verifier = new Verifier(
+            vInfos,
+            [REVOKER_PUBLIC_KEY_X, REVOKER_PUBLIC_KEY_Y],
+            [ENCRYPTION_PUBLIC_KEY_X, ENCRYPTION_PUBLIC_KEY_Y]
+        );
         convertor = new Convertor();
         entryPoint = address(0);
 
