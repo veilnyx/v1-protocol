@@ -5,32 +5,47 @@ import {console2} from "forge-std/console2.sol";
 import {IVerifier} from "../interfaces/IVerifier.sol";
 import {VerifierInfo} from "../libraries/DataTypes.sol";
 import {ZTransaction, ZTransactionType, ZTransactionLogic} from "../libraries/ZTransaction.sol";
-import {Verifier22} from "../verifiers/Verifier22.sol";
 
 contract Verifier is IVerifier {
     using ZTransactionLogic for ZTransaction;
 
-    uint256 constant ENC_PUB_KEY_X =
-        5299619240641551281634865583518297030282874472190772894086521144482721001553;
-    uint256 constant ENC_PUB_KEY_Y =
-        16950150798460657717958625567821834550301663161624707787222815936182638968203;
+    uint256 public immutable REVOKER_PUBLIC_KEY_X;
+    uint256 public immutable REVOKER_PUBLIC_KEY_Y;
+
+    uint256 public immutable ENCRYPTION_PUBLIC_KEY_X;
+    uint256 public immutable ENCRYPTION_PUBLIC_KEY_Y;
 
     /**
      * @notice Verifier id to Verifier info mapping
      */
     mapping(uint256 => VerifierInfo) public verifiers;
 
-    constructor(uint256[] memory ids, VerifierInfo[] memory vInfos) {
-        if (ids.length != vInfos.length) {
-            revert BadArguments();
-        }
-
-        for (uint256 i = 0; i < ids.length; ) {
-            verifiers[ids[i]] = vInfos[i];
+    constructor(
+        VerifierInfo[] memory vInfos,
+        uint256[2] memory revokerPublicKey,
+        uint256[2] memory encryptionPublicKey
+    ) {
+        uint256 len = vInfos.length;
+        for (uint256 i = 0; i < len; ) {
+            verifiers[vInfos[i].id] = vInfos[i];
             unchecked {
                 ++i;
             }
         }
+
+        REVOKER_PUBLIC_KEY_X = revokerPublicKey[0];
+        REVOKER_PUBLIC_KEY_Y = revokerPublicKey[1];
+
+        ENCRYPTION_PUBLIC_KEY_X = encryptionPublicKey[0];
+        ENCRYPTION_PUBLIC_KEY_Y = encryptionPublicKey[1];
+    }
+
+    function getRevokerPublicKey() public view returns (uint256[2] memory) {
+        return [REVOKER_PUBLIC_KEY_X, REVOKER_PUBLIC_KEY_Y];
+    }
+
+    function getEncryptionPublicKey() public view returns (uint256[2] memory) {
+        return [ENCRYPTION_PUBLIC_KEY_X, ENCRYPTION_PUBLIC_KEY_Y];
     }
 
     function verifyTransactionProof(

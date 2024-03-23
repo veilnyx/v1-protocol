@@ -6,6 +6,10 @@ import {ZTransaction} from "../libraries/ZTransaction.sol";
 interface IVerifier {
     error BadArguments();
 
+    function getRevokerPublicKey() external view returns (uint256[2] memory);
+
+    function getEncryptionPublicKey() external view returns (uint256[2] memory);
+
     function verifyTransactionProof(
         ZTransaction memory ztx
     ) external view returns (bool);
