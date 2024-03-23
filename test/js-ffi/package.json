@@ -5,8 +5,8 @@
   "main": "index.js",
   "scripts": {
     "genZTx": "npx ts-node src/genZTx.ts",
-    "genZTxAndHash": "npx ts-node src/genZTxAndHash.ts",
-    "genAccount": "npx ts-node src/genAccount.ts"
+    "genAccount": "npx ts-node src/genAccount.ts",
+    "genMockDeposit": "npx ts-node src/genMockDepositTx.ts"
   },
   "keywords": [],
   "author": "",
