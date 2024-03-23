@@ -32,7 +32,7 @@ export function parseTransactionRequest() {
   if (size(reqData.to) < 64) {
     to = `0x${reqData.to.slice(-40)}`; // trim(reqData.to) as HexString;
   } else if (size(reqData.to) === 64) {
-    to = ShieldedAddress.unpack(reqData.to);
+    to = ShieldedAddress.unpack(reqData.to).pack();
   } else {
     throw new Error(
       `Invalid address  ${reqData.to} of size ${size(
