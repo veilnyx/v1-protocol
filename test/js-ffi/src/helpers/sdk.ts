@@ -9,7 +9,7 @@ import {
   MockTreeSource,
 } from "./services";
 import MerkleTree from "fixed-merkle-tree";
-import { Fp, Fr, poseidonHash } from "@zkfi-tech/babyjubjub";
+import { Fp, Fr, Point, poseidonHash } from "@zkfi-tech/babyjubjub";
 import { circuits } from "./zk";
 import { ShieldedAccount } from "@zkfi-tech/account";
 
@@ -23,6 +23,14 @@ export const tree = new MerkleTree(treeDepth, [], {
 const account = ShieldedAccount.generate(
   Fr.from(keccak256(stringToBytes("sender"))).val
 );
+const encryptionPublicKey = Point.fromArray([
+  BigInt(
+    "18136749973959690676930643759397962821618865161533601684883289116728073483917"
+  ),
+  BigInt(
+    "7818464758266392754559612367237682152094555123891341826265694881788827476134"
+  ),
+]);
 
 export const getSDKInstance = () => {
   const client = createTestClient({
@@ -50,6 +58,8 @@ export const getSDKInstance = () => {
       notesSource,
     },
   });
+
+  zkfi.getEncryptionPublicKey = async () => encryptionPublicKey;
 
   return zkfi;
 };
