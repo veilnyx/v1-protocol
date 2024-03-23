@@ -9,18 +9,22 @@ import {
   MockTreeSource,
 } from "./services";
 import MerkleTree from "fixed-merkle-tree";
-import { Fp, poseidonHash } from "@zkfi-tech/babyjubjub";
+import { Fp, Fr, poseidonHash } from "@zkfi-tech/babyjubjub";
 import { circuits } from "./zk";
+import { ShieldedAccount } from "@zkfi-tech/account";
 
-const treeDepth = 24;
+const treeDepth = 32;
 const zeroElement = Fp.from(keccak256(stringToBytes("zkFi"))).toHex();
 const hashFunction = (a: any, b: any) => poseidonHash([a, b]);
 export const tree = new MerkleTree(treeDepth, [], {
   zeroElement,
   hashFunction,
 });
+const account = ShieldedAccount.generate(
+  Fr.from(keccak256(stringToBytes("sender"))).val
+);
 
-export const getSDKInstance = ({ account }: any) => {
+export const getSDKInstance = () => {
   const client = createTestClient({
     chain: foundry,
     mode: "anvil",

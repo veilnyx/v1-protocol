@@ -35,7 +35,7 @@ async function main() {
   const account = ShieldedAccount.generate(
     Fr.from(keccak256(stringToBytes("sender"))).val
   );
-  const zkfi = getSDKInstance({ account });
+  const zkfi = getSDKInstance();
   // Pre-deposit 10000 token of assets - 0x010001 and 0x010002
   mockDeposit(zkfi);
 
