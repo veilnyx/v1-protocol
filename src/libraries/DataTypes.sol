@@ -27,6 +27,7 @@ struct Proof {
 }
 
 struct VerifierInfo {
+    uint16 id;
     address addr;
     bytes4 selector;
 }
