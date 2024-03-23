@@ -35,11 +35,6 @@ struct ZTransaction {
 }
 
 library ZTransactionLogic {
-    uint256 constant ENC_PUB_KEY_X =
-        5299619240641551281634865583518297030282874472190772894086521144482721001553;
-    uint256 constant ENC_PUB_KEY_Y =
-        16950150798460657717958625567821834550301663161624707787222815936182638968203;
-
     function hash(ZTransaction memory self) public pure returns (uint256) {
         return
             uint256(
@@ -64,7 +59,8 @@ library ZTransactionLogic {
 
     function toVerifierInput(
         ZTransaction memory self,
-        bytes4 selector
+        bytes4 selector,
+        uint256[2] memory encryptionPublicKey
     ) public pure returns (bytes memory) {
         uint256 nIns = self.nullifiers.length;
         uint256 nOuts = self.commitments.length;
@@ -104,8 +100,8 @@ library ZTransactionLogic {
         }
 
         // Compliance encryption key: (Index: (3 + nIns + 3 * nOuts) to (5 + nIns + 3 * nOuts))
-        pubInputs[3 + nIns + 3 * nOuts] = ENC_PUB_KEY_X;
-        pubInputs[4 + nIns + 3 * nOuts] = ENC_PUB_KEY_Y;
+        pubInputs[3 + nIns + 3 * nOuts] = encryptionPublicKey[0];
+        pubInputs[4 + nIns + 3 * nOuts] = encryptionPublicKey[1];
 
         // Compliance memo: (Index: (5 + nIns + 3 * nOuts) to (9 + nIns + 4 * nOuts))
         // [5 + nIns + 3 * nOuts]: ephemeral pub key x

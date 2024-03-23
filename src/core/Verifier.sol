@@ -60,7 +60,10 @@ contract Verifier is IVerifier {
             revert("Verifier: verifier not found");
         }
 
-        bytes memory vInp = ztx.toVerifierInput(vInfo.selector);
+        bytes memory vInp = ztx.toVerifierInput(
+            vInfo.selector,
+            getEncryptionPublicKey()
+        );
         (bool success, bytes memory result) = vInfo.addr.staticcall(vInp);
 
         if (!success) {
