@@ -9,17 +9,17 @@ struct TxInfo {
     address contractAddress;
 }
 
-abstract contract DeployScript is Script {
+abstract contract BaseScript is Script {
     Config internal _config;
 
     constructor() {
         _config = new Config();
     }
 
-    function run() external {
+    modifier broadcast() {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         vm.startBroadcast(deployerPrivateKey);
-        _deploy();
+        _;
         vm.stopBroadcast();
     }
 
@@ -45,6 +45,4 @@ abstract contract DeployScript is Script {
 
         return address(uint160(uint256(bytes32(res))));
     }
-
-    function _deploy() internal virtual;
 }

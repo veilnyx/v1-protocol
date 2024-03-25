@@ -1,25 +1,27 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.23;
 
-import {Upgrades, Options} from "openzeppelin-foundry-upgrades/Upgrades.sol";
 import {console2} from "forge-std/console2.sol";
-import {DeployScript} from "./DeployScript.sol";
-import {PoolProxy} from "./PoolProxy.sol";
+import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
+import {Upgrades, Options} from "openzeppelin-foundry-upgrades/Upgrades.sol";
 import {Pool} from "src/core/Pool.sol";
 import {AssetType} from "src/libraries/DataTypes.sol";
+import {BaseScript} from "../BaseScript.sol";
 
-contract PoolProxyDeploy is DeployScript {
-    function _deploy() internal override {
+contract PoolProxyDeploy is BaseScript {
+    function run() external broadcast {
         address verifier = _getContract("Verifier");
         address convertor = _getContract("Convertor");
+        address poolImpl = _getContract("PoolImpl");
+
         uint256 treeDepth = _config.treeDepth();
         address entryPoint = _config.entryPoint();
         AssetType[] memory initAssetTypes = _config.initalAssetTypes();
         address[] memory initAssetAddresses = _config.initalAssetAddresses();
 
-        Pool poolImpl = new Pool();
+        // Pool poolImpl = new Pool(poolImpl);
         bytes memory initializeData = abi.encodeCall(
-            poolImpl.initialize,
+            Pool.initialize,
             (
                 treeDepth,
                 verifier,
@@ -29,7 +31,7 @@ contract PoolProxyDeploy is DeployScript {
                 initAssetAddresses
             )
         );
-        PoolProxy poolProxy = new PoolProxy(address(poolImpl), initializeData);
+        new ERC1967Proxy(address(poolImpl), initializeData);
 
         // Options memory opts;
         // opts.unsafeAllow = "external-library-linking";
