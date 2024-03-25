@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.23;
 
-import {console2} from "forge-std/console2.sol";
 import {IVerifier} from "../interfaces/IVerifier.sol";
 import {VerifierInfo} from "../libraries/DataTypes.sol";
 import {ZTransaction, ZTransactionType, ZTransactionLogic} from "../libraries/ZTransaction.sol";
