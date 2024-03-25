@@ -1,16 +1,17 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.20;
 
+import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {BaseFixture} from "./BaseFixture.sol";
 import {MockERC20} from "./MockERC20.sol";
 
-import {Pool} from "../../src/core/Pool.sol";
-import {Verifier22} from "../../src/verifiers/Verifier22.sol";
-import {VerifierInfo} from "../../src/libraries/DataTypes.sol";
-import {Verifier} from "../../src/core/Verifier.sol";
-import {Convertor} from "../../src/core/Convertor.sol";
-import {Asset, AssetType} from "../../src/libraries/DataTypes.sol";
-import {ZTransaction} from "../../src/libraries/ZTransaction.sol";
+import {Pool} from "src/core/Pool.sol";
+import {Verifier22} from "src/verifiers/Verifier22.sol";
+import {VerifierInfo} from "src/libraries/DataTypes.sol";
+import {Verifier} from "src/core/Verifier.sol";
+import {Convertor} from "src/core/Convertor.sol";
+import {Asset, AssetType} from "src/libraries/DataTypes.sol";
+import {ZTransaction} from "src/libraries/ZTransaction.sol";
 
 contract PoolFixture is BaseFixture {
     Verifier public verifier;
@@ -66,7 +67,8 @@ contract PoolFixture is BaseFixture {
         assetAddresses[0] = address(token1);
         assetAddresses[1] = address(token2);
 
-        pool.initialize(
+        bytes memory initData = abi.encodeWithSelector(
+            pool.initialize.selector,
             treeDepth,
             address(verifier),
             address(convertor),
@@ -74,6 +76,9 @@ contract PoolFixture is BaseFixture {
             assetTypes,
             assetAddresses
         );
+
+        ERC1967Proxy poolProxy = new ERC1967Proxy(address(pool), initData);
+        pool = Pool(address(poolProxy));
     }
 
     function _mintAsset(
