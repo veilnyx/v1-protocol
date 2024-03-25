@@ -39,7 +39,6 @@ contract Pool is
         AssetType[] calldata initAssetTypes,
         address[] calldata initAssetAddresses
     ) external initializer {
-        convertor = convertor_;
         __Ownable_init(msg.sender);
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
@@ -125,6 +124,16 @@ contract Pool is
         return _markedNullifiers[nullifier];
     }
 
+    function checkMarkedNullifiers(
+        uint256[] calldata nullifiers
+    ) public view returns (bool[] memory) {
+        bool[] memory markedArr = new bool[](nullifiers.length);
+        for (uint256 i = 0; i < nullifiers.length; i++) {
+            markedArr[i] = _markedNullifiers[nullifiers[i]];
+        }
+        return markedArr;
+    }
+
     function zeroes(uint256 level) public view returns (uint256) {
         return _tree.zeroes[level];
     }
@@ -145,6 +154,14 @@ contract Pool is
         return _tree.isKnownRoot(root, ROOT_HISTORY_SIZE);
     }
 
+    function getEncryptionPublicKey() public view returns (uint256[2] memory) {
+        return IVerifier(verifier).getEncryptionPublicKey();
+    }
+
+    function getRevokerPublicKey() public view returns (uint256[2] memory) {
+        return IVerifier(verifier).getRevokerPublicKey();
+    }
+
     function _entryPoint() internal view override returns (address) {
         return entryPoint;
     }
@@ -156,6 +173,4 @@ contract Pool is
     function _authorizeAssetUpdate() internal onlyOwner {}
 
     function _authorizeWithdrawAccountDeposit() internal override onlyOwner {}
-
-    receive() external payable {}
 }
