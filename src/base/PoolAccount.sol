@@ -3,7 +3,7 @@ pragma solidity ^0.8.18;
 
 import {IAccount} from "@account-abstraction/contracts/interfaces/IAccount.sol";
 import {IEntryPoint} from "@account-abstraction/contracts/interfaces/IEntryPoint.sol";
-import {UserOperation} from "@account-abstraction/contracts/interfaces/UserOperation.sol";
+import {PackedUserOperation} from "@account-abstraction/contracts/interfaces/PackedUserOperation.sol";
 
 abstract contract PoolAccount is IAccount {
     uint256 internal constant VALIDATION_SUCCEEDED = 0;
@@ -14,13 +14,14 @@ abstract contract PoolAccount is IAccount {
     /// @dev `missingAccountFunds` is always expected to be 0 since paymaster
     /// pays for the tx and extracts gas+protocol fee
     function validateUserOp(
-        UserOperation calldata,
+        PackedUserOperation calldata,
         bytes32,
         uint256
     ) external virtual override returns (uint256 validationData) {
         if (msg.sender != _entryPoint()) {
             revert InvalidEntryPoint(msg.sender);
         }
+
         return VALIDATION_SUCCEEDED;
     }
 
