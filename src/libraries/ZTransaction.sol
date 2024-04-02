@@ -9,8 +9,7 @@ enum ZTransactionType {
     DEPOSIT,
     TRANSFER,
     WITHDRAW,
-    CONVERT,
-    FUND
+    CONVERT
 }
 
 struct ZTransaction {

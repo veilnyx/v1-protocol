@@ -27,10 +27,6 @@ contract Pool is
 {
     using MerkleTreeLogic for MerkleTree;
 
-    // constructor() {
-    //     _disableInitializers();
-    // }
-
     function initialize(
         uint256 treeDepth,
         address verifier_,
