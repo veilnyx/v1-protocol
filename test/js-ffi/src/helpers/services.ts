@@ -23,8 +23,8 @@ export class MockAddressResolver implements IAddressResolver {
     this._mockedEnsNames[name] = address;
   }
 
-  async getShieldedAddress(pubAddress: HexString): Promise<ShieldedAddress> {
-    return this._mockedShieldedAddresses[pubAddress];
+  async getShieldedAddress(pubAddress: HexString): Promise<HexString> {
+    return this._mockedShieldedAddresses[pubAddress].pack();
   }
 
   async resolveEnsName(name: string): Promise<HexString> {
