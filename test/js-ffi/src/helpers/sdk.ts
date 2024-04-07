@@ -49,11 +49,9 @@ export const getSDKInstance = () => {
     rpc: client as any,
     contracts: {} as any,
     circuits,
-    isTestnet: true,
     snarkJs,
     services: {
       treeSource,
-      eventFetcher: {} as any,
       addressResolver,
       notesSource,
     },
