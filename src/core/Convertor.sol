@@ -5,8 +5,8 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IConvertor} from "../interfaces/IConvertor.sol";
 import {IConvertProxy} from "../interfaces/IConvertProxy.sol";
-import {IAssetManager} from "../interfaces/IAssetManager.sol";
-import {Asset, AssetType} from "../libraries/DataTypes.sol";
+import {IPool} from "../interfaces/IPool.sol";
+import {Asset, AssetType} from "../libraries/Asset.sol";
 
 contract Convertor is IConvertor {
     using SafeERC20 for IERC20;
@@ -34,7 +34,7 @@ contract Convertor is IConvertor {
         Asset memory asset;
         uint256 assetBalance;
         for (uint8 i = 0; i < outAssetIds.length; ) {
-            asset = IAssetManager(msg.sender).getAsset(outAssetIds[i]);
+            asset = IPool(msg.sender).getAsset(outAssetIds[i]);
 
             if (!asset.isSupported) {
                 revert("Unsupported asset");

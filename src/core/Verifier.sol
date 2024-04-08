@@ -2,8 +2,13 @@
 pragma solidity 0.8.23;
 
 import {IVerifier} from "../interfaces/IVerifier.sol";
-import {VerifierInfo} from "../libraries/DataTypes.sol";
 import {ZTransaction, ZTransactionType, ZTransactionLogic} from "../libraries/ZTransaction.sol";
+
+struct VerifierInfo {
+    uint16 id;
+    address addr;
+    bytes4 selector;
+}
 
 contract Verifier is IVerifier {
     using ZTransactionLogic for ZTransaction;
@@ -39,12 +44,12 @@ contract Verifier is IVerifier {
         ENCRYPTION_PUBLIC_KEY_Y = encryptionPublicKey[1];
     }
 
-    function getRevokerPublicKey() public view returns (uint256[2] memory) {
-        return [REVOKER_PUBLIC_KEY_X, REVOKER_PUBLIC_KEY_Y];
+    function getRevokerPublicKey() external view returns (uint256, uint256) {
+        return (REVOKER_PUBLIC_KEY_X, REVOKER_PUBLIC_KEY_Y);
     }
 
-    function getEncryptionPublicKey() public view returns (uint256[2] memory) {
-        return [ENCRYPTION_PUBLIC_KEY_X, ENCRYPTION_PUBLIC_KEY_Y];
+    function getEncryptionPublicKey() external view returns (uint256, uint256) {
+        return (ENCRYPTION_PUBLIC_KEY_X, ENCRYPTION_PUBLIC_KEY_Y);
     }
 
     function verifyTransactionProof(
@@ -61,7 +66,8 @@ contract Verifier is IVerifier {
 
         bytes memory vInp = ztx.toVerifierInput(
             vInfo.selector,
-            getEncryptionPublicKey()
+            ENCRYPTION_PUBLIC_KEY_X,
+            ENCRYPTION_PUBLIC_KEY_Y
         );
         (bool success, bytes memory result) = vInfo.addr.staticcall(vInp);
 

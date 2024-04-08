@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.23;
-import {Asset, AssetType} from "../libraries/DataTypes.sol";
+import {Asset, AssetType} from "../libraries/Asset.sol";
 
 abstract contract IConvertProxy {
     function convert(
