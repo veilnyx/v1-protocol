@@ -113,7 +113,7 @@ contract Pool is
 
     function isConvertProxySupported(
         address proxyAddress
-    ) public view returns (bool) {
+    ) external view returns (bool) {
         return _convertProxies[proxyAddress];
     }
 
