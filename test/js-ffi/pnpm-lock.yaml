@@ -11,6 +11,9 @@ dependencies:
   '@zkfi-tech/shared-types':
     specifier: ^1.0.0
     version: link:../../../v1-sdk/packages/shared-types
+  '@zkfi-tech/zk-prover':
+    specifier: ^1.1.3
+    version: link:../../../v1-sdk/packages/zk-prover
   fixed-merkle-tree:
     specifier: ^0.7.3
     version: 0.7.3

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.23;
 
-import {ZTransactionType} from "../../src/libraries/ZTransaction.sol";
+import {ZTransactionType} from "src/libraries/ZTransaction.sol";
 
 struct TransactionRequest {
     ZTransactionType txType;

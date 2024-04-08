@@ -3,8 +3,8 @@ pragma solidity 0.8.23;
 
 import {console2} from "forge-std/console2.sol";
 import {Test} from "forge-std/Test.sol";
-import {AssetType, Asset} from "../../src/libraries/DataTypes.sol";
-import {ZTransaction, ZTransactionLogic, ZTransactionType} from "../../src/libraries/ZTransaction.sol";
+import {AssetType, Asset} from "src/libraries/Asset.sol";
+import {ZTransaction, ZTransactionLogic, ZTransactionType} from "src/libraries/ZTransaction.sol";
 
 import {JsFFI} from "./helpers/JsFFI.sol";
 import {ZkFi} from "./helpers/ZkFi.sol";

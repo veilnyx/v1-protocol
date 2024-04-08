@@ -4,8 +4,7 @@ pragma solidity ^0.8.23;
 import {console2} from "forge-std/console2.sol";
 import {JsFFI} from "./JsFFI.sol";
 import {ZAccount, ZAccountLogic} from "./ZAccount.sol";
-import {ZTransaction, ZTransactionType} from "../../../src/libraries/ZTransaction.sol";
-import {Proof} from "../../../src/libraries/DataTypes.sol";
+import {ZTransaction, ZTransactionType} from "src/libraries/ZTransaction.sol";
 import {TransactionRequest, TransactionRequestLogic} from "./TransactionRequest.sol";
 
 contract ZkFi is JsFFI {

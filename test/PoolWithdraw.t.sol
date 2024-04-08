@@ -1,21 +1,17 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.23;
 
-import {Pool} from "../../src/core/Pool.sol";
-import {Verifier} from "../../src/core/Verifier.sol";
-import {Verifier22} from "../../src/verifiers/Verifier22.sol";
-import {AssetType, VerifierInfo} from "../../src/libraries/DataTypes.sol";
-import {ZTransaction, ZTransactionType} from "../../src/libraries/ZTransaction.sol";
-
 import {Test} from "forge-std/Test.sol";
 import {console2} from "forge-std/console2.sol";
-import {TransactionRequest} from "./helpers/TransactionRequest.sol";
-import {ZkFi, ZAccount} from "./helpers/ZkFi.sol";
+
+import {IPool} from "src/interfaces/IPool.sol";
+import {Pool} from "src/core/Pool.sol";
+import {ZTransaction} from "src/libraries/ZTransaction.sol";
 import {PoolFixture} from "./fixtures/PoolFixture.sol";
+import {TransactionRequest} from "./helpers/TransactionRequest.sol";
 
 contract PoolWithdrawTest is PoolFixture {
     Pool internal _pool;
-    Verifier internal _verifier;
 
     function setUp() public {
         _initFixture();

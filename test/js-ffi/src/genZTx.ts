@@ -1,26 +1,16 @@
 import { readFileSync } from "fs";
-import { keccak256, stringToBytes } from "viem";
-import { ShieldedAccount } from "@zkfi-tech/account";
-import { Fr } from "@zkfi-tech/babyjubjub";
-import { HexString } from "@zkfi-tech/shared-types";
+import { Hex } from "viem";
 import { Core } from "@zkfi-tech/core";
 import { Note } from "@zkfi-tech/transaction";
+import { ZTransaction } from "@zkfi-tech/zk-prover";
 import { getSDKInstance } from "./helpers/sdk";
-import {
-  decodeZTransaction,
-  encodeZTransaction,
-  parseTransactionRequest,
-} from "./helpers/tx";
+import { parseTransactionRequest } from "./helpers/tx";
 
 async function mockDeposit(zkfi: Core) {
-  const encoded = readFileSync(
-    "../fixtures/mock-deposit.txt",
-    "utf-8"
-  ) as HexString;
+  const encoded = readFileSync("../mocks/deposit.txt", "utf-8") as Hex;
+  const ztx = ZTransaction.decode(encoded) as any;
 
-  const ztx = decodeZTransaction(encoded) as any;
-
-  const notes = ztx.memos.map((m: HexString) => Note.fromMemo(m, zkfi.account));
+  const notes = ztx.outMemos.map((m: Hex) => Note.fromMemo(m, zkfi.account));
   notes.forEach((n, i) => (n.leafIndex = i));
 
   //@ts-ignore
@@ -29,13 +19,17 @@ async function mockDeposit(zkfi: Core) {
   zkfi.notesSource.mockNotes(notes[1].assetId, [notes[1]]);
   //@ts-ignore
   notes.forEach((n) => zkfi.treeSource.insert(n.commitment));
+
+  // const x = await zkfi.notesSource.getUnspent(65537);
+  // console.log("===============================", x.length);
+  // throw new Error(
+  //   `lol=====${x.length} =========${x?.[0]?.assetId} / ${x?.[0]?.value}`
+  // );
 }
 
 async function main() {
-  const account = ShieldedAccount.generate(
-    Fr.from(keccak256(stringToBytes("sender"))).val
-  );
   const zkfi = getSDKInstance();
+
   // Pre-deposit 10000 token of assets - 0x010001 and 0x010002
   mockDeposit(zkfi);
 
@@ -45,9 +39,11 @@ async function main() {
   const tx = await zkfi.createTransaction(req, opts);
   const signedTx = await zkfi.signTransaction(tx);
   const ztx = await zkfi.proveTransaction(signedTx);
-  const inp = ztx.toSolidityInput();
 
-  const encoded = encodeZTransaction(inp);
+  const encoded = ztx.encode();
+  // const inp = ztx.toSolidityInput();
+
+  // const encoded = encodeZTransaction(inp);
 
   process.stdout.write(encoded);
 }

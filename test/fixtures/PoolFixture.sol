@@ -7,10 +7,9 @@ import {MockERC20} from "./MockERC20.sol";
 
 import {Pool} from "src/core/Pool.sol";
 import {Verifier22} from "src/verifiers/Verifier22.sol";
-import {VerifierInfo} from "src/libraries/DataTypes.sol";
-import {Verifier} from "src/core/Verifier.sol";
+import {Verifier, VerifierInfo} from "src/core/Verifier.sol";
 import {Convertor} from "src/core/Convertor.sol";
-import {Asset, AssetType} from "src/libraries/DataTypes.sol";
+import {Asset, AssetType} from "src/libraries/Asset.sol";
 import {ZTransaction} from "src/libraries/ZTransaction.sol";
 
 contract PoolFixture is BaseFixture {
@@ -50,19 +49,19 @@ contract PoolFixture is BaseFixture {
         token1 = new MockERC20(address(this));
         token2 = new MockERC20(address(this));
         asset1 = Asset({
+            id: 65537,
             assetType: AssetType.ERC20,
             assetAddress: address(token1),
             isSupported: true
         });
         asset2 = Asset({
+            id: 65538,
             assetType: AssetType.ERC20,
             assetAddress: address(token2),
             isSupported: true
         });
 
-        AssetType[] memory assetTypes = new AssetType[](2);
-        assetTypes[0] = AssetType.ERC20;
-        assetTypes[1] = AssetType.ERC20;
+        AssetType assetType = AssetType.ERC20;
         address[] memory assetAddresses = new address[](2);
         assetAddresses[0] = address(token1);
         assetAddresses[1] = address(token2);
@@ -73,12 +72,15 @@ contract PoolFixture is BaseFixture {
             address(verifier),
             address(convertor),
             address(entryPoint),
-            assetTypes,
+            assetType,
             assetAddresses
         );
 
         ERC1967Proxy poolProxy = new ERC1967Proxy(address(pool), initData);
         pool = Pool(address(poolProxy));
+
+        // asset1 = pool.getAsset(address(token1));
+        // asset2 = pool.getAsset(address(token2));
     }
 
     function _mintAsset(
@@ -98,14 +100,14 @@ contract PoolFixture is BaseFixture {
     }
 
     function _getAssetId(Asset storage asset) internal view returns (uint24) {
-        return pool.getAssetId(asset.assetAddress);
+        return pool.getAsset(asset.assetAddress).id;
     }
 
     // Deposits 10000 ether
     function _mockDeposit() internal {
         string memory path = string.concat(
             vm.projectRoot(),
-            "/test/fixtures/mock-deposit.txt"
+            "/test/mocks/deposit.txt"
         );
         string memory file = vm.readFile(path);
         bytes memory data = vm.parseBytes(file);

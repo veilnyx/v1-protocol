@@ -1,10 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.23;
 
-import {Verifier} from "../../src/core/Verifier.sol";
-import {Verifier22} from "../../src/verifiers/Verifier22.sol";
-import {AssetType, VerifierInfo} from "../../src/libraries/DataTypes.sol";
-import {ZTransaction, ZTransactionType} from "../../src/libraries/ZTransaction.sol";
+import {Verifier, VerifierInfo} from "src/core/Verifier.sol";
+import {Verifier22} from "src/verifiers/Verifier22.sol";
+import {ZTransaction, ZTransactionType} from "src/libraries/ZTransaction.sol";
 
 import {Test} from "forge-std/Test.sol";
 import {console2} from "forge-std/console2.sol";
@@ -32,12 +31,12 @@ contract VerifierTest is BaseFixture {
     }
 
     function test_PublicKeys() public view {
-        uint256[2] memory revokerPubKey = _verifier.getRevokerPublicKey();
-        uint256[2] memory encryptionPubKey = _verifier.getEncryptionPublicKey();
-        assertEq(revokerPubKey[0], REVOKER_PUBLIC_KEY_X);
-        assertEq(revokerPubKey[1], REVOKER_PUBLIC_KEY_Y);
-        assertEq(encryptionPubKey[0], ENCRYPTION_PUBLIC_KEY_X);
-        assertEq(encryptionPubKey[1], ENCRYPTION_PUBLIC_KEY_Y);
+        (uint256 revKeyX, uint256 revKeyY) = _verifier.getRevokerPublicKey();
+        (uint256 encKeyX, uint256 encKeyY) = _verifier.getEncryptionPublicKey();
+        assertEq(revKeyX, REVOKER_PUBLIC_KEY_X);
+        assertEq(revKeyY, REVOKER_PUBLIC_KEY_Y);
+        assertEq(encKeyX, ENCRYPTION_PUBLIC_KEY_X);
+        assertEq(encKeyY, ENCRYPTION_PUBLIC_KEY_Y);
     }
 
     function test_getVerifierId() public view {

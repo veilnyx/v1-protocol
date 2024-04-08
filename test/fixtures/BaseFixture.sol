@@ -6,7 +6,7 @@ import {ZAccount} from "../helpers/ZAccount.sol";
 import {ZkFi} from "../helpers/ZkFi.sol";
 import {TransactionRequest} from "../helpers/TransactionRequest.sol";
 import {ZAccountLogic} from "../helpers/ZAccount.sol";
-import {ZTransactionType, ZTransaction} from "../../../src/libraries/ZTransaction.sol";
+import {ZTransactionType, ZTransaction} from "src/libraries/ZTransaction.sol";
 
 abstract contract BaseFixture is Test {
     using ZAccountLogic for ZAccount;
