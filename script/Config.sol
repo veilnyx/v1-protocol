@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.23;
 
-import {AssetType} from "src/libraries/DataTypes.sol";
+import {AssetType} from "src/libraries/Asset.sol";
 
 contract Config {
     uint256 public constant TREE_DEPTH = 32;
     mapping(uint256 => address) entryPoints;
-    mapping(uint256 => AssetType[]) initialAssetTypes;
+    mapping(uint256 => AssetType) initialAssetTypes;
     mapping(uint256 => address[]) initialAssetAddresses;
 
     constructor() {
@@ -21,9 +21,9 @@ contract Config {
         return entryPoints[block.chainid];
     }
 
-    function initalAssetTypes() external view returns (AssetType[] memory) {
-        AssetType[] memory types = initialAssetTypes[block.chainid];
-        return types;
+    function initalAssetType() external view returns (AssetType) {
+        AssetType assetType = initialAssetTypes[block.chainid];
+        return assetType;
     }
 
     function initalAssetAddresses() external view returns (address[] memory) {

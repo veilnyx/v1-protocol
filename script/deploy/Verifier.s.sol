@@ -5,7 +5,7 @@ import {console2} from "forge-std/console2.sol";
 import {BaseScript} from "../BaseScript.sol";
 import {Verifier} from "src/core/Verifier.sol";
 import {Verifier22} from "src/verifiers/Verifier22.sol";
-import {VerifierInfo} from "src/libraries/DataTypes.sol";
+import {VerifierInfo} from "src/core/Verifier.sol";
 
 contract VerifierDeploy is BaseScript {
     uint256 public constant REVOKER_PUBLIC_KEY_X =

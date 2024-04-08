@@ -5,7 +5,7 @@ import {console2} from "forge-std/console2.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {Upgrades, Options} from "openzeppelin-foundry-upgrades/Upgrades.sol";
 import {Pool} from "src/core/Pool.sol";
-import {AssetType} from "src/libraries/DataTypes.sol";
+import {AssetType} from "src/libraries/Asset.sol";
 import {BaseScript} from "../BaseScript.sol";
 
 contract PoolProxyDeploy is BaseScript {
@@ -16,7 +16,7 @@ contract PoolProxyDeploy is BaseScript {
 
         uint256 treeDepth = _config.treeDepth();
         address entryPoint = _config.entryPoint();
-        AssetType[] memory initAssetTypes = _config.initalAssetTypes();
+        AssetType initAssetType = _config.initalAssetType();
         address[] memory initAssetAddresses = _config.initalAssetAddresses();
 
         // Pool poolImpl = new Pool(poolImpl);
@@ -27,7 +27,7 @@ contract PoolProxyDeploy is BaseScript {
                 verifier,
                 convertor,
                 entryPoint,
-                initAssetTypes,
+                initAssetType,
                 initAssetAddresses
             )
         );
