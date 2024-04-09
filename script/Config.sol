@@ -88,11 +88,11 @@ contract Config is Script {
         return _entryPoints[block.chainid];
     }
 
-    function initalAssetType() external view returns (AssetType) {
+    function initAssetType() external view returns (AssetType) {
         return _initAssetType;
     }
 
-    function initalAssetAddresses() external view returns (address[] memory) {
+    function initAssetAddresses() external view returns (address[] memory) {
         address[] memory addresses = _initAssetAddresses[block.chainid];
         return addresses;
     }

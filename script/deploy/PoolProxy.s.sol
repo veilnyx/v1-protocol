@@ -16,10 +16,9 @@ contract PoolProxyDeploy is BaseScript {
 
         uint256 treeDepth = _config.treeDepth();
         address entryPoint = _config.entryPoint();
-        AssetType initAssetType = _config.initalAssetType();
-        address[] memory initAssetAddresses = _config.initalAssetAddresses();
+        AssetType initAssetType = _config.initAssetType();
+        address[] memory initAssetAddresses = _config.initAssetAddresses();
 
-        // Pool poolImpl = new Pool(poolImpl);
         bytes memory initializeData = abi.encodeCall(
             Pool.initialize,
             (
@@ -31,6 +30,7 @@ contract PoolProxyDeploy is BaseScript {
                 initAssetAddresses
             )
         );
+
         new ERC1967Proxy(address(poolImpl), initializeData);
 
         // Options memory opts;
