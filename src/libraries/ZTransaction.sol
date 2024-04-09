@@ -181,7 +181,6 @@ library ZTransactionLogic {
         // [9 + nIns + 5 * nOuts...9 + nIns + 6 * nOuts]: encrypted out pubKeyXs
         bytes memory complianceMemo = self.complianceMemo;
         uint256 tmp;
-        console2.log("Building compliace");
         for (uint8 i = 0; i < 3 * nOuts + 4; ) {
             assembly {
                 tmp := mload(add(complianceMemo, add(0x20, mul(0x20, i))))
