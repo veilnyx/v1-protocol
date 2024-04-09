@@ -20,8 +20,7 @@ contract Pool is
     UUPSUpgradeable,
     OwnableUpgradeable,
     ReentrancyGuardUpgradeable,
-    PoolStorage,
-    PoolAccount
+    PoolStorage
 {
     using MerkleTreeLogic for MerkleTree;
     using ZTransactionLogic for ZTransaction;
@@ -66,7 +65,7 @@ contract Pool is
     function addAssets(
         AssetType assetType,
         address[] memory assetAddresses
-    ) external {
+    ) external onlyOwner {
         _assetCounts[assetType] = AssetLogic.addAssets({
             assetIds: _assetIds,
             assets: _assets,
@@ -162,15 +161,7 @@ contract Pool is
         return IVerifier(verifier).getEncryptionPublicKey();
     }
 
-    function _entryPoint() internal view override returns (address) {
-        return entryPoint;
-    }
-
     function _authorizeUpgrade(
         address newImplementation
     ) internal override onlyOwner {}
-
-    function _authorizeAssetUpdate() internal onlyOwner {}
-
-    function _authorizeWithdrawAccountDeposit() internal override onlyOwner {}
 }
