@@ -37,7 +37,7 @@ struct ZTransaction {
     bytes[] outMemos;
     // Fees info
     uint256 feeData; // 20-byte address + 12-byte fee value
-    uint256 beneficiary; // stealth address or normal address
+    uint256 beneficiary; // stealth address for any public fund to shielded account
     bytes beneficiaryMemo;
     address target;
     bytes targetPayload;
@@ -103,11 +103,7 @@ library ZTransactionLogic {
 
         // Transfer any withdrawals
         if (ztx.txType == ZTransactionType.WITHDRAW) {
-            _transferToExceptFee(
-                assets,
-                address(uint160(ztx.beneficiary)),
-                ztx
-            );
+            _transferToExceptFee(assets, ztx.target, ztx);
         }
 
         // Perform any conversions
@@ -130,7 +126,7 @@ library ZTransactionLogic {
         uint256 nIns = self.nullifiers.length;
         uint256 nOuts = self.commitments.length;
         uint256 nPubs = self.pubAssetIds.length;
-        uint256 pubInputCount = 7 + nIns + (6 * nOuts);
+        uint256 pubInputCount = 10 + nIns + (6 * nOuts);
 
         uint256[] memory pubInputs = new uint256[](pubInputCount);
 
@@ -140,47 +136,57 @@ library ZTransactionLogic {
         pubInputs[2] = self.txType == ZTransactionType.DEPOSIT ? 0 : 1;
 
         // Public asset ids and values (Index: 3 to 3 + 2 * nOuts)
+        uint256 offset = 3;
         for (uint8 i = 0; i < nOuts; ) {
-            pubInputs[3 + i] = i < nPubs ? self.pubAssetIds[i] : 0;
-            pubInputs[3 + nOuts + i] = i < nPubs ? self.pubValues[i] : 0;
+            pubInputs[offset + i] = i < nPubs ? self.pubAssetIds[i] : 0;
+            pubInputs[offset + nOuts + i] = i < nPubs ? self.pubValues[i] : 0;
             unchecked {
                 ++i;
             }
         }
 
         // Input notes nullifiers (Index: 3 + 2 * nOuts to (3 + nIns + 2 * nOuts))
+        offset += 2 * nOuts;
         for (uint8 i = 0; i < nIns; ) {
-            pubInputs[3 + (2 * nOuts) + i] = self.nullifiers[i];
+            pubInputs[offset + i] = self.nullifiers[i];
             unchecked {
                 ++i;
             }
         }
 
         // Output notes commitments: (Index: (3 + nIns + 2 * nOuts) to (3 + nIns + 3 * nOuts)
+        offset += nIns;
         for (uint8 i = 0; i < nOuts; ) {
-            pubInputs[3 + nIns + (2 * nOuts) + i] = self.commitments[i];
+            pubInputs[offset + i] = self.commitments[i];
             unchecked {
                 ++i;
             }
         }
 
-        // Compliance encryption key: (Index: (3 + nIns + 3 * nOuts) to (5 + nIns + 3 * nOuts))
-        pubInputs[3 + nIns + 3 * nOuts] = encryptionPublicKeyX;
-        pubInputs[4 + nIns + 3 * nOuts] = encryptionPublicKeyY;
+        // Beneficiary stealth address (Index: (3 + nIns + 3 * nOuts) to (4 + nIns + 3 * nOuts))
+        offset += nOuts;
+        pubInputs[offset] = self.beneficiary;
+        // Compliance encryption key: (Index: (4 + nIns + 3 * nOuts) to (6 + nIns + 3 * nOuts))
+        pubInputs[offset + 1] = encryptionPublicKeyX;
+        pubInputs[offset + 2] = encryptionPublicKeyY;
 
-        // Compliance memo: (Index: (5 + nIns + 3 * nOuts) to (9 + nIns + 4 * nOuts))
-        // [5 + nIns + 3 * nOuts]: ephemeral pub key x
-        // [6 + nIns + 3 * nOuts]: ephemeral pub key y
-        // [7 + nIns + 3 * nOuts...7 + nIns + 4 * nOuts]: encrypted assets
-        // [7 + nIns + 4 * nOuts...7 + nIns + 5 * nOuts]: encrypted blindings
-        // [7 + nIns + 5 * nOuts...7 + nIns + 6 * nOuts]: encrypted pubKeyXs
+        // Compliance memo: (Index: (6 + nIns + 3 * nOuts) to (9 + nIns + 4 * nOuts))
+        offset += 3;
+        // [6 + nIns + 3 * nOuts]: ephemeral pub key x
+        // [7 + nIns + 3 * nOuts]: ephemeral pub key y
+        // [8 + nIns + 3 * nOuts]: encrypted in publicKeyX
+        // [9 + nIns + 3 * nOuts]: encrypted beneficiary blinding
+        // [9 + nIns + 3 * nOuts...9 + nIns + 4 * nOuts]: encrypted out assets
+        // [9 + nIns + 4 * nOuts...9 + nIns + 5 * nOuts]: encrypted out blindings
+        // [9 + nIns + 5 * nOuts...9 + nIns + 6 * nOuts]: encrypted out pubKeyXs
         bytes memory complianceMemo = self.complianceMemo;
         uint256 tmp;
-        for (uint8 i = 0; i < nOuts + 6; ) {
+        console2.log("Building compliace");
+        for (uint8 i = 0; i < 3 * nOuts + 4; ) {
             assembly {
                 tmp := mload(add(complianceMemo, add(0x20, mul(0x20, i))))
             }
-            pubInputs[5 + nIns + 3 * nOuts + i] = tmp;
+            pubInputs[offset + i] = tmp;
             unchecked {
                 ++i;
             }

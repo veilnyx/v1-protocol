@@ -19,17 +19,18 @@ contract VerifierDeploy is BaseScript {
         7818464758266392754559612367237682152094555123891341826265694881788827476134;
 
     function run() external broadcast {
-        Verifier22 v22 = new Verifier22();
-        VerifierInfo[] memory vInfos = new VerifierInfo[](1);
-        vInfos[0] = VerifierInfo({
-            id: 2 * 10 + 2,
-            addr: address(v22),
-            selector: v22.verifyProof.selector
-        });
-        new Verifier(
-            vInfos,
-            [REVOKER_PUBLIC_KEY_X, REVOKER_PUBLIC_KEY_Y],
-            [ENCRYPTION_PUBLIC_KEY_X, ENCRYPTION_PUBLIC_KEY_Y]
-        );
+        console2.log("Deploying Verifier contract...");
+        // Verifier22 v22 = new Verifier22();
+        // VerifierInfo[] memory vInfos = new VerifierInfo[](1);
+        // vInfos[0] = VerifierInfo({
+        //     id: 2 * 10 + 2,
+        //     addr: address(v22),
+        //     selector: v22.verifyProof.selector
+        // });
+        // new Verifier(
+        //     vInfos,
+        //     [REVOKER_PUBLIC_KEY_X, REVOKER_PUBLIC_KEY_Y],
+        //     [ENCRYPTION_PUBLIC_KEY_X, ENCRYPTION_PUBLIC_KEY_Y]
+        // );
     }
 }
