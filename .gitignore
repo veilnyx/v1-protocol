@@ -3,3 +3,4 @@ cache/
 out/
 .env
 broadcast/
+.DS_STORE
