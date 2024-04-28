@@ -13,7 +13,7 @@ import {IPool} from "../interfaces/IPool.sol";
 contract Paymaster is BasePaymaster {
     uint256 public constant VALIDATION_SUCCESS = 0;
 
-    address public immutable pool;
+    address public immutable sender;
 
     /**
      * @dev Mapping from assetId to fee value.
@@ -28,9 +28,9 @@ contract Paymaster is BasePaymaster {
 
     constructor(
         address entryPoint_,
-        address pool_
+        address sender_
     ) BasePaymaster(IEntryPoint(entryPoint_)) {
-        pool = pool_;
+        sender = sender_;
     }
 
     function updateAssetFee(
@@ -70,7 +70,7 @@ contract Paymaster is BasePaymaster {
         uint256 maxCostEth
     ) internal view override returns (bytes memory, uint256) {
         // Only support pool contract as sender
-        if (userOp.sender != pool) {
+        if (userOp.sender != sender) {
             revert InvalidSender(userOp.sender);
         }
 
