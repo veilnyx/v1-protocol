@@ -13,15 +13,22 @@
   "31337": {
     "chain": "local",
     "treeDepth": 32,
-    "entryPoint": "0x0576a174D229E3cFA37253523E645A78A0C91B57",
+    "entryPoint": "0x0000000000000000000000000000000000000000",
     "initAssetType": 1,
-    "initAssetAddresses": ["0x9c3C9283D3e44854697Cd22D3Faa240Cfb032889"]
+    "initAssetAddresses": ["0x0000000000000000000000000000000000000000"]
   },
-  "80001": {
-    "chain": "polygon-mumbai",
+  "80002": {
+    "chain": "polygon-amoy",
     "treeDepth": 32,
-    "entryPoint": "0x0576a174D229E3cFA37253523E645A78A0C91B57",
+    "entryPoint": "0x0000000000000000000000000000000000000000",
     "initAssetType": 1,
-    "initAssetAddresses": ["0x9c3C9283D3e44854697Cd22D3Faa240Cfb032889"]
+    "initAssetAddresses": ["0xaFE07e24314864290f6E11D3CaA51290280fAEE1"]
+  },
+  "11155420": {
+    "chain": "optimism-sepolia",
+    "treeDepth": 32,
+    "entryPoint": "0x0000000000000000000000000000000000000000",
+    "initAssetType": 1,
+    "initAssetAddresses": ["0x4200000000000000000000000000000000000006"]
   }
 }
