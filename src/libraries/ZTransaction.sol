@@ -8,8 +8,7 @@ import {IConvertor} from "../interfaces/IConvertor.sol";
 import {Asset, AssetLogic} from "./Asset.sol";
 import {MerkleTree, MerkleTreeLogic} from "./MerkleTree.sol";
 
-uint256 constant FIELD_SIZE = 21888242871839275222246405745257275088548364400416034343698204186575808495617;
-
+/// @title ZTransactionType enum representing types of shielded transactions
 enum ZTransactionType {
     DEPOSIT,
     TRANSFER,
@@ -17,12 +16,33 @@ enum ZTransactionType {
     CONVERT
 }
 
+/// @title MemoType enum representing memo types for output notes
 enum MemoType {
     NULL,
     SEMI,
     FULL
 }
 
+/// @title ZTransaction struct representing shielded transaction
+///
+/// @param txType           Type of transaction
+/// @param proof            Abi encoded proof
+/// @param merkleRoot       Recent merkle root of commitment tree
+/// @param pubAssetIds      Asset ids for public asset transfers (if applicable, fee asset is always first)
+/// @param pubValues        Values (in same order of asset ids) for public asset transfers
+/// @param nullifiers       Revealed nullifiers of input/spent notes
+/// @param commitments      New commitments of output notes to be inserted in tree
+/// @param inMemos          Memo for input notes (helpful for parsing transaction history). This is
+///                         encrypted (by sender's key), packed indices of input notes
+/// @param outMemos         Memos for output notes. This is list of encrypted notes' fields.
+/// @param feeData          Packed fee data (20-byte paymaster address + 12-byte fee value)
+/// @param beneficiary      Stealth address for any public fund to shielded account (e.g. in CONVERT type tx)
+/// @param beneficiaryMemo  Memo for beneficiary stealth address. This is encrypted blinding factor which
+///                         is used to generate `beneficiary` stealth address
+/// @param target           This is either a withdraw address in case of `WITHDRAW` transaction or
+///                         a convert proxy address in case of `CONVERT` transaction
+/// @param targetPayload    Payload for target contract (if applicable)
+/// @param complianceMemo   Encrypted compliance data
 struct ZTransaction {
     ZTransactionType txType;
     bytes proof;
@@ -45,9 +65,16 @@ struct ZTransaction {
     bytes complianceMemo;
 }
 
+/// @title ZTransactionLogic library for shielded transaction logic
 library ZTransactionLogic {
     using MerkleTreeLogic for MerkleTree;
 
+    uint256 constant FIELD_SIZE =
+        21888242871839275222246405745257275088548364400416034343698204186575808495617;
+
+    /// @notice Calculates the hash of a ZTransaction
+    /// @param self ZTransaction
+    /// @return Hash of the transaction
     function hash(ZTransaction memory self) public pure returns (uint256) {
         return
             uint256(
@@ -71,6 +98,14 @@ library ZTransactionLogic {
             ) % FIELD_SIZE;
     }
 
+    /// @notice Executes a shielded transaction
+    /// @param ztx ZTransaction to be executed
+    /// @param tree MerkleTree state in this contract
+    /// @param assets Mapping of assetId to Asset
+    /// @param convertProxies Mapping of convert proxy addresses
+    /// @param markedNullifiers Mapping of nullifiers that are already marked
+    /// @param verifier Verifier contract address
+    /// @param convertor Convertor contract address
     function execute(
         ZTransaction memory ztx,
         MerkleTree storage tree,
@@ -117,6 +152,12 @@ library ZTransactionLogic {
         emit IPool.ComplianceMemo(ztx.complianceMemo);
     }
 
+    /// @notice Calculates calldata to proper verifier contract
+    /// @param self ZTransaction
+    /// @param selector Selector of verifier contract
+    /// @param encryptionPublicKeyX Compliance encryption public key x
+    /// @param encryptionPublicKeyY Compliance encryption public key y
+    /// @return Calldata bytes for verifier contract
     function toVerifierInput(
         ZTransaction memory self,
         bytes4 selector,
