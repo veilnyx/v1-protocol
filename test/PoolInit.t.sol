@@ -2,9 +2,9 @@
 pragma solidity 0.8.23;
 
 import {Test} from "forge-std/Test.sol";
-import {PoolFixture} from "./fixtures/PoolFixture.sol";
+import {PoolTest} from "test/fixtures/PoolTest.sol";
 
-contract PoolInitTest is PoolFixture {
+contract PoolInitTest is PoolTest {
     function setUp() public {
         _initFixture();
     }
@@ -20,9 +20,9 @@ contract PoolInitTest is PoolFixture {
         assertEq(verifier_, address(verifier));
         assertEq(convertor_, address(convertor));
         assertEq(entryPoint_, entryPoint);
-        assertEq(revokerKeyX, REVOKER_PUBLIC_KEY_X);
-        assertEq(revokerKeyY, REVOKER_PUBLIC_KEY_Y);
-        assertEq(encryptionKeyX, ENCRYPTION_PUBLIC_KEY_X);
-        assertEq(encryptionKeyY, ENCRYPTION_PUBLIC_KEY_Y);
+        assertEq(revokerKeyX, fixture.revokerPublicKey[0]);
+        assertEq(revokerKeyY, fixture.revokerPublicKey[1]);
+        assertEq(encryptionKeyX, fixture.encryptionPublicKey[0]);
+        assertEq(encryptionKeyY, fixture.encryptionPublicKey[1]);
     }
 }

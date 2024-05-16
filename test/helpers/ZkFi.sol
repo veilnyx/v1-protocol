@@ -7,7 +7,7 @@ import {ZAccount, ZAccountLogic} from "./ZAccount.sol";
 import {ZTransaction, ZTransactionType} from "src/libraries/ZTransaction.sol";
 import {TransactionRequest, TransactionRequestLogic} from "./TransactionRequest.sol";
 
-contract ZkFi is JsFFI {
+contract ZKFi is JsFFI {
     using TransactionRequestLogic for TransactionRequest;
 
     function genAccount(uint256 seed) public returns (ZAccount memory) {
@@ -27,25 +27,16 @@ contract ZkFi is JsFFI {
         return ztx;
     }
 
-    function getZTxAndHash(
-        TransactionRequest memory req
-    ) public returns (uint256, ZTransaction memory) {
-        bytes memory data = runScript(
-            "genZTxAndHash",
-            vm.toString(req.encode())
-        );
-        (uint256 txHash, ZTransaction memory ztx) = _getZTxAndHash(data);
-        return (txHash, ztx);
-    }
-
-    function _getZTxAndHash(
-        bytes memory data
-    ) internal pure returns (uint256, ZTransaction memory) {
-        (uint256 txHash, ZTransaction memory ztx) = abi.decode(
-            data,
-            (uint256, ZTransaction)
-        );
-
-        return (txHash, ztx);
-    }
+    // function loadZTxFixture(
+    //     string memory name
+    // ) external view returns (ZTransaction memory) {
+    //     string memory path = string.concat(
+    //         vm.projectRoot(),
+    //         string.concat("/test/fixtures/ztx/", name, ".txt")
+    //     );
+    //     string memory file = vm.readFile(path);
+    //     bytes memory data = vm.parseBytes(file);
+    //     ZTransaction memory ztx = abi.decode(data, (ZTransaction));
+    //     return ztx;
+    // }
 }

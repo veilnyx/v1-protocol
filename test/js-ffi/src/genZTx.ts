@@ -19,12 +19,6 @@ async function mockDeposit(zkfi: Core) {
   zkfi.notesSource.mockNotes(notes[1].assetId, [notes[1]]);
   //@ts-ignore
   notes.forEach((n) => zkfi.treeSource.insert(n.commitment));
-
-  // const x = await zkfi.notesSource.getUnspent(65537);
-  // console.log("===============================", x.length);
-  // throw new Error(
-  //   `lol=====${x.length} =========${x?.[0]?.assetId} / ${x?.[0]?.value}`
-  // );
 }
 
 async function main() {

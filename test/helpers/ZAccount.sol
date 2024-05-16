@@ -17,13 +17,4 @@ library ZAccountLogic {
                 bytes32(self.viewPublicKey)
             );
     }
-
-    // function generate(uint256 seed, JsFFI ffi) public returns (Account memory) {
-    //     bytes memory res = ffi.runScript(
-    //         "genAccount",
-    //         string(abi.encode(seed))
-    //     );
-    //     Account memory account = abi.decode(res, (Account));
-    //     return account;
-    // }
 }
