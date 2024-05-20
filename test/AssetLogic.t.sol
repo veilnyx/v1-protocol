@@ -2,8 +2,7 @@
 pragma solidity 0.8.23;
 
 import {Test} from "forge-std/Test.sol";
-import {AssetType, Asset} from "../../src/libraries/DataTypes.sol";
-import {AssetLogic} from "../../src/libraries/AssetLogic.sol";
+import {AssetType, Asset, AssetLogic} from "src/libraries/Asset.sol";
 
 contract AssetLogicTest is Test {
     address public t1 = address(1);
@@ -23,16 +22,10 @@ contract AssetLogicTest is Test {
             t1
         );
         assertEq(count, _counter + 1);
-
-        bool supported = AssetLogic.isAssetSupported(_assetIds, _assets, t1);
-        assertTrue(supported);
     }
 
     function test_addAssets() public {
-        AssetType[] memory assetTypes = new AssetType[](3);
-        assetTypes[0] = AssetType.ERC20;
-        assetTypes[1] = AssetType.ERC20;
-        assetTypes[2] = AssetType.ERC20;
+        AssetType assetType = AssetType.ERC20;
 
         address[] memory assetAddresses = new address[](3);
         assetAddresses[0] = t1;
@@ -43,19 +36,10 @@ contract AssetLogicTest is Test {
             _assetIds,
             _assets,
             _counter,
-            assetTypes,
+            assetType,
             assetAddresses
         );
 
-        assertEq(count, _counter + assetTypes.length);
-
-        for (uint256 i = 0; i < assetAddresses.length; i++) {
-            bool supported = AssetLogic.isAssetSupported(
-                _assetIds,
-                _assets,
-                assetAddresses[i]
-            );
-            assertTrue(supported);
-        }
+        assertEq(count, _counter + assetAddresses.length);
     }
 }

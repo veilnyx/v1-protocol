@@ -1,23 +1,22 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.20;
 
-import {BaseFixture} from "./BaseFixture.sol";
-import {MockERC20} from "./MockERC20.sol";
+import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
+import {Pool} from "src/core/Pool.sol";
+import {Verifier22} from "src/verifiers/Verifier22.sol";
+import {Verifier, VerifierInfo} from "src/core/Verifier.sol";
+import {Convertor} from "src/core/Convertor.sol";
+import {Asset, AssetType} from "src/libraries/Asset.sol";
+import {ZTransaction} from "src/libraries/ZTransaction.sol";
+import {MockERC20} from "test/mocks/MockERC20.sol";
+import {BaseTest} from "./BaseTest.sol";
 
-import {Pool} from "../../src/core/Pool.sol";
-import {Verifier22} from "../../src/verifiers/Verifier22.sol";
-import {VerifierInfo} from "../../src/libraries/DataTypes.sol";
-import {Verifier} from "../../src/core/Verifier.sol";
-import {Convertor} from "../../src/core/Convertor.sol";
-import {Asset, AssetType} from "../../src/libraries/DataTypes.sol";
-import {ZTransaction} from "../../src/libraries/ZTransaction.sol";
-
-contract PoolFixture is BaseFixture {
+contract PoolTest is BaseTest {
     Verifier public verifier;
     Convertor public convertor;
     Pool public pool;
 
-    uint256 public treeDepth = 24;
+    uint256 public treeDepth = 32;
     address public entryPoint;
 
     MockERC20 public token1;
@@ -26,50 +25,57 @@ contract PoolFixture is BaseFixture {
     Asset public asset1;
     Asset public asset2;
 
-    function _initFixture() internal virtual override {
-        BaseFixture._initFixture();
+    function _initFixture() internal virtual {
         Verifier22 v22 = new Verifier22();
-        uint256[] memory ids = new uint256[](1);
         VerifierInfo[] memory vInfos = new VerifierInfo[](1);
-        ids[0] = 2 * 10 + 2;
         vInfos[0] = VerifierInfo({
+            id: 2 * 10 + 2,
             addr: address(v22),
             selector: v22.verifyProof.selector
         });
-        verifier = new Verifier(ids, vInfos);
+        verifier = new Verifier(
+            vInfos,
+            fixture.revokerPublicKey,
+            fixture.encryptionPublicKey
+        );
         convertor = new Convertor();
         entryPoint = address(0);
 
-        pool = new Pool(address(entryPoint));
+        pool = new Pool();
 
         // Assets
         token1 = new MockERC20(address(this));
         token2 = new MockERC20(address(this));
         asset1 = Asset({
+            id: 65537,
             assetType: AssetType.ERC20,
             assetAddress: address(token1),
             isSupported: true
         });
         asset2 = Asset({
+            id: 65538,
             assetType: AssetType.ERC20,
             assetAddress: address(token2),
             isSupported: true
         });
 
-        AssetType[] memory assetTypes = new AssetType[](2);
-        assetTypes[0] = AssetType.ERC20;
-        assetTypes[1] = AssetType.ERC20;
+        AssetType assetType = AssetType.ERC20;
         address[] memory assetAddresses = new address[](2);
         assetAddresses[0] = address(token1);
         assetAddresses[1] = address(token2);
 
-        pool.initialize(
+        bytes memory initData = abi.encodeWithSelector(
+            pool.initialize.selector,
             treeDepth,
             address(verifier),
             address(convertor),
-            assetTypes,
+            address(entryPoint),
+            assetType,
             assetAddresses
         );
+
+        ERC1967Proxy poolProxy = new ERC1967Proxy(address(pool), initData);
+        pool = Pool(address(poolProxy));
     }
 
     function _mintAsset(
@@ -89,14 +95,14 @@ contract PoolFixture is BaseFixture {
     }
 
     function _getAssetId(Asset storage asset) internal view returns (uint24) {
-        return pool.getAssetId(asset.assetAddress);
+        return pool.getAsset(asset.assetAddress).id;
     }
 
     // Deposits 10000 ether
     function _mockDeposit() internal {
         string memory path = string.concat(
             vm.projectRoot(),
-            "/test/fixtures/deps.txt"
+            "/test/mocks/deposit.txt"
         );
         string memory file = vm.readFile(path);
         bytes memory data = vm.parseBytes(file);
@@ -106,6 +112,15 @@ contract PoolFixture is BaseFixture {
         _mintAsset(asset2, address(this), 10000 ether);
         _approveAsset(asset1, address(pool), 10000 ether);
         _approveAsset(asset2, address(pool), 10000 ether);
+        pool.transact(ztx);
+    }
+
+    function _makeInitialDeposit() internal {
+        _mintAsset(asset1, address(this), 1000 ether);
+        _mintAsset(asset2, address(this), 1000 ether);
+        _approveAsset(asset1, address(pool), 1000 ether);
+        _approveAsset(asset2, address(pool), 1000 ether);
+        ZTransaction memory ztx = _loadZTx("deposit_1000_weth_usdc");
         pool.transact(ztx);
     }
 }

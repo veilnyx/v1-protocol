@@ -2,7 +2,7 @@
 pragma solidity 0.8.23;
 
 import {Test} from "forge-std/Test.sol";
-import {MerkleTree, MerkleTreeLogic} from "../../src/libraries/MerkleTreeLogic.sol";
+import {MerkleTree, MerkleTreeLogic} from "src/libraries/MerkleTree.sol";
 import {PoseidonT3} from "poseidon-solidity/PoseidonT3.sol";
 
 contract MerkleTreeLogicTest is Test {
@@ -19,7 +19,7 @@ contract MerkleTreeLogicTest is Test {
         assertEq(_tree.currentRootIndex, 0);
     }
 
-    function test_hashLeaves() public {
+    function test_hashLeaves() public pure {
         uint256 leaf1 = 1;
         uint256 leaf2 = 2;
         uint256 h = MerkleTreeLogic.hashLeaves(leaf1, leaf2);

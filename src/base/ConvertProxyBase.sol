@@ -2,26 +2,26 @@
 pragma solidity 0.8.23;
 
 import {IConvertProxy} from "../interfaces/IConvertProxy.sol";
-import {IAssetManager} from "../interfaces/IAssetManager.sol";
-import {Asset, AssetType} from "../libraries/DataTypes.sol";
+import {IPool} from "../interfaces/IPool.sol";
+import {Asset, AssetType} from "../libraries/Asset.sol";
 
 /// NOTE: THIS SHOULD BE STATELESS - NO STORAGE VARS!!
 abstract contract ConvertProxyBase is IConvertProxy {
-    IAssetManager immutable _assetManager;
+    IPool immutable _pool;
 
     constructor(address assetManager_) {
-        _assetManager = IAssetManager(assetManager_);
+        _pool = IPool(assetManager_);
     }
 
     function getAssetId(address assetAddress) public view returns (uint24) {
-        return _assetManager.getAssetId(assetAddress);
+        return _pool.getAsset(assetAddress).id;
     }
 
     function getAsset(uint24 assetId) public view returns (Asset memory) {
-        return _assetManager.getAsset(assetId);
+        return _pool.getAsset(assetId);
     }
 
     function getAsset(address assetAddress) public view returns (Asset memory) {
-        return _assetManager.getAsset(assetAddress);
+        return _pool.getAsset(assetAddress);
     }
 }

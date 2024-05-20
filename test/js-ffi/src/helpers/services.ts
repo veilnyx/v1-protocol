@@ -1,9 +1,8 @@
-import { hexToBigInt, keccak256, stringToBytes } from "viem";
+import { Hex, hexToBigInt, keccak256, stringToBytes } from "viem";
 import MerkleTree from "fixed-merkle-tree";
 import { Fp } from "@zkfi-tech/babyjubjub";
 import { ShieldedAddress } from "@zkfi-tech/account";
 import {
-  HexString,
   IAddressResolver,
   INote,
   INoteSource,
@@ -12,22 +11,22 @@ import {
 import { hexFixed } from "@zkfi-tech/utils";
 
 export class MockAddressResolver implements IAddressResolver {
-  private _mockedEnsNames: Record<string, HexString> = {};
-  private _mockedShieldedAddresses: Record<HexString, ShieldedAddress> = {};
+  private _mockedEnsNames: Record<string, Hex> = {};
+  private _mockedShieldedAddresses: Record<Hex, ShieldedAddress> = {};
 
-  mockShieldedAddress(pubAddress: HexString, zAddress: ShieldedAddress) {
+  mockShieldedAddress(pubAddress: Hex, zAddress: ShieldedAddress) {
     this._mockedShieldedAddresses[pubAddress] = zAddress;
   }
 
-  mockEnsName(name: string, address: HexString) {
+  mockEnsName(name: string, address: Hex) {
     this._mockedEnsNames[name] = address;
   }
 
-  async getShieldedAddress(pubAddress: HexString): Promise<ShieldedAddress> {
-    return this._mockedShieldedAddresses[pubAddress];
+  async getShieldedAddress(pubAddress: Hex): Promise<Hex> {
+    return this._mockedShieldedAddresses[pubAddress].pack();
   }
 
-  async resolveEnsName(name: string): Promise<HexString> {
+  async resolveEnsName(name: string): Promise<Hex> {
     return this._mockedEnsNames[name];
   }
 }
@@ -51,12 +50,12 @@ export class MockTreeSource implements ITreeSource {
     return Fp.from(keccak256(stringToBytes("zkFi"))).val;
   }
 
-  insert(leaf: bigint | HexString) {
+  insert(leaf: bigint | Hex) {
     const hex = typeof leaf === "bigint" ? `0x${leaf.toString(16)}` : leaf;
     this._tree.insert(hexFixed(hex, 32));
   }
 
-  indexOf(leaf: bigint | HexString): number {
+  indexOf(leaf: bigint | Hex): number {
     const hex = typeof leaf === "bigint" ? `0x${leaf.toString(16)}` : leaf;
     return this._tree.indexOf(hexFixed(hex, 32));
   }
@@ -64,7 +63,7 @@ export class MockTreeSource implements ITreeSource {
   pathElements(index: number): bigint[] {
     return this._tree
       .path(index)
-      .pathElements.map((el) => hexToBigInt(el.toString() as HexString));
+      .pathElements.map((el) => hexToBigInt(el.toString() as Hex));
   }
 }
 

@@ -5,7 +5,6 @@ import {PoseidonT3} from "poseidon-solidity/PoseidonT3.sol";
 
 struct MerkleTree {
     uint256 depth;
-    // uint256 zeroValue;
     uint256 nextLeafIndex;
     uint256 currentRootIndex;
     mapping(uint256 => uint256) roots;

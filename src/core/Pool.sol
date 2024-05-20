@@ -7,63 +7,79 @@ import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/U
 import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import {IVerifier} from "../interfaces/IVerifier.sol";
 import {IPool} from "../interfaces/IPool.sol";
-import {IAssetManager} from "../interfaces/IAssetManager.sol";
 import {IConvertor} from "../interfaces/IConvertor.sol";
 import {PoolStorage} from "../base/PoolStorage.sol";
 import {PoolAccount} from "../base/PoolAccount.sol";
-import {PoolLogic} from "../libraries/PoolLogic.sol";
-import {MerkleTree, MerkleTreeLogic} from "../libraries/MerkleTreeLogic.sol";
-import {ZTransaction} from "../libraries/ZTransaction.sol";
-import {Asset, AssetType} from "../libraries/DataTypes.sol";
+import {Asset, AssetType, AssetLogic} from "../libraries/Asset.sol";
+import {ZTransaction, ZTransactionLogic} from "../libraries/ZTransaction.sol";
+import {MerkleTree, MerkleTreeLogic} from "../libraries/MerkleTree.sol";
 
 contract Pool is
-    IAssetManager,
+    IPool,
     Initializable,
     UUPSUpgradeable,
     OwnableUpgradeable,
     ReentrancyGuardUpgradeable,
-    PoolStorage,
-    PoolAccount
+    PoolStorage
 {
     using MerkleTreeLogic for MerkleTree;
-
-    constructor(address entryPoint_) PoolAccount(entryPoint_) {}
+    using ZTransactionLogic for ZTransaction;
 
     function initialize(
         uint256 treeDepth,
         address verifier_,
         address convertor_,
-        AssetType[] calldata initAssetTypes,
+        address entryPoint_,
+        AssetType initAssetType,
         address[] calldata initAssetAddresses
     ) external initializer {
-        convertor = convertor_;
         __Ownable_init(msg.sender);
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
 
         verifier = verifier_;
         convertor = convertor_;
+        entryPoint = entryPoint_;
 
         _tree.init(treeDepth);
-        _counter = PoolLogic.addAssets(
+        _assetCounts[initAssetType] = AssetLogic.addAssets(
             _assetIds,
             _assets,
             0,
-            initAssetTypes,
+            initAssetType,
             initAssetAddresses
         );
     }
 
-    function transact(ZTransaction memory ztx) external payable nonReentrant {
-        PoolLogic.executeTransaction({
+    function transact(ZTransaction memory ztx) external nonReentrant {
+        ztx.execute({
             tree: _tree,
             assets: _assets,
-            supportedProxies: _supportedProxies,
+            convertProxies: _convertProxies,
             markedNullifiers: _markedNullifiers,
             verifier: verifier,
-            convertor: convertor,
-            ztx: ztx
+            convertor: convertor
         });
+    }
+
+    function addAssets(
+        AssetType assetType,
+        address[] memory assetAddresses
+    ) external onlyOwner {
+        _assetCounts[assetType] = AssetLogic.addAssets({
+            assetIds: _assetIds,
+            assets: _assets,
+            counter: _assetCounts[assetType],
+            assetType: assetType,
+            assetAddresses: assetAddresses
+        });
+    }
+
+    function setConvertProxy(
+        address proxyAddress,
+        bool enable
+    ) external onlyOwner {
+        _convertProxies[proxyAddress] = enable;
     }
 
     function verifyTransactionProof(
@@ -72,82 +88,80 @@ contract Pool is
         return IVerifier(verifier).verifyTransactionProof(ztx);
     }
 
-    function setProxy(address proxyAddress, bool enable) external onlyOwner {
-        _supportedProxies[proxyAddress] = enable;
+    function assetCount(AssetType assetType) external view returns (uint24) {
+        return _assetCounts[assetType];
     }
 
-    function addAssets(
-        AssetType[] calldata assetTypes,
-        address[] calldata assetAddresses
-    ) external onlyOwner {
-        _counter = PoolLogic.addAssets({
-            assetIds: _assetIds,
-            assets: _assets,
-            counter: _counter,
-            assetTypes: assetTypes,
-            assetAddresses: assetAddresses
-        });
+    function isAssetSupported(
+        address assetAddress
+    ) external view returns (bool) {
+        uint24 id = _assetIds[assetAddress];
+        return _assets[id].isSupported;
     }
 
-    function assetCount() public view returns (uint24) {
-        return _counter;
-    }
-
-    function isProxySupported(address proxyAddress) public view returns (bool) {
-        return _supportedProxies[proxyAddress];
-    }
-
-    function isAssetSupported(uint24 assetId) public view returns (bool) {
-        return getAsset(assetId).isSupported;
-    }
-
-    function isAssetSupported(address assetAddress) public view returns (bool) {
-        return getAsset(assetAddress).isSupported;
-    }
-
-    function getAsset(uint24 assetId) public view returns (Asset memory) {
+    function getAsset(uint24 assetId) external view returns (Asset memory) {
         return _assets[assetId];
     }
 
-    function getAsset(address assetAddress) public view returns (Asset memory) {
-        return _assets[_assetIds[assetAddress]];
+    function getAsset(
+        address assetAddress
+    ) external view returns (Asset memory) {
+        uint24 id = _assetIds[assetAddress];
+        return _assets[id];
     }
 
-    function getAssetId(address assetAddress) public view returns (uint24) {
-        return _assetIds[assetAddress];
+    function isConvertProxySupported(
+        address proxyAddress
+    ) external view returns (bool) {
+        return _convertProxies[proxyAddress];
     }
 
-    function isMarkedNullifier(uint256 nullifier) public view returns (bool) {
+    function isMarkedNullifier(uint256 nullifier) external view returns (bool) {
         return _markedNullifiers[nullifier];
     }
 
-    function zeroes(uint256 level) public view returns (uint256) {
+    function areMarkedNullifiers(
+        uint256[] calldata nullifiers
+    ) external view returns (bool[] memory) {
+        bool[] memory markedArr = new bool[](nullifiers.length);
+        for (uint256 i = 0; i < nullifiers.length; ) {
+            markedArr[i] = _markedNullifiers[nullifiers[i]];
+            unchecked {
+                ++i;
+            }
+        }
+        return markedArr;
+    }
+
+    function zeroes(uint256 level) external view returns (uint256) {
         return _tree.zeroes[level];
     }
 
-    function getLastRoot() public view returns (uint256) {
+    function getLastRoot() external view returns (uint256) {
         return _tree.roots[_tree.currentRootIndex];
     }
 
-    function getCurrentRootIndex() public view returns (uint256) {
+    function getCurrentRootIndex() external view returns (uint256) {
         return _tree.currentRootIndex;
     }
 
-    function getLastSubtrees(uint256 level) public view returns (uint256) {
+    function getLastSubtrees(uint256 level) external view returns (uint256) {
         return _tree.lastSubtrees[level];
     }
 
-    function isKnownRoot(uint256 root) public view returns (bool) {
+    function isKnownRoot(uint256 root) external view returns (bool) {
         return _tree.isKnownRoot(root, ROOT_HISTORY_SIZE);
+    }
+
+    function getRevokerPublicKey() external view returns (uint256, uint256) {
+        return IVerifier(verifier).getRevokerPublicKey();
+    }
+
+    function getEncryptionPublicKey() external view returns (uint256, uint256) {
+        return IVerifier(verifier).getEncryptionPublicKey();
     }
 
     function _authorizeUpgrade(
         address newImplementation
     ) internal override onlyOwner {}
-
-    function _authorizeAssetUpdate() internal onlyOwner {}
-
-    function _authorizeWithdrawAccountDeposit() internal override onlyOwner {}
-
-    receive() external payable {}
 }

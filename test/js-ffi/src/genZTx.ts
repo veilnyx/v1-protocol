@@ -1,23 +1,16 @@
 import { readFileSync } from "fs";
-import { keccak256, stringToBytes } from "viem";
-import { Account } from "@zkfi-tech/account";
-import { Fr } from "@zkfi-tech/babyjubjub";
-import { HexString, TransactionType } from "@zkfi-tech/shared-types";
+import { Hex } from "viem";
 import { Core } from "@zkfi-tech/core";
 import { Note } from "@zkfi-tech/transaction";
+import { ZTransaction } from "@zkfi-tech/zk-prover";
 import { getSDKInstance } from "./helpers/sdk";
-import {
-  decodeZTransaction,
-  encodeZTransaction,
-  parseTransactionRequest,
-} from "./helpers/tx";
+import { parseTransactionRequest } from "./helpers/tx";
 
 async function mockDeposit(zkfi: Core) {
-  const encoded = readFileSync("../fixtures/deps.txt", "utf-8") as HexString;
+  const encoded = readFileSync("../mocks/deposit.txt", "utf-8") as Hex;
+  const ztx = ZTransaction.decode(encoded) as any;
 
-  const ztx = decodeZTransaction(encoded) as any;
-
-  const notes = ztx.memos.map((m: HexString) => Note.fromMemo(m, zkfi.account));
+  const notes = ztx.outMemos.map((m: Hex) => Note.fromMemo(m, zkfi.account));
   notes.forEach((n, i) => (n.leafIndex = i));
 
   //@ts-ignore
@@ -29,27 +22,10 @@ async function mockDeposit(zkfi: Core) {
 }
 
 async function main() {
-  const account = Account.generate(
-    Fr.from(keccak256(stringToBytes("sender"))).val
-  );
-  const zkfi = getSDKInstance({ account });
+  const zkfi = getSDKInstance();
+
   // Pre-deposit 10000 token of assets - 0x010001 and 0x010002
   mockDeposit(zkfi);
-
-  // const req = {
-  //   type: TransactionType.CALL,
-  //   assetIds: [0x010001, 0x010002],
-  //   values: [10000000000000000000000, 10000000000000000000000],
-  //   feeAssetId: 0,
-  //   to: "0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef",
-  // };
-  // const req = {
-  //   type: TransactionType.CALL,
-  //   assetIds: [0x010001],
-  //   values: [1000000000000000000],
-  //   feeAssetId: 0,
-  //   to: "0xdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef",
-  // };
 
   const req = parseTransactionRequest();
   const opts = { viaBundler: false };
@@ -57,13 +33,11 @@ async function main() {
   const tx = await zkfi.createTransaction(req, opts);
   const signedTx = await zkfi.signTransaction(tx);
   const ztx = await zkfi.proveTransaction(signedTx);
-  // console.log("target", ztx.target);
 
-  const inp = ztx.toSolidityInput();
-  const encoded = encodeZTransaction(inp);
-  // throw new Error(`Not implemented::::::::${inp.target}`);
-  // const decoded = decodeZTransaction(encoded) as any;
-  // throw new Error(`Not implemented::::::::${decoded.target}`);
+  const encoded = ztx.encode();
+  // const inp = ztx.toSolidityInput();
+
+  // const encoded = encodeZTransaction(inp);
 
   process.stdout.write(encoded);
 }

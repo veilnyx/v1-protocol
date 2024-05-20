@@ -1,7 +1,15 @@
 [profile.default]
+solc = "0.8.23"
 ffi = true
-fs_permissions = [{ access = "read", path = "./" }]
+ast = true
+build_info = true
+extra_output = ["storageLayout"]
+fs_permissions = [{ access = "read-write", path = "./" }]
 
 [profile.ci.fuzz]
 runs = 10_000
 
+[rpc_endpoints]
+tenderly = "${RPC_TENDERLY}"
+op_sepolia = "${RPC_OPTIMISM_SEPOLIA}"
+polygon_amoy = "${RPC_POLYGON_AMOY}"

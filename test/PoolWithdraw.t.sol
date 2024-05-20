@@ -1,59 +1,49 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.23;
 
-import {Pool} from "../../src/core/Pool.sol";
-import {Verifier} from "../../src/core/Verifier.sol";
-import {Verifier22} from "../../src/verifiers/Verifier22.sol";
-import {AssetType, VerifierInfo} from "../../src/libraries/DataTypes.sol";
-import {ZTransaction, ZTransactionType} from "../../src/libraries/ZTransaction.sol";
-
 import {Test} from "forge-std/Test.sol";
 import {console2} from "forge-std/console2.sol";
-import {TransactionRequest} from "./helpers/TransactionRequest.sol";
-import {ZkFi, ZAccount} from "./helpers/ZkFi.sol";
-import {PoolFixture} from "./fixtures/PoolFixture.sol";
+import {IPool} from "src/interfaces/IPool.sol";
+import {Pool} from "src/core/Pool.sol";
+import {ZTransaction} from "src/libraries/ZTransaction.sol";
+import {PoolTest} from "test/fixtures/PoolTest.sol";
+import {TransactionRequest} from "test/helpers/TransactionRequest.sol";
 
-contract PoolWithdrawTest is PoolFixture {
+contract PoolWithdrawTest is PoolTest {
     Pool internal _pool;
-    Verifier internal _verifier;
 
     function setUp() public {
-        Verifier22 v22 = new Verifier22();
-        uint256[] memory ids = new uint256[](1);
-        VerifierInfo[] memory vInfos = new VerifierInfo[](1);
-        ids[0] = 2 * 10 + 2;
-        vInfos[0] = VerifierInfo({
-            addr: address(v22),
-            selector: v22.verifyProof.selector
-        });
-        _verifier = new Verifier(ids, vInfos);
+        _initFixture();
+        _makeInitialDeposit();
     }
 
-    function test_withdrawTx() public {
-        _mintAsset(asset1, address(this), 10 ether);
-        _approveAsset(asset1, address(pool), 2 ether);
+    function test_withdraw500WethWithoutFee() public {
+        ZTransaction memory ztx = _loadZTx("withdraw_500_weth_without_fee");
 
-        TransactionRequest memory req = _createWithdrawReq(
-            _getAssetId(asset1),
-            1 ether
-        );
-        ZTransaction memory ztx = zkfi.getZTx(req);
+        for (uint256 i = 0; i < ztx.nullifiers.length; i++) {
+            vm.expectEmit(true, true, true, true);
+            emit IPool.NullifierMarked(ztx.nullifiers[i]);
+        }
+
         pool.transact(ztx);
+
+        for (uint256 i = 0; i < ztx.nullifiers.length; i++) {
+            assertTrue(pool.isMarkedNullifier(ztx.nullifiers[i]));
+        }
     }
 
-    function test_withdrawMultiTx() public {
-        _mintAsset(asset1, address(this), 10 ether);
-        _mintAsset(asset2, address(this), 10 ether);
-        _approveAsset(asset1, address(pool), 2 ether);
-        _approveAsset(asset2, address(pool), 2 ether);
+    function test_withdraw500WethWithWethFee() public {
+        ZTransaction memory ztx = _loadZTx("withdraw_500_weth_with_weth_fee");
 
-        TransactionRequest memory req = _createWithdrawReq(
-            _getAssetId(asset1),
-            1 ether,
-            _getAssetId(asset2),
-            1 ether
-        );
-        ZTransaction memory ztx = zkfi.getZTx(req);
+        for (uint256 i = 0; i < ztx.nullifiers.length; i++) {
+            vm.expectEmit(true, true, true, true);
+            emit IPool.NullifierMarked(ztx.nullifiers[i]);
+        }
+
         pool.transact(ztx);
+
+        for (uint256 i = 0; i < ztx.nullifiers.length; i++) {
+            assertTrue(pool.isMarkedNullifier(ztx.nullifiers[i]));
+        }
     }
 }
