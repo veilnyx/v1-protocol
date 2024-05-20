@@ -5,8 +5,8 @@ import {Test} from "forge-std/Test.sol";
 import {EntryPoint} from "@account-abstraction/contracts/core/EntryPoint.sol";
 import {PackedUserOperation} from "@account-abstraction/contracts/interfaces/PackedUserOperation.sol";
 import {Pool} from "src/core/Pool.sol";
-import {ZTransaction, ZTransactionType} from "src/libraries/ZTransaction.sol";
 import {Paymaster} from "src/core/Paymaster.sol";
+import {ZTransaction, ZTransactionType} from "src/libraries/ZTransaction.sol";
 
 contract PaymasterTest is Test {
     address public mockPool;
@@ -27,7 +27,7 @@ contract PaymasterTest is Test {
         uint24 assetId = 65538;
         uint256 feeValue = 0.1 ether;
         paymaster.updateAssetFee(assetId, feeValue);
-        assertEq(paymaster.assetFees(assetId), feeValue);
+        assertEq(paymaster.getAssetFee(assetId), feeValue);
 
         bool isSupported = paymaster.isFeeAssetSupported(assetId);
         assertTrue(isSupported);

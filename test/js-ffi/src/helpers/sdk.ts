@@ -1,6 +1,12 @@
 //@ts-ignore
 import * as snarkJs from "snarkjs";
-import { createTestClient, http, keccak256, stringToBytes } from "viem";
+import {
+  createTestClient,
+  http,
+  keccak256,
+  parseEther,
+  stringToBytes,
+} from "viem";
 import { foundry } from "viem/chains";
 import { Core } from "@zkfi-tech/core";
 import {
@@ -47,6 +53,7 @@ export const getSDKInstance = () => {
     chainId: foundry.id,
     account,
     rpc: client as any,
+    explorerApi: "",
     contracts: {} as any,
     circuits,
     snarkJs,
@@ -54,10 +61,12 @@ export const getSDKInstance = () => {
       treeSource,
       addressResolver,
       notesSource,
+      contractSource: {} as any,
     },
   });
 
   zkfi.getEncryptionPublicKey = async () => encryptionPublicKey;
+  zkfi.getFeePreEstimate = async () => BigInt(parseEther("0.001"));
 
   return zkfi;
 };

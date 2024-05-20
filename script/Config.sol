@@ -22,6 +22,8 @@ contract Config is Script {
 
     uint256 internal immutable _treeDepth = 32;
     mapping(uint256 => address) internal _entryPoints;
+    mapping(uint256 => address) internal _wTokens;
+
     AssetType internal immutable _initAssetType;
     mapping(uint256 => address[]) internal _initAssetAddresses;
 
@@ -62,6 +64,11 @@ contract Config is Script {
             string.concat(chainPrefix, ".entryPoint")
         );
 
+        _wTokens[_chainId] = vm.parseJsonAddress(
+            json,
+            string.concat(chainPrefix, ".wToken")
+        );
+
         _initAssetType = AssetType(
             vm.parseJsonUint(json, string.concat(chainPrefix, ".initAssetType"))
         );
@@ -86,6 +93,10 @@ contract Config is Script {
 
     function entryPoint() external view returns (address) {
         return _entryPoints[block.chainid];
+    }
+
+    function wToken() external view returns (address) {
+        return _wTokens[block.chainid];
     }
 
     function initAssetType() external view returns (AssetType) {

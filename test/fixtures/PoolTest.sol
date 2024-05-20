@@ -2,17 +2,16 @@
 pragma solidity ^0.8.20;
 
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
-import {BaseFixture} from "./BaseFixture.sol";
-import {MockERC20} from "./MockERC20.sol";
-
 import {Pool} from "src/core/Pool.sol";
 import {Verifier22} from "src/verifiers/Verifier22.sol";
 import {Verifier, VerifierInfo} from "src/core/Verifier.sol";
 import {Convertor} from "src/core/Convertor.sol";
 import {Asset, AssetType} from "src/libraries/Asset.sol";
 import {ZTransaction} from "src/libraries/ZTransaction.sol";
+import {MockERC20} from "test/mocks/MockERC20.sol";
+import {BaseTest} from "./BaseTest.sol";
 
-contract PoolFixture is BaseFixture {
+contract PoolTest is BaseTest {
     Verifier public verifier;
     Convertor public convertor;
     Pool public pool;
@@ -26,8 +25,7 @@ contract PoolFixture is BaseFixture {
     Asset public asset1;
     Asset public asset2;
 
-    function _initFixture() internal virtual override {
-        BaseFixture._initFixture();
+    function _initFixture() internal virtual {
         Verifier22 v22 = new Verifier22();
         VerifierInfo[] memory vInfos = new VerifierInfo[](1);
         vInfos[0] = VerifierInfo({
@@ -37,8 +35,8 @@ contract PoolFixture is BaseFixture {
         });
         verifier = new Verifier(
             vInfos,
-            [REVOKER_PUBLIC_KEY_X, REVOKER_PUBLIC_KEY_Y],
-            [ENCRYPTION_PUBLIC_KEY_X, ENCRYPTION_PUBLIC_KEY_Y]
+            fixture.revokerPublicKey,
+            fixture.encryptionPublicKey
         );
         convertor = new Convertor();
         entryPoint = address(0);
@@ -78,9 +76,6 @@ contract PoolFixture is BaseFixture {
 
         ERC1967Proxy poolProxy = new ERC1967Proxy(address(pool), initData);
         pool = Pool(address(poolProxy));
-
-        // asset1 = pool.getAsset(address(token1));
-        // asset2 = pool.getAsset(address(token2));
     }
 
     function _mintAsset(
@@ -117,6 +112,15 @@ contract PoolFixture is BaseFixture {
         _mintAsset(asset2, address(this), 10000 ether);
         _approveAsset(asset1, address(pool), 10000 ether);
         _approveAsset(asset2, address(pool), 10000 ether);
+        pool.transact(ztx);
+    }
+
+    function _makeInitialDeposit() internal {
+        _mintAsset(asset1, address(this), 1000 ether);
+        _mintAsset(asset2, address(this), 1000 ether);
+        _approveAsset(asset1, address(pool), 1000 ether);
+        _approveAsset(asset2, address(pool), 1000 ether);
+        ZTransaction memory ztx = _loadZTx("deposit_1000_weth_usdc");
         pool.transact(ztx);
     }
 }

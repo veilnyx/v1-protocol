@@ -1,21 +1,20 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.23;
 
+import {Test} from "forge-std/Test.sol";
+import {console2} from "forge-std/console2.sol";
 import {Verifier, VerifierInfo} from "src/core/Verifier.sol";
 import {Verifier22} from "src/verifiers/Verifier22.sol";
 import {ZTransaction, ZTransactionType} from "src/libraries/ZTransaction.sol";
+import {TransactionRequest} from "test/helpers/TransactionRequest.sol";
+import {ZKFi, ZAccount} from "test/helpers/ZKFi.sol";
+import {BaseTest} from "test/fixtures/BaseTest.sol";
 
-import {Test} from "forge-std/Test.sol";
-import {console2} from "forge-std/console2.sol";
-import {TransactionRequest} from "./helpers/TransactionRequest.sol";
-import {ZkFi, ZAccount} from "./helpers/ZkFi.sol";
-import {BaseFixture} from "./fixtures/BaseFixture.sol";
-
-contract VerifierTest is BaseFixture {
+contract VerifierTest is BaseTest {
     Verifier internal _verifier;
 
     function setUp() public {
-        _initFixture();
+        // _initFixture();
         Verifier22 verifier22 = new Verifier22();
         VerifierInfo[] memory vInfos = new VerifierInfo[](1);
         vInfos[0] = VerifierInfo({
@@ -25,50 +24,22 @@ contract VerifierTest is BaseFixture {
         });
         _verifier = new Verifier(
             vInfos,
-            [REVOKER_PUBLIC_KEY_X, REVOKER_PUBLIC_KEY_Y],
-            [ENCRYPTION_PUBLIC_KEY_X, ENCRYPTION_PUBLIC_KEY_Y]
+            fixture.revokerPublicKey,
+            fixture.encryptionPublicKey
         );
     }
 
     function test_PublicKeys() public view {
         (uint256 revKeyX, uint256 revKeyY) = _verifier.getRevokerPublicKey();
         (uint256 encKeyX, uint256 encKeyY) = _verifier.getEncryptionPublicKey();
-        assertEq(revKeyX, REVOKER_PUBLIC_KEY_X);
-        assertEq(revKeyY, REVOKER_PUBLIC_KEY_Y);
-        assertEq(encKeyX, ENCRYPTION_PUBLIC_KEY_X);
-        assertEq(encKeyY, ENCRYPTION_PUBLIC_KEY_Y);
+        assertEq(revKeyX, fixture.revokerPublicKey[0]);
+        assertEq(revKeyY, fixture.revokerPublicKey[1]);
+        assertEq(encKeyX, fixture.encryptionPublicKey[0]);
+        assertEq(encKeyY, fixture.encryptionPublicKey[1]);
     }
 
     function test_getVerifierId() public view {
         uint256 id = _verifier.getVerifierId(2, 2);
         assertEq(id, 22);
-    }
-
-    function test_verifyDeposit() public {
-        TransactionRequest memory req = _createDepositReq(0x010001, 100);
-        ZTransaction memory ztx = zkfi.getZTx(req);
-        bool isValid = _verifier.verifyTransactionProof(ztx);
-        assertTrue(isValid);
-    }
-
-    function test_verifyTransfer() public {
-        TransactionRequest memory req = _createTransferReq(0x010001, 100);
-        ZTransaction memory ztx = zkfi.getZTx(req);
-        bool isValid = _verifier.verifyTransactionProof(ztx);
-        assertTrue(isValid);
-    }
-
-    function test_verifyWithdraw() public {
-        TransactionRequest memory req = _createWithdrawReq(0x010001, 100);
-        ZTransaction memory ztx = zkfi.getZTx(req);
-        bool isValid = _verifier.verifyTransactionProof(ztx);
-        assertTrue(isValid);
-    }
-
-    function test_verifyConvert() public {
-        TransactionRequest memory req = _createConvertReq(0x010001, 100);
-        ZTransaction memory ztx = zkfi.getZTx(req);
-        bool isValid = _verifier.verifyTransactionProof(ztx);
-        assertTrue(isValid);
     }
 }

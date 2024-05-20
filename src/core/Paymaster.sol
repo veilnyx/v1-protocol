@@ -18,7 +18,7 @@ contract Paymaster is BasePaymaster {
     /**
      * @dev Mapping from assetId to fee value.
      */
-    mapping(uint24 => uint256) public assetFees;
+    mapping(uint24 => uint256) private _assetFees;
 
     error InvalidPaymaster(address paymaster);
     error InvalidSender(address sender);
@@ -33,15 +33,19 @@ contract Paymaster is BasePaymaster {
         sender = sender_;
     }
 
+    function getAssetFee(uint24 assetId) external view returns (uint256) {
+        return _assetFees[assetId];
+    }
+
     function updateAssetFee(
         uint24 assetId,
         uint256 feeValue
     ) external onlyOwner {
-        assetFees[assetId] = feeValue;
+        _assetFees[assetId] = feeValue;
     }
 
     function isFeeAssetSupported(uint24 assetId) external view returns (bool) {
-        return assetFees[assetId] > 0;
+        return _assetFees[assetId] > 0;
     }
 
     function withdrawTo(
@@ -113,7 +117,7 @@ contract Paymaster is BasePaymaster {
         uint24 feeAssetId,
         uint256 /*maxCostEth*/
     ) internal view returns (uint256) {
-        uint256 feeAssetValue = assetFees[feeAssetId];
+        uint256 feeAssetValue = _assetFees[feeAssetId];
 
         if (feeAssetValue == 0) {
             revert UnsupportedFeeAsset(feeAssetId);

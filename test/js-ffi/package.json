@@ -6,7 +6,7 @@
   "scripts": {
     "genZTx": "npx ts-node src/genZTx.ts",
     "genAccount": "npx ts-node src/genAccount.ts",
-    "genMockDeposit": "npx ts-node src/genMockDepositTx.ts"
+    "genFixtures": "npx ts-node src/genFixtures.ts"
   },
   "keywords": [],
   "author": "",

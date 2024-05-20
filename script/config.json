@@ -14,20 +14,23 @@
     "chain": "local",
     "treeDepth": 32,
     "entryPoint": "0x0000000000000000000000000000000000000000",
+    "wToken": "0x0000000000000000000000000000000000000000",
     "initAssetType": 1,
     "initAssetAddresses": ["0x0000000000000000000000000000000000000000"]
   },
   "80002": {
     "chain": "polygon-amoy",
     "treeDepth": 32,
-    "entryPoint": "0x0000000000000000000000000000000000000000",
+    "entryPoint": "0x0000000071727De22E5E9d8BAf0edAc6f37da032",
+    "wToken": "0xaFE07e24314864290f6E11D3CaA51290280fAEE1",
     "initAssetType": 1,
     "initAssetAddresses": ["0xaFE07e24314864290f6E11D3CaA51290280fAEE1"]
   },
   "11155420": {
     "chain": "optimism-sepolia",
     "treeDepth": 32,
-    "entryPoint": "0x0000000000000000000000000000000000000000",
+    "entryPoint": "0x0000000071727De22E5E9d8BAf0edAc6f37da032",
+    "wToken": "0x4200000000000000000000000000000000000006",
     "initAssetType": 1,
     "initAssetAddresses": ["0x4200000000000000000000000000000000000006"]
   }
