@@ -16,7 +16,7 @@ library MerkleTreeLogic {
     uint256 public constant FIELD_SIZE =
         21888242871839275222246405745257275088548364400416034343698204186575808495617;
     uint256 public constant ZERO_LEAF = uint256(keccak256("zkFi")) % FIELD_SIZE;
-    uint8 public constant ROOT_HISTORY_SIZE = 100;
+    uint8 public constant ROOT_HISTORY_SIZE = 101;
 
     function init(MerkleTree storage self, uint256 depth) public {
         self.depth = depth;
@@ -76,7 +76,7 @@ library MerkleTreeLogic {
             }
         }
 
-        uint256 newRootIndex = self.currentRootIndex + 1;
+        uint256 newRootIndex = (self.currentRootIndex + 1) % ROOT_HISTORY_SIZE;
         self.currentRootIndex = newRootIndex;
         self.roots[newRootIndex] = currentLevelHash;
 
@@ -145,7 +145,7 @@ library MerkleTreeLogic {
             }
         }
 
-        uint256 newRootIndex = self.currentRootIndex + 1;
+        uint256 newRootIndex = (self.currentRootIndex + 1) % ROOT_HISTORY_SIZE;
         self.currentRootIndex = newRootIndex;
         self.roots[newRootIndex] = currentLevelHash;
 
@@ -155,11 +155,10 @@ library MerkleTreeLogic {
 
     function isKnownRoot(
         MerkleTree storage self,
-        uint256 root,
-        uint8 numLastRoots
+        uint256 root
     ) public view returns (bool) {
-        uint256 from = self.currentRootIndex > numLastRoots - 1
-            ? self.currentRootIndex - numLastRoots - 1
+        uint256 from = self.currentRootIndex > ROOT_HISTORY_SIZE - 1
+            ? self.currentRootIndex - ROOT_HISTORY_SIZE - 1
             : 0;
 
         uint8 i = 0;

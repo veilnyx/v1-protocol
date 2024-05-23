@@ -51,6 +51,10 @@ contract Pool is
         );
     }
 
+    function initializeV2(address verifier_) external reinitializer(2) {
+        verifier = verifier_;
+    }
+
     function transact(ZTransaction memory ztx) external nonReentrant {
         ztx.execute({
             tree: _tree,
@@ -150,7 +154,7 @@ contract Pool is
     }
 
     function isKnownRoot(uint256 root) external view returns (bool) {
-        return _tree.isKnownRoot(root, ROOT_HISTORY_SIZE);
+        return _tree.isKnownRoot(root);
     }
 
     function getRevokerPublicKey() external view returns (uint256, uint256) {

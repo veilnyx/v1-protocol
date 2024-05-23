@@ -370,7 +370,7 @@ library ZTransactionLogic {
         ZTransaction memory ztx
     ) internal {
         // Check recent merkle root
-        if (!tree.isKnownRoot(ztx.merkleRoot, 100)) {
+        if (!tree.isKnownRoot(ztx.merkleRoot)) {
             revert IPool.UnknownMerkleRoot();
         }
 
