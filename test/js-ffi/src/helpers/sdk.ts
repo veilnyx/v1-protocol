@@ -66,7 +66,7 @@ export const getSDKInstance = () => {
   });
 
   zkfi.getEncryptionPublicKey = async () => encryptionPublicKey;
-  zkfi.getFeePreEstimate = async () => BigInt(parseEther("0.001"));
+  zkfi.getFeeEstimate = async () => BigInt(parseEther("0.001"));
 
   return zkfi;
 };

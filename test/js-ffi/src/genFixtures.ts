@@ -35,6 +35,15 @@ const usdcAssetId = 0x010002;
 const dirFixtures = "../fixtures/ztx";
 
 const depositReqs = {
+  deposit_1000_weth: {
+    type: TransactionType.DEPOSIT,
+    assetIds: [wethAssetId],
+    values: [parseEther("1000")],
+    feeAssetId: 0,
+    to: senderAccount.shieldedAddress.pack(),
+    viaBundler: false,
+    paymaster: zeroAddress,
+  },
   deposit_1000_weth_usdc: {
     type: TransactionType.DEPOSIT,
     assetIds: [wethAssetId, usdcAssetId],
@@ -88,13 +97,27 @@ const transferReqs = {
   },
 };
 
+const convertReqs = {
+  swap_100_weth_to_usdc: {
+    type: TransactionType.CONVERT,
+    assetIds: [wethAssetId],
+    values: [parseEther("100")],
+    feeAssetId: 0,
+    to: "0xa2047A78E2d8ca97C2eB171652C167d908795703",
+    viaBundler: false,
+    paymaster: zeroAddress,
+    payload:
+      "0x0000000000000000000000000000000000000000000000000000000000010002000000000000000000000000f67e26649037695ddfab19f4e22d5c9fd156459200000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000258",
+  },
+};
+
 const createMockZTx = async (
   name: string,
   req: TransactionRequest & TransactionOptions,
   zkfi: Core
 ) => {
   const opts = { viaBundler: req.viaBundler, paymaster: req.paymaster };
-  const tx = await zkfi.createTransaction(req, opts);
+  const tx = await zkfi.createTransaction(req as any, opts);
 
   const signedTx = await zkfi.signTransaction(tx);
   const ztx = await zkfi.proveTransaction(signedTx);
@@ -123,15 +146,17 @@ async function mockNotes(depositName: string, zkfi: Core) {
 async function main() {
   const zkfi = getSDKInstance();
   // Pre-deposit 1000 token of assets - 0x010001 and 0x010002
-  const depositName = "deposit_1000_weth_usdc";
+  const depositName = "deposit_1000_weth";
+  // const depositName = "deposit_1000_weth_usdc";
   await createMockZTx(depositName, depositReqs[depositName], zkfi);
   await mockNotes(depositName, zkfi);
   const reqs = {
     ...withdrawReqs,
     ...transferReqs,
+    ...convertReqs,
   };
   for (const [name, req] of Object.entries(reqs)) {
-    await createMockZTx(name, req, zkfi);
+    await createMockZTx(name, req as any, zkfi);
   }
 }
 
