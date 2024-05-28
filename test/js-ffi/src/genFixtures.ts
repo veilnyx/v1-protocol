@@ -146,8 +146,8 @@ async function mockNotes(depositName: string, zkfi: Core) {
 async function main() {
   const zkfi = getSDKInstance();
   // Pre-deposit 1000 token of assets - 0x010001 and 0x010002
-  const depositName = "deposit_1000_weth";
-  // const depositName = "deposit_1000_weth_usdc";
+  // const depositName = "deposit_1000_weth";
+  const depositName = "deposit_1000_weth_usdc";
   await createMockZTx(depositName, depositReqs[depositName], zkfi);
   await mockNotes(depositName, zkfi);
   const reqs = {
