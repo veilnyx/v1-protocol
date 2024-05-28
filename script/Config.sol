@@ -3,7 +3,6 @@ pragma solidity 0.8.23;
 
 import {console2} from "forge-std/console2.sol";
 import {Script} from "forge-std/Script.sol";
-import {stdJson} from "forge-std/stdJson.sol";
 import {AssetType} from "src/libraries/Asset.sol";
 
 struct CommonConfig {
@@ -12,8 +11,6 @@ struct CommonConfig {
 }
 
 contract Config is Script {
-    using stdJson for string;
-
     uint256 internal immutable _chainId = block.chainid;
     uint256 internal immutable _revokerPublicKeyX;
     uint256 internal immutable _revokerPublicKeyY;
@@ -21,11 +18,11 @@ contract Config is Script {
     uint256 internal immutable _encryptionPublicKeyY;
 
     uint256 internal immutable _treeDepth = 32;
-    mapping(uint256 => address) internal _entryPoints;
-    mapping(uint256 => address) internal _wTokens;
+    address internal _entryPoint;
+    address internal _wToken;
 
     AssetType internal immutable _initAssetType;
-    mapping(uint256 => address[]) internal _initAssetAddresses;
+    address[] internal _initAssetAddresses;
 
     constructor() {
         string memory path = string.concat(
@@ -59,12 +56,12 @@ contract Config is Script {
             string.concat(chainPrefix, ".treeDepth")
         );
 
-        _entryPoints[_chainId] = vm.parseJsonAddress(
+        _entryPoint = vm.parseJsonAddress(
             json,
             string.concat(chainPrefix, ".entryPoint")
         );
 
-        _wTokens[_chainId] = vm.parseJsonAddress(
+        _wToken = vm.parseJsonAddress(
             json,
             string.concat(chainPrefix, ".wToken")
         );
@@ -73,7 +70,7 @@ contract Config is Script {
             vm.parseJsonUint(json, string.concat(chainPrefix, ".initAssetType"))
         );
 
-        _initAssetAddresses[_chainId] = vm.parseJsonAddressArray(
+        _initAssetAddresses = vm.parseJsonAddressArray(
             json,
             string.concat(chainPrefix, ".initAssetAddresses")
         );
@@ -92,11 +89,11 @@ contract Config is Script {
     }
 
     function entryPoint() external view returns (address) {
-        return _entryPoints[block.chainid];
+        return _entryPoint;
     }
 
     function wToken() external view returns (address) {
-        return _wTokens[block.chainid];
+        return _wToken;
     }
 
     function initAssetType() external view returns (AssetType) {
@@ -104,7 +101,7 @@ contract Config is Script {
     }
 
     function initAssetAddresses() external view returns (address[] memory) {
-        address[] memory addresses = _initAssetAddresses[block.chainid];
+        address[] memory addresses = _initAssetAddresses;
         return addresses;
     }
 }
