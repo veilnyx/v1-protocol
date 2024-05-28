@@ -51,10 +51,6 @@ contract Pool is
         );
     }
 
-    function initializeV2(address verifier_) external reinitializer(2) {
-        verifier = verifier_;
-    }
-
     function transact(ZTransaction memory ztx) external nonReentrant {
         ztx.execute({
             tree: _tree,
