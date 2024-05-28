@@ -1,5 +1,5 @@
 [profile.default]
-solc = "0.8.23"
+solc = "0.8.24"
 ffi = true
 ast = true
 build_info = true

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity ^0.8.23;
+pragma solidity ^0.8.24;
 
 import {PoseidonT4} from "poseidon-solidity/PoseidonT4.sol";
 import {IPool} from "../interfaces/IPool.sol";

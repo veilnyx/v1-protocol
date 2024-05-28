@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.23;
+pragma solidity ^0.8.24;
 
 import {ZTransaction} from "../libraries/ZTransaction.sol";
 import {AssetType, Asset} from "../libraries/Asset.sol";
