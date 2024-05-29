@@ -9,8 +9,8 @@ import {Asset, AssetType} from "../libraries/Asset.sol";
 abstract contract ConvertProxyBase is IConvertProxy {
     IPool immutable _pool;
 
-    constructor(address assetManager_) {
-        _pool = IPool(assetManager_);
+    constructor(address pool_) {
+        _pool = IPool(pool_);
     }
 
     function getAssetId(address assetAddress) public view returns (uint24) {

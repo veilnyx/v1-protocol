@@ -1,26 +1,27 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-pragma solidity 0.8.24;
+pragma solidity ^0.8.24;
 
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IConvertProxy} from "src/interfaces/IConvertProxy.sol";
+import {ConvertProxyBase} from "src/base/ConvertProxyBase.sol";
 import {Asset, AssetType} from "src/libraries/Asset.sol";
 import {ISwapRouter} from "./ISwapRouter.sol";
 
-contract UniswapV3Adaptor is IConvertProxy {
+contract UniswapV3Adaptor is ConvertProxyBase {
     // Errors //
-    error AssetNotSupportedByZkFi(uint256 assetId);
+    // error AssetNotSupportedByZkFi(uint24 assetId);
+    error UnsupportedAsset(uint24 assetId);
+    // Rename these
     error OnlySingleAssetSwapSupported();
     error InAssetValueShouldBeNonZero();
     error ZeroAddressError();
 
-    ISwapRouter public immutable ISWAP_ROUTER;
-    address public immutable ZKFI_POOL;
+    ISwapRouter public immutable swapRouter;
     uint24 public constant feeTier = 3000;
 
-    constructor(address swapRouter_, address pool_) {
-        ISWAP_ROUTER = ISwapRouter(swapRouter_); // Uniswap V3 Swap router
-        ZKFI_POOL = pool_; // zkFi Pool
+    constructor(address swapRouter_, address pool_) ConvertProxyBase(pool_) {
+        swapRouter = ISwapRouter(swapRouter_); // Uniswap V3 Swap router
     }
 
     /// @dev Will be called by the zkFi Convertor.sol to execute the swap.
@@ -48,15 +49,16 @@ contract UniswapV3Adaptor is IConvertProxy {
 
         // getting asset details
         // TODO: check if outAsset is supported by zkFi pool
-        (bool success, bytes memory inAssetRes) = ZKFI_POOL.call(
-            abi.encodeWithSignature("getAsset(uint24)", inAssetIds[0])
-        );
-        if (!success) {
-            revert("Failed call to zkFi");
-        }
-        Asset memory inAsset = abi.decode(inAssetRes, (Asset));
+        // (bool success, bytes memory inAssetRes) = zkfiPool.call(
+        //     abi.encodeWithSignature("getAsset(uint24)", inAssetIds[0])
+        // );
+        // if (!success) {
+        //     revert("Failed call to zkFi");
+        // }
+
+        Asset memory inAsset = getAsset(inAssetIds[0]);
         if (!inAsset.isSupported) {
-            revert AssetNotSupportedByZkFi(inAssetIds[0]);
+            revert UnsupportedAsset(inAssetIds[0]);
         }
 
         // decoding payload
@@ -68,16 +70,16 @@ contract UniswapV3Adaptor is IConvertProxy {
         ) = abi.decode(payload, (uint24, address, uint256, uint256));
 
         // TODO: check if outAsset is supported by zkFi pool
-        (bool status, bytes memory outAssetRes) = ZKFI_POOL.call(
-            abi.encodeWithSignature("getAsset(uint24)", outAssetId)
-        );
-        if (!status) {
-            revert("Failed call to zkFi");
-        }
-
-        Asset memory outAsset = abi.decode(outAssetRes, (Asset));
+        // (bool status, bytes memory outAssetRes) = ZKFI_POOL.call(
+        //     abi.encodeWithSignature("getAsset(uint24)", outAssetId)
+        // );
+        // if (!status) {
+        //     revert("Failed call to zkFi");
+        // }
+        // Asset memory outAsset = abi.decode(outAssetRes, (Asset));
+        Asset memory outAsset = getAsset(outAssetId);
         if (!outAsset.isSupported) {
-            revert AssetNotSupportedByZkFi(outAssetId);
+            revert UnsupportedAsset(outAssetId);
         }
 
         if (beneficiary == address(0)) {
@@ -130,7 +132,7 @@ contract UniswapV3Adaptor is IConvertProxy {
         // ZkFi convertor to approve the Uniswap adaptor the inTokens received.
         SafeERC20.forceApprove(
             IERC20(tokenIn),
-            address(ISWAP_ROUTER),
+            address(swapRouter),
             tokenInAmt
         );
 
@@ -149,6 +151,6 @@ contract UniswapV3Adaptor is IConvertProxy {
             });
 
         // The call to `exactInputSingle` executes the swap.
-        amountOut = ISWAP_ROUTER.exactInputSingle(params);
+        amountOut = swapRouter.exactInputSingle(params);
     }
 }
