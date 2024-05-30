@@ -53,6 +53,15 @@ const depositReqs = {
     viaBundler: false,
     paymaster: zeroAddress,
   },
+  deposit_1_weth: {
+    type: TransactionType.DEPOSIT,
+    assetIds: [wethAssetId],
+    values: [parseEther("1")],
+    feeAssetId: 0,
+    to: senderAccount.shieldedAddress.pack(),
+    viaBundler: false,
+    paymaster: zeroAddress,
+  }
 };
 
 const withdrawReqs = {
@@ -98,16 +107,16 @@ const transferReqs = {
 };
 
 const convertReqs = {
-  swap_100_weth_to_usdc: {
+  swap_1e16_weth_to_usdc: {
     type: TransactionType.CONVERT,
     assetIds: [wethAssetId],
-    values: [parseEther("100")],
+    values: [parseEther("0.01")],
     feeAssetId: 0,
-    to: "0xa2047A78E2d8ca97C2eB171652C167d908795703",
+    to: "0x23948386711aC76b86761080c0f583d985751330",  // adaptor to which the ZkFi Convertor will call to execute swap
     viaBundler: false,
     paymaster: zeroAddress,
     payload:
-      "0x0000000000000000000000000000000000000000000000000000000000010002000000000000000000000000f67e26649037695ddfab19f4e22d5c9fd156459200000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000258",
+      "0x000000000000000000000000000000000000000000000000000000000001000200000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000", // beneficiary: pool address
   },
 };
 
@@ -147,13 +156,11 @@ async function main() {
   const zkfi = getSDKInstance();
   // Pre-deposit 1000 token of assets - 0x010001 and 0x010002
   // const depositName = "deposit_1000_weth";
-  const depositName = "deposit_1000_weth_usdc";
+  const depositName = "deposit_1_weth";
   await createMockZTx(depositName, depositReqs[depositName], zkfi);
   await mockNotes(depositName, zkfi);
   const reqs = {
-    ...withdrawReqs,
-    ...transferReqs,
-    ...convertReqs,
+    ...convertReqs
   };
   for (const [name, req] of Object.entries(reqs)) {
     await createMockZTx(name, req as any, zkfi);

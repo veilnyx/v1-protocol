@@ -20,6 +20,7 @@ contract Config is Script {
     uint256 internal immutable _treeDepth = 32;
     address internal _entryPoint;
     address internal _wToken;
+    address internal _uniswapSwapRouter02;
 
     AssetType internal immutable _initAssetType;
     address[] internal _initAssetAddresses;
@@ -66,6 +67,11 @@ contract Config is Script {
             string.concat(chainPrefix, ".wToken")
         );
 
+        _uniswapSwapRouter02 = vm.parseJsonAddress(
+            json,
+            string.concat(chainPrefix, ".uniswapSwapRouter02")
+        );
+
         _initAssetType = AssetType(
             vm.parseJsonUint(json, string.concat(chainPrefix, ".initAssetType"))
         );
@@ -94,6 +100,10 @@ contract Config is Script {
 
     function wToken() external view returns (address) {
         return _wToken;
+    }
+
+    function uniswapSwapRouter02() external view returns (address) {
+        return _uniswapSwapRouter02;
     }
 
     function initAssetType() external view returns (AssetType) {

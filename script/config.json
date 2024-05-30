@@ -15,31 +15,55 @@
     "treeDepth": 32,
     "entryPoint": "0x0000000000000000000000000000000000000000",
     "wToken": "0x0000000000000000000000000000000000000000",
+    "uniswapSwapRouter02": "0x0000000000000000000000000000000000000000",
     "initAssetType": 1,
-    "initAssetAddresses": ["0x0000000000000000000000000000000000000000"]
+    "initAssetAddresses": [
+      "0x0000000000000000000000000000000000000000"
+    ]
   },
   "137": {
     "chain": "polygon-mainnet",
     "treeDepth": 32,
     "entryPoint": "0x0000000071727De22E5E9d8BAf0edAc6f37da032",
     "wToken": "0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270",
+    "uniswapSwapRouter02": "0x0000000000000000000000000000000000000000",
     "initAssetType": 1,
-    "initAssetAddresses": ["0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270"]
+    "initAssetAddresses": [
+      "0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270"
+    ]
   },
   "80002": {
     "chain": "polygon-amoy",
     "treeDepth": 32,
     "entryPoint": "0x0000000071727De22E5E9d8BAf0edAc6f37da032",
     "wToken": "0xaFE07e24314864290f6E11D3CaA51290280fAEE1",
+    "uniswapSwapRouter02": "0x0000000000000000000000000000000000000000",
     "initAssetType": 1,
-    "initAssetAddresses": ["0xaFE07e24314864290f6E11D3CaA51290280fAEE1"]
+    "initAssetAddresses": [
+      "0xaFE07e24314864290f6E11D3CaA51290280fAEE1"
+    ]
   },
   "11155420": {
     "chain": "optimism-sepolia",
     "treeDepth": 32,
     "entryPoint": "0x0000000071727De22E5E9d8BAf0edAc6f37da032",
     "wToken": "0x4200000000000000000000000000000000000006",
+    "uniswapSwapRouter02": "0x0000000000000000000000000000000000000000",
     "initAssetType": 1,
-    "initAssetAddresses": ["0x4200000000000000000000000000000000000006"]
+    "initAssetAddresses": [
+      "0x4200000000000000000000000000000000000006"
+    ]
+  },
+  "11155111": {
+    "chain": "eth-sepolia",
+    "treeDepth": 32,
+    "entryPoint": "0x0576a174D229E3cFA37253523E645A78A0C91B57",
+    "wToken": "0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14",
+    "uniswapSwapRouter02": "0x3bFA4769FB09eefC5a80d6E87c3B9C650f7Ae48E",
+    "initAssetType": 1,
+    "initAssetAddresses": [
+      "0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14",
+      "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238"
+    ]
   }
 }

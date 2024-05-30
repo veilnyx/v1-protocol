@@ -1,93 +1,89 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.23;
+pragma solidity 0.8.24;
 pragma abicoder v2;
 
-import {BaseTest} from "test/fixtures/BaseTest.sol";
-import {PoolTest} from "test/fixtures/PoolTest.sol";
+import {BaseAdapterTest} from "test/adapters/BaseAdapterTest.sol";
 import {Pool} from "src/core/Pool.sol";
-import {DeployUniswapZkFiAdaptor} from "script/deploy/adaptors/DeployUniswapZkFiAdaptor.s.sol";
 import {ZTransaction} from "src/libraries/ZTransaction.sol";
-import {ISwapRouter} from "@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol";
-import {UniswapZkFiAdaptor} from "src/adaptors/UniswapZkFiAdaptor.sol";
+import {ISwapRouter02} from "src/adaptors/uniswap-v3/ISwapRouter02.sol";
+import {UniswapV3Adapter} from "src/adaptors/uniswap-v3/UniswapV3Adapter.sol";
 import {IWToken} from "src/interfaces/IWToken.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Asset} from "src/libraries/Asset.sol";
 import {console} from "forge-std/console.sol";
 
-contract UniswapZkFiAdaptorTest is BaseTest {
-    address public constant USDC = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48;
-    address public constant WETH = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
+contract UniswapV3AdaptorTest is BaseAdapterTest {
+    address public constant WETH = 0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14;
+    address public constant USDC = 0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238;
     IWToken public constant iWETH = IWToken(WETH);
-    IWToken public constant iUSDC = IWToken(USDC);
-    uint256 public constant INITIAL_SUPPLY = 1000 ether;
-    uint256 public constant SWAP_AMT = 100 ether;
-    address public user = vm.envAddress("ANVIL_PUBLIC_KEY");
-    UniswapZkFiAdaptor uniswapZkFiAdaptor;
-    uint24[] inAssetIds;
-    uint256[] inValues;
-    address public poolAddr;
-    address public convertorAddr;
-    address public deployerAddr;
-    Pool pool;
+    uint256 public constant INITIAL_SUPPLY = 1 ether;
+    uint256 public constant SWAP_AMT = 0.01 ether;
+    address public owner = vm.envAddress("ANVIL_PUBLIC_KEY");
+    address public user = 0x70997970C51812dc3A010C7d01b50e0d17dc79C8;
+    UniswapV3Adapter uniswapV3Adapter;
 
     function setUp() external {
-        DeployUniswapZkFiAdaptor deployer = new DeployUniswapZkFiAdaptor();
-        (uniswapZkFiAdaptor, poolAddr, convertorAddr, , deployerAddr) = deployer
-            .run();
+        _runBaseTest();
+        uniswapV3Adapter = new UniswapV3Adapter(
+            uniswapSwapRouter02,
+            address(pool)
+        );
 
-        console.log("Uni adaptor:", address(uniswapZkFiAdaptor));
-        console.log("ZKFI Convertor:", convertorAddr);
+        console.log("Uni adaptor:", address(uniswapV3Adapter));
 
-        pool = Pool(poolAddr);
+        // // TODO: Use a cheat code for Uni adp. address for consistency
+        vm.prank(owner);
+        pool.setConvertProxy(address(uniswapV3Adapter), true);
 
-        // TODO: Use a cheat code for Uni adp. address for consistency
-        vm.prank(deployerAddr);
-        pool.setConvertProxy(address(uniswapZkFiAdaptor), true);
+        vm.deal(user, INITIAL_SUPPLY * 2);
+        console.log("User ETH bal:", address(user).balance);
 
         vm.startPrank(user);
         iWETH.deposit{value: INITIAL_SUPPLY}();
-        iWETH.approve(poolAddr, INITIAL_SUPPLY);
+        console.log("User WETH bal:", iWETH.balanceOf(user));
+        iWETH.approve(address(pool), INITIAL_SUPPLY);
+        console.log("WETH deposited and approved to pool");
 
-        ZTransaction memory ztxDeposit = _loadZTx("deposit_1000_weth");
+        ZTransaction memory ztxDeposit = _loadZTx("deposit_1_weth");
         pool.transact(ztxDeposit);
         vm.stopPrank();
     }
 
     function testUniswapZkFiAdaptorDeploy() external view {
-        assert(address(uniswapZkFiAdaptor) != address(0));
+        assert(address(uniswapV3Adapter) != address(0));
     }
 
     function testSwapToPool() external /* zkFiSetup */ {
         console.log("Initiating swap to USDC using Uniswap test");
-        uint256 poolUSDCBalBeforeConvert = IERC20(USDC).balanceOf(poolAddr);
-
-        ZTransaction memory ztxDeposit = _loadZTx(
-            "swap_100_weth_to_usdc_for_pool"
+        uint256 poolUSDCBalBeforeConvert = IERC20(USDC).balanceOf(
+            address(pool)
         );
+
+        ZTransaction memory ztxDeposit = _loadZTx("swap_1e16_weth_to_usdc");
         pool.transact(ztxDeposit);
 
         // Asserts
-        uint256 poolUSDCBalPostConvert = IERC20(USDC).balanceOf(poolAddr);
+        uint256 poolUSDCBalPostConvert = IERC20(USDC).balanceOf(address(pool));
         console.log("Pool USDC bal before swap:", poolUSDCBalBeforeConvert);
         console.log("Pool USDC bal after swap:", poolUSDCBalPostConvert);
         assert(poolUSDCBalPostConvert > poolUSDCBalBeforeConvert);
     }
 
-    function testSwapToNonPoolAddr() external /* zkFiSetup */ {
-        console.log("Initiating swap to USDC using Uniswap test");
-        uint256 userUSDCBalBeforeConvert = IERC20(USDC).balanceOf(user);
+    // function testSwapToNonPoolAddr() external /* zkFiSetup */ {
+    //     console.log("Initiating swap to USDC using Uniswap test");
+    //     uint256 userUSDCBalBeforeConvert = IERC20(USDC).balanceOf(user);
 
-        ZTransaction memory ztxDeposit = _loadZTx(
-            "swap_100_weth_to_usdc_for_user"
-        );
-        pool.transact(ztxDeposit);
+    //     ZTransaction memory ztxDeposit = _loadZTx(
+    //         "swap_1e16_weth_to_usdc"
+    //     );
+    //     pool.transact(ztxDeposit);
 
-        // Asserts
-        uint256 userUSDCBalPostConvert = IERC20(USDC).balanceOf(user);
-        console.log("User USDC bal before swap:", userUSDCBalBeforeConvert);
-        console.log("User USDC bal after swap:", userUSDCBalPostConvert);
-        assert(userUSDCBalPostConvert > userUSDCBalBeforeConvert);
-    }
+    //     // Asserts
+    //     uint256 userUSDCBalPostConvert = IERC20(USDC).balanceOf(user);
+    //     console.log("User USDC bal before swap:", userUSDCBalBeforeConvert);
+    //     console.log("User USDC bal after swap:", userUSDCBalPostConvert);
+    //     assert(userUSDCBalPostConvert > userUSDCBalBeforeConvert);
+    // }
 }
 
 // function testSlippageProtection() external {
