@@ -24,16 +24,6 @@ contract BaseAdapterTest is BaseTest, BaseScript {
     address[2] assetAddresses;
     address uniswapSwapRouter02 = 0x3bFA4769FB09eefC5a80d6E87c3B9C650f7Ae48E;
 
-    uint256 public constant REVOKER_PUBLIC_KEY_X =
-        8116072818876777666029027213729376705234613448128995613697283149497235402123;
-    uint256 public constant REVOKER_PUBLIC_KEY_Y =
-        4598772416842731049226007701899382609184728232075557894618791492264594188716;
-
-    uint256 public constant ENCRYPTION_PUBLIC_KEY_X =
-        15187339732644800751812193648350861431733040013104897934882869545575329240973;
-    uint256 public constant ENCRYPTION_PUBLIC_KEY_Y =
-        18224946718075372665314217959364704865149122115871220475141871484502637776562;
-
     function _runBaseTest() internal {
         vm.startBroadcast(vm.envUint("ANVIL_PRIVATE_KEY"));
         Verifier22 v22 = new Verifier22();
@@ -45,8 +35,8 @@ contract BaseAdapterTest is BaseTest, BaseScript {
         });
         verifier = new Verifier(
             vInfos,
-            [REVOKER_PUBLIC_KEY_X, REVOKER_PUBLIC_KEY_Y],
-            [ENCRYPTION_PUBLIC_KEY_X, ENCRYPTION_PUBLIC_KEY_Y]
+            _config.revokerPublicKey(),
+            _config.encryptionPublicKey()
         );
         convertor = new Convertor();
         entryPoint = address(0);
