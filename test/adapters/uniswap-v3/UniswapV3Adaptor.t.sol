@@ -18,8 +18,7 @@ contract UniswapV3AdaptorTest is BaseAdapterTest {
     IWToken public constant iWETH = IWToken(WETH);
     uint256 public constant INITIAL_SUPPLY = 1 ether;
     uint256 public constant SWAP_AMT = 0.01 ether;
-    address public owner = vm.envAddress("ANVIL_PUBLIC_KEY");
-    address public user = 0x70997970C51812dc3A010C7d01b50e0d17dc79C8;
+    address public user = makeAddr("user");
     UniswapV3Adapter uniswapV3Adapter;
 
     function setUp() external {
@@ -31,19 +30,16 @@ contract UniswapV3AdaptorTest is BaseAdapterTest {
 
         console.log("Uni adaptor:", address(uniswapV3Adapter));
 
-        // // TODO: Use a cheat code for Uni adp. address for consistency
-        vm.prank(owner);
+        // TODO: Use a cheat code for Uni adp. address for consistency
+        address poolOwner = pool.owner();
+        vm.prank(poolOwner);
         pool.setConvertProxy(address(uniswapV3Adapter), true);
 
         vm.deal(user, INITIAL_SUPPLY * 2);
-        console.log("User ETH bal:", address(user).balance);
-
         vm.startPrank(user);
         iWETH.deposit{value: INITIAL_SUPPLY}();
-        console.log("User WETH bal:", iWETH.balanceOf(user));
         iWETH.approve(address(pool), INITIAL_SUPPLY);
-        console.log("WETH deposited and approved to pool");
-
+        
         ZTransaction memory ztxDeposit = _loadZTx("deposit_1_weth");
         pool.transact(ztxDeposit);
         vm.stopPrank();

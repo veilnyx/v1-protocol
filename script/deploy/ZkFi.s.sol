@@ -12,9 +12,10 @@ import {Convertor} from "src/core/Convertor.sol";
 import {AssetType} from "src/libraries/Asset.sol";
 import {AssetType} from "src/libraries/Asset.sol";
 import {BaseScript} from "../BaseScript.sol";
+import {console} from "forge-std/Test.sol";
 
 contract ZkFiDeploy is BaseScript {
-    function run() external broadcast returns(Verifier, Convertor, Pool, address){
+    function run() external broadcast returns (Pool, address) {
         Verifier22 v22 = new Verifier22();
         VerifierInfo[] memory vInfos = new VerifierInfo[](1);
         vInfos[0] = VerifierInfo({
@@ -27,6 +28,7 @@ contract ZkFiDeploy is BaseScript {
             _config.revokerPublicKey(),
             _config.encryptionPublicKey()
         );
+
         Convertor convertor = new Convertor();
         Pool pool = new Pool();
 
@@ -48,7 +50,11 @@ contract ZkFiDeploy is BaseScript {
             )
         );
 
-        new ERC1967Proxy(address(pool), initializeData);
-        return(verifier, convertor, pool, uniswapSwapRouter02);
+        ERC1967Proxy poolProxy = new ERC1967Proxy(
+            address(pool),
+            initializeData
+        );
+        pool = Pool(address(poolProxy));
+        return (pool, uniswapSwapRouter02);
     }
 }
