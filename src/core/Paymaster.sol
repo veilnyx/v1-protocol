@@ -3,16 +3,19 @@ pragma solidity ^0.8.24;
 
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IERC165} from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {BasePaymaster} from "@account-abstraction/contracts/core/BasePaymaster.sol";
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {IPaymaster} from "@account-abstraction/contracts/interfaces/IPaymaster.sol";
 import {IEntryPoint} from "@account-abstraction/contracts/interfaces/IEntryPoint.sol";
 import {PackedUserOperation} from "@account-abstraction/contracts/interfaces/PackedUserOperation.sol";
 import {ZTransaction} from "../libraries/ZTransaction.sol";
 import {IPool} from "../interfaces/IPool.sol";
 
-contract Paymaster is BasePaymaster {
+contract Paymaster is IPaymaster, Ownable {
     uint256 public constant VALIDATION_SUCCESS = 0;
 
+    IEntryPoint public immutable entryPoint;
     address public immutable sender;
 
     /**
@@ -26,17 +29,53 @@ contract Paymaster is BasePaymaster {
     error InsufficientFee(uint256 given, uint256 required);
     error UnsupportedFeeAsset(uint24 asset);
 
-    constructor(
-        address entryPoint_,
-        address sender_
-    ) BasePaymaster(IEntryPoint(entryPoint_)) {
+    constructor(address entryPoint_, address sender_) Ownable(msg.sender) {
+        entryPoint = IEntryPoint(entryPoint_);
         sender = sender_;
     }
 
-    function getAssetFee(uint24 assetId) external view returns (uint256) {
-        return _assetFees[assetId];
+    /**
+     * Add a deposit for this paymaster, used for paying for transaction fees.
+     */
+    function depositToEntryPoint() public payable {
+        entryPoint.depositTo{value: msg.value}(address(this));
     }
 
+    /**
+     * Withdraw value from the deposit.
+     * @param withdrawAddress - Target to send to.
+     * @param amount          - Amount to withdraw.
+     */
+    function withdrawFromEntryPoint(
+        address payable withdrawAddress,
+        uint256 amount
+    ) public onlyOwner {
+        entryPoint.withdrawTo(withdrawAddress, amount);
+    }
+
+    /**
+     * Withdraw any asset/fee from the deposit.
+     * @param token  - Token to withdraw.
+     * @param to     - Target to send to.
+     * @param value  - Amount to withdraw.
+     */
+    function withdrawAsset(
+        address token,
+        address payable to,
+        uint256 value
+    ) external onlyOwner {
+        if (token == address(0)) {
+            Address.sendValue(to, value);
+        } else {
+            SafeERC20.safeTransfer(IERC20(token), to, value);
+        }
+    }
+
+    /**
+     * Update fee value for an asset.
+     * @param assetId  - Asset id to update fee for.
+     * @param feeValue - Fee value to set.
+     */
     function updateAssetFee(
         uint24 assetId,
         uint256 feeValue
@@ -44,20 +83,42 @@ contract Paymaster is BasePaymaster {
         _assetFees[assetId] = feeValue;
     }
 
-    function isFeeAssetSupported(uint24 assetId) external view returns (bool) {
-        return _assetFees[assetId] > 0;
+    /// @inheritdoc IPaymaster
+    function validatePaymasterUserOp(
+        PackedUserOperation calldata userOp,
+        bytes32 userOpHash,
+        uint256 maxCost
+    ) external override returns (bytes memory context, uint256 validationData) {
+        _requireFromEntryPoint();
+        return _validatePaymasterUserOp(userOp, userOpHash, maxCost);
     }
 
-    function withdrawTo(
-        address token,
-        address payable to,
-        uint256 value
-    ) public onlyOwner {
-        if (token == address(0)) {
-            Address.sendValue(to, value);
-        } else {
-            SafeERC20.safeTransfer(IERC20(token), to, value);
-        }
+    /// @inheritdoc IPaymaster
+    function postOp(
+        PostOpMode /*mode*/,
+        bytes calldata /*context*/,
+        uint256 /*actualGasCost*/,
+        uint256 /*actualUserOpFeePerGas*/
+    ) external pure override {
+        revert("not supported");
+    }
+
+    /**
+     * Return current paymaster's deposit on the entryPoint.
+     */
+    function getEntryPointDeposit() public view returns (uint256) {
+        return entryPoint.balanceOf(address(this));
+    }
+
+    /**
+     * Return fee value for an asset.
+     */
+    function getAssetFee(uint24 assetId) external view returns (uint256) {
+        return _assetFees[assetId];
+    }
+
+    function isAssetFeeSupported(uint24 assetId) external view returns (bool) {
+        return _assetFees[assetId] > 0;
     }
 
     /// @dev The only requirements for validation are
@@ -72,7 +133,7 @@ contract Paymaster is BasePaymaster {
         PackedUserOperation calldata userOp,
         bytes32 /*userOpHash*/,
         uint256 maxCostEth
-    ) internal view override returns (bytes memory, uint256) {
+    ) internal view returns (bytes memory, uint256) {
         // Only support pool contract as sender
         if (userOp.sender != sender) {
             revert InvalidSender(userOp.sender);
@@ -124,6 +185,13 @@ contract Paymaster is BasePaymaster {
         }
 
         return feeAssetValue;
+    }
+
+    /**
+     * Validate the call is made from a valid entrypoint
+     */
+    function _requireFromEntryPoint() internal virtual {
+        require(msg.sender == address(entryPoint), "Sender not EntryPoint");
     }
 
     receive() external payable {}
