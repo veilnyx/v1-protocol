@@ -10,12 +10,10 @@ import {ISwapRouter02} from "./ISwapRouter02.sol";
 
 contract UniswapV3Adapter is ConvertProxyBase {
     // Errors //
-    error AssetNotSupportedByZkFi(uint24 assetId);
     error UnsupportedAsset(uint24 assetId);
-    // Rename these
-    error OnlySingleAssetSwapSupported();
-    error InAssetValueShouldBeNonZero();
-    error ZeroAddressError();
+    error MultiAssetSwap();
+    error ZeroValues();
+    error ZeroAddress();
 
     ISwapRouter02 public immutable swapRouter02;
     uint24 public constant feeTier = 3000;
@@ -38,27 +36,22 @@ contract UniswapV3Adapter is ConvertProxyBase {
         uint256 inValue;
         // Checks
         if (inAssetIds.length != 1 || inValues.length != 1) {
-            revert OnlySingleAssetSwapSupported();
+            revert MultiAssetSwap();
         }
 
         if (inValues[0] == 0) {
-            revert InAssetValueShouldBeNonZero();
+            revert ZeroValues();
         } else {
             inValue = inValues[0];
         }
 
-        // getting asset details
-        // TODO: check if outAsset is supported by zkFi pool
-        // (bool success, bytes memory inAssetRes) = zkfiPool.call(
-        //     abi.encodeWithSignature("getAsset(uint24)", inAssetIds[0])
-        // );
-        // if (!success) {
-        //     revert("Failed call to zkFi");
-        // }
-
         Asset memory inAsset = getAsset(inAssetIds[0]);
         if (!inAsset.isSupported) {
             revert UnsupportedAsset(inAssetIds[0]);
+        }
+
+        if(inAsset.assetAddress == address(0)) {
+            revert ZeroAddress();
         }
 
         // decoding payload
@@ -69,13 +62,6 @@ contract UniswapV3Adapter is ConvertProxyBase {
         ) = abi.decode(payload, (uint24, address, uint256));
 
         // TODO: check if outAsset is supported by zkFi pool
-        // (bool status, bytes memory outAssetRes) = ZKFI_POOL.call(
-        //     abi.encodeWithSignature("getAsset(uint24)", outAssetId)
-        // );
-        // if (!status) {
-        //     revert("Failed call to zkFi");
-        // }
-        // Asset memory outAsset = abi.decode(outAssetRes, (Asset));
         Asset memory outAsset = getAsset(outAssetId);
         if (!outAsset.isSupported) {
             revert UnsupportedAsset(outAssetId);

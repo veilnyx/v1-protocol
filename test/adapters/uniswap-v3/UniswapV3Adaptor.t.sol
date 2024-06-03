@@ -2,48 +2,61 @@
 pragma solidity 0.8.24;
 pragma abicoder v2;
 
-import {BaseAdapterTest} from "test/adapters/BaseAdapterTest.sol";
+import {BaseScript} from "script/BaseScript.sol";
+import {BaseTest} from "test/fixtures/BaseTest.sol";
 import {Pool} from "src/core/Pool.sol";
+import {ZkFiDeploy} from "script/deploy/ZkFi.s.sol";
 import {ZTransaction} from "src/libraries/ZTransaction.sol";
-import {ISwapRouter02} from "src/adaptors/uniswap-v3/ISwapRouter02.sol";
 import {UniswapV3Adapter} from "src/adaptors/uniswap-v3/UniswapV3Adapter.sol";
 import {IWToken} from "src/interfaces/IWToken.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Asset} from "src/libraries/Asset.sol";
 import {console} from "forge-std/console.sol";
 
-contract UniswapV3AdaptorTest is BaseAdapterTest {
-    address public constant WETH = 0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14;
-    address public constant USDC = 0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238;
-    IWToken public constant iWETH = IWToken(WETH);
+contract UniswapV3AdaptorTest is BaseTest, BaseScript {
+    error CheckChainAssetConfig();
+    
+    Pool pool;
+    UniswapV3Adapter uniswapV3Adapter;
+    address uniswapSwapRouter02;
+    address public WETH;
+    address public USDC;
+    IWToken public iWETH;
     uint256 public constant INITIAL_SUPPLY = 1 ether;
     uint256 public constant SWAP_AMT = 0.01 ether;
-    address public owner = vm.envAddress("ANVIL_PUBLIC_KEY");
-    address public user = 0x70997970C51812dc3A010C7d01b50e0d17dc79C8;
-    UniswapV3Adapter uniswapV3Adapter;
+    address public user = makeAddr("user");
 
     function setUp() external {
-        _runBaseTest();
+        WETH = _config.initAssetAddresses()[0];
+        if(WETH == address(0)) {
+             revert CheckChainAssetConfig();
+        }
+        USDC = _config.initAssetAddresses()[1];
+        if(USDC == address(0)) {
+            revert CheckChainAssetConfig();
+        }
+
+        iWETH = IWToken(WETH);
+        ZkFiDeploy zkFiDeployer = new ZkFiDeploy();
+        (pool, uniswapSwapRouter02) = zkFiDeployer.run();
+        
         uniswapV3Adapter = new UniswapV3Adapter(
             uniswapSwapRouter02,
             address(pool)
         );
 
-        console.log("Uni adaptor:", address(uniswapV3Adapter));
+        console.log("Uniswap adaptor:", address(uniswapV3Adapter));
 
-        // // TODO: Use a cheat code for Uni adp. address for consistency
-        vm.prank(owner);
+        // TODO: Use a cheat code for Uni adp. address for consistency
+        address poolOwner = pool.owner();
+        vm.prank(poolOwner);
         pool.setConvertProxy(address(uniswapV3Adapter), true);
 
         vm.deal(user, INITIAL_SUPPLY * 2);
-        console.log("User ETH bal:", address(user).balance);
-
         vm.startPrank(user);
         iWETH.deposit{value: INITIAL_SUPPLY}();
-        console.log("User WETH bal:", iWETH.balanceOf(user));
         iWETH.approve(address(pool), INITIAL_SUPPLY);
-        console.log("WETH deposited and approved to pool");
-
+        
         ZTransaction memory ztxDeposit = _loadZTx("deposit_1_weth");
         pool.transact(ztxDeposit);
         vm.stopPrank();
