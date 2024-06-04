@@ -29,7 +29,7 @@ contract PaymasterTest is Test {
         paymaster.updateAssetFee(assetId, feeValue);
         assertEq(paymaster.getAssetFee(assetId), feeValue);
 
-        bool isSupported = paymaster.isFeeAssetSupported(assetId);
+        bool isSupported = paymaster.isAssetFeeSupported(assetId);
         assertTrue(isSupported);
     }
 
@@ -37,18 +37,21 @@ contract PaymasterTest is Test {
         uint256 value = 1000 ether;
         vm.deal(address(this), value);
 
-        paymaster.deposit{value: value}();
+        paymaster.depositToEntryPoint{value: value}();
 
-        uint256 deposit = paymaster.getDeposit();
+        uint256 deposit = paymaster.getEntryPointDeposit();
         assertEq(deposit, value);
 
         address withdrawAddress = address(
             uint160(uint256(keccak256("withdraw")))
         );
         uint256 withdrawValue = 100 ether;
-        paymaster.withdrawTo(payable(withdrawAddress), withdrawValue);
+        paymaster.withdrawFromEntryPoint(
+            payable(withdrawAddress),
+            withdrawValue
+        );
 
-        uint256 newDeposit = paymaster.getDeposit();
+        uint256 newDeposit = paymaster.getEntryPointDeposit();
 
         assertEq(newDeposit, value - withdrawValue);
         assertEq(withdrawAddress.balance, withdrawValue);
