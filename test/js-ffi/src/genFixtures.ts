@@ -113,11 +113,21 @@ const convertReqs = {
     values: [parseEther("0.01")],
     feeAssetId: wethAssetId,
     to: "0x58ECDae15111ba09e6B91D6aE236eb9C3aca9a6F",  // adaptor to which the ZkFi Convertor will call to execute swap
+    viaBundler: false,
+    paymaster: zeroAddress,
+    payload:
+      "0x000000000000000000000000000000000000000000000000000000000001000200000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000", // beneficiary: pool address (address(0))
+  }, swap_1e16_weth_to_usdc_via_bundler: {
+    type: TransactionType.CONVERT,
+    assetIds: [wethAssetId],
+    values: [parseEther("0.01")],
+    feeAssetId: wethAssetId,
+    to: "0x58ECDae15111ba09e6B91D6aE236eb9C3aca9a6F",  // adaptor to which the ZkFi Convertor will call to execute swap
     viaBundler: true,
     paymaster: "0x5AD0ED34c2E4c6555dc008d4E8ff52480cdB3DfB",
     payload:
       "0x000000000000000000000000000000000000000000000000000000000001000200000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000", // beneficiary: pool address (address(0))
-  },
+  }
 };
 
 const createMockZTx = async (

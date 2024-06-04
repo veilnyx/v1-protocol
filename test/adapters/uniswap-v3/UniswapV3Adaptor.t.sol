@@ -83,6 +83,22 @@ contract UniswapV3AdaptorTest is BaseTest, BaseScript {
         assert(poolUSDCBalPostConvert > poolUSDCBalBeforeConvert);
     }
 
+     function testWethToUSDCSwapToPoolViaBundler() public /* zkFiSetup */ {
+        console.log("Initiating WETH<>USDC swap");
+        uint256 poolUSDCBalBeforeConvert = IERC20(USDC).balanceOf(
+            address(pool)
+        );
+
+        ZTransaction memory ztxDeposit = _loadZTx("swap_1e16_weth_to_usdc_via_bundler");
+        pool.transact(ztxDeposit);
+
+        // Asserts
+        uint256 poolUSDCBalPostConvert = IERC20(USDC).balanceOf(address(pool));
+        console.log("Pool USDC bal before swap:", poolUSDCBalBeforeConvert);
+        console.log("Pool USDC bal after swap:", poolUSDCBalPostConvert);
+        assert(poolUSDCBalPostConvert > poolUSDCBalBeforeConvert);
+    }
+
     // function testWethToUSDCToWETHSwapToPool() external /* zkFiSetup */ {
     //     testWethToUSDCSwapToPool();
     //     console.log("Initiating USDC<>WETH");
