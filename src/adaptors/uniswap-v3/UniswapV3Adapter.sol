@@ -7,6 +7,7 @@ import {IConvertProxy} from "src/interfaces/IConvertProxy.sol";
 import {ConvertProxyBase} from "src/base/ConvertProxyBase.sol";
 import {Asset, AssetType} from "src/libraries/Asset.sol";
 import {ISwapRouter02} from "./ISwapRouter02.sol";
+import {console} from "forge-std/Test.sol";
 
 contract UniswapV3Adapter is ConvertProxyBase {
     // Errors //
@@ -43,6 +44,7 @@ contract UniswapV3Adapter is ConvertProxyBase {
             revert ZeroValues();
         } else {
             inValue = inValues[0];
+            console.log("UniswapV3Adp:: inValue to swap:", inValue);
         }
 
         Asset memory inAsset = getAsset(inAssetIds[0]);
@@ -50,16 +52,15 @@ contract UniswapV3Adapter is ConvertProxyBase {
             revert UnsupportedAsset(inAssetIds[0]);
         }
 
-        if(inAsset.assetAddress == address(0)) {
+        if (inAsset.assetAddress == address(0)) {
             revert ZeroAddress();
         }
 
         // decoding payload
-        (
-            uint24 outAssetId,
-            address beneficiary,
-            uint256 minOut
-        ) = abi.decode(payload, (uint24, address, uint256));
+        (uint24 outAssetId, address beneficiary, uint256 minOut) = abi.decode(
+            payload,
+            (uint24, address, uint256)
+        );
 
         // TODO: check if outAsset is supported by zkFi pool
         Asset memory outAsset = getAsset(outAssetId);

@@ -7,7 +7,7 @@ import {IVerifier} from "../interfaces/IVerifier.sol";
 import {IConvertor} from "../interfaces/IConvertor.sol";
 import {Asset, AssetLogic} from "./Asset.sol";
 import {MerkleTree, MerkleTreeLogic} from "./MerkleTree.sol";
-
+import {console} from "forge-std/Test.sol";
 /// @title ZTransactionType enum representing types of shielded transactions
 enum ZTransactionType {
     DEPOSIT,
@@ -56,7 +56,7 @@ struct ZTransaction {
     bytes inMemos;
     bytes[] outMemos;
     // Fees info
-    uint256 feeData; // 20-byte address + 12-byte fee value
+    uint256 feeData; //  160-bit address + 96-bit feeValue
     uint256 beneficiary; // stealth address for any public fund to shielded account
     bytes beneficiaryMemo;
     address target;
@@ -296,16 +296,18 @@ library ZTransactionLogic {
         ZTransaction memory ztx
     ) internal {
         uint256 feeValue = uint256(uint96(ztx.feeData));
-
+        console.log("ZTransaction::_transferFee feeValue:", feeValue);
+        
         if (feeValue != 0) {
             address paymaster = address(bytes20(bytes32(ztx.feeData)));
-
+            console.log("Transfering fee to paymaster", paymaster);
             AssetLogic.transferAsset({
                 assets: assets,
                 to: paymaster,
                 assetId: ztx.pubAssetIds[0],
                 value: feeValue
             });
+            console.log("Fee transfered to paymaster:", feeValue);
         }
     }
 
@@ -316,15 +318,19 @@ library ZTransactionLogic {
     ) internal {
         uint256 pubAssetCount = ztx.pubAssetIds.length;
         uint256 feeValue = uint256(uint96(ztx.feeData));
-        uint256 firstValue = ztx.pubValues[0] - feeValue;
+        ztx.pubValues[0] = ztx.pubValues[0] - feeValue;
+        console.log("_transferToExceptFee:: ztx.pubValue:", ztx.pubValues[0]);
+        console.log("Deduction feeValue:", feeValue);
 
-        if (firstValue != 0) {
+        if (ztx.pubValues[0] != 0) {
+            console.log("Transferring except fee to convertor:", ztx.pubValues[0]);
             AssetLogic.transferAsset({
                 assets: assets,
                 to: to,
                 assetId: ztx.pubAssetIds[0],
-                value: firstValue
+                value: ztx.pubValues[0]
             });
+
         }
 
         for (uint8 i = 1; i < pubAssetCount; ) {
