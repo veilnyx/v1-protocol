@@ -16,7 +16,7 @@ import {console} from "forge-std/console.sol";
 
 contract UniswapV3AdaptorTest is BaseTest, BaseScript {
     error CheckChainAssetConfig();
-    
+
     Pool pool;
     UniswapV3Adapter uniswapV3Adapter;
     address uniswapSwapRouter02;
@@ -30,31 +30,29 @@ contract UniswapV3AdaptorTest is BaseTest, BaseScript {
 
     function setUp() external {
         WETH = _config.initAssetAddresses()[0];
-        if(WETH == address(0)) {
-             revert CheckChainAssetConfig();
+        if (WETH == address(0)) {
+            revert CheckChainAssetConfig();
         }
         USDC = _config.initAssetAddresses()[1];
-        if(USDC == address(0)) {
+        if (USDC == address(0)) {
             revert CheckChainAssetConfig();
         }
 
         iWETH = IWToken(WETH);
         ZkFiDeploy zkFiDeployer = new ZkFiDeploy();
-        (pool, uniswapSwapRouter02, paymaster) = zkFiDeployer.run();
-        
+        (pool, uniswapSwapRouter02) = zkFiDeployer.run();
+
         uniswapV3Adapter = new UniswapV3Adapter(
             uniswapSwapRouter02,
             address(pool)
         );
 
         console.log("Uniswap adaptor:", address(uniswapV3Adapter));
-        
+
         // TODO: Use a cheat code for Uni adp. address for consistency
         address poolOwner = pool.owner();
-        vm.startPrank(poolOwner);
+        vm.prank(poolOwner);
         pool.setConvertProxy(address(uniswapV3Adapter), true);
-        paymaster.updateAssetFee(65537, 0.01 ether);
-        vm.stopPrank();
 
         vm.deal(user, INITIAL_SUPPLY * 2);
         vm.startPrank(user);

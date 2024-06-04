@@ -17,7 +17,7 @@ import {BaseScript} from "../BaseScript.sol";
 import {console} from "forge-std/Test.sol";
 
 contract ZkFiDeploy is BaseScript {
-    function run() external broadcast returns (Pool, address, Paymaster) {
+    function run() external broadcast returns (Pool, address) {
         // verifier
         Verifier22 v22 = new Verifier22();
         VerifierInfo[] memory vInfos = new VerifierInfo[](1);
@@ -64,6 +64,6 @@ contract ZkFiDeploy is BaseScript {
         // Paymaster
         Paymaster paymaster = new Paymaster(entryPoint, address(gateway));
         console.log("Paymaster address:", address(paymaster));
-        return (pool, _config.uniswapSwapRouter02(), paymaster);
+        return (pool, _config.uniswapSwapRouter02());
     }
 }
