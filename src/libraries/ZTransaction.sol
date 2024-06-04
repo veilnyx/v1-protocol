@@ -330,7 +330,7 @@ library ZTransactionLogic {
                 assetId: ztx.pubAssetIds[0],
                 value: ztx.pubValues[0]
             });
-
+            
         }
 
         for (uint8 i = 1; i < pubAssetCount; ) {
