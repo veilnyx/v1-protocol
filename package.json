@@ -1,0 +1,21 @@
+{
+  "name": "@zkfi-tech/v1-protocol",
+  "version": "1.0.0",
+  "description": "Smart contracts for zkfi v1 protocol",
+  "scripts": {
+    "clean": "rm -rf cache out",
+    "build": "forge build",
+    "test": "forge test"
+  },
+  "keywords": [],
+  "author": "zkFi Team",
+  "dependencies": {
+    "@account-abstraction/contracts": "^0.7.0",
+    "@openzeppelin/contracts": "^5.0.2",
+    "@openzeppelin/contracts-upgradeable": "^5.0.2",
+    "poseidon-solidity": "^0.0.5"
+  },
+  "devDependencies": {
+    "forge-std": "github:foundry-rs/forge-std#v1.8.2"
+  }
+}
