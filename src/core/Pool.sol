@@ -5,11 +5,13 @@ import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Own
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
+import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
+import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {IVerifier} from "../interfaces/IVerifier.sol";
 import {IPool} from "../interfaces/IPool.sol";
 import {IConvertor} from "../interfaces/IConvertor.sol";
 import {PoolStorage} from "../base/PoolStorage.sol";
-import {PoolAccount} from "../base/PoolAccount.sol";
 import {Asset, AssetType, AssetLogic} from "../libraries/Asset.sol";
 import {ZTransaction, ZTransactionLogic} from "../libraries/ZTransaction.sol";
 import {MerkleTree, MerkleTreeLogic} from "../libraries/MerkleTree.sol";
@@ -20,6 +22,7 @@ contract Pool is
     UUPSUpgradeable,
     OwnableUpgradeable,
     ReentrancyGuardUpgradeable,
+    PausableUpgradeable,
     PoolStorage
 {
     using MerkleTreeLogic for MerkleTree;
@@ -29,19 +32,18 @@ contract Pool is
         uint256 treeDepth,
         address verifier_,
         address convertor_,
-        address entryPoint_,
         AssetType initAssetType,
         address[] calldata initAssetAddresses
     ) external initializer {
         __Ownable_init(msg.sender);
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
+        __Pausable_init();
 
         verifier = verifier_;
         convertor = convertor_;
-        entryPoint = entryPoint_;
 
-        _tree.init(treeDepth);
+        _commitmentTree.init(treeDepth);
         _assetCounts[initAssetType] = AssetLogic.addAssets(
             _assetIds,
             _assets,
@@ -51,15 +53,33 @@ contract Pool is
         );
     }
 
-    function transact(ZTransaction memory ztx) external nonReentrant {
+    function transact(
+        ZTransaction memory ztx
+    ) external nonReentrant whenNotPaused {
         ztx.execute({
-            tree: _tree,
+            tree: _commitmentTree,
             assets: _assets,
             convertProxies: _convertProxies,
             markedNullifiers: _markedNullifiers,
             verifier: verifier,
             convertor: convertor
         });
+    }
+
+    function registerComplianceKeys(
+        uint256[4] calldata keys
+    ) external onlyOwner {
+        complianceKeys[_complianceKeysCount] = keys;
+        emit RegisterComplianceKeys(_complianceKeysCount, keys);
+        _complianceKeysCount += 1;
+    }
+
+    function pause() external onlyOwner {
+        _pause();
+    }
+
+    function unpause() external onlyOwner {
+        _unpause();
     }
 
     function addAssets(
@@ -134,23 +154,23 @@ contract Pool is
     }
 
     function zeroes(uint256 level) external view returns (uint256) {
-        return _tree.zeroes[level];
+        return _commitmentTree.zeroes[level];
     }
 
     function getLastRoot() external view returns (uint256) {
-        return _tree.roots[_tree.currentRootIndex];
+        return _commitmentTree.roots[_commitmentTree.currentRootIndex];
     }
 
     function getCurrentRootIndex() external view returns (uint256) {
-        return _tree.currentRootIndex;
+        return _commitmentTree.currentRootIndex;
     }
 
     function getLastSubtrees(uint256 level) external view returns (uint256) {
-        return _tree.lastSubtrees[level];
+        return _commitmentTree.lastSubtrees[level];
     }
 
     function isKnownRoot(uint256 root) external view returns (bool) {
-        return _tree.isKnownRoot(root);
+        return _commitmentTree.isKnownRoot(root);
     }
 
     function getRevokerPublicKey() external view returns (uint256, uint256) {

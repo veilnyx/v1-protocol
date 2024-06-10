@@ -14,6 +14,7 @@ interface IPool {
         uint256 indexed commitment,
         bytes outMemo
     );
+    event RegisterComplianceKeys(uint256 indexed id, uint256[4] keys);
     event InputNoteMemos(bytes inMemos);
     event ComplianceMemo(bytes complianceMemo);
     event NullifierMarked(uint256 indexed nullifier);

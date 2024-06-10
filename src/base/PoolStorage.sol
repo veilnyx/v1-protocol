@@ -10,20 +10,20 @@ abstract contract PoolStorage {
 
     uint256 public constant ZERO_LEAF = uint256(keccak256("zkFi")) % FIELD_SIZE;
 
-    address public entryPoint;
     address public verifier;
     address public convertor;
 
-    mapping(AssetType => uint16) internal _assetCounts;
-
     /// Asset ids are are 3 bytes long - 1 byte for asset type and 2 bytes for asset uid
+    mapping(AssetType => uint16) internal _assetCounts;
+    mapping(address assetAddress => uint24 assetId) _assetIds;
     mapping(uint24 assetId => Asset asset) _assets;
 
-    MerkleTree internal _tree;
-
-    mapping(address assetAddress => uint24 assetId) _assetIds;
+    MerkleTree internal _commitmentTree;
 
     mapping(uint256 => bool) internal _markedNullifiers;
 
     mapping(address => bool) internal _convertProxies;
+
+    uint256 internal _complianceKeysCount;
+    mapping(uint256 => uint256[4]) complianceKeys;
 }
