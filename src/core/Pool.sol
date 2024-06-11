@@ -53,6 +53,32 @@ contract Pool is
         );
     }
 
+    function register(
+        uint256 addr,
+        bytes calldata publicKeys,
+        bytes calldata signature
+    ) external view whenNotPaused {
+        if (_addressRegistered[addr]) {
+            revert AddressAlreadyRegistered(addr);
+        }
+
+        // Each public key is 32 bytes long
+        if (publicKeys.length != 64) {
+            revert BadArguments();
+        }
+
+        bytes32 msgHash = MessageHashUtils.toEthSignedMessageHash(
+            bytes.concat(bytes32(addr), publicKeys)
+        );
+
+        address sender = ECDSA.recover(msgHash, signature);
+
+        uint256 regIdx = _addressTree.insert(addr);
+        _addressRegistered[addr] = true;
+
+        emit RegisterAddress(sender, addr, regIdx, publicKeys);
+    }
+
     function transact(
         ZTransaction memory ztx
     ) external nonReentrant whenNotPaused {

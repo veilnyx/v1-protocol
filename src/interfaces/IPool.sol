@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {ZTransaction} from "../libraries/ZTransaction.sol";
+import {ZTransaction, ZTransactionType} from "../libraries/ZTransaction.sol";
 import {AssetType, Asset} from "../libraries/Asset.sol";
 
 interface IPool {
@@ -14,16 +14,32 @@ interface IPool {
         uint256 indexed commitment,
         bytes outMemo
     );
+    event RegisterAddress(
+        address indexed sender,
+        uint256 indexed addr,
+        uint256 leafIndex,
+        bytes publicKeys
+    );
     event RegisterComplianceKeys(uint256 indexed id, uint256[4] keys);
     event InputNoteMemos(bytes inMemos);
     event ComplianceMemo(bytes complianceMemo);
     event NullifierMarked(uint256 indexed nullifier);
     event AssetAdded(address indexed assetAddress, uint24 assetId);
 
+    // how do i know its mine & whether im sender or receiver
+    event ZTransactionLog(
+        ZTransactionType indexed txType,
+        uint256 revokerId,
+        bytes historyMemo,
+        bytes[] memos,
+        uint256 endLeafIndex
+    );
+
     /////////////////////////////////////////
     //            ERRORS                   //
     ////////////////////////////////////////
 
+    error AddressAlreadyRegistered(uint256 addr);
     error BadArguments();
     error InvalidProof();
     error UnexpectedFee();
@@ -36,6 +52,12 @@ interface IPool {
     /////////////////////////////////////////
     //         WRITE METHODS               //
     ////////////////////////////////////////
+
+    function register(
+        uint256 addr,
+        bytes calldata publicKeys,
+        bytes calldata signature
+    ) external view;
 
     function transact(ZTransaction memory ztx) external;
 
