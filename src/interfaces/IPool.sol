@@ -57,7 +57,7 @@ interface IPool {
         uint256 addr,
         bytes calldata publicKeys,
         bytes calldata signature
-    ) external view;
+    ) external;
 
     function transact(ZTransaction memory ztx) external;
 

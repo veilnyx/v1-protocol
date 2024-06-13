@@ -44,6 +44,7 @@ contract Pool is
         convertor = convertor_;
 
         _commitmentTree.init(treeDepth);
+        _addressTree.init(treeDepth / 2);
         _assetCounts[initAssetType] = AssetLogic.addAssets(
             _assetIds,
             _assets,
@@ -57,7 +58,7 @@ contract Pool is
         uint256 addr,
         bytes calldata publicKeys,
         bytes calldata signature
-    ) external view whenNotPaused {
+    ) external whenNotPaused {
         if (_addressRegistered[addr]) {
             revert AddressAlreadyRegistered(addr);
         }

@@ -12,11 +12,20 @@ struct MerkleTree {
     mapping(uint256 => uint256) lastSubtrees;
 }
 
+error MerkleTreeFull();
+
 library MerkleTreeLogic {
     uint256 public constant FIELD_SIZE =
         21888242871839275222246405745257275088548364400416034343698204186575808495617;
     uint256 public constant ZERO_LEAF = uint256(keccak256("zkFi")) % FIELD_SIZE;
     uint8 public constant ROOT_HISTORY_SIZE = 101;
+
+    modifier whenTreeNotFull(MerkleTree storage self) {
+        if(self.nextLeafIndex >= (2 ** self.depth)) {
+            revert MerkleTreeFull();
+        }
+        _;
+    }
 
     function init(MerkleTree storage self, uint256 depth) public {
         self.depth = depth;
@@ -44,9 +53,45 @@ library MerkleTreeLogic {
 
     function insert(
         MerkleTree storage self,
+        uint256 userAddress
+    ) public whenTreeNotFull(self) returns (uint256) {
+        uint256 depth = self.depth;
+
+        uint256 currentLevelHash = userAddress;
+        uint256 currentLevelIndex = self.nextLeafIndex;
+
+        uint256 left;
+        uint256 right;
+
+        for (uint256 l = 0; l < depth; l++) {
+            if (currentLevelIndex % 2 == 0) {
+                // Insertion on the left leaf
+                left = currentLevelHash;
+                right = self.zeroes[l];
+                self.lastSubtrees[l] = currentLevelHash;
+            } else {
+                // insertion on the right leaf
+                left = self.lastSubtrees[l];
+                right = currentLevelHash;
+            }
+            // preparing for next level
+            currentLevelHash = hashLeaves(left, right);
+            currentLevelIndex /= 2;
+        }
+
+        self.nextLeafIndex++;
+        uint256 newRootIndex = (self.currentRootIndex + 1) % ROOT_HISTORY_SIZE;
+        self.currentRootIndex = newRootIndex;
+        self.roots[newRootIndex] = currentLevelHash;
+
+        return self.nextLeafIndex;
+    }
+
+    function insert(
+        MerkleTree storage self,
         uint256 leaf1,
         uint256 leaf2
-    ) public returns (uint256) {
+    ) public whenTreeNotFull(self) returns (uint256) {
         uint256 depth = self.depth;
         uint256 nextIndex = self.nextLeafIndex;
 
@@ -109,7 +154,7 @@ library MerkleTreeLogic {
         uint256 leaf2,
         uint256 leaf3,
         uint256 leaf4
-    ) public returns (uint256) {
+    ) public whenTreeNotFull(self) returns (uint256) {
         uint256 depth = self.depth;
         uint256 nextIndex = self.nextLeafIndex;
 
