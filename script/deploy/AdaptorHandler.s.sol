@@ -2,11 +2,10 @@
 pragma solidity ^0.8.24;
 
 import {BaseScript} from "../BaseScript.sol";
+import {AdaptorHandler} from "src/core/AdaptorHandler.sol";
 
-import {Convertor} from "src/core/Convertor.sol";
-
-contract ConvertorDeploy is BaseScript {
+contract AdaptorHandlerDeploy is BaseScript {
     function run() external broadcast {
-        new Convertor();
+        new AdaptorHandler();
     }
 }

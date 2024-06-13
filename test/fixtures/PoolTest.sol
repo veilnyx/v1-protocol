@@ -5,7 +5,7 @@ import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.s
 import {Pool} from "src/core/Pool.sol";
 import {Verifier22} from "src/verifiers/Verifier22.sol";
 import {Verifier, VerifierInfo} from "src/core/Verifier.sol";
-import {Convertor} from "src/core/Convertor.sol";
+import {AdaptorHandler} from "src/core/AdaptorHandler.sol";
 import {Asset, AssetType} from "src/libraries/Asset.sol";
 import {ZTransaction} from "src/libraries/ZTransaction.sol";
 import {MockERC20} from "test/mocks/MockERC20.sol";
@@ -13,7 +13,7 @@ import {BaseTest} from "./BaseTest.sol";
 
 contract PoolTest is BaseTest {
     Verifier public verifier;
-    Convertor public convertor;
+    AdaptorHandler public adaptorHandler;
     Pool public pool;
 
     uint256 public treeDepth = 32;
@@ -38,7 +38,7 @@ contract PoolTest is BaseTest {
             fixture.revokerPublicKey,
             fixture.encryptionPublicKey
         );
-        convertor = new Convertor();
+        adaptorHandler = new AdaptorHandler();
         entryPoint = address(0);
 
         pool = new Pool();
@@ -68,8 +68,7 @@ contract PoolTest is BaseTest {
             pool.initialize.selector,
             treeDepth,
             address(verifier),
-            address(convertor),
-            address(entryPoint),
+            address(adaptorHandler),
             assetType,
             assetAddresses
         );

@@ -12,7 +12,7 @@ import {TransactionRequest} from "test/helpers/TransactionRequest.sol";
 import {MockDeFi} from "test/mocks/MockDeFi.sol";
 import {MockDeFiProxy} from "test/mocks/MockDeFiProxy.sol";
 
-contract PoolConvertTest is PoolTest {
+contract PoolAdaptorTest is PoolTest {
     MockDeFi public mockDefi;
     MockDeFiProxy public mockDefiProxy;
 
@@ -24,15 +24,15 @@ contract PoolConvertTest is PoolTest {
             asset1.assetAddress,
             address(mockDefi)
         );
-        pool.setConvertProxy(address(mockDefiProxy), true);
+        pool.addAdaptorSupport(address(mockDefiProxy), true);
         AssetType assetType = AssetType.ERC20;
         address[] memory addresses = new address[](1);
         addresses[0] = address(mockDefi);
         pool.addAssets(assetType, addresses);
     }
 
-    function test_supportProxy() public view {
-        bool isSupported = pool.isConvertProxySupported(address(mockDefiProxy));
+    function test_supportAdaptor() public view {
+        bool isSupported = pool.isAdaptorSupported(address(mockDefiProxy));
         assertTrue(isSupported);
     }
 }

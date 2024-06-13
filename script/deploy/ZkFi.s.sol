@@ -7,7 +7,7 @@ import {Pool} from "src/core/Pool.sol";
 import {Verifier22} from "src/verifiers/Verifier22.sol";
 import {VerifierInfo} from "src/core/Verifier.sol";
 import {Verifier} from "src/core/Verifier.sol";
-import {Convertor} from "src/core/Convertor.sol";
+import {AdaptorHandler} from "src/core/AdaptorHandler.sol";
 import {Gateway} from "src/core/Gateway.sol";
 import {Paymaster} from "src/core/Paymaster.sol";
 import {AssetType} from "src/libraries/Asset.sol";
@@ -31,8 +31,8 @@ contract ZkFiDeploy is BaseScript {
             _config.encryptionPublicKey()
         );
 
-        // Convertor
-        Convertor convertor = new Convertor();
+        // AdaptorHandler
+        AdaptorHandler adaptorHandler = new AdaptorHandler();
         // Pool
         Pool pool = new Pool();
 
@@ -43,7 +43,7 @@ contract ZkFiDeploy is BaseScript {
             (
                 _config.treeDepth(),
                 address(verifier),
-                address(convertor),
+                address(adaptorHandler),
                 _config.initAssetType(),
                 _config.initAssetAddresses()
             )
@@ -57,11 +57,25 @@ contract ZkFiDeploy is BaseScript {
 
         // Gateway
         address wToken = _config.wToken();
-        Gateway gateway = new Gateway(entryPoint, wToken, address(pool));
+        address gateway = _config.gateway();
+        if (gateway == address(0)) {
+            Gateway gatewayContract = new Gateway(
+                entryPoint,
+                wToken,
+                address(pool)
+            );
+            gateway = address(gatewayContract);
+        }
 
         // Paymaster
-        Paymaster paymaster = new Paymaster(entryPoint, address(gateway));
-        console.log("Paymaster address:", address(paymaster));
+        address paymaster = _config.paymaster();
+        if (paymaster == address(0)) {
+            Paymaster paymasterContract = new Paymaster(entryPoint, gateway);
+            paymaster = address(paymasterContract);
+        }
+
+        console.log("Paymaster address:", paymaster);
+
         return (pool, _config.uniswapSwapRouter02());
     }
 }

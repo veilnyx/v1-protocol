@@ -11,7 +11,7 @@ abstract contract PoolStorage {
     uint256 public constant ZERO_LEAF = uint256(keccak256("zkFi")) % FIELD_SIZE;
 
     address public verifier;
-    address public convertor;
+    address public adaptorHandler;
 
     MerkleTree internal _addressTree;
     mapping(uint256 => bool) internal _addressRegistered;
@@ -25,7 +25,7 @@ abstract contract PoolStorage {
 
     mapping(uint256 => bool) internal _markedNullifiers;
 
-    mapping(address => bool) internal _convertProxies;
+    mapping(address => bool) internal _adaptors;
 
     uint256 internal _complianceKeysCount;
     mapping(uint256 => uint256[4]) complianceKeys;

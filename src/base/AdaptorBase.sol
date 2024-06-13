@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {IConvertProxy} from "../interfaces/IConvertProxy.sol";
+import {IAdaptor} from "../interfaces/IAdaptor.sol";
 import {IPool} from "../interfaces/IPool.sol";
 import {Asset, AssetType} from "../libraries/Asset.sol";
 
 /// NOTE: THIS SHOULD BE STATELESS - NO STORAGE VARS!!
-abstract contract ConvertProxyBase is IConvertProxy {
+abstract contract AdaptorBase is IAdaptor {
     IPool immutable _pool;
 
     constructor(address pool_) {

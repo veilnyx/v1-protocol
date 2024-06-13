@@ -10,7 +10,7 @@ import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/Messa
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {IVerifier} from "../interfaces/IVerifier.sol";
 import {IPool} from "../interfaces/IPool.sol";
-import {IConvertor} from "../interfaces/IConvertor.sol";
+import {IAdaptorHandler} from "../interfaces/IAdaptorHandler.sol";
 import {PoolStorage} from "../base/PoolStorage.sol";
 import {Asset, AssetType, AssetLogic} from "../libraries/Asset.sol";
 import {ZTransaction, ZTransactionLogic} from "../libraries/ZTransaction.sol";
@@ -31,7 +31,7 @@ contract Pool is
     function initialize(
         uint256 treeDepth,
         address verifier_,
-        address convertor_,
+        address adaptorHandler_,
         AssetType initAssetType,
         address[] calldata initAssetAddresses
     ) external initializer {
@@ -41,7 +41,7 @@ contract Pool is
         __Pausable_init();
 
         verifier = verifier_;
-        convertor = convertor_;
+        adaptorHandler = adaptorHandler_;
 
         _commitmentTree.init(treeDepth);
         _addressTree.init(treeDepth / 2);
@@ -86,10 +86,10 @@ contract Pool is
         ztx.execute({
             tree: _commitmentTree,
             assets: _assets,
-            convertProxies: _convertProxies,
+            adaptors: _adaptors,
             markedNullifiers: _markedNullifiers,
             verifier: verifier,
-            convertor: convertor
+            adaptorHandler: adaptorHandler
         });
     }
 
@@ -122,11 +122,11 @@ contract Pool is
         });
     }
 
-    function setConvertProxy(
-        address proxyAddress,
+    function addAdaptorSupport(
+        address adaptorAddress,
         bool enable
     ) external onlyOwner {
-        _convertProxies[proxyAddress] = enable;
+        _adaptors[adaptorAddress] = enable;
     }
 
     function verifyTransactionProof(
@@ -157,10 +157,10 @@ contract Pool is
         return _assets[id];
     }
 
-    function isConvertProxySupported(
-        address proxyAddress
+    function isAdaptorSupported(
+        address adaptorAddress
     ) external view returns (bool) {
-        return _convertProxies[proxyAddress];
+        return _adaptors[adaptorAddress];
     }
 
     function isMarkedNullifier(uint256 nullifier) external view returns (bool) {

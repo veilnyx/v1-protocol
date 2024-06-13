@@ -3,7 +3,7 @@ pragma solidity 0.8.24;
 
 import {Script} from "forge-std/Script.sol";
 import {console} from "forge-std/Test.sol";
-import {Convertor} from "src/core/Convertor.sol";
+import {AdaptorHandler} from "src/core/AdaptorHandler.sol";
 import {Pool} from "src/core/Pool.sol";
 
 /// @dev Static script that generates the `targetPayload` bytes for convert txns or any other purpose (if required).
@@ -12,8 +12,8 @@ contract GenerateTargetPayload is Script {
     function run() external pure returns (bytes memory) {
         bytes memory swapOutPayloadForConvertZTx = abi.encode(
             65538, // USDC
-            address(0), // beneficiary: Any EVM address or address(0) which will send out tokens to Convertor.sol. Then the Convertor.sol transfers them to the Pool.
-            0
+            address(0), // beneficiary: Any EVM address or address(0) which will send out tokens to AdaptorHandler.sol. Then the AdaptorHandler.sol transfers them to the Pool.
+            0 // minOut (for uniswap slippage protection, set to 0 for now)
         );
         return swapOutPayloadForConvertZTx;
     }

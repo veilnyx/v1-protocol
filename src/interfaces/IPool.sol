@@ -66,7 +66,7 @@ interface IPool {
         address[] memory assetAddresses
     ) external;
 
-    function setConvertProxy(address proxyAddress, bool enable) external;
+    function addAdaptorSupport(address proxyAddress, bool enable) external;
 
     /////////////////////////////////////////
     //         READ METHODS                //

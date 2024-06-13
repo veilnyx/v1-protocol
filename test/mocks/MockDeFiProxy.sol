@@ -3,12 +3,12 @@ pragma solidity ^0.8.24;
 
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {ConvertProxyBase} from "src/base/ConvertProxyBase.sol";
+import {AdaptorBase} from "src/base/AdaptorBase.sol";
 import {MockDeFi} from "./MockDeFi.sol";
 
 import {console2} from "forge-std/console2.sol";
 
-contract MockDeFiProxy is ERC20, ConvertProxyBase {
+contract MockDeFiProxy is ERC20, AdaptorBase {
     address public immutable tokenAddress;
     address public immutable mockDefi;
 
@@ -16,12 +16,12 @@ contract MockDeFiProxy is ERC20, ConvertProxyBase {
         address assetManager_,
         address tokenAddress_,
         address mockDefi_
-    ) ERC20("MockDeFi", "MDF") ConvertProxyBase(assetManager_) {
+    ) ERC20("MockDeFi", "MDF") AdaptorBase(assetManager_) {
         tokenAddress = tokenAddress_;
         mockDefi = mockDefi_;
     }
 
-    function convert(
+    function adaptorConnect(
         uint24[] calldata inAssetIds,
         uint256[] calldata inValues,
         bytes calldata /*payload*/

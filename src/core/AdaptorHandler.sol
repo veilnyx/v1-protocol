@@ -3,15 +3,15 @@ pragma solidity ^0.8.24;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {IConvertor} from "../interfaces/IConvertor.sol";
-import {IConvertProxy} from "../interfaces/IConvertProxy.sol";
+import {IAdaptorHandler} from "../interfaces/IAdaptorHandler.sol";
+import {IAdaptor} from "../interfaces/IAdaptor.sol";
 import {IPool} from "../interfaces/IPool.sol";
 import {Asset, AssetType} from "../libraries/Asset.sol";
 
-contract Convertor is IConvertor {
+contract AdaptorHandler is IAdaptorHandler {
     using SafeERC20 for IERC20;
 
-    function convert(
+    function handleAdaptor(
         address target,
         uint24[] calldata inAssetIds,
         uint256[] calldata inValues,
@@ -19,7 +19,7 @@ contract Convertor is IConvertor {
     ) external payable returns (uint24[] memory, uint256[] memory) {
         (bool success, bytes memory res) = target.delegatecall(
             abi.encodeCall(
-                IConvertProxy.convert,
+                IAdaptor.adaptorConnect,
                 (inAssetIds, inValues, targetPayload)
             )
         );

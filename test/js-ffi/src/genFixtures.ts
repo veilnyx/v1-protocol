@@ -112,7 +112,7 @@ const convertReqs = {
     assetIds: [wethAssetId],
     values: [parseEther("0.01")],
     feeAssetId: wethAssetId,
-    to: "0x58ECDae15111ba09e6B91D6aE236eb9C3aca9a6F",  // adaptor to which the ZkFi Convertor will call to execute swap
+    to: "0x67aD37B223C2EA3357456b6160199b98D9478799",  // adaptor to which the ZkFi Convertor will call to execute swap
     viaBundler: false,
     paymaster: zeroAddress,
     payload:
@@ -122,9 +122,9 @@ const convertReqs = {
     assetIds: [wethAssetId],
     values: [parseEther("0.01")],
     feeAssetId: wethAssetId,
-    to: "0x58ECDae15111ba09e6B91D6aE236eb9C3aca9a6F",  // adaptor to which the ZkFi Convertor will call to execute swap
+    to: "0x67aD37B223C2EA3357456b6160199b98D9478799",  // adaptor to which the ZkFi Convertor will call to execute swap
     viaBundler: true,
-    paymaster: "0x5AD0ED34c2E4c6555dc008d4E8ff52480cdB3DfB",
+    paymaster: "0xE45c40643af3aa4146E1B1C95051c23f7439ed75", // paymaster address on Sepolia
     payload:
       "0x000000000000000000000000000000000000000000000000000000000001000200000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000", // beneficiary: pool address (address(0))
   }

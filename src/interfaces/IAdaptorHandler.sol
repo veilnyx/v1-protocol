@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.18;
 
-interface IConvertor {
+interface IAdaptorHandler {
     error InvalidOutputValue();
 
-    function convert(
+    function handleAdaptor(
         address target,
         uint24[] calldata assetIds,
         uint256[] calldata inValues,

@@ -4,7 +4,7 @@ pragma solidity ^0.8.24;
 import {PoseidonT4} from "poseidon-solidity/PoseidonT4.sol";
 import {IPool} from "../interfaces/IPool.sol";
 import {IVerifier} from "../interfaces/IVerifier.sol";
-import {IConvertor} from "../interfaces/IConvertor.sol";
+import {IAdaptorHandler} from "../interfaces/IAdaptorHandler.sol";
 import {Asset, AssetLogic} from "./Asset.sol";
 import {MerkleTree, MerkleTreeLogic} from "./MerkleTree.sol";
 
@@ -40,7 +40,7 @@ enum MemoType {
 /// @param beneficiaryMemo  Memo for beneficiary stealth address. This is encrypted blinding factor which
 ///                         is used to generate `beneficiary` stealth address
 /// @param target           This is either a withdraw address in case of `WITHDRAW` transaction or
-///                         a convert proxy address in case of `CONVERT` transaction
+///                         a targetted adaptor address in case of `CONVERT` transaction
 /// @param targetPayload    Payload for target contract (if applicable)
 /// @param complianceMemo   Encrypted compliance data
 struct ZTransaction {
@@ -102,22 +102,22 @@ library ZTransactionLogic {
     /// @param ztx ZTransaction to be executed
     /// @param tree MerkleTree state in this contract
     /// @param assets Mapping of assetId to Asset
-    /// @param convertProxies Mapping of convert proxy addresses
+    /// @param adaptors Mapping of supported external adaptor addresses
     /// @param markedNullifiers Mapping of nullifiers that are already marked
     /// @param verifier Verifier contract address
-    /// @param convertor Convertor contract address
+    /// @param adaptorHandler Adaptor contract address
     function execute(
         ZTransaction memory ztx,
         MerkleTree storage tree,
         mapping(uint24 => Asset) storage assets,
-        mapping(address => bool) storage convertProxies,
+        mapping(address => bool) storage adaptors,
         mapping(uint256 => bool) storage markedNullifiers,
         address verifier,
-        address convertor
+        address adaptorHandler
     ) external {
         _validateTransaction(
             tree,
-            convertProxies,
+            adaptors,
             markedNullifiers,
             verifier,
             ztx
@@ -143,8 +143,8 @@ library ZTransactionLogic {
 
         // Perform any conversions
         if (ztx.txType == ZTransactionType.CONVERT) {
-            _transferToExceptFee(assets, convertor, ztx);
-            _convert(assets, convertor, ztx);
+            _transferToExceptFee(assets, adaptorHandler, ztx);
+            _convert(assets, adaptorHandler, ztx);
         }
 
         _mintNotes(tree, ztx.commitments, ztx.inMemos, ztx.outMemos);
@@ -240,19 +240,20 @@ library ZTransactionLogic {
 
     function _convert(
         mapping(uint24 => Asset) storage assets,
-        address convertor,
+        address adaptorHandler,
         ZTransaction memory ztx
     ) internal {
-        (uint24[] memory outAssetIds, uint256[] memory outValues) = IConvertor(
-            convertor
-        ).convert(
+        (
+            uint24[] memory outAssetIds,
+            uint256[] memory outValues
+        ) = IAdaptorHandler(adaptorHandler).handleAdaptor(
                 ztx.target,
                 ztx.pubAssetIds,
                 ztx.pubValues,
                 ztx.targetPayload
             );
 
-        _receiveAssetsFrom(assets, convertor, outAssetIds, outValues);
+        _receiveAssetsFrom(assets, adaptorHandler, outAssetIds, outValues);
 
         uint256 cmLen = ztx.commitments.length;
         uint256 outLen = outAssetIds.length;
@@ -363,7 +364,7 @@ library ZTransactionLogic {
 
     function _validateTransaction(
         MerkleTree storage tree,
-        mapping(address => bool) storage supportedProxies,
+        mapping(address => bool) storage supportedAdaptors,
         mapping(uint256 => bool) storage markedNullifiers,
         address verifier,
         ZTransaction memory ztx
@@ -375,7 +376,7 @@ library ZTransactionLogic {
 
         if (
             ztx.txType == ZTransactionType.CONVERT &&
-            !supportedProxies[ztx.target]
+            !supportedAdaptors[ztx.target]
         ) {
             revert IPool.UnsupportedProxy();
         }

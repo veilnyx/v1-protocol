@@ -3,8 +3,8 @@ pragma solidity ^0.8.24;
 
 import {Asset, AssetType} from "../libraries/Asset.sol";
 
-abstract contract IConvertProxy {
-    function convert(
+abstract contract IAdaptor {
+    function adaptorConnect(
         uint24[] calldata inAssetIds,
         uint256[] calldata inValues,
         bytes calldata payload

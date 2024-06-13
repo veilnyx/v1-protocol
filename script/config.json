@@ -50,6 +50,8 @@
     "chain": "eth-sepolia",
     "treeDepth": 32,
     "entryPoint": "0x0000000071727De22E5E9d8BAf0edAc6f37da032",
+    "gateway": "0x329FA1dd7f274C0C0B3F2B7539EF71f435a89F04",
+    "paymaster": "0xE45c40643af3aa4146E1B1C95051c23f7439ed75",
     "wToken": "0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14",
     "uniswapSwapRouter02": "0x3bFA4769FB09eefC5a80d6E87c3B9C650f7Ae48E",
     "initAssetType": 1,

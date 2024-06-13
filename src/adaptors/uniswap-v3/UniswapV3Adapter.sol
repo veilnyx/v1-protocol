@@ -3,13 +3,12 @@ pragma solidity ^0.8.24;
 
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {IConvertProxy} from "src/interfaces/IConvertProxy.sol";
-import {ConvertProxyBase} from "src/base/ConvertProxyBase.sol";
+import { AdaptorBase } from "src/base/AdaptorBase.sol";
 import {Asset, AssetType} from "src/libraries/Asset.sol";
 import {ISwapRouter02} from "./ISwapRouter02.sol";
 import {console} from "forge-std/Test.sol";
 
-contract UniswapV3Adapter is ConvertProxyBase {
+contract UniswapV3Adapter is AdaptorBase {
     // Errors //
     error UnsupportedAsset(uint24 assetId);
     error MultiAssetSwap();
@@ -19,12 +18,12 @@ contract UniswapV3Adapter is ConvertProxyBase {
     ISwapRouter02 public immutable swapRouter02;
     uint24 public constant feeTier = 3000;
 
-    constructor(address swapRouter02_, address pool_) ConvertProxyBase(pool_) {
+    constructor(address swapRouter02_, address pool_) AdaptorBase(pool_) {
         swapRouter02 = ISwapRouter02(swapRouter02_); // Uniswap V3 Swap router
     }
 
-    /// @dev Will be called by the zkFi Convertor.sol to execute the swap.
-    function convert(
+    /// @dev Will be called by the zkFi AdaptorHandler.sol to execute the swap.
+    function adaptorConnect(
         uint24[] calldata inAssetIds,
         uint256[] calldata inValues,
         bytes calldata payload
@@ -62,15 +61,14 @@ contract UniswapV3Adapter is ConvertProxyBase {
             (uint24, address, uint256)
         );
 
-        // TODO: check if outAsset is supported by zkFi pool
         Asset memory outAsset = getAsset(outAssetId);
         if (!outAsset.isSupported) {
             revert UnsupportedAsset(outAssetId);
         }
 
         if (beneficiary == address(0)) {
-            // means the out tokens will go to the ZKFI Convertor and have to be processed to the pool
-            beneficiary = address(this); // Convertor.sol
+            // means the out tokens will go to the ZKFI AdaptorHandler and have to be processed to the pool
+            beneficiary = address(this); // AdaptorHandler.sol
         }
 
         // Executing swap using UniswapV3

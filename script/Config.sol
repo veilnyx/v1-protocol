@@ -19,6 +19,8 @@ contract Config is Script {
 
     uint256 internal immutable _treeDepth = 32;
     address internal _entryPoint;
+    address internal _gateway;
+    address internal _paymaster;
     address internal _wToken;
     address internal _uniswapSwapRouter02;
 
@@ -30,54 +32,67 @@ contract Config is Script {
             vm.projectRoot(),
             "/script/config.json"
         );
-        string memory json = vm.readFile(path);
+        string memory configJson = vm.readFile(path);
+
+        // common config
         _revokerPublicKeyX = vm.parseJsonUint(
-            json,
+            configJson,
             ".common.revokerPublicKey[0]"
         );
         _revokerPublicKeyY = vm.parseJsonUint(
-            json,
+            configJson,
             ".common.revokerPublicKey[1]"
         );
 
         _encryptionPublicKeyX = vm.parseJsonUint(
-            json,
+            configJson,
             ".common.encryptionPublicKey[0]"
         );
 
         _encryptionPublicKeyY = vm.parseJsonUint(
-            json,
+            configJson,
             ".common.encryptionPublicKey[1]"
         );
 
+        // chain specific config
         string memory chainPrefix = string.concat(".", vm.toString(_chainId));
 
         _treeDepth = vm.parseJsonUint(
-            json,
+            configJson,
             string.concat(chainPrefix, ".treeDepth")
         );
 
         _entryPoint = vm.parseJsonAddress(
-            json,
+            configJson,
             string.concat(chainPrefix, ".entryPoint")
         );
 
+        _gateway = vm.parseJsonAddress(
+            configJson,
+            string.concat(chainPrefix, ".gateway")
+        );
+
+        _paymaster = vm.parseJsonAddress(
+            configJson,
+            string.concat(chainPrefix, ".paymaster")
+        );
+
         _wToken = vm.parseJsonAddress(
-            json,
+            configJson,
             string.concat(chainPrefix, ".wToken")
         );
 
         _uniswapSwapRouter02 = vm.parseJsonAddress(
-            json,
+            configJson,
             string.concat(chainPrefix, ".uniswapSwapRouter02")
         );
 
         _initAssetType = AssetType(
-            vm.parseJsonUint(json, string.concat(chainPrefix, ".initAssetType"))
+            vm.parseJsonUint(configJson, string.concat(chainPrefix, ".initAssetType"))
         );
 
         _initAssetAddresses = vm.parseJsonAddressArray(
-            json,
+            configJson,
             string.concat(chainPrefix, ".initAssetAddresses")
         );
     }
@@ -92,6 +107,14 @@ contract Config is Script {
 
     function treeDepth() external pure returns (uint256) {
         return _treeDepth;
+    }
+
+    function gateway() external view returns (address) {
+        return _gateway;
+    }
+
+    function paymaster() external view returns (address) {
+        return _paymaster;
     }
 
     function entryPoint() external view returns (address) {

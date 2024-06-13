@@ -52,7 +52,7 @@ contract UniswapV3AdaptorTest is BaseTest, BaseScript {
         // TODO: Use a cheat code for Uni adp. address for consistency
         address poolOwner = pool.owner();
         vm.prank(poolOwner);
-        pool.setConvertProxy(address(uniswapV3Adapter), true);
+        pool.addAdaptorSupport(address(uniswapV3Adapter), true);
 
         vm.deal(user, INITIAL_SUPPLY * 2);
         vm.startPrank(user);
@@ -83,13 +83,15 @@ contract UniswapV3AdaptorTest is BaseTest, BaseScript {
         assert(poolUSDCBalPostConvert > poolUSDCBalBeforeConvert);
     }
 
-     function testWethToUSDCSwapToPoolViaBundler() public /* zkFiSetup */ {
+    function testWethToUSDCSwapToPoolViaBundler() public /* zkFiSetup */ {
         console.log("Initiating WETH<>USDC swap");
         uint256 poolUSDCBalBeforeConvert = IERC20(USDC).balanceOf(
             address(pool)
         );
 
-        ZTransaction memory ztxDeposit = _loadZTx("swap_1e16_weth_to_usdc_via_bundler");
+        ZTransaction memory ztxDeposit = _loadZTx(
+            "swap_1e16_weth_to_usdc_via_bundler"
+        );
         pool.transact(ztxDeposit);
 
         // Asserts
@@ -173,7 +175,7 @@ contract UniswapV3AdaptorTest is BaseTest, BaseScript {
 //     vm.prank(proxyOwner);
 //     (bool success, ) = zkFiPoolProxy.call(
 //         abi.encodeWithSignature(
-//             "setConvertProxy(address, bool)",
+//             "addAdaptorSupport(address, bool)",
 //             address(uniswapZkFiAdaptor),
 //             true
 //         )
@@ -185,8 +187,8 @@ contract UniswapV3AdaptorTest is BaseTest, BaseScript {
 //     return pool.getAsset(assetAddress).id;
 // }
 
-// function setConvertProxy(address adaptor) external {
-//     pool.setConvertProxy(adaptor, true);
+// function addAdaptorSupport(address adaptor) external {
+//     pool.addAdaptorSupport(adaptor, true);
 // }
 
 // function loadZTx(
