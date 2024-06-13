@@ -44,7 +44,6 @@ contract ZkFiDeploy is BaseScript {
                 _config.treeDepth(),
                 address(verifier),
                 address(convertor),
-                _config.entryPoint(),
                 _config.initAssetType(),
                 _config.initAssetAddresses()
             )

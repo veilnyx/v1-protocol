@@ -2,6 +2,7 @@
 pragma solidity ^0.8.18;
 
 import {PoseidonT3} from "poseidon-solidity/PoseidonT3.sol";
+import {PoseidonT2} from "poseidon-solidity/PoseidonT2.sol";
 
 struct MerkleTree {
     uint256 depth;
@@ -57,7 +58,7 @@ library MerkleTreeLogic {
     ) public whenTreeNotFull(self) returns (uint256) {
         uint256 depth = self.depth;
 
-        uint256 currentLevelHash = userAddress;
+        uint256 currentLevelHash = PoseidonT2.hash([userAddress]);
         uint256 currentLevelIndex = self.nextLeafIndex;
 
         uint256 left;

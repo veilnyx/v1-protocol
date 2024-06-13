@@ -14,7 +14,6 @@ contract PoolProxyDeploy is BaseScript {
         address poolImpl = _getContract("PoolImpl");
 
         uint256 treeDepth = _config.treeDepth();
-        address entryPoint = _config.entryPoint();
         AssetType initAssetType = _config.initAssetType();
         address[] memory initAssetAddresses = _config.initAssetAddresses();
 
@@ -24,7 +23,6 @@ contract PoolProxyDeploy is BaseScript {
                 treeDepth,
                 verifier,
                 convertor,
-                entryPoint,
                 initAssetType,
                 initAssetAddresses
             )
