@@ -5,7 +5,8 @@
   "scripts": {
     "clean": "rm -rf cache out",
     "build": "forge build",
-    "test": "forge test"
+    "test": "forge test",
+    "coverage": "forge coverage --ir-minimum"
   },
   "keywords": [],
   "author": "zkFi Team",
