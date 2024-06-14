@@ -29,6 +29,7 @@ contract UniswapV3AdaptorTest is BaseTest, BaseScript {
     address public user = 0x689EcF264657302052c3dfBD631e4c20d3ED0baB;
 
     function setUp() external {
+        if(!shouldTestRun()) return;
         WETH = _config.initAssetAddresses()[0];
         if (WETH == address(0)) {
             revert CheckChainAssetConfig();
@@ -64,10 +65,12 @@ contract UniswapV3AdaptorTest is BaseTest, BaseScript {
     }
 
     function testUniswapZkFiAdaptorDeploy() external view {
+        if(!shouldTestRun()) return;
         assert(address(uniswapV3Adapter) != address(0));
     }
 
     function testWethToUSDCSwapToPool() public /* zkFiSetup */ {
+        if(!shouldTestRun()) return;
         console.log("Initiating WETH<>USDC swap");
         uint256 poolUSDCBalBeforeConvert = IERC20(USDC).balanceOf(
             address(pool)
@@ -84,6 +87,7 @@ contract UniswapV3AdaptorTest is BaseTest, BaseScript {
     }
 
     function testWethToUSDCSwapToPoolViaBundler() public /* zkFiSetup */ {
+        if(!shouldTestRun()) return;
         console.log("Initiating WETH<>USDC swap");
         uint256 poolUSDCBalBeforeConvert = IERC20(USDC).balanceOf(
             address(pool)
@@ -99,6 +103,17 @@ contract UniswapV3AdaptorTest is BaseTest, BaseScript {
         console.log("Pool USDC bal before swap:", poolUSDCBalBeforeConvert);
         console.log("Pool USDC bal after swap:", poolUSDCBalPostConvert);
         assert(poolUSDCBalPostConvert > poolUSDCBalBeforeConvert);
+    }
+
+    /// @dev Only allowing uniswap tests to run on Seplia testnet and ETH mainnet. More chains can be added.
+    function shouldTestRun() internal view returns (bool) {
+        if (block.chainid != 11155111 && block.chainid != 1) {
+            console.log(
+                "Skipping Uniswap adaptor tests on the current chain as UniswapV3 protocol may not be deployed. To run Uniswap tests, kindly run the tests on one of the chain forks where UniswapV3 is deployed. Ref: https://docs.uniswap.org/contracts/v3/reference/deployments/"
+            );
+            return false;
+        }
+        return true;
     }
 
     // function testWethToUSDCToWETHSwapToPool() external /* zkFiSetup */ {
