@@ -27,6 +27,14 @@ contract PoolTransactTest is Test {
         MockERC20(token2).approve(address(pool), initialDeposit);
     }
 
+    function makeInitialDeposit(ZTransaction memory depositZTx) public {
+        pool.transact(depositZTx);
+    }
+
+    function updateZTxToExecute(ZTransaction memory newZTx) public {
+        ztx = newZTx;
+    }
+
     function test_nullifiersMarked() public {
         for (uint256 i = 0; i < ztx.nullifiers.length; i++) {
             vm.expectEmit(true, true, true, true);

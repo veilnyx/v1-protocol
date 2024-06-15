@@ -25,6 +25,8 @@ contract PoolTest is BaseTest {
     Asset public asset1;
     Asset public asset2;
 
+    uint256 constant INITIAL_DEPOSIT = 1000 ether;
+
     function _initFixture() internal virtual {
         Verifier22 v22 = new Verifier22();
         VerifierInfo[] memory vInfos = new VerifierInfo[](1);
@@ -115,11 +117,13 @@ contract PoolTest is BaseTest {
     }
 
     function _makeInitialDeposit() internal {
-        _mintAsset(asset1, address(this), 1000 ether);
-        _mintAsset(asset2, address(this), 1000 ether);
-        _approveAsset(asset1, address(pool), 1000 ether);
-        _approveAsset(asset2, address(pool), 1000 ether);
-        ZTransaction memory ztx = _loadZTx("deposit_1000_weth_usdc");
+        _mintAsset(asset1, address(this), INITIAL_DEPOSIT);
+        _mintAsset(asset2, address(this), INITIAL_DEPOSIT);
+        _approveAsset(asset1, address(pool), INITIAL_DEPOSIT);
+        _approveAsset(asset2, address(pool), INITIAL_DEPOSIT);
+        ZTransaction memory ztx = _loadZTx(
+            "deposit_1000_weth_usdc_without_fee"
+        );
         pool.transact(ztx);
     }
 }

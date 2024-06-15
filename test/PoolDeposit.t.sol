@@ -10,11 +10,13 @@ import {MockERC20} from "test/mocks/MockERC20.sol";
 
 contract PoolDepositTest is PoolTest {
     ZTransaction ztx;
-    uint256 constant INITIAL_DEPOSIT = 1000 ether;
     PoolTransactTest poolTransactTestHelper;
 
     function setUp() public {
         _initFixture();
+        _mintAsset(asset1, address(this), INITIAL_DEPOSIT);
+        _mintAsset(asset2, address(this), INITIAL_DEPOSIT);
+
         ztx = _loadZTx("deposit_1000_weth_usdc_with_fee");
         poolTransactTestHelper = new PoolTransactTest(
             ztx,
@@ -23,8 +25,6 @@ contract PoolDepositTest is PoolTest {
             token2,
             pool
         );
-        _mintAsset(asset1, address(this), INITIAL_DEPOSIT);
-        _mintAsset(asset2, address(this), INITIAL_DEPOSIT);
     }
 
     function test_depositAssetBalances() public {
@@ -49,7 +49,7 @@ contract PoolDepositTest is PoolTest {
        poolTransactTestHelper.test_leafAddedToCommitmentTree();
     }
 
-    function test_AnnoucementsOnDeposit() external {
+    function test_AnnoucementEventsOnDeposit() external {
         _transferAssetsToPoolTransactHelper();
         poolTransactTestHelper.test_Annoucements();
     }

@@ -35,7 +35,7 @@ const usdcAssetId = 0x010002;
 const dirFixtures = "../fixtures/ztx";
 
 const depositReqs = {
-  deposit_1000_weth_usdc: {
+  deposit_1000_weth_usdc_without_fee: {
     type: TransactionType.DEPOSIT,
     assetIds: [wethAssetId, usdcAssetId],
     values: [parseEther("1000"), parseUnits("1000", 6)],
@@ -176,7 +176,7 @@ async function mockNotes(depositName: string, zkfi: Core) {
 async function main() {
   const zkfi = getSDKInstance();
   // Pre-deposit 1000 token of assets - 0x010001 and 0x010002
-  let depositName = "deposit_1000_weth_usdc_with_fee";
+  let depositName = "deposit_1000_weth_usdc_without_fee";
   await createMockZTx(depositName, depositReqs[depositName], zkfi);
   await mockNotes(depositName, zkfi);
 
@@ -185,9 +185,7 @@ async function main() {
   // await mockNotes(depositName, zkfi);
 
   const reqs = {
-    ...withdrawReqs,
-    ...transferReqs,
-    ...convertReqs
+    ...withdrawReqs
   };
   for (const [name, req] of Object.entries(reqs)) {
     await createMockZTx(name, req as any, zkfi);
