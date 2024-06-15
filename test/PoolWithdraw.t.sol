@@ -7,7 +7,6 @@ import {IPool} from "src/interfaces/IPool.sol";
 import {Pool} from "src/core/Pool.sol";
 import {ZTransaction} from "src/libraries/ZTransaction.sol";
 import {PoolTest} from "test/fixtures/PoolTest.sol";
-import {TransactionRequest} from "test/helpers/TransactionRequest.sol";
 import {PoolTransactTest} from "test/helpers/PoolTransact.t.sol";
 import {MockERC20} from "test/mocks/MockERC20.sol";
 
@@ -22,7 +21,7 @@ contract PoolWithdrawTest is PoolTest {
         _mintAsset(asset2, address(this), INITIAL_DEPOSIT);
 
         ZTransaction memory initialDepositZTrxn = _loadZTx(
-            "deposit_1000_weth_usdc_without_fee"
+            "deposit_1000_weth_without_fee"
         ); // deposit setup
 
         withdrawZTx = _loadZTx("withdraw_500_weth_without_fee"); // actual ztx to test
