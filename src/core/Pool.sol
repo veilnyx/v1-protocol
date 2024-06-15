@@ -184,6 +184,10 @@ contract Pool is
         return _commitmentTree.zeroes[level];
     }
 
+    function getNextLeafIndex() external view returns (uint256) {
+        return _commitmentTree.nextLeafIndex;
+    }
+
     function getLastRoot() external view returns (uint256) {
         return _commitmentTree.roots[_commitmentTree.currentRootIndex];
     }
