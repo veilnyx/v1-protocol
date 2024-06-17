@@ -35,6 +35,15 @@ const usdcAssetId = 0x010002;
 const dirFixtures = "../fixtures/ztx";
 
 const depositReqs = {
+  deposit_1000_weth_without_fee: {
+    type: TransactionType.DEPOSIT,
+    assetIds: [wethAssetId],
+    values: [parseEther("1000")],
+    feeAssetId: 0,
+    to: senderAccount.shieldedAddress.pack(),
+    viaBundler: false,
+    paymaster: zeroAddress,
+  },
   deposit_1000_weth_usdc_without_fee: {
     type: TransactionType.DEPOSIT,
     assetIds: [wethAssetId, usdcAssetId],
@@ -53,15 +62,6 @@ const depositReqs = {
     viaBundler: true,
     paymaster: paymasterAddress,
   },
-  deposit_1000_weth_without_fee: {
-    type: TransactionType.DEPOSIT,
-    assetIds: [wethAssetId],
-    values: [parseEther("1000")],
-    feeAssetId: 0,
-    to: senderAccount.shieldedAddress.pack(),
-    viaBundler: false,
-    paymaster: zeroAddress,
-  },
   deposit_1_weth: {
     type: TransactionType.DEPOSIT,
     assetIds: [wethAssetId],
@@ -71,10 +71,18 @@ const depositReqs = {
     viaBundler: false,
     paymaster: zeroAddress,
   }
-
 };
 
 const withdrawReqs = {
+  withdraw_500_weth_without_fee_to_mock_attacker: {
+    type: TransactionType.WITHDRAW,
+    assetIds: [wethAssetId],
+    values: [parseEther("500")],
+    feeAssetId: 0,
+    to: "0xbE5c5b64F8Fd981d7A896ECA561220062317Faa9",
+    viaBundler: false,
+    paymaster: zeroAddress,
+  },
   withdraw_500_weth_without_fee: {
     type: TransactionType.WITHDRAW,
     assetIds: [wethAssetId],
@@ -92,7 +100,7 @@ const withdrawReqs = {
     to: withdrawAddress,
     viaBundler: true,
     paymaster: paymasterAddress,
-  },
+  }
 };
 
 const transferReqs = {
@@ -179,13 +187,8 @@ async function main() {
   await createMockZTx(depositName, depositReqs[depositName], zkfi);
   await mockNotes(depositName, zkfi);
 
-  // depositName = "deposit_1_weth";
-  // await createMockZTx(depositName, depositReqs[depositName], zkfi);
-  // await mockNotes(depositName, zkfi);
-
   const reqs = {
-    ...withdrawReqs,
-    ...transferReqs
+    ...withdrawReqs
   };
   for (const [name, req] of Object.entries(reqs)) {
     await createMockZTx(name, req as any, zkfi);
