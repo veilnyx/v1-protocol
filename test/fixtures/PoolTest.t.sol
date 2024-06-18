@@ -9,7 +9,7 @@ import {AdaptorHandler} from "src/core/AdaptorHandler.sol";
 import {Asset, AssetType} from "src/libraries/Asset.sol";
 import {ZTransaction} from "src/libraries/ZTransaction.sol";
 import {MockERC20} from "test/mocks/MockERC20.sol";
-import {BaseTest} from "./BaseTest.sol";
+import {BaseTest} from "./BaseTest.t.sol";
 
 contract PoolTest is BaseTest {
     Verifier public verifier;

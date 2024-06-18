@@ -13,9 +13,9 @@ struct MerkleTree {
     mapping(uint256 => uint256) lastSubtrees;
 }
 
-error MerkleTreeFull();
-
 library MerkleTreeLogic {
+    error MerkleTreeFull();
+    
     uint256 public constant FIELD_SIZE =
         21888242871839275222246405745257275088548364400416034343698204186575808495617;
     uint256 public constant ZERO_LEAF = uint256(keccak256("zkFi")) % FIELD_SIZE;
@@ -43,6 +43,25 @@ library MerkleTreeLogic {
         }
 
         self.roots[0] = zero;
+    }
+
+    function insert(
+        MerkleTree storage self,
+        uint256[] memory leaves
+    ) internal returns (uint256) {
+        uint256 nLeaves = leaves.length;
+        if (nLeaves == 1) {
+            return insert(self, self.zeroes[0], leaves[0]);
+        } else if (nLeaves == 2) {
+            return insert(self, leaves[0], leaves[1]);
+        } else if (nLeaves == 3) {
+            return
+                insert(self, self.zeroes[0], leaves[0], leaves[1], leaves[2]);
+        } else if (nLeaves == 4) {
+            return insert(self, leaves[0], leaves[1], leaves[2], leaves[3]);
+        } else {
+            revert("Unsupported number of leaves");
+        }
     }
 
     function hashLeaves(
@@ -128,25 +147,6 @@ library MerkleTreeLogic {
 
         self.nextLeafIndex = nextIndex + 2;
         return self.nextLeafIndex;
-    }
-
-    function insert(
-        MerkleTree storage self,
-        uint256[] memory leaves
-    ) internal returns (uint256) {
-        uint256 nLeaves = leaves.length;
-        if (nLeaves == 1) {
-            return insert(self, self.zeroes[0], leaves[0]);
-        } else if (nLeaves == 2) {
-            return insert(self, leaves[0], leaves[1]);
-        } else if (nLeaves == 3) {
-            return
-                insert(self, self.zeroes[0], leaves[0], leaves[1], leaves[2]);
-        } else if (nLeaves == 4) {
-            return insert(self, leaves[0], leaves[1], leaves[2], leaves[3]);
-        } else {
-            revert("Unsupported number of leaves");
-        }
     }
 
     function insert(

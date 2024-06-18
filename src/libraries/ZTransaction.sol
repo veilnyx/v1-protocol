@@ -115,13 +115,7 @@ library ZTransactionLogic {
         address verifier,
         address adaptorHandler
     ) external {
-        _validateTransaction(
-            tree,
-            adaptors,
-            markedNullifiers,
-            verifier,
-            ztx
-        );
+        _validateTransaction(tree, adaptors, markedNullifiers, verifier, ztx);
 
         // Transfer any fees
         _transferFee(assets, ztx);

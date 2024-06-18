@@ -3,6 +3,7 @@ pragma solidity ^0.8.24;
 
 import {Test} from "forge-std/Test.sol";
 import {PoolTest} from "test/fixtures/PoolTest.t.sol";
+import {AssetType, Asset} from "src/libraries/Asset.sol";
 
 contract PoolInitTest is PoolTest {
     function setUp() public {
@@ -22,5 +23,19 @@ contract PoolInitTest is PoolTest {
         assertEq(revokerKeyY, fixture.revokerPublicKey[1]);
         assertEq(encryptionKeyX, fixture.encryptionPublicKey[0]);
         assertEq(encryptionKeyY, fixture.encryptionPublicKey[1]);
+    }
+
+    function test_adding_asset() external {
+        AssetType assetType = AssetType.ERC20;
+        address assetAddress = makeAddr("newAsset");
+        address[] memory assetAddresses = new address[](1);
+        assetAddresses[0] = assetAddress;
+
+        pool.addAssets(assetType, assetAddresses);
+
+        Asset memory newAsset = pool.getAsset(assetAddress);
+        assert(newAsset.id != 0);
+        assert(newAsset.assetType == assetType);
+        assertEq(newAsset.assetAddress, assetAddress);
     }
 }

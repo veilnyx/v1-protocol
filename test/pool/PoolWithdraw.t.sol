@@ -6,7 +6,7 @@ import {console2} from "forge-std/console2.sol";
 import {IPool} from "src/interfaces/IPool.sol";
 import {Pool} from "src/core/Pool.sol";
 import {ZTransaction} from "src/libraries/ZTransaction.sol";
-import {PoolTest} from "test/fixtures/PoolTest.sol";
+import {PoolTest} from "test/fixtures/PoolTest.t.sol";
 import {PoolTransactTest} from "test/helpers/PoolTransact.t.sol";
 import {MockERC20} from "test/mocks/MockERC20.sol";
 
@@ -58,12 +58,16 @@ contract PoolWithdrawTest is PoolTest {
         poolTransactTestHelper.test_nullifiersMarked();
     }
 
-    function test_leafAddedToCommitmentTreePostWithdraw500WethWithoutFee() public {
+    function test_leafAddedToCommitmentTreePostWithdraw500WethWithoutFee()
+        public
+    {
         poolTransactTestHelper.test_leafAddedToCommitmentTree();
     }
 
     function test_leafAddedToCommitmentTreePostWithdraw500WethWithFee() public {
-        ZTransaction memory updateZTx = _loadZTx("withdraw_500_weth_with_weth_fee");
+        ZTransaction memory updateZTx = _loadZTx(
+            "withdraw_500_weth_with_weth_fee"
+        );
         poolTransactTestHelper.updateZTxToExecute(updateZTx);
         poolTransactTestHelper.test_leafAddedToCommitmentTree();
     }
@@ -73,7 +77,9 @@ contract PoolWithdrawTest is PoolTest {
     }
 
     function test_AnnoucementEventsOnWithdraw500WethWithFee() external {
-        ZTransaction memory updateZTx = _loadZTx("withdraw_500_weth_with_weth_fee");
+        ZTransaction memory updateZTx = _loadZTx(
+            "withdraw_500_weth_with_weth_fee"
+        );
         poolTransactTestHelper.updateZTxToExecute(updateZTx);
 
         poolTransactTestHelper.test_Annoucements();

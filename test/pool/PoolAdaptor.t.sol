@@ -7,7 +7,7 @@ import {IPool} from "src/interfaces/IPool.sol";
 import {Pool} from "src/core/Pool.sol";
 import {ZTransaction} from "src/libraries/ZTransaction.sol";
 import {AssetType} from "src/libraries/Asset.sol";
-import {PoolTest} from "test/fixtures/PoolTest.sol";
+import {PoolTest} from "test/fixtures/PoolTest.t.sol";
 import {TransactionRequest} from "test/helpers/TransactionRequest.sol";
 import {MockDeFi} from "test/mocks/MockDeFi.sol";
 import {MockDeFiProxy} from "test/mocks/MockDeFiProxy.sol";

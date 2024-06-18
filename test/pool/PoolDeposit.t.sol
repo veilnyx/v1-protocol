@@ -5,7 +5,7 @@ import {Test, console} from "forge-std/Test.sol";
 import {console2} from "forge-std/console2.sol";
 import {ZTransaction} from "src/libraries/ZTransaction.sol";
 import {PoolTransactTest} from "test/helpers/PoolTransact.t.sol";
-import {PoolTest} from "test/fixtures/PoolTest.sol";
+import {PoolTest} from "test/fixtures/PoolTest.t.sol";
 import {MockERC20} from "test/mocks/MockERC20.sol";
 
 contract PoolDepositTest is PoolTest {
@@ -38,15 +38,15 @@ contract PoolDepositTest is PoolTest {
         assertEq(token1.balanceOf(address(pool)), balance1 + INITIAL_DEPOSIT);
         assertEq(token2.balanceOf(address(pool)), balance2 + 1000e6); // USDC is 6 decimals
     }
-    
+
     function test_nullifiersMarkedPostDeposit() public {
         _transferAssetsToPoolTransactHelper();
         poolTransactTestHelper.test_nullifiersMarked();
     }
 
     function test_leafAddedToCommitmentTreePostDeposit() external {
-       _transferAssetsToPoolTransactHelper();
-       poolTransactTestHelper.test_leafAddedToCommitmentTree();
+        _transferAssetsToPoolTransactHelper();
+        poolTransactTestHelper.test_leafAddedToCommitmentTree();
     }
 
     function test_AnnoucementEventsOnDeposit() external {
@@ -56,11 +56,17 @@ contract PoolDepositTest is PoolTest {
 
     function test_InputNotesMemoEventPostDeposit() external {
         _transferAssetsToPoolTransactHelper();
-       poolTransactTestHelper.test_InputNotesMemoEvent();
+        poolTransactTestHelper.test_InputNotesMemoEvent();
     }
 
     function _transferAssetsToPoolTransactHelper() internal {
-        MockERC20(token1).transfer(address(poolTransactTestHelper), INITIAL_DEPOSIT);
-        MockERC20(token2).transfer(address(poolTransactTestHelper), INITIAL_DEPOSIT);
+        MockERC20(token1).transfer(
+            address(poolTransactTestHelper),
+            INITIAL_DEPOSIT
+        );
+        MockERC20(token2).transfer(
+            address(poolTransactTestHelper),
+            INITIAL_DEPOSIT
+        );
     }
 }
