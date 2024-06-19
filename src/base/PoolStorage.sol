@@ -5,6 +5,11 @@ import {MerkleTree} from "../libraries/MerkleTree.sol";
 import {Asset, AssetType} from "../libraries/Asset.sol";
 
 abstract contract PoolStorage {
+    struct ComplianceKey {
+        uint256[2] revokerKeys;
+        uint256[2] encryptionKeys;
+        bool isActive;
+    }
     uint256 public constant FIELD_SIZE =
         21888242871839275222246405745257275088548364400416034343698204186575808495617;
 
@@ -28,5 +33,5 @@ abstract contract PoolStorage {
     mapping(address => bool) internal _adaptors;
 
     uint256 internal _complianceKeysCount;
-    mapping(uint256 => uint256[4]) complianceKeys;
+    mapping(uint256 => ComplianceKey) complianceKeys;
 }

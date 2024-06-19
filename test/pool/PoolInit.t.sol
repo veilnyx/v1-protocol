@@ -3,8 +3,10 @@ pragma solidity ^0.8.24;
 
 import {Test} from "forge-std/Test.sol";
 import {PoolTest} from "test/fixtures/PoolTest.t.sol";
+import {IPool} from "src/interfaces/IPool.sol";
 import {AssetType, Asset} from "src/libraries/Asset.sol";
 import {MerkleTree} from "src/libraries/MerkleTree.sol";
+import {PoolStorage} from "src/base/PoolStorage.sol";
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 
 contract PoolInitTest is PoolTest {
@@ -44,5 +46,90 @@ contract PoolInitTest is PoolTest {
         assert(newAsset.id != 0);
         assert(newAsset.assetType == assetType);
         assertEq(newAsset.assetAddress, assetAddress);
+    }
+
+    ///////////////////////////
+    /// Compliance Keys Tests//
+    ///////////////////////////
+    function test_adding_complianceKey() external {
+        (
+            uint256[2] memory revokerKeys,
+            uint256[2] memory encryptionKeys
+        ) = _getComplianceKeyArrays();
+
+        vm.expectEmit(true, true, false, true);
+        emit IPool.RegisterComplianceKeys(0);
+
+        pool.registerComplianceKeys(revokerKeys, encryptionKeys);
+    }
+
+    function test_revertWhenNonOwnerAddsCompliance() external {
+        address random = makeAddr("random");
+        (
+            uint256[2] memory revokerKeys,
+            uint256[2] memory encryptionKeys
+        ) = _getComplianceKeyArrays();
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                OwnableUpgradeable.OwnableUnauthorizedAccount.selector,
+                random
+            )
+        );
+        vm.prank(random);
+        pool.registerComplianceKeys(revokerKeys, encryptionKeys);
+    }
+
+    function test_getComplianceKey() external {
+        (
+            uint256[2] memory revokerKeys,
+            uint256[2] memory encryptionKeys
+        ) = _getComplianceKeyArrays();
+
+        pool.registerComplianceKeys(revokerKeys, encryptionKeys);
+
+        PoolStorage.ComplianceKey memory complianceKey = pool.getComplianceKey(
+            0
+        );
+        assertEq(complianceKey.revokerKeys[0], revokerKeys[0]);
+        assertEq(complianceKey.revokerKeys[1], revokerKeys[1]);
+        assertEq(complianceKey.encryptionKeys[0], encryptionKeys[0]);
+        assertEq(complianceKey.encryptionKeys[1], encryptionKeys[1]);
+        assert(complianceKey.isActive);
+    }
+
+    function test_changeComplianceKeyStatus() external {
+        (
+            uint256[2] memory revokerKeys,
+            uint256[2] memory encryptionKeys
+        ) = _getComplianceKeyArrays();
+
+        pool.registerComplianceKeys(revokerKeys, encryptionKeys);
+        pool.changeComplianceKeyStatus(0, false);
+
+        PoolStorage.ComplianceKey memory complianceKey = pool.getComplianceKey(
+            0
+        );
+        assertEq(complianceKey.isActive, false);
+    }
+
+    function _getComplianceKeyArrays()
+        internal
+        pure
+        returns (
+            uint256[2] memory revokerKeys,
+            uint256[2] memory encryptionKeys
+        )
+    {
+        uint256 revokerKeyX = uint256(keccak256(bytes("revokerKeyX")));
+        uint256 revokerKeyY = uint256(keccak256(bytes("revokerKeyX")));
+
+        uint256 encryptionKeyX = uint256(keccak256(bytes("encryptionKeyX")));
+        uint256 encryptionKeyY = uint256(keccak256(bytes("encryptionKeyX")));
+
+        revokerKeys = [revokerKeyX, revokerKeyY];
+        encryptionKeys = [encryptionKeyX, encryptionKeyY];
+
+        return (revokerKeys, encryptionKeys);
     }
 }

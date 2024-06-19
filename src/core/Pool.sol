@@ -94,11 +94,31 @@ contract Pool is
     }
 
     function registerComplianceKeys(
-        uint256[4] calldata keys
+        uint256[2] calldata revokerKeys,
+        uint256[2] calldata encryptionKeys
     ) external onlyOwner {
-        complianceKeys[_complianceKeysCount] = keys;
-        emit RegisterComplianceKeys(_complianceKeysCount, keys);
+        ComplianceKey memory complianceKey = ComplianceKey({
+            revokerKeys: revokerKeys,
+            encryptionKeys: encryptionKeys,
+            isActive: true
+        });
+
+        complianceKeys[_complianceKeysCount] = complianceKey;
+        emit RegisterComplianceKeys(_complianceKeysCount);
         _complianceKeysCount += 1;
+    }
+
+    function changeComplianceKeyStatus(
+        uint256 index,
+        bool status
+    ) external onlyOwner {
+        complianceKeys[index].isActive = status;
+    }
+
+    function getComplianceKey(
+        uint256 index
+    ) external view returns (ComplianceKey memory) {
+        return complianceKeys[index];
     }
 
     function pause() external onlyOwner {
@@ -196,7 +216,11 @@ contract Pool is
         return _commitmentTree.roots[_commitmentTree.currentRootIndex];
     }
 
-    function getCommitmentTreeCurrentRootIndex() external view returns (uint256) {
+    function getCommitmentTreeCurrentRootIndex()
+        external
+        view
+        returns (uint256)
+    {
         return _commitmentTree.currentRootIndex;
     }
 
