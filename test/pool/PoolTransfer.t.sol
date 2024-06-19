@@ -39,17 +39,28 @@ contract PoolTransferTest is PoolTest {
         poolTransactTestHelper.makeInitialDeposit(initialDepositZTrxn);
     }
 
-    function test_assetBalPostWithdraw() external {
+    function test_assetBalPostTransfer() external {
         uint256 balance1 = token1.balanceOf(address(pool));
         pool.transact(transferZTx);
         assertEq(token1.balanceOf(address(pool)), balance1);
     }
 
-    function test_nullifiersMarkedPostWithdraw500WethWithoutFee() public {
+     function test_revertOnDoubleSpend() external {
+        pool.transact(transferZTx);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IPool.DoubleSpend.selector,
+                transferZTx.nullifiers[0]
+            )
+        );
+        pool.transact(transferZTx);
+    }
+
+    function test_nullifiersMarkedPostTransfer500WethWithoutFee() public {
         poolTransactTestHelper.test_nullifiersMarked();
     }
 
-    function test_nullifiersMarkedPostWithdraw500WethWithFee() public {
+    function test_nullifiersMarkedPostTransfer500WethWithFee() public {
         ZTransaction memory updatedZTx = _loadZTx(
             "transfer_500_weth_with_weth_fee"
         );
@@ -58,13 +69,13 @@ contract PoolTransferTest is PoolTest {
         poolTransactTestHelper.test_nullifiersMarked();
     }
 
-    function test_leafAddedToCommitmentTreePostWithdraw500WethWithoutFee()
+    function test_leafAddedToCommitmentTreePostTransfer500WethWithoutFee()
         public
     {
         poolTransactTestHelper.test_leafAddedToCommitmentTree();
     }
 
-    function test_leafAddedToCommitmentTreePostWithdraw500WethWithFee() public {
+    function test_leafAddedToCommitmentTreePostTransfer500WethWithFee() public {
         ZTransaction memory updateZTx = _loadZTx(
             "transfer_500_weth_with_weth_fee"
         );
@@ -72,17 +83,30 @@ contract PoolTransferTest is PoolTest {
         poolTransactTestHelper.test_leafAddedToCommitmentTree();
     }
 
-    function test_AnnoucementEventsOnWithdraw500WethWithoutFee() external {
+    function test_AnnoucementEventsOnTransfer500WethWithoutFee() external {
         poolTransactTestHelper.test_Annoucements();
     }
 
-    function test_AnnoucementEventsOnWithdraw500WethWithFee() external {
+    function test_AnnoucementEventsOnTransfer500WethWithFee() external {
         ZTransaction memory updateZTx = _loadZTx(
             "transfer_500_weth_with_weth_fee"
         );
         poolTransactTestHelper.updateZTxToExecute(updateZTx);
 
         poolTransactTestHelper.test_Annoucements();
+    }
+
+    function test_ComplianceMemoEventOnTransfer500WethWithoutFee() external {
+        poolTransactTestHelper.test_ComplianceMemo();
+    }
+
+    function test_ComplianceMemoEventOnTransfer500WethWithFee() external {
+        ZTransaction memory updateZTx = _loadZTx(
+            "transfer_500_weth_with_weth_fee"
+        );
+        poolTransactTestHelper.updateZTxToExecute(updateZTx);
+
+        poolTransactTestHelper.test_ComplianceMemo();
     }
 
     function _transferAssetsToPoolTransactHelper() internal {

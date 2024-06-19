@@ -3,7 +3,7 @@ pragma solidity 0.8.24;
 pragma abicoder v2;
 
 import {BaseScript} from "script/BaseScript.sol";
-import {BaseTest} from "test/fixtures/BaseTest.sol";
+import {BaseTest} from "test/fixtures/BaseTest.t.sol";
 import {Pool} from "src/core/Pool.sol";
 import {Paymaster} from "src/core/Paymaster.sol";
 import {ZkFiDeploy} from "script/deploy/ZkFi.s.sol";
@@ -29,7 +29,7 @@ contract UniswapV3AdaptorTest is BaseTest, BaseScript {
     address public user = 0x689EcF264657302052c3dfBD631e4c20d3ED0baB;
 
     function setUp() external {
-        if(!shouldTestRun()) return;
+        if (!shouldTestRun()) return;
         WETH = _config.initAssetAddresses()[0];
         if (WETH == address(0)) {
             revert CheckChainAssetConfig();
@@ -65,12 +65,12 @@ contract UniswapV3AdaptorTest is BaseTest, BaseScript {
     }
 
     function testUniswapZkFiAdaptorDeploy() external view {
-        if(!shouldTestRun()) return;
+        if (!shouldTestRun()) return;
         assert(address(uniswapV3Adapter) != address(0));
     }
 
     function testWethToUSDCSwapToPool() public /* zkFiSetup */ {
-        if(!shouldTestRun()) return;
+        if (!shouldTestRun()) return;
         console.log("Initiating WETH<>USDC swap");
         uint256 poolUSDCBalBeforeConvert = IERC20(USDC).balanceOf(
             address(pool)
@@ -87,7 +87,7 @@ contract UniswapV3AdaptorTest is BaseTest, BaseScript {
     }
 
     function testWethToUSDCSwapToPoolViaBundler() public /* zkFiSetup */ {
-        if(!shouldTestRun()) return;
+        if (!shouldTestRun()) return;
         console.log("Initiating WETH<>USDC swap");
         uint256 poolUSDCBalBeforeConvert = IERC20(USDC).balanceOf(
             address(pool)

@@ -184,20 +184,24 @@ contract Pool is
         return _commitmentTree.zeroes[level];
     }
 
-    function getNextLeafIndex() external view returns (uint256) {
+    function getCommitmentTreeDepth() external view returns (uint256) {
+        return _commitmentTree.depth;
+    }
+
+    function getCommitmentTreeNextLeafIndex() external view returns (uint256) {
         return _commitmentTree.nextLeafIndex;
     }
 
-    function getLastRoot() external view returns (uint256) {
+    function getCommitmentTreeLastRoot() external view returns (uint256) {
         return _commitmentTree.roots[_commitmentTree.currentRootIndex];
     }
 
-    function getCurrentRootIndex() external view returns (uint256) {
+    function getCommitmentTreeCurrentRootIndex() external view returns (uint256) {
         return _commitmentTree.currentRootIndex;
     }
 
-    function getLastSubtrees(uint256 level) external view returns (uint256) {
-        return _commitmentTree.lastSubtrees[level];
+    function getAddressTreeDepth() external view returns (uint256) {
+        return _addressTree.depth;
     }
 
     function isKnownRoot(uint256 root) external view returns (bool) {

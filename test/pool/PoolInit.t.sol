@@ -4,6 +4,8 @@ pragma solidity ^0.8.24;
 import {Test} from "forge-std/Test.sol";
 import {PoolTest} from "test/fixtures/PoolTest.t.sol";
 import {AssetType, Asset} from "src/libraries/Asset.sol";
+import {MerkleTree} from "src/libraries/MerkleTree.sol";
+import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 
 contract PoolInitTest is PoolTest {
     function setUp() public {
@@ -19,6 +21,8 @@ contract PoolInitTest is PoolTest {
 
         assertEq(verifier_, address(verifier));
         assertEq(adaptorHandler_, address(adaptorHandler));
+        assertEq(treeDepth, pool.getCommitmentTreeDepth());
+        assertEq(treeDepth / 2, pool.getAddressTreeDepth());
         assertEq(revokerKeyX, fixture.revokerPublicKey[0]);
         assertEq(revokerKeyY, fixture.revokerPublicKey[1]);
         assertEq(encryptionKeyX, fixture.encryptionPublicKey[0]);
@@ -33,7 +37,10 @@ contract PoolInitTest is PoolTest {
 
         pool.addAssets(assetType, assetAddresses);
 
+        bool isAssetSupported = pool.isAssetSupported(assetAddress);
         Asset memory newAsset = pool.getAsset(assetAddress);
+
+        assert(isAssetSupported);
         assert(newAsset.id != 0);
         assert(newAsset.assetType == assetType);
         assertEq(newAsset.assetAddress, assetAddress);

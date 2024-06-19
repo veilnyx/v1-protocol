@@ -6,10 +6,11 @@ import {console2} from "forge-std/console2.sol";
 import {ZTransaction} from "src/libraries/ZTransaction.sol";
 import {PoolTransactTest} from "test/helpers/PoolTransact.t.sol";
 import {PoolTest} from "test/fixtures/PoolTest.t.sol";
+import {IPool} from "src/interfaces/IPool.sol";
 import {MockERC20} from "test/mocks/MockERC20.sol";
 
 contract PoolDepositTest is PoolTest {
-    ZTransaction ztx;
+    ZTransaction depositZTx;
     PoolTransactTest poolTransactTestHelper;
 
     function setUp() public {
@@ -17,9 +18,16 @@ contract PoolDepositTest is PoolTest {
         _mintAsset(asset1, address(this), INITIAL_DEPOSIT);
         _mintAsset(asset2, address(this), INITIAL_DEPOSIT);
 
-        ztx = _loadZTx("deposit_1000_weth_usdc_with_fee");
+        /**
+        // running the js-ffi `getBalances` script
+        string[] memory shellScripts = new string[](1);
+        shellScripts[0] = "script/shell/genFixtures.sh";
+        vm.ffi(shellScripts);
+        */
+
+        depositZTx = _loadZTx("deposit_1000_weth_usdc_with_fee");
         poolTransactTestHelper = new PoolTransactTest(
-            ztx,
+            depositZTx,
             INITIAL_DEPOSIT,
             token1,
             token2,
@@ -33,10 +41,36 @@ contract PoolDepositTest is PoolTest {
 
         _approveAsset(asset1, address(pool), INITIAL_DEPOSIT);
         _approveAsset(asset2, address(pool), 1000e6);
-        pool.transact(ztx);
+        pool.transact(depositZTx);
+
+        /**
+        string memory path = string.concat(
+            vm.projectRoot(),
+            ("/test/fixtures/balances.txt")
+        );
+        string memory balanceFile = vm.readFile(path);
+        console.log("Read bal:", balanceFile);
+         */
 
         assertEq(token1.balanceOf(address(pool)), balance1 + INITIAL_DEPOSIT);
         assertEq(token2.balanceOf(address(pool)), balance2 + 1000e6); // USDC is 6 decimals
+    }
+
+    function test_revertOnDoubleSpend() external {
+        _approveAsset(asset1, address(pool), INITIAL_DEPOSIT);
+        _approveAsset(asset2, address(pool), 1000e6);
+        pool.transact(depositZTx);
+
+        // re-depositing
+        _approveAsset(asset1, address(pool), INITIAL_DEPOSIT);
+        _approveAsset(asset2, address(pool), 1000e6);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IPool.DoubleSpend.selector,
+                depositZTx.nullifiers[0]
+            )
+        );
+        pool.transact(depositZTx);
     }
 
     function test_nullifiersMarkedPostDeposit() public {
@@ -57,6 +91,10 @@ contract PoolDepositTest is PoolTest {
     function test_InputNotesMemoEventPostDeposit() external {
         _transferAssetsToPoolTransactHelper();
         poolTransactTestHelper.test_InputNotesMemoEvent();
+    }
+
+    function test_ComplianceMemoEventPostDeposit() external {
+        poolTransactTestHelper.test_ComplianceMemo();
     }
 
     function _transferAssetsToPoolTransactHelper() internal {

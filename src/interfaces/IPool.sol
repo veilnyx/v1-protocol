@@ -96,11 +96,15 @@ interface IPool {
 
     function zeroes(uint256 level) external view returns (uint256);
 
-    function getLastRoot() external view returns (uint256);
+    function getCommitmentTreeDepth() external view returns (uint256);
 
-    function getCurrentRootIndex() external view returns (uint256);
+    function getCommitmentTreeNextLeafIndex() external view returns (uint256);
 
-    function getLastSubtrees(uint256 level) external view returns (uint256);
+    function getCommitmentTreeLastRoot() external view returns (uint256);
+    
+    function getCommitmentTreeCurrentRootIndex() external view returns (uint256);
+
+    function getAddressTreeDepth() external view returns (uint256);
 
     function isKnownRoot(uint256 root) external view returns (bool);
 

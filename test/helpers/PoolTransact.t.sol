@@ -55,27 +55,27 @@ contract PoolTransactTest is Test {
     }
 
     function test_leafAddedToCommitmentTree() external {
-        uint256 commitmentTreeRootBeforeDeposit = pool.getLastRoot();
-        uint256 commitmentTreeCurrentRootIndexBeforeDeposit = pool
-            .getCurrentRootIndex();
+        uint256 nextLeafIndexBeforeDeposit = pool
+            .getCommitmentTreeNextLeafIndex();
+        uint256 rootBeforeDeposit = pool.getCommitmentTreeLastRoot();
+        uint256 currentRootIndexBeforeDeposit = pool
+            .getCommitmentTreeCurrentRootIndex();
 
         pool.transact(ztx);
 
-        uint256 commitmentTreeRootAfterDeposit = pool.getLastRoot();
-        uint256 commitmentTreeCurrentRootIndexAfterDeposit = pool
-            .getCurrentRootIndex();
+        uint256 nextLeafIndexAfterDeposit = pool
+            .getCommitmentTreeNextLeafIndex();
+        uint256 rootAfterDeposit = pool.getCommitmentTreeLastRoot();
+        uint256 currentRootIndexAfterDeposit = pool
+            .getCommitmentTreeCurrentRootIndex();
 
-        assert(
-            commitmentTreeRootBeforeDeposit != commitmentTreeRootAfterDeposit
-        );
-        assert(
-            commitmentTreeCurrentRootIndexBeforeDeposit <
-                commitmentTreeCurrentRootIndexAfterDeposit
-        );
+        assert(nextLeafIndexBeforeDeposit < nextLeafIndexAfterDeposit);
+        assert(rootBeforeDeposit != rootAfterDeposit);
+        assert(currentRootIndexBeforeDeposit < currentRootIndexAfterDeposit);
     }
 
     function test_Annoucements() external {
-        uint256 nextIndex = pool.getNextLeafIndex();
+        uint256 nextIndex = pool.getCommitmentTreeNextLeafIndex();
         console.log("Leaf commitment for deposit:", ztx.commitments.length);
 
         for (uint256 a = 0; a < ztx.commitments.length; a++) {
@@ -93,6 +93,12 @@ contract PoolTransactTest is Test {
     function test_InputNotesMemoEvent() external {
         vm.expectEmit(true, true, false, true);
         emit IPool.InputNoteMemos(ztx.inMemos);
+        pool.transact(ztx);
+    }
+
+    function test_ComplianceMemo() external {
+        vm.expectEmit(true, true, false, true);
+        emit IPool.ComplianceMemo(ztx.complianceMemo);
         pool.transact(ztx);
     }
 }
