@@ -18,7 +18,8 @@ import {
 import { Core } from "@zkfi-tech/core";
 import { ZTransaction } from "@zkfi-tech/zk-prover";
 import { Note } from "@zkfi-tech/transaction";
-import { getSDKInstance } from "./helpers/sdk";
+import { getReceiverSDKInstance, getSDKInstance } from "./helpers/sdk";
+import { inspect } from 'util';
 
 const senderAccount = ShieldedAccount.generate(
   Fr.from(keccak256(stringToBytes("sender"))).val
@@ -35,6 +36,7 @@ const usdcAssetId = 0x010002;
 const dirFixtures = "../fixtures/ztx";
 
 const depositReqs = {
+  /**
   deposit_1000_weth_without_fee: {
     type: TransactionType.DEPOSIT,
     assetIds: [wethAssetId],
@@ -62,7 +64,8 @@ const depositReqs = {
     viaBundler: true,
     paymaster: paymasterAddress,
   },
-  deposit_1_weth: {
+   */
+  deposit_1_weth_without_fee: {
     type: TransactionType.DEPOSIT,
     assetIds: [wethAssetId],
     values: [parseEther("1")],
@@ -74,6 +77,7 @@ const depositReqs = {
 };
 
 const withdrawReqs = {
+  /**
   withdraw_500_weth_without_fee_to_mock_attacker: {
     type: TransactionType.WITHDRAW,
     assetIds: [wethAssetId],
@@ -100,10 +104,20 @@ const withdrawReqs = {
     to: withdrawAddress,
     viaBundler: true,
     paymaster: paymasterAddress,
+  }, */
+  withdraw_1_weth_without_fee: {
+    type: TransactionType.WITHDRAW,
+    assetIds: [wethAssetId],
+    values: [parseEther("1")],
+    feeAssetId: 0,
+    to: withdrawAddress,
+    viaBundler: false,
+    paymaster: zeroAddress,
   }
 };
 
 const transferReqs = {
+  /**
   transfer_500_weth_without_fee: {
     type: TransactionType.TRANSFER,
     assetIds: [wethAssetId],
@@ -122,6 +136,16 @@ const transferReqs = {
     viaBundler: true,
     paymaster: paymasterAddress,
   },
+  */
+  transfer_1_weth_without_fee: {
+    type: TransactionType.TRANSFER,
+    assetIds: [wethAssetId],
+    values: [parseEther("1")],
+    feeAssetId: 0,
+    to: receiverAccount.shieldedAddress.pack(),
+    viaBundler: false,
+    paymaster: zeroAddress,
+  }
 };
 
 const convertReqs = {
@@ -162,37 +186,117 @@ const createMockZTx = async (
   writeFileSync(`${dirFixtures}/${name}.txt`, encoded);
 };
 
-async function mockNotes(depositName: string, zkfi: Core) {
+let depositNotes;
+async function mockDepositNotes(depositName: string, zkfi: Core) {
   const encoded = readFileSync(
     `${dirFixtures}/${depositName}.txt`,
     "utf-8"
   ) as Hex;
   const ztx = ZTransaction.decode(encoded) as any;
 
-  const notes = ztx.outMemos.map((m: Hex) => Note.fromMemo(m, zkfi.account));
-  notes.forEach((n, i) => (n.leafIndex = i));
+  depositNotes = ztx.outMemos.map((m: Hex) => {
+    return Note.fromMemo(m, zkfi.account)
+  });
+  console.log(`OUT Notes created for ${depositName}: ${depositNotes}`);
+  depositNotes.forEach((n, i) => (n.leafIndex = i));
 
   //@ts-ignore
-  zkfi.notesSource.mockNotes(notes[0].assetId, [notes[0]]);
+  zkfi.notesSource.mockNotes(depositNotes[0].assetId, [depositNotes[0]]);
   //@ts-ignore
-  zkfi.notesSource.mockNotes(notes[1].assetId, [notes[1]]);
+  zkfi.notesSource.mockNotes(depositNotes[1].assetId, [depositNotes[1]]);
   //@ts-ignore
-  notes.forEach((n) => zkfi.treeSource.insert(n.commitment));
+  depositNotes.forEach((n) => zkfi.treeSource.insert(n.commitment));
 }
+
+async function mockTransferNotes(transferName: string, senderZkFi: Core, receiverZkFi: Core) {
+
+  // let calculatedleafIndex = receiverZkFi.treeSource.indexOf(depositNotes[depositNotes.length - 1].commitment);
+
+  const encoded = readFileSync(
+    `${dirFixtures}/${transferName}.txt`,
+    "utf-8"
+  ) as Hex;
+  const ztx = ZTransaction.decode(encoded) as any;
+
+  {
+  const receiverOutMemo = ztx.outMemos[0];
+  let receiverNote = Note.fromMemo(receiverOutMemo, receiverZkFi.account);
+
+  // @ts-ignore
+  receiverNote.leafIndex = 2;
+  // @ts-ignore
+  receiverZkFi.notesSource.mockNotes(receiverNote.assetId, [receiverNote]);
+  // @ts-ignore
+  senderZkFi.notesSource.mockNotes(receiverNote.assetId, [receiverNote]);
+
+  // adding receiver note to treeSource
+  //@ts-ignore
+  receiverZkFi.treeSource.insert(receiverNote.commitment);
+  console.log("receiver note added to tree source");
+  }
+
+  // Sender Note
+  {
+  const senderOutMemo = ztx.outMemos[1];
+  console.log("sender out memo:", senderOutMemo);
+
+  let senderNote = Note.fromMemo(senderOutMemo, senderZkFi.account);
+  console.log("Second transfer Note:", inspect(senderNote));
+  // @ts-ignore
+  senderNote.leafIndex = 3;
+
+  // mocking note in both SDKs 
+  // @ts-ignore
+  receiverZkFi.notesSource.mockNotes(senderNote.assetId, [senderNote]);
+  // @ts-ignore
+  senderZkFi.notesSource.mockNotes(senderNote.assetId, [senderNote]);
+
+  // adding sender note to treeSource of both SDKs
+  // @ts-ignore
+  receiverZkFi.treeSource.insert(senderNote.commitment);
+
+  // @ts-ignore
+  senderZkFi.treeSource.insert(receiverNote.commitment);
+  //@ts-ignore
+  senderZkFi.treeSource.insert(senderNote.commitment);
+  }
+}
+
 
 async function main() {
   const zkfi = getSDKInstance();
-  // Pre-deposit 1000 token of assets - 0x010001 and 0x010002
-  let depositName = "deposit_1000_weth_without_fee";
-  await createMockZTx(depositName, depositReqs[depositName], zkfi);
-  await mockNotes(depositName, zkfi);
+  const receiverZkFi = getReceiverSDKInstance();
 
-  const reqs = {
-    ...withdrawReqs
-  };
-  for (const [name, req] of Object.entries(reqs)) {
-    await createMockZTx(name, req as any, zkfi);
-  }
+  // Pre-deposit 1000 token of assets - 0x010001 and 0x010002
+  let depositName = "deposit_1_weth_without_fee";
+  await createMockZTx(depositName, depositReqs[depositName], zkfi);
+  await mockDepositNotes(depositName, zkfi);
+
+  //@ts-ignore
+  receiverZkFi.notesSource.mockNotes(depositNotes[0].assetId, [depositNotes[0]]);
+  //@ts-ignore
+  receiverZkFi.notesSource.mockNotes(depositNotes[1].assetId, [depositNotes[1]]);
+  //@ts-ignore
+  depositNotes.forEach((n) => receiverZkFi.treeSource.insert(n.commitment));
+
+  let transferName = "transfer_1_weth_without_fee";
+  await createMockZTx(transferName, transferReqs[transferName], zkfi);
+  await mockTransferNotes(transferName, zkfi, receiverZkFi);
+
+  let withdrawName = "withdraw_1_weth_without_fee";
+  await createMockZTx(withdrawName, withdrawReqs[withdrawName], receiverZkFi);
+
+  // const reqs = {
+  //   ...transferReqs
+  // };
+  // for (const [name, req] of Object.entries(reqs)) {
+  //   await createMockZTx(name, req as any, zkfi);
+  // }
+
+  // let balances = await zkfi.getBalances();
+  // console.log(balances);
+  // console.log(balances[65537]);
+  // writeFileSync(`../fixtures/balances.txt`, balances[65537].toString());
 }
 
 main()
