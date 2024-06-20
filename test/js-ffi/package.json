@@ -6,7 +6,8 @@
   "scripts": {
     "genZTx": "npx ts-node src/genZTx.ts",
     "genAccount": "npx ts-node src/genAccount.ts",
-    "genFixtures": "npx ts-node src/genFixtures.ts"
+    "genFixtures": "npx ts-node src/genFixtures.ts",
+    "getBalances": "npx ts-node src/getBalances.ts"
   },
   "keywords": [],
   "author": "",

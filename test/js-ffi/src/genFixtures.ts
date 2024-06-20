@@ -26,7 +26,7 @@ const senderAccount = ShieldedAccount.generate(
 const receiverAccount = ShieldedAccount.generate(
   Fr.from(keccak256(stringToBytes("receiver"))).val
 );
-const withdrawAddress = sliceHex(keccak256(stringToBytes("withdraw")), 0, 20);
+const withdrawAddress = "0x19d10A59420fd2587a73EB65266E57eb6b6157f9";
 const paymasterAddress = sliceHex(keccak256(stringToBytes("paymaster")), 0, 20);
 
 const wethAssetId = 0x010001;
@@ -43,46 +43,10 @@ const depositReqs = {
     to: senderAccount.shieldedAddress.pack(),
     viaBundler: false,
     paymaster: zeroAddress,
-  },
-  deposit_1000_weth_usdc_without_fee: {
-    type: TransactionType.DEPOSIT,
-    assetIds: [wethAssetId, usdcAssetId],
-    values: [parseEther("1000"), parseUnits("1000", 6)],
-    feeAssetId: 0,
-    to: senderAccount.shieldedAddress.pack(),
-    viaBundler: false,
-    paymaster: zeroAddress,
-  },
-  deposit_1000_weth_usdc_with_fee: {
-    type: TransactionType.DEPOSIT,
-    assetIds: [wethAssetId, usdcAssetId],
-    values: [parseEther("1000"), parseUnits("1000", 6)],
-    feeAssetId: 0,
-    to: senderAccount.shieldedAddress.pack(),
-    viaBundler: true,
-    paymaster: paymasterAddress,
-  },
-  deposit_1_weth: {
-    type: TransactionType.DEPOSIT,
-    assetIds: [wethAssetId],
-    values: [parseEther("1")],
-    feeAssetId: 0,
-    to: senderAccount.shieldedAddress.pack(),
-    viaBundler: false,
-    paymaster: zeroAddress,
   }
 };
 
 const withdrawReqs = {
-  withdraw_500_weth_without_fee_to_mock_attacker: {
-    type: TransactionType.WITHDRAW,
-    assetIds: [wethAssetId],
-    values: [parseEther("500")],
-    feeAssetId: 0,
-    to: "0xbE5c5b64F8Fd981d7A896ECA561220062317Faa9",
-    viaBundler: false,
-    paymaster: zeroAddress,
-  },
   withdraw_500_weth_without_fee: {
     type: TransactionType.WITHDRAW,
     assetIds: [wethAssetId],
@@ -91,37 +55,19 @@ const withdrawReqs = {
     to: withdrawAddress,
     viaBundler: false,
     paymaster: zeroAddress,
-  },
-  withdraw_500_weth_with_weth_fee: {
-    type: TransactionType.WITHDRAW,
-    assetIds: [wethAssetId],
-    values: [parseEther("500")],
-    feeAssetId: wethAssetId,
-    to: withdrawAddress,
-    viaBundler: true,
-    paymaster: paymasterAddress,
   }
 };
 
 const transferReqs = {
-  transfer_500_weth_without_fee: {
+  transfer_200_weth_without_fee: {
     type: TransactionType.TRANSFER,
     assetIds: [wethAssetId],
-    values: [parseEther("500")],
+    values: [parseEther("200")],
     feeAssetId: 0,
     to: receiverAccount.shieldedAddress.pack(),
     viaBundler: false,
     paymaster: zeroAddress,
-  },
-  transfer_500_weth_with_weth_fee: {
-    type: TransactionType.TRANSFER,
-    assetIds: [wethAssetId],
-    values: [parseEther("500")],
-    feeAssetId: wethAssetId,
-    to: receiverAccount.shieldedAddress.pack(),
-    viaBundler: true,
-    paymaster: paymasterAddress,
-  },
+  }
 };
 
 const convertReqs = {
@@ -133,16 +79,6 @@ const convertReqs = {
     to: "0x67aD37B223C2EA3357456b6160199b98D9478799",  // adaptor to which the ZkFi Convertor will call to execute swap
     viaBundler: false,
     paymaster: zeroAddress,
-    payload:
-      "0x000000000000000000000000000000000000000000000000000000000001000200000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000", // beneficiary: pool address (address(0))
-  }, swap_1e16_weth_to_usdc_via_bundler: {
-    type: TransactionType.CONVERT,
-    assetIds: [wethAssetId],
-    values: [parseEther("0.01")],
-    feeAssetId: wethAssetId,
-    to: "0x67aD37B223C2EA3357456b6160199b98D9478799",  // adaptor to which the ZkFi Convertor will call to execute swap
-    viaBundler: true,
-    paymaster: "0xE45c40643af3aa4146E1B1C95051c23f7439ed75", // paymaster address on Sepolia
     payload:
       "0x000000000000000000000000000000000000000000000000000000000001000200000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000", // beneficiary: pool address (address(0))
   }
@@ -187,12 +123,20 @@ async function main() {
   await createMockZTx(depositName, depositReqs[depositName], zkfi);
   await mockNotes(depositName, zkfi);
 
-  const reqs = {
-    ...withdrawReqs
-  };
-  for (const [name, req] of Object.entries(reqs)) {
-    await createMockZTx(name, req as any, zkfi);
-  }
+  let withdrawName = "withdraw_500_weth_without_fee";
+  await createMockZTx(withdrawName, withdrawReqs[withdrawName], zkfi);
+  await mockNotes(withdrawName, zkfi);
+
+  let transferName = "transfer_200_weth_without_fee";
+  await createMockZTx(transferName, transferReqs[transferName], zkfi);
+
+  // const reqs = {
+  //   ...withdrawReqs,
+  //   ...transferReqs
+  // };
+  // for (const [name, req] of Object.entries(reqs)) {
+  //   await createMockZTx(name, req as any, zkfi);
+  // }
 }
 
 main()
