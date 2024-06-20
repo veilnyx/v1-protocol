@@ -30,10 +30,6 @@ const account = ShieldedAccount.generate(
   Fr.from(keccak256(stringToBytes("sender"))).val
 );
 
-const receiverAccount = ShieldedAccount.generate(
-  Fr.from(keccak256(stringToBytes("receiver"))).val
-)
-
 const encryptionPublicKey = Point.fromArray([
   BigInt(
     "15187339732644800751812193648350861431733040013104897934882869545575329240973"
@@ -74,36 +70,4 @@ export const getSDKInstance = () => {
   zkfi.getFeeEstimate = async () => BigInt(parseEther("0.001"));
 
   return zkfi;
-};
-
-export const getReceiverSDKInstance = () => {
-  const client = createTestClient({
-    chain: foundry,
-    mode: "anvil",
-    transport: http(),
-  });
-
-  const treeSource = new MockTreeSource(tree);
-  const addressResolver = new MockAddressResolver();
-  const notesSource = new MockNotesSource();
-
-  const receiverZkfi = new Core({
-    chainId: foundry.id,
-    account: receiverAccount,
-    rpc: client as any,
-    explorerApi: "",
-    contracts: {} as any,
-    circuits,
-    snarkJs,
-    services: {
-      treeSource,
-      addressResolver,
-      notesSource,
-      contractSource: {} as any,
-    },
-  });
-
-  receiverZkfi.getEncryptionPublicKey = async () => encryptionPublicKey;
-  receiverZkfi.getFeeEstimate = async () => BigInt(parseEther("0.001"));
-  return receiverZkfi;
 };

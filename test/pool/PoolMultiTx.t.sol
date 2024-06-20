@@ -13,31 +13,39 @@ import {MockERC20} from "test/mocks/MockERC20.sol";
 contract PoolMultiTxTest is PoolTest {
     Pool internal _pool;
     PoolTransactTest poolTransactTestHelper;
+    ZTransaction[] fixtureZTx;
+    address withdrawAddr = 0x19d10A59420fd2587a73EB65266E57eb6b6157f9;
 
     function setUp() public {
         _initFixture();
-        _mintAsset(asset1, address(this), 1 ether);
-        _approveAsset(asset1, address(pool), 1 ether);
+        _mintAsset(asset1, address(this), INITIAL_DEPOSIT);
+        _approveAsset(asset1, address(pool), INITIAL_DEPOSIT);
 
-        ZTransaction memory initialDepositZTrxn = _loadZTx("deposit_1_weth_without_fee"); // deposit setup
+        ZTransaction memory depositZTx = _loadZTx(
+            "deposit_1000_weth_for_seq_ztx"
+        ); // deposit setup
+        pool.transact(depositZTx);
 
-        pool.transact(initialDepositZTrxn);
-    }
+        // loading the batch of trxn to execute by the fuzzer
+        ZTransaction memory withdrawZTx = _loadZTx(
+            "withdraw_500_weth_for_seq_ztx"
+        );
 
-    function test_revertWhenSenderAttemptsToWithdrawPostTransfer() external {
-        ZTransaction memory transferZTx = _loadZTx("transfer_1_weth_without_fee"); // actual ztx to test
-        pool.transact(transferZTx);
-
-        ZTransaction memory withdrawSameAmt = _loadZTx(
-            "withdraw_1_weth_without_fee"
+        ZTransaction memory transferZTx = _loadZTx(
+            "transfer_200_weth_for_seq_ztx"
         );
         
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                IPool.DoubleSpend.selector,
-                withdrawSameAmt.nullifiers[0]
-            )
-        );
-        pool.transact(withdrawSameAmt);
+        fixtureZTx.push(withdrawZTx);
+        fixtureZTx.push(transferZTx);
+    }
+
+    function test_MultiTxValueConservation() public {
+        // order to tx execution is crucial here. Should match `genSequentialZTxFixtures.ts`.
+        pool.transact(fixtureZTx[0]);
+        pool.transact(fixtureZTx[1]);
+
+        uint256 totalValue = token1.balanceOf(address(pool)) +
+            token1.balanceOf(withdrawAddr);
+        assertEq(totalValue, INITIAL_DEPOSIT);
     }
 }
