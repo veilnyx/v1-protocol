@@ -27,15 +27,13 @@ const receiverAccount = ShieldedAccount.generate(
   Fr.from(keccak256(stringToBytes("receiver"))).val
 );
 const withdrawAddress = "0x19d10A59420fd2587a73EB65266E57eb6b6157f9";
-const paymasterAddress = sliceHex(keccak256(stringToBytes("paymaster")), 0, 20);
 
 const wethAssetId = 0x010001;
-const usdcAssetId = 0x010002;
 
 const dirFixtures = "../fixtures/ztx";
 
 const depositReqs = {
-  deposit_1000_weth_without_fee: {
+  deposit_1000_weth_for_seq_ztx: {
     type: TransactionType.DEPOSIT,
     assetIds: [wethAssetId],
     values: [parseEther("1000")],
@@ -47,7 +45,7 @@ const depositReqs = {
 };
 
 const withdrawReqs = {
-  withdraw_500_weth_without_fee: {
+  withdraw_500_weth_for_seq_ztx: {
     type: TransactionType.WITHDRAW,
     assetIds: [wethAssetId],
     values: [parseEther("500")],
@@ -59,7 +57,7 @@ const withdrawReqs = {
 };
 
 const transferReqs = {
-  transfer_200_weth_without_fee: {
+  transfer_200_weth_for_seq_ztx: {
     type: TransactionType.TRANSFER,
     assetIds: [wethAssetId],
     values: [parseEther("200")],
@@ -98,7 +96,7 @@ const createMockZTx = async (
   writeFileSync(`${dirFixtures}/${name}.txt`, encoded);
 };
 
-async function mockNotes(depositName: string, zkfi: Core) {
+async function mockDepositNotes(depositName: string, zkfi: Core) {
   const encoded = readFileSync(
     `${dirFixtures}/${depositName}.txt`,
     "utf-8"
@@ -116,20 +114,38 @@ async function mockNotes(depositName: string, zkfi: Core) {
   notes.forEach((n) => zkfi.treeSource.insert(n.commitment));
 }
 
+async function mockWithdrawNotes(withdrawName: string, zkfi: Core) {
+  const encoded = readFileSync(
+    `${dirFixtures}/${withdrawName}.txt`,
+    "utf-8"
+  ) as Hex;
+  const ztx = ZTransaction.decode(encoded) as any;
+
+  const notes = ztx.outMemos.map((m: Hex) => Note.fromMemo(m, zkfi.account));
+  notes.forEach((n, i) => (n.leafIndex = i + 2)); // considering 2 notes of deposit
+
+  //@ts-ignore
+  zkfi.notesSource.mockNotes(notes[0].assetId, [notes[0]]);
+  //@ts-ignore
+  zkfi.notesSource.mockNotes(notes[1].assetId, [notes[1]]);
+  //@ts-ignore
+  notes.forEach((n) => zkfi.treeSource.insert(n.commitment));
+}
+
 async function main() {
   const zkfi = getSDKInstance();
-  // Pre-deposit 1000 token of assets - 0x010001 and 0x010002
-  let depositName = "deposit_1000_weth_without_fee";
-  await createMockZTx(depositName, depositReqs[depositName], zkfi);
-  await mockNotes(depositName, zkfi);
 
-  const reqs = {
-    ...withdrawReqs,
-    ...transferReqs
-  };
-  for (const [name, req] of Object.entries(reqs)) {
-    await createMockZTx(name, req as any, zkfi);
-  }
+  /// @dev Order of ZTx creation and note mocking is crucial here. This is because for any followup ztx creation, the outMemos and notes created by the previous tx are needed. Hence to carry out 3 txns in a sequence, after deposit, withdraw tx should be created and it's notes mocked. This is cuz in case of Withdraw tx, the same zkFi instance will still be able to decrypt the outMemos(and own both the notes gen. by the withdraw tx) apart from the value withdrawn. This is important for mocking notes and making them available for next tx. Then we can finally create the transfer tx.
+  let depositName = "deposit_1000_weth_for_seq_ztx";
+  await createMockZTx(depositName, depositReqs[depositName], zkfi);
+  await mockDepositNotes(depositName, zkfi);
+
+  let withdrawName = "withdraw_500_weth_for_seq_ztx";
+  await createMockZTx(withdrawName, withdrawReqs[withdrawName], zkfi);
+  await mockWithdrawNotes(withdrawName, zkfi);
+
+  let transferName = "transfer_200_weth_for_seq_ztx";
+  await createMockZTx(transferName, transferReqs[transferName], zkfi);
 }
 
 main()

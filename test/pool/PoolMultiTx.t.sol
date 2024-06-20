@@ -22,34 +22,26 @@ contract PoolMultiTxTest is PoolTest {
         _approveAsset(asset1, address(pool), INITIAL_DEPOSIT);
 
         ZTransaction memory depositZTx = _loadZTx(
-            "deposit_1000_weth_without_fee"
+            "deposit_1000_weth_for_seq_ztx"
         ); // deposit setup
         pool.transact(depositZTx);
 
         // loading the batch of trxn to execute by the fuzzer
-        ZTransaction memory transferZTx = _loadZTx(
-            "transfer_200_weth_without_fee"
-        );
         ZTransaction memory withdrawZTx = _loadZTx(
-            "withdraw_500_weth_without_fee"
+            "withdraw_500_weth_for_seq_ztx"
         );
+
+        ZTransaction memory transferZTx = _loadZTx(
+            "transfer_200_weth_for_seq_ztx"
+        );
+        
         fixtureZTx.push(withdrawZTx);
         fixtureZTx.push(transferZTx);
-
-        if (block.chainid == 1 || block.chainid == 11155111) {
-            ZTransaction memory swapZTx = _loadZTx(
-                "swap_1e16_weth_without_fee"
-            );
-            fixtureZTx.push(swapZTx);
-        }
     }
 
-    function test_MultiTx() public {
+    function test_MultiTxValueConservation() public {
         pool.transact(fixtureZTx[0]);
         pool.transact(fixtureZTx[1]);
-        if (block.chainid == 1 || block.chainid == 11155111) {
-            pool.transact(fixtureZTx[2]);
-        }
 
         uint256 totalValue = token1.balanceOf(address(pool)) +
             token1.balanceOf(withdrawAddr);
