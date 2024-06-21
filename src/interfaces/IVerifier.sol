@@ -11,7 +11,8 @@ interface IVerifier {
     function getEncryptionPublicKey() external view returns (uint256, uint256);
 
     function verifyTransactionProof(
-        ZTransaction memory ztx
+        ZTransaction memory ztx,
+        uint256 treeRoot
     ) external view returns (bool);
 
     function getVerifierId(

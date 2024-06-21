@@ -63,8 +63,7 @@ const depositReqs = {
     viaBundler: true,
     paymaster: paymasterAddress,
   },
-   */
-  deposit_1_weth_without_fee: {
+  deposit_1_weth: {
     type: TransactionType.DEPOSIT,
     assetIds: [wethAssetId],
     values: [parseEther("1")],
@@ -73,6 +72,7 @@ const depositReqs = {
     viaBundler: false,
     paymaster: zeroAddress,
   }
+  */
 };
 
 const withdrawReqs = {
@@ -175,7 +175,7 @@ const createMockZTx = async (
   writeFileSync(`${dirFixtures}/${name}.txt`, encoded);
 };
 
-async function mockDepositNotes(depositName: string, zkfi: Core) {
+async function mockNotes(depositName: string, zkfi: Core) {
   const encoded = readFileSync(
     `${dirFixtures}/${depositName}.txt`,
     "utf-8"
@@ -200,10 +200,10 @@ async function main() {
   const zkfi = getSDKInstance();
 
   // Pre-deposit 1000 token of assets - 0x010001 and 0x010002
-  let depositName = "deposit_1_weth_without_fee";
+  const depositName = "deposit_1000_weth_usdc";
+  // const depositName = "deposit_1_weth";
   await createMockZTx(depositName, depositReqs[depositName], zkfi);
-  await mockDepositNotes(depositName, zkfi);
-
+  await mockNotes(depositName, zkfi);
   const reqs = {
     ...withdrawReqs,
     ...transferReqs

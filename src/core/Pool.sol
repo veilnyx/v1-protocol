@@ -155,7 +155,7 @@ contract Pool is
     function verifyTransactionProof(
         ZTransaction calldata ztx
     ) external view returns (bool) {
-        return IVerifier(verifier).verifyTransactionProof(ztx);
+        return IVerifier(verifier).verifyTransactionProof(ztx, _commitmentTree.roots[ztx.commitmentTreeRootIndex]);
     }
 
     function getComplianceKey(

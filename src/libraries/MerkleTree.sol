@@ -201,23 +201,27 @@ library MerkleTreeLogic {
 
     function isKnownRoot(
         MerkleTree storage self,
-        uint256 root
+        uint256 _root
     ) public view returns (bool) {
-        uint256 from = self.currentRootIndex > ROOT_HISTORY_SIZE - 1
-            ? self.currentRootIndex - ROOT_HISTORY_SIZE - 1
-            : 0;
-
-        uint8 i = 0;
-        while (i <= self.currentRootIndex) {
-            if (self.roots[i + from] == root) {
+        if (_root == 0) {
+            return false;
+        }
+        uint256 _currentRootIndex = self.currentRootIndex;
+        uint256 i = _currentRootIndex; // currentRootIndex -> 0
+        do {
+            if (_root == self.roots[i]) {
                 return true;
             }
-
-            unchecked {
-                ++i;
+            if (i == 0) {
+                // ROOT_HISTORY_SIZE -> currentRootIndex + 1
+                i = ROOT_HISTORY_SIZE;
             }
-        }
-
+            i--;
+        } while (i != _currentRootIndex);
         return false;
+    }
+
+    function getMerkleRoot(MerkleTree storage self, uint8 rootIndex) external view returns(uint256) {
+        return self.roots[rootIndex];
     }
 }

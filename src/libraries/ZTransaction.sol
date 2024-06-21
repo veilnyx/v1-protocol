@@ -4,6 +4,7 @@ pragma solidity ^0.8.24;
 import {PoseidonT4} from "poseidon-solidity/PoseidonT4.sol";
 import {IPool} from "../interfaces/IPool.sol";
 import {IVerifier} from "../interfaces/IVerifier.sol";
+import {Verifier} from "../core/Verifier.sol";
 import {IAdaptorHandler} from "../interfaces/IAdaptorHandler.sol";
 import {Asset, AssetLogic} from "./Asset.sol";
 import {MerkleTree, MerkleTreeLogic} from "./MerkleTree.sol";
@@ -55,7 +56,8 @@ struct ZTransaction {
     ZTransactionType txType;
     bytes proof;
     uint256 addressTreeRoot;
-    uint256 commitmentTreeRoot;
+    uint256 commitmentTreeRoot; // TODO: To be removed if we are sticking with `commitmentTreeRootIndex`
+    uint8 commitmentTreeRootIndex;
     // Public data
     uint24[] pubAssetIds; // First index is always fee asset
     uint256[] pubValues;
@@ -71,6 +73,7 @@ struct ZTransaction {
     address target;
     bytes targetPayload;
     // Compliance params
+    uint8 revokerId;
     bytes complianceMemo;
 }
 
@@ -103,6 +106,29 @@ library ZTransactionLogic {
                         self.beneficiaryMemo,
                         self.target,
                         self.targetPayload
+                    )
+                )
+            ) % FIELD_SIZE;
+    }
+
+    /// @notice Calculates the hash of those ZTx params which are not being sent as individual public params to the verifier.
+    /// @param self ZTransaction
+    /// @return Hash of the non individual ZTx params
+    function hashNonIndividualZTxParams(
+        ZTransaction memory self
+    ) public pure returns (uint256) {
+        return
+            uint256(
+                keccak256(
+                    abi.encode(
+                        self.nullifiers, // exception
+                        self.inMemos,
+                        self.outMemos,
+                        self.feeData,
+                        self.beneficiaryMemo,
+                        self.target,
+                        self.targetPayload,
+                        self.revokerId
                     )
                 )
             ) % FIELD_SIZE;
@@ -158,12 +184,14 @@ library ZTransactionLogic {
 
     /// @notice Calculates calldata to proper verifier contract
     /// @param self ZTransaction
+    /// @param treeRoot Root of the merkle tree to verify against
     /// @param selector Selector of verifier contract
     /// @param encryptionPublicKeyX Compliance encryption public key x
     /// @param encryptionPublicKeyY Compliance encryption public key y
     /// @return Calldata bytes for verifier contract
     function toVerifierInput(
         ZTransaction memory self,
+        uint256 treeRoot,
         bytes4 selector,
         uint256 encryptionPublicKeyX,
         uint256 encryptionPublicKeyY
@@ -177,8 +205,11 @@ library ZTransactionLogic {
 
         // Common params (Index: 0 to 3)
         pubInputs[0] = self.addressTreeRoot;
-        pubInputs[1] = self.commitmentTreeRoot;
-        pubInputs[2] = hash(self);
+        // pubInputs[1] = self.commitmentTreeRoot; // TODO Remove this if we are sticking with `commitmentTreeRootIndex`
+        pubInputs[1] = treeRoot;
+
+        // pubInputs[2] = hash(self); // TODO To be removed once SDK is updated
+        pubInputs[2] = hashNonIndividualZTxParams(self);
         pubInputs[3] = self.txType == ZTransactionType.DEPOSIT ? 0 : 1;
 
         // Public asset ids and values (Index: 4 to 4 + 2 * nOuts)
@@ -387,7 +418,7 @@ library ZTransactionLogic {
         }
 
         // Verify ZK proof
-        if (!IVerifier(verifier).verifyTransactionProof(ztx)) {
+        if (!Verifier(verifier).verifyTransactionProof(ztx, tree.roots[ztx.commitmentTreeRootIndex])) { // TODO: might have to include `verifyTransactionProof` in ZTransactionLogic library if merkle tree has to be sent for 
             revert IPool.InvalidProof();
         }
 
