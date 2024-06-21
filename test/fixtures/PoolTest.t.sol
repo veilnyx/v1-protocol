@@ -16,7 +16,8 @@ contract PoolTest is BaseTest {
     AdaptorHandler public adaptorHandler;
     Pool public pool;
 
-    uint256 public treeDepth = 32;
+    uint256 public commitmentTreeDepth = 25;
+    uint256 public addressTreeDepth = 20;
     address public entryPoint;
 
     MockERC20 public token1;
@@ -68,7 +69,8 @@ contract PoolTest is BaseTest {
 
         bytes memory initData = abi.encodeWithSelector(
             pool.initialize.selector,
-            treeDepth,
+            commitmentTreeDepth,
+            addressTreeDepth,
             address(verifier),
             address(adaptorHandler),
             assetType,

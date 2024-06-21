@@ -13,14 +13,16 @@ contract PoolProxyDeploy is BaseScript {
         address convertor = _getContract("Convertor");
         address poolImpl = _getContract("PoolImpl");
 
-        uint256 treeDepth = _config.treeDepth();
+        uint256 commitmentTreeDepth = _config.commitmentTreeDepth();
+        uint256 addressTreeDepth = _config.addressTreeDepth();
         AssetType initAssetType = _config.initAssetType();
         address[] memory initAssetAddresses = _config.initAssetAddresses();
 
         bytes memory initializeData = abi.encodeCall(
             Pool.initialize,
             (
-                treeDepth,
+                commitmentTreeDepth,
+                addressTreeDepth,
                 verifier,
                 convertor,
                 initAssetType,

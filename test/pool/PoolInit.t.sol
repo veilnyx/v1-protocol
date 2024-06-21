@@ -24,8 +24,8 @@ contract PoolInitTest is PoolTest {
 
         assertEq(verifier_, address(verifier));
         assertEq(adaptorHandler_, address(adaptorHandler));
-        assertEq(treeDepth, pool.getCommitmentTreeDepth());
-        assertEq(treeDepth / 2, pool.getAddressTreeDepth());
+        assertEq(commitmentTreeDepth, pool.getCommitmentTreeDepth());
+        assertEq(addressTreeDepth, pool.getAddressTreeDepth());
         assertEq(revokerKeyX, fixture.revokerPublicKey[0]);
         assertEq(revokerKeyY, fixture.revokerPublicKey[1]);
         assertEq(encryptionKeyX, fixture.encryptionPublicKey[0]);

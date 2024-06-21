@@ -8,11 +8,12 @@
     "encryptionPublicKey": [
       15187339732644800751812193648350861431733040013104897934882869545575329240973,
       18224946718075372665314217959364704865149122115871220475141871484502637776562
-    ]
+    ],
+    "commitmentTreeDepth": 25,
+    "addressTreeDepth": 20
   },
   "31337": {
     "chain": "local",
-    "treeDepth": 32,
     "entryPoint": "0x0000000000000000000000000000000000000000",
     "wToken": "0x0000000000000000000000000000000000000000",
     "gateway": "0x0000000000000000000000000000000000000000",
@@ -23,7 +24,6 @@
   },
   "137": {
     "chain": "polygon-mainnet",
-    "treeDepth": 32,
     "entryPoint": "0x0000000071727De22E5E9d8BAf0edAc6f37da032",
     "wToken": "0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270",
     "gateway": "0x0000000000000000000000000000000000000000",
@@ -34,7 +34,6 @@
   },
   "80002": {
     "chain": "polygon-amoy",
-    "treeDepth": 32,
     "entryPoint": "0x0000000071727De22E5E9d8BAf0edAc6f37da032",
     "gateway": "0x0000000000000000000000000000000000000000",
     "paymaster": "0x0000000000000000000000000000000000000000",
@@ -45,7 +44,6 @@
   },
   "11155420": {
     "chain": "optimism-sepolia",
-    "treeDepth": 32,
     "entryPoint": "0x0000000071727De22E5E9d8BAf0edAc6f37da032",
     "gateway": "0x0000000000000000000000000000000000000000",
     "paymaster": "0x0000000000000000000000000000000000000000",
@@ -56,7 +54,6 @@
   },
   "11155111": {
     "chain": "eth-sepolia",
-    "treeDepth": 32,
     "entryPoint": "0x0000000071727De22E5E9d8BAf0edAc6f37da032",
     "gateway": "0x329FA1dd7f274C0C0B3F2B7539EF71f435a89F04",
     "paymaster": "0xE45c40643af3aa4146E1B1C95051c23f7439ed75",

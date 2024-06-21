@@ -29,7 +29,8 @@ contract Pool is
     using ZTransactionLogic for ZTransaction;
 
     function initialize(
-        uint256 treeDepth,
+        uint256 commitmentTreeDepth,
+        uint256 addressTreeDepth,
         address verifier_,
         address adaptorHandler_,
         AssetType initAssetType,
@@ -43,8 +44,8 @@ contract Pool is
         verifier = verifier_;
         adaptorHandler = adaptorHandler_;
 
-        _commitmentTree.init(treeDepth);
-        _addressTree.init(treeDepth / 2);
+        _commitmentTree.init(commitmentTreeDepth);
+        _addressTree.init(addressTreeDepth);
         _assetCounts[initAssetType] = AssetLogic.addAssets(
             _assetIds,
             _assets,

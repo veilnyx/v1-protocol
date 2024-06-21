@@ -16,8 +16,8 @@ contract Config is Script {
     uint256 internal immutable _revokerPublicKeyY;
     uint256 internal immutable _encryptionPublicKeyX;
     uint256 internal immutable _encryptionPublicKeyY;
-
-    uint256 internal immutable _treeDepth = 32;
+    uint256 internal immutable _commitmentTreeDepth;
+    uint256 internal immutable _addressTreeDepth;
     address internal _entryPoint;
     address internal _gateway;
     address internal _paymaster;
@@ -54,13 +54,18 @@ contract Config is Script {
             ".common.encryptionPublicKey[1]"
         );
 
+        _commitmentTreeDepth = vm.parseJsonUint(
+            configJson,
+            ".common.commitmentTreeDepth"
+        );
+
+        _addressTreeDepth = vm.parseJsonUint(
+            configJson,
+            ".common.addressTreeDepth"
+        );
+
         // chain specific config
         string memory chainPrefix = string.concat(".", vm.toString(_chainId));
-
-        _treeDepth = vm.parseJsonUint(
-            configJson,
-            string.concat(chainPrefix, ".treeDepth")
-        );
 
         _entryPoint = vm.parseJsonAddress(
             configJson,
@@ -105,8 +110,12 @@ contract Config is Script {
         return [_encryptionPublicKeyX, _encryptionPublicKeyY];
     }
 
-    function treeDepth() external pure returns (uint256) {
-        return _treeDepth;
+    function commitmentTreeDepth() external view returns (uint256) {
+        return _commitmentTreeDepth;
+    }
+
+    function addressTreeDepth() external view returns (uint256) {
+        return _addressTreeDepth;
     }
 
     function gateway() external view returns (address) {

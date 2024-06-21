@@ -41,7 +41,8 @@ contract ZkFiDeploy is BaseScript {
         bytes memory initializeData = abi.encodeCall(
             Pool.initialize,
             (
-                _config.treeDepth(),
+                _config.commitmentTreeDepth(),
+                _config.addressTreeDepth(),
                 address(verifier),
                 address(adaptorHandler),
                 _config.initAssetType(),
