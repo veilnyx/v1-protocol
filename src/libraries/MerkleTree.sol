@@ -220,4 +220,8 @@ library MerkleTreeLogic {
 
         return false;
     }
+
+    function getMerkleRoot(MerkleTree storage self, uint8 rootIndex) external view returns(uint256) {
+        return self.roots[rootIndex];
+    }
 }

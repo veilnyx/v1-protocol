@@ -46,7 +46,8 @@ enum MemoType {
 struct ZTransaction {
     ZTransactionType txType;
     bytes proof;
-    uint256 merkleRoot;
+    // uint256 merkleRoot;
+    uint8 merkleRootIndex;
     // Public data
     uint24[] pubAssetIds; // First index is always fee asset
     uint256[] pubValues;
@@ -61,7 +62,9 @@ struct ZTransaction {
     bytes beneficiaryMemo;
     address target;
     bytes targetPayload;
+    
     // Compliance params
+    uint8 revokerId;
     bytes complianceMemo;
 }
 
@@ -93,6 +96,27 @@ library ZTransactionLogic {
                         self.beneficiaryMemo,
                         self.target,
                         self.targetPayload
+                    )
+                )
+            ) % FIELD_SIZE;
+    }
+
+    /// @notice Calculates the hash of those ZTx params which are not being sent as individual public params to the verifier.
+    /// @param self ZTransaction
+    /// @return Hash of the non individual ZTx params
+    function hashNonIndividualZTxParams(ZTransaction memory self) public pure returns (uint256) {
+        return
+            uint256(
+                keccak256(
+                    abi.encode(
+                        self.nullifiers, // exception
+                        self.inMemos,
+                        self.outMemos, 
+                        self.feeData, 
+                        self.beneficiaryMemo,
+                        self.target,
+                        self.targetPayload,
+                        self.revokerId
                     )
                 )
             ) % FIELD_SIZE;
@@ -148,12 +172,14 @@ library ZTransactionLogic {
 
     /// @notice Calculates calldata to proper verifier contract
     /// @param self ZTransaction
+    /// @param tree Merkle Tree
     /// @param selector Selector of verifier contract
     /// @param encryptionPublicKeyX Compliance encryption public key x
     /// @param encryptionPublicKeyY Compliance encryption public key y
     /// @return Calldata bytes for verifier contract
     function toVerifierInput(
         ZTransaction memory self,
+        MerkleTree storage tree,
         bytes4 selector,
         uint256 encryptionPublicKeyX,
         uint256 encryptionPublicKeyY
@@ -166,8 +192,10 @@ library ZTransactionLogic {
         uint256[] memory pubInputs = new uint256[](pubInputCount);
 
         // Common params (Index: 0 to 3)
-        pubInputs[0] = self.merkleRoot;
-        pubInputs[1] = hash(self);
+        // pubInputs[0] = self.merkleRoot;
+        pubInputs[0] = MerkleTreeLogic.getMerkleRoot(tree, self.rootIndex);
+        // pubInputs[1] = hash(self);
+        pubInputs[1] = hashNonIndividualZTxParams(self);
         pubInputs[2] = self.txType == ZTransactionType.DEPOSIT ? 0 : 1;
 
         // Public asset ids and values (Index: 3 to 3 + 2 * nOuts)
@@ -376,7 +404,7 @@ library ZTransactionLogic {
         }
 
         // Verify ZK proof
-        if (!IVerifier(verifier).verifyTransactionProof(ztx)) {
+        if (!IVerifier(verifier)._verifyTransactionProof(ztx, tree)) {
             revert IPool.InvalidProof();
         }
 

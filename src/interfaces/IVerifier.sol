@@ -2,6 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {ZTransaction} from "../libraries/ZTransaction.sol";
+import {MerkleTree} from "../libraries/MerkleTree.sol";
 
 interface IVerifier {
     error BadArguments();
@@ -9,10 +10,6 @@ interface IVerifier {
     function getRevokerPublicKey() external view returns (uint256, uint256);
 
     function getEncryptionPublicKey() external view returns (uint256, uint256);
-
-    function verifyTransactionProof(
-        ZTransaction memory ztx
-    ) external view returns (bool);
 
     function getVerifierId(
         uint256 nIns,

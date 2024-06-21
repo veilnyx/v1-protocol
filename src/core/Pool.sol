@@ -152,7 +152,7 @@ contract Pool is
     function verifyTransactionProof(
         ZTransaction calldata ztx
     ) external view returns (bool) {
-        return IVerifier(verifier).verifyTransactionProof(ztx);
+        return IVerifier(verifier)._verifyTransactionProof(ztx, _commitmentTree);
     }
 
     function assetCount(AssetType assetType) external view returns (uint24) {
