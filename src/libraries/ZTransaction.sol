@@ -23,6 +23,13 @@ enum MemoType {
     FULL
 }
 
+/// @title ComplianceKeys struct representing compliance encryption keys
+struct ComplianceKeys {
+    uint256[2] revokerPublicKey;
+    uint256[2] encryptionPublicKey;
+    bool isActive;
+}
+
 /// @title ZTransaction struct representing shielded transaction
 ///
 /// @param txType           Type of transaction
@@ -46,7 +53,8 @@ enum MemoType {
 struct ZTransaction {
     ZTransactionType txType;
     bytes proof;
-    uint256 merkleRoot;
+    uint256 addressTreeRoot;
+    uint256 commitmentTreeRoot;
     // Public data
     uint24[] pubAssetIds; // First index is always fee asset
     uint256[] pubValues;
@@ -81,7 +89,8 @@ library ZTransactionLogic {
                 keccak256(
                     abi.encode(
                         self.txType,
-                        self.merkleRoot,
+                        self.addressTreeRoot,
+                        self.commitmentTreeRoot,
                         self.pubAssetIds,
                         self.pubValues,
                         self.nullifiers,
@@ -166,12 +175,13 @@ library ZTransactionLogic {
         uint256[] memory pubInputs = new uint256[](pubInputCount);
 
         // Common params (Index: 0 to 3)
-        pubInputs[0] = self.merkleRoot;
-        pubInputs[1] = hash(self);
-        pubInputs[2] = self.txType == ZTransactionType.DEPOSIT ? 0 : 1;
+        pubInputs[0] = self.addressTreeRoot;
+        pubInputs[1] = self.commitmentTreeRoot;
+        pubInputs[2] = hash(self);
+        pubInputs[3] = self.txType == ZTransactionType.DEPOSIT ? 0 : 1;
 
-        // Public asset ids and values (Index: 3 to 3 + 2 * nOuts)
-        uint256 offset = 3;
+        // Public asset ids and values (Index: 4 to 4 + 2 * nOuts)
+        uint256 offset = 4;
         for (uint8 i = 0; i < nOuts; ) {
             pubInputs[offset + i] = i < nPubs ? self.pubAssetIds[i] : 0;
             pubInputs[offset + nOuts + i] = i < nPubs ? self.pubValues[i] : 0;
@@ -180,7 +190,7 @@ library ZTransactionLogic {
             }
         }
 
-        // Input notes nullifiers (Index: 3 + 2 * nOuts to (3 + nIns + 2 * nOuts))
+        // Input notes nullifiers (Index: 4 + 2 * nOuts to (4 + nIns + 2 * nOuts))
         offset += 2 * nOuts;
         for (uint8 i = 0; i < nIns; ) {
             pubInputs[offset + i] = self.nullifiers[i];

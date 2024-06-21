@@ -13,7 +13,7 @@ import {IPool} from "../interfaces/IPool.sol";
 import {IAdaptorHandler} from "../interfaces/IAdaptorHandler.sol";
 import {PoolStorage} from "../base/PoolStorage.sol";
 import {Asset, AssetType, AssetLogic} from "../libraries/Asset.sol";
-import {ZTransaction, ZTransactionLogic} from "../libraries/ZTransaction.sol";
+import {ZTransaction, ZTransactionLogic, ComplianceKeys} from "../libraries/ZTransaction.sol";
 import {MerkleTree, MerkleTreeLogic} from "../libraries/MerkleTree.sol";
 
 contract Pool is
@@ -94,31 +94,30 @@ contract Pool is
     }
 
     function registerComplianceKeys(
-        uint256[2] calldata revokerKeys,
-        uint256[2] calldata encryptionKeys
+        uint256[2] calldata revokerPublicKey,
+        uint256[2] calldata encryptionPublicKey
     ) external onlyOwner {
-        ComplianceKey memory complianceKey = ComplianceKey({
-            revokerKeys: revokerKeys,
-            encryptionKeys: encryptionKeys,
+        ComplianceKeys memory complianceKeys = ComplianceKey({
+            revokerPublicKey: revokerPublicKey,
+            encryptionPublicKey: encryptionPublicKey,
             isActive: true
         });
 
-        complianceKeys[_complianceKeysCount] = complianceKey;
-        emit RegisterComplianceKeys(_complianceKeysCount);
+        _complianceKeys[_complianceKeysCount] = complianceKeys;
+        emit RegisterComplianceKeys(
+            _complianceKeysCount,
+            revokerPublicKey,
+            encryptionPublicKey
+        );
+
         _complianceKeysCount += 1;
     }
 
-    function changeComplianceKeyStatus(
-        uint256 index,
-        bool status
+    function setComplianceKeysStatus(
+        uint256 id,
+        bool isActive
     ) external onlyOwner {
-        complianceKeys[index].isActive = status;
-    }
-
-    function getComplianceKey(
-        uint256 index
-    ) external view returns (ComplianceKey memory) {
-        return complianceKeys[index];
+        _complianceKeys[id].isActive = isActive;
     }
 
     function pause() external onlyOwner {
@@ -153,6 +152,12 @@ contract Pool is
         ZTransaction calldata ztx
     ) external view returns (bool) {
         return IVerifier(verifier).verifyTransactionProof(ztx);
+    }
+
+    function getComplianceKey(
+        uint256 id
+    ) external view returns (ComplianceKeys memory) {
+        return _complianceKeys[id];
     }
 
     function assetCount(AssetType assetType) external view returns (uint24) {

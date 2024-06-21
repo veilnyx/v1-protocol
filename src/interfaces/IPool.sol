@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {ZTransaction, ZTransactionType} from "../libraries/ZTransaction.sol";
+import {ZTransaction, ZTransactionType, ComplianceKeys} from "../libraries/ZTransaction.sol";
 import {AssetType, Asset} from "../libraries/Asset.sol";
 import {PoolStorage} from "src/base/PoolStorage.sol";
 
@@ -21,7 +21,11 @@ interface IPool {
         uint256 leafIndex,
         bytes publicKeys
     );
-    event RegisterComplianceKeys(uint256 indexed id);
+    event RegisterComplianceKeys(
+        uint256 indexed id,
+        uint256[2] revokerPublicKey,
+        uint256[2] encryptionPublicKey
+    );
     event InputNoteMemos(bytes inMemos);
     event ComplianceMemo(bytes complianceMemo);
     event NullifierMarked(uint256 indexed nullifier);
@@ -74,10 +78,7 @@ interface IPool {
         uint256[2] calldata encryptionKeys
     ) external;
 
-    function changeComplianceKeyStatus(
-        uint256 index,
-        bool status
-    ) external;
+    function changeComplianceKeyStatus(uint256 index, bool status) external;
 
     /////////////////////////////////////////
     //         READ METHODS                //
@@ -101,7 +102,7 @@ interface IPool {
 
     function getComplianceKey(
         uint256 index
-    ) external view returns (PoolStorage.ComplianceKey memory);
+    ) external view returns (ComplianceKeys memory);
 
     function isMarkedNullifier(uint256 nullifier) external view returns (bool);
 
