@@ -46,7 +46,7 @@ enum MemoType {
 struct ZTransaction {
     ZTransactionType txType;
     bytes proof;
-    // uint256 merkleRoot;
+    uint256 merkleRoot; // TODO: To be removed if we are sticking with `merkleRootIndex`
     uint8 merkleRootIndex;
     // Public data
     uint24[] pubAssetIds; // First index is always fee asset
@@ -192,10 +192,10 @@ library ZTransactionLogic {
         uint256[] memory pubInputs = new uint256[](pubInputCount);
 
         // Common params (Index: 0 to 3)
-        // pubInputs[0] = self.merkleRoot;
-        pubInputs[0] = tree.roots[self.rootIndex];
+        // pubInputs[0] = self.merkleRoot; // TODO Remove this if we are sticking with `merkleRootIndex`
+        pubInputs[0] = tree.roots[self.merkleRootIndex];
         
-        // pubInputs[1] = hash(self);
+        // pubInputs[1] = hash(self); // TODO To be removed once SDK is updated
         pubInputs[1] = hashNonIndividualZTxParams(self);
         pubInputs[2] = self.txType == ZTransactionType.DEPOSIT ? 0 : 1;
 
