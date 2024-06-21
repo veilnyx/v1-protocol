@@ -6,6 +6,7 @@ import {PoolTest} from "test/fixtures/PoolTest.t.sol";
 import {IPool} from "src/interfaces/IPool.sol";
 import {AssetType, Asset} from "src/libraries/Asset.sol";
 import {MerkleTree} from "src/libraries/MerkleTree.sol";
+import {ComplianceKeys} from "src/libraries/ZTransaction.sol";
 import {PoolStorage} from "src/base/PoolStorage.sol";
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 
@@ -58,7 +59,7 @@ contract PoolInitTest is PoolTest {
         ) = _getComplianceKeyArrays();
 
         vm.expectEmit(true, true, false, true);
-        emit IPool.RegisterComplianceKeys(0);
+        emit IPool.RegisterComplianceKeys(0, revokerKeys, encryptionKeys);
 
         pool.registerComplianceKeys(revokerKeys, encryptionKeys);
     }
@@ -88,13 +89,11 @@ contract PoolInitTest is PoolTest {
 
         pool.registerComplianceKeys(revokerKeys, encryptionKeys);
 
-        PoolStorage.ComplianceKey memory complianceKey = pool.getComplianceKey(
-            0
-        );
-        assertEq(complianceKey.revokerKeys[0], revokerKeys[0]);
-        assertEq(complianceKey.revokerKeys[1], revokerKeys[1]);
-        assertEq(complianceKey.encryptionKeys[0], encryptionKeys[0]);
-        assertEq(complianceKey.encryptionKeys[1], encryptionKeys[1]);
+        ComplianceKeys memory complianceKey = pool.getComplianceKey(0);
+        assertEq(complianceKey.revokerPublicKey[0], revokerKeys[0]);
+        assertEq(complianceKey.revokerPublicKey[1], revokerKeys[1]);
+        assertEq(complianceKey.encryptionPublicKey[0], encryptionKeys[0]);
+        assertEq(complianceKey.encryptionPublicKey[1], encryptionKeys[1]);
         assert(complianceKey.isActive);
     }
 
@@ -107,9 +106,7 @@ contract PoolInitTest is PoolTest {
         pool.registerComplianceKeys(revokerKeys, encryptionKeys);
         pool.changeComplianceKeyStatus(0, false);
 
-        PoolStorage.ComplianceKey memory complianceKey = pool.getComplianceKey(
-            0
-        );
+        ComplianceKeys memory complianceKey = pool.getComplianceKey(0);
         assertEq(complianceKey.isActive, false);
     }
 

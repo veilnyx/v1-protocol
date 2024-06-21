@@ -97,7 +97,7 @@ contract Pool is
         uint256[2] calldata revokerPublicKey,
         uint256[2] calldata encryptionPublicKey
     ) external onlyOwner {
-        ComplianceKeys memory complianceKeys = ComplianceKey({
+        ComplianceKeys memory complianceKeys = ComplianceKeys({
             revokerPublicKey: revokerPublicKey,
             encryptionPublicKey: encryptionPublicKey,
             isActive: true
@@ -113,7 +113,7 @@ contract Pool is
         _complianceKeysCount += 1;
     }
 
-    function setComplianceKeysStatus(
+    function changeComplianceKeyStatus(
         uint256 id,
         bool isActive
     ) external onlyOwner {
@@ -147,6 +147,10 @@ contract Pool is
     ) external onlyOwner {
         _adaptors[adaptorAddress] = enable;
     }
+
+    ////////////////////////////////
+    ////     View Functions     ////   
+    ////////////////////////////////
 
     function verifyTransactionProof(
         ZTransaction calldata ztx

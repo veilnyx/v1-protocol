@@ -34,7 +34,8 @@ struct ComplianceKeys {
 ///
 /// @param txType           Type of transaction
 /// @param proof            Abi encoded proof
-/// @param merkleRoot       Recent merkle root of commitment tree
+/// @param addressTreeRoot          Recent merkle root of address tree
+/// @param commitmentTreeRoot       Recent merkle root of commitment tree
 /// @param pubAssetIds      Asset ids for public asset transfers (if applicable, fee asset is always first)
 /// @param pubValues        Values (in same order of asset ids) for public asset transfers
 /// @param nullifiers       Revealed nullifiers of input/spent notes
@@ -374,7 +375,7 @@ library ZTransactionLogic {
         ZTransaction memory ztx
     ) internal {
         // Check recent merkle root
-        if (!tree.isKnownRoot(ztx.merkleRoot)) {
+        if (!tree.isKnownRoot(ztx.commitmentTreeRoot)) {
             revert IPool.UnknownMerkleRoot();
         }
 
