@@ -193,7 +193,8 @@ library ZTransactionLogic {
 
         // Common params (Index: 0 to 3)
         // pubInputs[0] = self.merkleRoot;
-        pubInputs[0] = MerkleTreeLogic.getMerkleRoot(tree, self.rootIndex);
+        pubInputs[0] = tree.roots[self.rootIndex];
+        
         // pubInputs[1] = hash(self);
         pubInputs[1] = hashNonIndividualZTxParams(self);
         pubInputs[2] = self.txType == ZTransactionType.DEPOSIT ? 0 : 1;
