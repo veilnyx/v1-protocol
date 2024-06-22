@@ -8,7 +8,6 @@ import {ComplianceKeys} from "../libraries/ZTransaction.sol";
 abstract contract PoolStorage {
     uint256 public constant FIELD_SIZE =
         21888242871839275222246405745257275088548364400416034343698204186575808495617;
-
     uint256 public constant ZERO_LEAF = uint256(keccak256("zkFi")) % FIELD_SIZE;
 
     address public verifier;
@@ -23,11 +22,10 @@ abstract contract PoolStorage {
     mapping(uint24 assetId => Asset asset) _assets;
 
     MerkleTree internal _commitmentTree;
-
     mapping(uint256 => bool) internal _markedNullifiers;
 
     mapping(address => bool) internal _adaptors;
 
-    uint256 internal _complianceKeysCount;
+    uint16 internal _complianceKeysCount;
     mapping(uint256 => ComplianceKeys) internal _complianceKeys;
 }

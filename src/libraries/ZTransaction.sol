@@ -26,9 +26,10 @@ enum MemoType {
 
 /// @title ComplianceKeys struct representing compliance encryption keys
 struct ComplianceKeys {
+    uint16 id;
+    bool isActive;
     uint256[2] revokerPublicKey;
     uint256[2] encryptionPublicKey;
-    bool isActive;
 }
 
 /// @title ZTransaction struct representing shielded transaction
@@ -51,13 +52,13 @@ struct ComplianceKeys {
 /// @param target           This is either a withdraw address in case of `WITHDRAW` transaction or
 ///                         a targetted adaptor address in case of `CONVERT` transaction
 /// @param targetPayload    Payload for target contract (if applicable)
+/// @param complianceKeysId Id of compliance keys used for this transaction
 /// @param complianceMemo   Encrypted compliance data
 struct ZTransaction {
     ZTransactionType txType;
     bytes proof;
     uint256 addressTreeRoot;
-    uint256 commitmentTreeRoot; // TODO: To be removed if we are sticking with `commitmentTreeRootIndex`
-    uint8 commitmentTreeRootIndex;
+    uint256 commitmentTreeRoot;
     // Public data
     uint24[] pubAssetIds; // First index is always fee asset
     uint256[] pubValues;
@@ -67,13 +68,13 @@ struct ZTransaction {
     bytes inMemos;
     bytes[] outMemos;
     // Fees info
-    uint256 feeData; //  160-bit address + 96-bit feeValue
-    uint256 beneficiary; // stealth address for any public fund to shielded account
+    uint256 feeData;
+    uint256 beneficiary;
     bytes beneficiaryMemo;
     address target;
     bytes targetPayload;
     // Compliance params
-    uint8 revokerId;
+    uint16 complianceKeysId;
     bytes complianceMemo;
 }
 
@@ -85,6 +86,10 @@ library ZTransactionLogic {
         21888242871839275222246405745257275088548364400416034343698204186575808495617;
 
     /// @notice Calculates the hash of a ZTransaction
+    /// @dev All of the omitted fields of ZTransaction for hashing are public inputs
+    ///      to the verifier, and tampering with any of those fields will result in invalid
+    ///      proof anyway. `nullifiers` is exception for sake of including some element of
+    ///      spent notes in the hash.
     /// @param self ZTransaction
     /// @return Hash of the transaction
     function hash(ZTransaction memory self) public pure returns (uint256) {
@@ -93,16 +98,11 @@ library ZTransactionLogic {
                 keccak256(
                     abi.encode(
                         self.txType,
-                        self.addressTreeRoot,
-                        self.commitmentTreeRoot,
-                        self.pubAssetIds,
-                        self.pubValues,
                         self.nullifiers,
                         self.commitments,
                         self.inMemos,
                         self.outMemos,
                         self.feeData,
-                        self.beneficiary,
                         self.beneficiaryMemo,
                         self.target,
                         self.targetPayload
@@ -111,32 +111,10 @@ library ZTransactionLogic {
             ) % FIELD_SIZE;
     }
 
-    /// @notice Calculates the hash of those ZTx params which are not being sent as individual public params to the verifier.
-    /// @param self ZTransaction
-    /// @return Hash of the non individual ZTx params
-    function hashNonIndividualZTxParams(
-        ZTransaction memory self
-    ) public pure returns (uint256) {
-        return
-            uint256(
-                keccak256(
-                    abi.encode(
-                        self.nullifiers, // exception
-                        self.inMemos,
-                        self.outMemos,
-                        self.feeData,
-                        self.beneficiaryMemo,
-                        self.target,
-                        self.targetPayload,
-                        self.revokerId
-                    )
-                )
-            ) % FIELD_SIZE;
-    }
-
     /// @notice Executes a shielded transaction
     /// @param ztx ZTransaction to be executed
-    /// @param tree MerkleTree state in this contract
+    /// @param addressTree Address `MerkleTree` state in this contract
+    /// @param commitmentTree Commitment `MerkleTree` state in this contract
     /// @param assets Mapping of assetId to Asset
     /// @param adaptors Mapping of supported external adaptor addresses
     /// @param markedNullifiers Mapping of nullifiers that are already marked
@@ -144,14 +122,24 @@ library ZTransactionLogic {
     /// @param adaptorHandler Adaptor contract address
     function execute(
         ZTransaction memory ztx,
-        MerkleTree storage tree,
+        MerkleTree storage addressTree,
+        MerkleTree storage commitmentTree,
         mapping(uint24 => Asset) storage assets,
         mapping(address => bool) storage adaptors,
         mapping(uint256 => bool) storage markedNullifiers,
+        mapping(uint256 => ComplianceKeys) storage complianceKeys,
         address verifier,
         address adaptorHandler
     ) external {
-        _validateTransaction(tree, adaptors, markedNullifiers, verifier, ztx);
+        _validateTransaction(
+            addressTree,
+            commitmentTree,
+            adaptors,
+            markedNullifiers,
+            complianceKeys,
+            verifier,
+            ztx
+        );
 
         // Transfer any fees
         _transferFee(assets, ztx);
@@ -177,39 +165,31 @@ library ZTransactionLogic {
             _convert(assets, adaptorHandler, ztx);
         }
 
-        _mintNotes(tree, ztx.commitments, ztx.inMemos, ztx.outMemos);
+        _mintNotes(commitmentTree, ztx.commitments, ztx.inMemos, ztx.outMemos);
 
         emit IPool.ComplianceMemo(ztx.complianceMemo);
     }
 
     /// @notice Calculates calldata to proper verifier contract
     /// @param self ZTransaction
-    /// @param treeRoot Root of the merkle tree to verify against
     /// @param selector Selector of verifier contract
-    /// @param encryptionPublicKeyX Compliance encryption public key x
-    /// @param encryptionPublicKeyY Compliance encryption public key y
     /// @return Calldata bytes for verifier contract
     function toVerifierInput(
         ZTransaction memory self,
-        uint256 treeRoot,
-        bytes4 selector,
-        uint256 encryptionPublicKeyX,
-        uint256 encryptionPublicKeyY
+        ComplianceKeys memory cKeys,
+        bytes4 selector
     ) public pure returns (bytes memory) {
         uint256 nIns = self.nullifiers.length;
         uint256 nOuts = self.commitments.length;
         uint256 nPubs = self.pubAssetIds.length;
-        uint256 pubInputCount = 10 + nIns + (6 * nOuts);
+        uint256 pubInputCount = 12 + nIns + (6 * nOuts);
 
         uint256[] memory pubInputs = new uint256[](pubInputCount);
 
-        // Common params (Index: 0 to 3)
+        // Common params (Index: 0 to 4)
         pubInputs[0] = self.addressTreeRoot;
-        // pubInputs[1] = self.commitmentTreeRoot; // TODO Remove this if we are sticking with `commitmentTreeRootIndex`
-        pubInputs[1] = treeRoot;
-
-        // pubInputs[2] = hash(self); // TODO To be removed once SDK is updated
-        pubInputs[2] = hashNonIndividualZTxParams(self);
+        pubInputs[1] = self.commitmentTreeRoot;
+        pubInputs[2] = hash(self);
         pubInputs[3] = self.txType == ZTransactionType.DEPOSIT ? 0 : 1;
 
         // Public asset ids and values (Index: 4 to 4 + 2 * nOuts)
@@ -231,8 +211,13 @@ library ZTransactionLogic {
             }
         }
 
-        // Output notes commitments: (Index: (3 + nIns + 2 * nOuts) to (3 + nIns + 3 * nOuts)
+        // Revoker keys
         offset += nIns;
+        pubInputs[offset] = cKeys.revokerPublicKey[0];
+        pubInputs[offset + 1] = cKeys.revokerPublicKey[1];
+
+        // Output notes commitments: (Index: (3 + nIns + 2 * nOuts) to (3 + nIns + 3 * nOuts)
+        offset += 2;
         for (uint8 i = 0; i < nOuts; ) {
             pubInputs[offset + i] = self.commitments[i];
             unchecked {
@@ -244,18 +229,18 @@ library ZTransactionLogic {
         offset += nOuts;
         pubInputs[offset] = self.beneficiary;
         // Compliance encryption key: (Index: (4 + nIns + 3 * nOuts) to (6 + nIns + 3 * nOuts))
-        pubInputs[offset + 1] = encryptionPublicKeyX;
-        pubInputs[offset + 2] = encryptionPublicKeyY;
+        pubInputs[offset + 1] = cKeys.encryptionPublicKey[0];
+        pubInputs[offset + 2] = cKeys.encryptionPublicKey[1];
 
         // Compliance memo: (Index: (6 + nIns + 3 * nOuts) to (9 + nIns + 4 * nOuts))
         offset += 3;
         // [6 + nIns + 3 * nOuts]: ephemeral pub key x
         // [7 + nIns + 3 * nOuts]: ephemeral pub key y
-        // [8 + nIns + 3 * nOuts]: encrypted in publicKeyX
+        // [8 + nIns + 3 * nOuts]: encrypted in inAddress
         // [9 + nIns + 3 * nOuts]: encrypted beneficiary blinding
         // [9 + nIns + 3 * nOuts...9 + nIns + 4 * nOuts]: encrypted out assets
         // [9 + nIns + 4 * nOuts...9 + nIns + 5 * nOuts]: encrypted out blindings
-        // [9 + nIns + 5 * nOuts...9 + nIns + 6 * nOuts]: encrypted out pubKeyXs
+        // [9 + nIns + 5 * nOuts...9 + nIns + 6 * nOuts]: encrypted out address
         bytes memory complianceMemo = self.complianceMemo;
         uint256 tmp;
         for (uint8 i = 0; i < 3 * nOuts + 4; ) {
@@ -399,14 +384,26 @@ library ZTransactionLogic {
     }
 
     function _validateTransaction(
-        MerkleTree storage tree,
+        MerkleTree storage addressTree,
+        MerkleTree storage commitmentTree,
         mapping(address => bool) storage supportedAdaptors,
         mapping(uint256 => bool) storage markedNullifiers,
+        mapping(uint256 => ComplianceKeys) storage cKeysMap,
         address verifier,
         ZTransaction memory ztx
     ) internal {
+        ComplianceKeys memory cKeys = cKeysMap[ztx.complianceKeysId];
+
+        if (!cKeys.isActive) {
+            revert IPool.InvalidComplianceKeys(ztx.complianceKeysId);
+        }
+
         // Check recent merkle root
-        if (!tree.isKnownRoot(ztx.commitmentTreeRoot)) {
+        if (!commitmentTree.isKnownRoot(ztx.commitmentTreeRoot)) {
+            revert IPool.UnknownMerkleRoot();
+        }
+
+        if (!addressTree.isKnownRoot(ztx.addressTreeRoot)) {
             revert IPool.UnknownMerkleRoot();
         }
 
@@ -418,7 +415,8 @@ library ZTransactionLogic {
         }
 
         // Verify ZK proof
-        if (!Verifier(verifier).verifyTransactionProof(ztx, tree.roots[ztx.commitmentTreeRootIndex])) { // TODO: might have to include `verifyTransactionProof` in ZTransactionLogic library if merkle tree has to be sent for 
+        if (!Verifier(verifier).verifyTransactionProof(ztx, cKeys)) {
+            // TODO: might have to include `verifyTransactionProof` in ZTransactionLogic library if merkle tree has to be sent for
             revert IPool.InvalidProof();
         }
 

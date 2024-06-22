@@ -29,11 +29,10 @@ contract Pool is
     using ZTransactionLogic for ZTransaction;
 
     function initialize(
-        uint256 treeDepth,
+        uint256 addressTreeDepth,
+        uint256 commitmentTreeDepth,
         address verifier_,
-        address adaptorHandler_,
-        AssetType initAssetType,
-        address[] calldata initAssetAddresses
+        address adaptorHandler_
     ) external initializer {
         __Ownable_init(msg.sender);
         __UUPSUpgradeable_init();
@@ -43,82 +42,13 @@ contract Pool is
         verifier = verifier_;
         adaptorHandler = adaptorHandler_;
 
-        _commitmentTree.init(treeDepth);
-        _addressTree.init(treeDepth / 2);
-        _assetCounts[initAssetType] = AssetLogic.addAssets(
-            _assetIds,
-            _assets,
-            0,
-            initAssetType,
-            initAssetAddresses
-        );
+        _addressTree.init(addressTreeDepth);
+        _commitmentTree.init(commitmentTreeDepth);
     }
 
-    function register(
-        uint256 addr,
-        bytes calldata publicKeys,
-        bytes calldata signature
-    ) external whenNotPaused {
-        if (_addressRegistered[addr]) {
-            revert AddressAlreadyRegistered(addr);
-        }
-
-        // Each public key is 32 bytes long
-        if (publicKeys.length != 64) {
-            revert BadArguments();
-        }
-
-        bytes32 msgHash = MessageHashUtils.toEthSignedMessageHash(
-            bytes.concat(bytes32(addr), publicKeys)
-        );
-
-        address sender = ECDSA.recover(msgHash, signature);
-
-        uint256 regIdx = _addressTree.insert(addr);
-        _addressRegistered[addr] = true;
-
-        emit RegisterAddress(sender, addr, regIdx, publicKeys);
-    }
-
-    function transact(
-        ZTransaction memory ztx
-    ) external nonReentrant whenNotPaused {
-        ztx.execute({
-            tree: _commitmentTree,
-            assets: _assets,
-            adaptors: _adaptors,
-            markedNullifiers: _markedNullifiers,
-            verifier: verifier,
-            adaptorHandler: adaptorHandler
-        });
-    }
-
-    function registerComplianceKeys(
-        uint256[2] calldata revokerPublicKey,
-        uint256[2] calldata encryptionPublicKey
-    ) external onlyOwner {
-        ComplianceKeys memory complianceKeys = ComplianceKeys({
-            revokerPublicKey: revokerPublicKey,
-            encryptionPublicKey: encryptionPublicKey,
-            isActive: true
-        });
-
-        _complianceKeys[_complianceKeysCount] = complianceKeys;
-        emit RegisterComplianceKeys(
-            _complianceKeysCount,
-            revokerPublicKey,
-            encryptionPublicKey
-        );
-
-        _complianceKeysCount += 1;
-    }
-
-    function changeComplianceKeyStatus(
-        uint256 id,
-        bool isActive
-    ) external onlyOwner {
-        _complianceKeys[id].isActive = isActive;
-    }
+    /////////////////////////////////////////
+    //         ADMIN WRITE METHODS         //
+    ////////////////////////////////////////
 
     function pause() external onlyOwner {
         _pause();
@@ -148,17 +78,89 @@ contract Pool is
         _adaptors[adaptorAddress] = enable;
     }
 
-    ////////////////////////////////
-    ////     View Functions     ////   
-    ////////////////////////////////
+    function registerComplianceKeys(
+        uint256[2] calldata revokerPublicKey,
+        uint256[2] calldata encryptionPublicKey
+    ) external onlyOwner {
+        uint16 id = _complianceKeysCount;
+
+        ComplianceKeys memory complianceKeys = ComplianceKeys({
+            id: id,
+            revokerPublicKey: revokerPublicKey,
+            encryptionPublicKey: encryptionPublicKey,
+            isActive: true
+        });
+
+        _complianceKeys[id] = complianceKeys;
+        emit RegisterComplianceKeys(id, revokerPublicKey, encryptionPublicKey);
+
+        _complianceKeysCount += 1;
+    }
+
+    function setComplianceKeysStatus(
+        uint256 id,
+        bool isActive
+    ) external onlyOwner {
+        _complianceKeys[id].isActive = isActive;
+    }
+
+    /////////////////////////////////////////
+    //        PUBLIC WRITE METHODS         //
+    ////////////////////////////////////////
+
+    function registerAddress(
+        uint256 addr,
+        bytes calldata publicKeys,
+        bytes calldata signature
+    ) external whenNotPaused {
+        if (_addressRegistered[addr]) {
+            revert AddressAlreadyRegistered(addr);
+        }
+
+        // Each public key is 32 bytes long
+        if (publicKeys.length != 64) {
+            revert BadArguments();
+        }
+
+        bytes32 msgHash = MessageHashUtils.toEthSignedMessageHash(
+            bytes.concat(bytes32(addr), publicKeys)
+        );
+
+        address sender = ECDSA.recover(msgHash, signature);
+
+        uint256 regIdx = _addressTree.insert(addr);
+        _addressRegistered[addr] = true;
+
+        emit RegisterAddress(sender, addr, regIdx, publicKeys);
+    }
+
+    function transact(
+        ZTransaction memory ztx
+    ) external nonReentrant whenNotPaused {
+        ztx.execute({
+            commitmentTree: _commitmentTree,
+            addressTree: _addressTree,
+            assets: _assets,
+            adaptors: _adaptors,
+            markedNullifiers: _markedNullifiers,
+            complianceKeys: _complianceKeys,
+            verifier: verifier,
+            adaptorHandler: adaptorHandler
+        });
+    }
+
+    /////////////////////////////////////////
+    //         READ METHODS                //
+    ////////////////////////////////////////
 
     function verifyTransactionProof(
         ZTransaction calldata ztx
     ) external view returns (bool) {
-        return IVerifier(verifier).verifyTransactionProof(ztx, _commitmentTree.roots[ztx.commitmentTreeRootIndex]);
+        ComplianceKeys memory cKeys = _complianceKeys[ztx.complianceKeysId];
+        return IVerifier(verifier).verifyTransactionProof(ztx, cKeys);
     }
 
-    function getComplianceKey(
+    function getComplianceKeys(
         uint256 id
     ) external view returns (ComplianceKeys memory) {
         return _complianceKeys[id];
@@ -239,14 +241,6 @@ contract Pool is
 
     function isKnownRoot(uint256 root) external view returns (bool) {
         return _commitmentTree.isKnownRoot(root);
-    }
-
-    function getRevokerPublicKey() external view returns (uint256, uint256) {
-        return IVerifier(verifier).getRevokerPublicKey();
-    }
-
-    function getEncryptionPublicKey() external view returns (uint256, uint256) {
-        return IVerifier(verifier).getEncryptionPublicKey();
     }
 
     function _authorizeUpgrade(
