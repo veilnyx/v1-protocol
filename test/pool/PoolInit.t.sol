@@ -18,18 +18,11 @@ contract PoolInitTest is PoolTest {
     function test_correctParameters() public view {
         address verifier_ = pool.verifier();
         address adaptorHandler_ = pool.adaptorHandler();
-        (uint256 revokerKeyX, uint256 revokerKeyY) = pool.getRevokerPublicKey();
-        (uint256 encryptionKeyX, uint256 encryptionKeyY) = pool
-            .getEncryptionPublicKey();
 
         assertEq(verifier_, address(verifier));
         assertEq(adaptorHandler_, address(adaptorHandler));
         assertEq(treeDepth, pool.getCommitmentTreeDepth());
         assertEq(treeDepth / 2, pool.getAddressTreeDepth());
-        assertEq(revokerKeyX, fixture.revokerPublicKey[0]);
-        assertEq(revokerKeyY, fixture.revokerPublicKey[1]);
-        assertEq(encryptionKeyX, fixture.encryptionPublicKey[0]);
-        assertEq(encryptionKeyY, fixture.encryptionPublicKey[1]);
     }
 
     function test_adding_asset() external {
@@ -89,7 +82,7 @@ contract PoolInitTest is PoolTest {
 
         pool.registerComplianceKeys(revokerKeys, encryptionKeys);
 
-        ComplianceKeys memory complianceKey = pool.getComplianceKey(0);
+        ComplianceKeys memory complianceKey = pool.getComplianceKeys(0);
         assertEq(complianceKey.revokerPublicKey[0], revokerKeys[0]);
         assertEq(complianceKey.revokerPublicKey[1], revokerKeys[1]);
         assertEq(complianceKey.encryptionPublicKey[0], encryptionKeys[0]);
@@ -104,9 +97,9 @@ contract PoolInitTest is PoolTest {
         ) = _getComplianceKeyArrays();
 
         pool.registerComplianceKeys(revokerKeys, encryptionKeys);
-        pool.changeComplianceKeyStatus(0, false);
+        pool.setComplianceKeysStatus(0, false);
 
-        ComplianceKeys memory complianceKey = pool.getComplianceKey(0);
+        ComplianceKeys memory complianceKey = pool.getComplianceKeys(0);
         assertEq(complianceKey.isActive, false);
     }
 

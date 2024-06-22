@@ -7,7 +7,7 @@ import {Verifier22} from "src/verifiers/Verifier22.sol";
 import {Verifier, VerifierInfo} from "src/core/Verifier.sol";
 import {AdaptorHandler} from "src/core/AdaptorHandler.sol";
 import {Asset, AssetType} from "src/libraries/Asset.sol";
-import {ZTransaction} from "src/libraries/ZTransaction.sol";
+import {ZTransaction, ComplianceKeys} from "src/libraries/ZTransaction.sol";
 import {MockERC20} from "test/mocks/MockERC20.sol";
 import {BaseTest} from "./BaseTest.t.sol";
 
@@ -35,11 +35,7 @@ contract PoolTest is BaseTest {
             addr: address(v22),
             selector: v22.verifyProof.selector
         });
-        verifier = new Verifier(
-            vInfos,
-            fixture.revokerPublicKey,
-            fixture.encryptionPublicKey
-        );
+        verifier = new Verifier(vInfos);
         adaptorHandler = new AdaptorHandler();
         entryPoint = address(0);
 
@@ -77,6 +73,10 @@ contract PoolTest is BaseTest {
 
         ERC1967Proxy poolProxy = new ERC1967Proxy(address(pool), initData);
         pool = Pool(address(poolProxy));
+        pool.registerComplianceKeys(
+            fixture.revokerPublicKey,
+            fixture.encryptionPublicKey
+        );
     }
 
     function _mintAsset(

@@ -14,7 +14,6 @@ contract VerifierTest is BaseTest {
     Verifier internal _verifier;
 
     function setUp() public {
-        // _initFixture();
         Verifier22 verifier22 = new Verifier22();
         VerifierInfo[] memory vInfos = new VerifierInfo[](1);
         vInfos[0] = VerifierInfo({
@@ -22,20 +21,6 @@ contract VerifierTest is BaseTest {
             addr: address(verifier22),
             selector: verifier22.verifyProof.selector
         });
-        _verifier = new Verifier(
-            vInfos,
-            fixture.revokerPublicKey,
-            fixture.encryptionPublicKey
-        );
-    }
-
-    function test_PublicKeys() public view {
-        (uint256 revKeyX, uint256 revKeyY) = _verifier.getRevokerPublicKey();
-        (uint256 encKeyX, uint256 encKeyY) = _verifier.getEncryptionPublicKey();
-        assertEq(revKeyX, fixture.revokerPublicKey[0]);
-        assertEq(revKeyY, fixture.revokerPublicKey[1]);
-        assertEq(encKeyX, fixture.encryptionPublicKey[0]);
-        assertEq(encKeyY, fixture.encryptionPublicKey[1]);
     }
 
     function test_getVerifierId() public view {

@@ -12,15 +12,8 @@ contract PoolInitTest is PoolTest {
     function test_correctParameters() public view {
         address verifier_ = pool.verifier();
         address adaptorHandler_ = pool.adaptorHandler();
-        (uint256 revokerKeyX, uint256 revokerKeyY) = pool.getRevokerPublicKey();
-        (uint256 encryptionKeyX, uint256 encryptionKeyY) = pool
-            .getEncryptionPublicKey();
 
         assertEq(verifier_, address(verifier));
         assertEq(adaptorHandler_, address(adaptorHandler));
-        assertEq(revokerKeyX, fixture.revokerPublicKey[0]);
-        assertEq(revokerKeyY, fixture.revokerPublicKey[1]);
-        assertEq(encryptionKeyX, fixture.encryptionPublicKey[0]);
-        assertEq(encryptionKeyY, fixture.encryptionPublicKey[1]);
     }
 }

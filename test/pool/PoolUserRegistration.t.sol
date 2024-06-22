@@ -18,7 +18,7 @@ contract PoolInitTest is PoolTest {
     function setUp() public {
         _initFixture();
         (userAddr, userPK) = makeAddrAndKey("userAddr");
-        
+
         bytes32 userPublicKeyX = bytes32(user);
         bytes32 userPublicKeyY = bytes32(user);
 
@@ -37,13 +37,15 @@ contract PoolInitTest is PoolTest {
         emit IPool.RegisterAddress(userAddr, user, 1, publicKeys);
 
         vm.prank(userAddr);
-        pool.register(user, publicKeys, signature);
+        pool.registerAddress(user, publicKeys, signature);
     }
 
-     function test_userRegistrationWhenPaused() external {
+    function test_userRegistrationWhenPaused() external {
         pool.pause();
-        vm.expectRevert(abi.encodeWithSelector(PausableUpgradeable.EnforcedPause.selector));
+        vm.expectRevert(
+            abi.encodeWithSelector(PausableUpgradeable.EnforcedPause.selector)
+        );
         vm.prank(userAddr);
-        pool.register(user, publicKeys, signature);
+        pool.registerAddress(user, publicKeys, signature);
     }
 }

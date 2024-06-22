@@ -3,7 +3,7 @@ pragma solidity ^0.8.24;
 
 import {Test} from "forge-std/Test.sol";
 import {MerkleTree, MerkleTreeLogic} from "src/libraries/MerkleTree.sol";
-import {BinaryIMT as BinaryIMTLogic, BinaryIMTData} from "@zk-kit/imt/contracts/BinaryIMT.sol";
+import {BinaryIMT as BinaryIMTLogic, BinaryIMTData} from "@zk-kit/imt/BinaryIMT.sol";
 import {PoseidonT3} from "poseidon-solidity/PoseidonT3.sol";
 import {PoseidonT2} from "poseidon-solidity/PoseidonT2.sol";
 
