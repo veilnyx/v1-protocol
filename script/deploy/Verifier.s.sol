@@ -46,10 +46,6 @@ contract VerifierDeploy is BaseScript {
             selector: v84.verifyProof.selector
         });
 
-        new Verifier(
-            vInfos,
-            _config.revokerPublicKey(),
-            _config.encryptionPublicKey()
-        );
+        new Verifier(vInfos);
     }
 }

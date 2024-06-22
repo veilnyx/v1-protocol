@@ -21,19 +21,13 @@ contract ZkFiDeploy is BaseScript {
         Verifier22 v22 = new Verifier22();
         VerifierInfo[] memory vInfos = new VerifierInfo[](1);
         vInfos[0] = VerifierInfo({
-            id: 2 * 10 + 2,
+            id: 22,
             addr: address(v22),
             selector: v22.verifyProof.selector
         });
-        Verifier verifier = new Verifier(
-            vInfos,
-            _config.revokerPublicKey(),
-            _config.encryptionPublicKey()
-        );
+        Verifier verifier = new Verifier(vInfos);
 
-        // AdaptorHandler
         AdaptorHandler adaptorHandler = new AdaptorHandler();
-        // Pool
         Pool pool = new Pool();
 
         address entryPoint = _config.entryPoint();
@@ -41,11 +35,10 @@ contract ZkFiDeploy is BaseScript {
         bytes memory initializeData = abi.encodeCall(
             Pool.initialize,
             (
-                _config.treeDepth(),
+                _config.addressTreeDepth(),
+                _config.commitmentTreeDepth(),
                 address(verifier),
-                address(adaptorHandler),
-                _config.initAssetType(),
-                _config.initAssetAddresses()
+                address(adaptorHandler)
             )
         );
         // pool proxy
@@ -54,6 +47,7 @@ contract ZkFiDeploy is BaseScript {
             initializeData
         );
         pool = Pool(address(poolProxy));
+        pool.addAssets(_config.initAssetType(), _config.initAssetAddresses());
 
         // Gateway
         address wToken = _config.wToken();
