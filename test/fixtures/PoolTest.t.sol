@@ -10,6 +10,7 @@ import {Asset, AssetType} from "src/libraries/Asset.sol";
 import {ZTransaction} from "src/libraries/ZTransaction.sol";
 import {MockERC20} from "test/mocks/MockERC20.sol";
 import {BaseTest} from "./BaseTest.t.sol";
+import {Config} from "script/Config.sol";
 
 contract PoolTest is BaseTest {
     Verifier public verifier;
@@ -42,6 +43,7 @@ contract PoolTest is BaseTest {
             fixture.encryptionPublicKey
         );
         adaptorHandler = new AdaptorHandler();
+        Config config = new Config();
         entryPoint = address(0);
 
         pool = new Pool();
@@ -73,6 +75,7 @@ contract PoolTest is BaseTest {
             addressTreeDepth,
             address(verifier),
             address(adaptorHandler),
+            config.sanctionScreener(),
             assetType,
             assetAddresses
         );

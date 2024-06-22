@@ -11,6 +11,7 @@ import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {IVerifier} from "../interfaces/IVerifier.sol";
 import {IPool} from "../interfaces/IPool.sol";
 import {IAdaptorHandler} from "../interfaces/IAdaptorHandler.sol";
+import {IScreener} from "../interfaces/IScreener.sol";
 import {PoolStorage} from "../base/PoolStorage.sol";
 import {Asset, AssetType, AssetLogic} from "../libraries/Asset.sol";
 import {ZTransaction, ZTransactionLogic, ComplianceKeys} from "../libraries/ZTransaction.sol";
@@ -33,6 +34,7 @@ contract Pool is
         uint256 addressTreeDepth,
         address verifier_,
         address adaptorHandler_,
+        address sanctionScreener_,
         AssetType initAssetType,
         address[] calldata initAssetAddresses
     ) external initializer {
@@ -43,6 +45,7 @@ contract Pool is
 
         verifier = verifier_;
         adaptorHandler = adaptorHandler_;
+        sanctionScreener = sanctionScreener_;
 
         _commitmentTree.init(commitmentTreeDepth);
         _addressTree.init(addressTreeDepth);
@@ -60,6 +63,7 @@ contract Pool is
         bytes calldata publicKeys,
         bytes calldata signature
     ) external whenNotPaused {
+        address userAddr = address(uint160(addr));
         if (_addressRegistered[addr]) {
             revert AddressAlreadyRegistered(addr);
         }
@@ -67,6 +71,13 @@ contract Pool is
         // Each public key is 32 bytes long
         if (publicKeys.length != 64) {
             revert BadArguments();
+        }
+
+        if (
+            sanctionScreener != address(0) &&
+            IScreener(sanctionScreener).isSanctioned(userAddr)
+        ) {
+            revert IScreener.SanctionedAddress(userAddr);
         }
 
         bytes32 msgHash = MessageHashUtils.toEthSignedMessageHash(
@@ -150,13 +161,17 @@ contract Pool is
     }
 
     ////////////////////////////////
-    ////     View Functions     ////   
+    ////     View Functions     ////
     ////////////////////////////////
 
     function verifyTransactionProof(
         ZTransaction calldata ztx
     ) external view returns (bool) {
-        return IVerifier(verifier).verifyTransactionProof(ztx, _commitmentTree.roots[ztx.commitmentTreeRootIndex]);
+        return
+            IVerifier(verifier).verifyTransactionProof(
+                ztx,
+                _commitmentTree.roots[ztx.commitmentTreeRootIndex]
+            );
     }
 
     function getComplianceKey(

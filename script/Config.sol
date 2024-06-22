@@ -23,6 +23,7 @@ contract Config is Script {
     address internal _paymaster;
     address internal _wToken;
     address internal _uniswapSwapRouter02;
+    address public chainalysisSanctionScreener;
 
     AssetType internal immutable _initAssetType;
     address[] internal _initAssetAddresses;
@@ -92,6 +93,8 @@ contract Config is Script {
             string.concat(chainPrefix, ".uniswapSwapRouter02")
         );
 
+        chainalysisSanctionScreener = vm.parseJsonAddress(configJson, string.concat(chainPrefix, ".chainalysisSanctionScreener"));
+
         _initAssetType = AssetType(
             vm.parseJsonUint(configJson, string.concat(chainPrefix, ".initAssetType"))
         );
@@ -128,6 +131,10 @@ contract Config is Script {
 
     function entryPoint() external view returns (address) {
         return _entryPoint;
+    }
+
+    function sanctionScreener() external view returns (address) {
+        return chainalysisSanctionScreener;
     }
 
     function wToken() external view returns (address) {

@@ -10,7 +10,7 @@ import {BaseScript} from "../BaseScript.sol";
 contract PoolProxyDeploy is BaseScript {
     function run() external broadcast {
         address verifier = _getContract("Verifier");
-        address convertor = _getContract("Convertor");
+        address adaptorHandler = _getContract("AdaptorHandler");
         address poolImpl = _getContract("PoolImpl");
 
         uint256 commitmentTreeDepth = _config.commitmentTreeDepth();
@@ -24,7 +24,8 @@ contract PoolProxyDeploy is BaseScript {
                 commitmentTreeDepth,
                 addressTreeDepth,
                 verifier,
-                convertor,
+                adaptorHandler,
+                _config.sanctionScreener(),
                 initAssetType,
                 initAssetAddresses
             )

@@ -13,6 +13,7 @@ abstract contract PoolStorage {
 
     address public verifier;
     address public adaptorHandler;
+    address public sanctionScreener;
 
     MerkleTree internal _addressTree;
     mapping(uint256 => bool) internal _addressRegistered;
