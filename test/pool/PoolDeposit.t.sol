@@ -25,7 +25,7 @@ contract PoolDepositTest is PoolTest {
         vm.ffi(shellScripts);
         */
 
-        depositZTx = _loadZTx("deposit_1000_weth_usdc_with_fee");
+        depositZTx = _loadZTx("deposit_1000_weth_usdc_without_fee");
         poolTransactTestHelper = new PoolTransactTest(
             depositZTx,
             INITIAL_DEPOSIT,

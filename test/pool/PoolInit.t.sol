@@ -18,14 +18,13 @@ contract PoolInitTest is PoolTest {
     function test_correctParameters() public view {
         address verifier_ = pool.verifier();
         address adaptorHandler_ = pool.adaptorHandler();
-
         assertEq(verifier_, address(verifier));
         assertEq(adaptorHandler_, address(adaptorHandler));
-        assertEq(treeDepth, pool.getCommitmentTreeDepth());
-        assertEq(treeDepth / 2, pool.getAddressTreeDepth());
+        assertEq(commitmentTreeDepth, pool.getCommitmentTreeDepth());
+        assertEq(addressTreeDepth, pool.getAddressTreeDepth());
     }
 
-    function test_adding_asset() external {
+    function test_addAssets() external {
         AssetType assetType = AssetType.ERC20;
         address assetAddress = makeAddr("newAsset");
         address[] memory assetAddresses = new address[](1);
@@ -37,7 +36,7 @@ contract PoolInitTest is PoolTest {
         Asset memory newAsset = pool.getAsset(assetAddress);
 
         assert(isAssetSupported);
-        assert(newAsset.id != 0);
+        assertNotEq(newAsset.id, 0);
         assert(newAsset.assetType == assetType);
         assertEq(newAsset.assetAddress, assetAddress);
     }
@@ -45,7 +44,7 @@ contract PoolInitTest is PoolTest {
     ///////////////////////////
     /// Compliance Keys Tests//
     ///////////////////////////
-    function test_adding_complianceKey() external {
+    function test_registerComplianceKey() external {
         (
             uint256[2] memory revokerKeys,
             uint256[2] memory encryptionKeys
@@ -74,7 +73,7 @@ contract PoolInitTest is PoolTest {
         pool.registerComplianceKeys(revokerKeys, encryptionKeys);
     }
 
-    function test_getComplianceKey() external {
+    function test_getComplianceKeys() external {
         (
             uint256[2] memory revokerKeys,
             uint256[2] memory encryptionKeys
@@ -82,15 +81,16 @@ contract PoolInitTest is PoolTest {
 
         pool.registerComplianceKeys(revokerKeys, encryptionKeys);
 
-        ComplianceKeys memory complianceKey = pool.getComplianceKeys(0);
-        assertEq(complianceKey.revokerPublicKey[0], revokerKeys[0]);
-        assertEq(complianceKey.revokerPublicKey[1], revokerKeys[1]);
-        assertEq(complianceKey.encryptionPublicKey[0], encryptionKeys[0]);
-        assertEq(complianceKey.encryptionPublicKey[1], encryptionKeys[1]);
-        assert(complianceKey.isActive);
+        ComplianceKeys memory cKeys = pool.getComplianceKeys(0);
+        assertEq(cKeys.revokerPublicKey[0], revokerKeys[0]);
+        assertEq(cKeys.revokerPublicKey[1], revokerKeys[1]);
+        assertEq(cKeys.encryptionPublicKey[0], encryptionKeys[0]);
+        assertEq(cKeys.encryptionPublicKey[1], encryptionKeys[1]);
+
+        assertTrue(cKeys.isActive);
     }
 
-    function test_changeComplianceKeyStatus() external {
+    function test_setComplianceKeysStatus() external {
         (
             uint256[2] memory revokerKeys,
             uint256[2] memory encryptionKeys

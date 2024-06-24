@@ -26,17 +26,4 @@ contract ZKFi is JsFFI {
         ZTransaction memory ztx = abi.decode(data, (ZTransaction));
         return ztx;
     }
-
-    // function loadZTxFixture(
-    //     string memory name
-    // ) external view returns (ZTransaction memory) {
-    //     string memory path = string.concat(
-    //         vm.projectRoot(),
-    //         string.concat("/test/fixtures/ztx/", name, ".txt")
-    //     );
-    //     string memory file = vm.readFile(path);
-    //     bytes memory data = vm.parseBytes(file);
-    //     ZTransaction memory ztx = abi.decode(data, (ZTransaction));
-    //     return ztx;
-    // }
 }
