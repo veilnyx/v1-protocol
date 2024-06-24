@@ -50,7 +50,7 @@ interface IPool {
     error UnexpectedFee();
     error UnknownMerkleRoot();
     error DoubleSpend(uint256 markedNullifier);
-    error UnsupportedProxy();
+    error UnsupportedAdaptor();
     error DuplicateAsset(address assetAddress);
     error UnsupportedAsset(uint24 assetId);
     error InvalidComplianceKeys(uint256 id);
