@@ -441,26 +441,4 @@ library ZTransactionLogic {
 
         emit IPool.InputNoteMemos(inMemos);
     }
-
-    function _packPubInputs(
-        uint256[] memory arr
-    ) internal pure returns (bytes memory) {
-        uint256 len = arr.length;
-        bytes memory res = new bytes(32 * len);
-
-        assembly {
-            for {
-                let i := 0
-            } lt(i, len) {
-                i := add(i, 1)
-            } {
-                mstore(
-                    add(res, mul(0x20, add(i, 1))),
-                    mload(add(arr, mul(0x20, add(i, 1))))
-                )
-            }
-        }
-
-        return res;
-    }
 }
