@@ -35,7 +35,6 @@ const usdcAssetId = 0x010002;
 const dirFixtures = "../fixtures/ztx";
 
 const depositReqs = {
-  /**
   deposit_1000_weth_without_fee: {
     type: TransactionType.DEPOSIT,
     assetIds: [wethAssetId],
@@ -44,6 +43,7 @@ const depositReqs = {
     to: senderAccount.shieldedAddress.pack(),
     viaBundler: false,
     paymaster: zeroAddress,
+    revokerId: 0,
   },
   deposit_1000_weth_usdc_without_fee: {
     type: TransactionType.DEPOSIT,
@@ -53,6 +53,7 @@ const depositReqs = {
     to: senderAccount.shieldedAddress.pack(),
     viaBundler: false,
     paymaster: zeroAddress,
+    revokerId: 0,
   },
   deposit_1000_weth_usdc_with_fee: {
     type: TransactionType.DEPOSIT,
@@ -62,6 +63,7 @@ const depositReqs = {
     to: senderAccount.shieldedAddress.pack(),
     viaBundler: true,
     paymaster: paymasterAddress,
+    revokerId: 0,
   },
   deposit_1_weth: {
     type: TransactionType.DEPOSIT,
@@ -71,8 +73,8 @@ const depositReqs = {
     to: senderAccount.shieldedAddress.pack(),
     viaBundler: false,
     paymaster: zeroAddress,
-  }
-  */
+    revokerId: 0,
+  },
 };
 
 const withdrawReqs = {
@@ -112,7 +114,7 @@ const withdrawReqs = {
     to: withdrawAddress,
     viaBundler: false,
     paymaster: zeroAddress,
-  }
+  },
 };
 
 const transferReqs = {
@@ -144,7 +146,7 @@ const transferReqs = {
     to: receiverAccount.shieldedAddress.pack(),
     viaBundler: false,
     paymaster: zeroAddress,
-  }
+  },
 };
 
 const convertReqs = {
@@ -153,12 +155,12 @@ const convertReqs = {
     assetIds: [wethAssetId],
     values: [parseEther("0.01")],
     feeAssetId: wethAssetId,
-    to: "0x67aD37B223C2EA3357456b6160199b98D9478799",  // adaptor to which the ZkFi Convertor will call to execute swap
+    to: "0x67aD37B223C2EA3357456b6160199b98D9478799", // adaptor to which the ZkFi Convertor will call to execute swap
     viaBundler: false,
     paymaster: zeroAddress,
     payload:
       "0x000000000000000000000000000000000000000000000000000000000001000200000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000", // beneficiary: pool address (address(0))
-  }
+  },
 };
 
 const createMockZTx = async (
@@ -166,7 +168,11 @@ const createMockZTx = async (
   req: TransactionRequest & TransactionOptions,
   zkfi: Core
 ) => {
-  const opts = { viaBundler: req.viaBundler, paymaster: req.paymaster };
+  const opts = {
+    viaBundler: req.viaBundler,
+    paymaster: req.paymaster,
+    revokerId: req.revokerId,
+  };
   const tx = await zkfi.createTransaction(req as any, opts);
 
   const signedTx = await zkfi.signTransaction(tx);
@@ -175,42 +181,41 @@ const createMockZTx = async (
   writeFileSync(`${dirFixtures}/${name}.txt`, encoded);
 };
 
-async function mockNotes(depositName: string, zkfi: Core) {
-  const encoded = readFileSync(
-    `${dirFixtures}/${depositName}.txt`,
-    "utf-8"
-  ) as Hex;
-  const ztx = ZTransaction.decode(encoded) as any;
+// async function mockNotes(depositName: string, zkfi: Core) {
+//   const encoded = readFileSync(
+//     `${dirFixtures}/${depositName}.txt`,
+//     "utf-8"
+//   ) as Hex;
+//   const ztx = ZTransaction.decode(encoded) as any;
 
-  const depositNotes = ztx.outMemos.map((m: Hex) => {
-    return Note.fromMemo(m, zkfi.account)
-  });
-  depositNotes.forEach((n, i) => (n.leafIndex = i));
+//   const depositNotes = ztx.outMemos.map((m: Hex) => {
+//     return Note.fromMemo(m, zkfi.account);
+//   });
+//   depositNotes.forEach((n, i) => (n.leafIndex = i));
 
-  //@ts-ignore
-  zkfi.notesSource.mockNotes(depositNotes[0].assetId, [depositNotes[0]]);
-  //@ts-ignore
-  zkfi.notesSource.mockNotes(depositNotes[1].assetId, [depositNotes[1]]);
-  //@ts-ignore
-  depositNotes.forEach((n) => zkfi.treeSource.insert(n.commitment));
-}
-
+//   //@ts-ignore
+//   zkfi.notesSource.mockNotes(depositNotes[0].assetId, [depositNotes[0]]);
+//   //@ts-ignore
+//   zkfi.notesSource.mockNotes(depositNotes[1].assetId, [depositNotes[1]]);
+//   //@ts-ignore
+//   depositNotes.forEach((n) => zkfi.treeSource.insert(n.commitment));
+// }
 
 async function main() {
   const zkfi = getSDKInstance();
 
   // Pre-deposit 1000 token of assets - 0x010001 and 0x010002
-  const depositName = "deposit_1000_weth_usdc";
+  const depositName = "deposit_1000_weth_usdc_without_fee";
   // const depositName = "deposit_1_weth";
   await createMockZTx(depositName, depositReqs[depositName], zkfi);
-  await mockNotes(depositName, zkfi);
-  const reqs = {
-    ...withdrawReqs,
-    ...transferReqs
-  };
-  for (const [name, req] of Object.entries(reqs)) {
-    await createMockZTx(name, req as any, zkfi);
-  }
+  // await mockNotes(depositName, zkfi);
+  // const reqs = {
+  //   ...withdrawReqs,
+  //   ...transferReqs,
+  // };
+  // for (const [name, req] of Object.entries(reqs)) {
+  //   await createMockZTx(name, req as any, zkfi);
+  // }
 }
 
 main()

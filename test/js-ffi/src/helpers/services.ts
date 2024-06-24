@@ -50,6 +50,8 @@ export class MockTreeSource implements ITreeSource {
     return Fp.from(keccak256(stringToBytes("zkFi"))).val;
   }
 
+  update(): void {}
+
   insert(leaf: bigint | Hex) {
     const hex = typeof leaf === "bigint" ? `0x${leaf.toString(16)}` : leaf;
     this._tree.insert(hexFixed(hex, 32));

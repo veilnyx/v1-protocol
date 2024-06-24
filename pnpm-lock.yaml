@@ -19,6 +19,9 @@ dependencies:
     version: 0.0.5
 
 devDependencies:
+  '@zk-kit/imt.sol':
+    specifier: 2.0.0-beta.12
+    version: 2.0.0-beta.12
   forge-std:
     specifier: github:foundry-rs/forge-std#v1.8.2
     version: github.com/foundry-rs/forge-std/978ac6fadb62f5f0b723c996f64be52eddba6801
@@ -74,13 +77,18 @@ packages:
       base64-sol: 1.0.1
     dev: false
 
+  /@zk-kit/imt.sol@2.0.0-beta.12:
+    resolution: {integrity: sha512-kKgopVO6zlfSiQgv3X9WykaCeyb8jGtthWGqdo1ZD7fY1bH8A7BWhhWxtoCuU5mPEgRbamw1cAoUynuLoEULsg==}
+    dependencies:
+      poseidon-solidity: 0.0.5
+    dev: true
+
   /base64-sol@1.0.1:
     resolution: {integrity: sha512-ld3cCNMeXt4uJXmLZBHFGMvVpK9KsLVEhPpFRXnvSVAqABKbuNZg/+dsq3NuM+wxFLb/UrVkz7m1ciWmkMfTbg==}
     dev: false
 
   /poseidon-solidity@0.0.5:
     resolution: {integrity: sha512-NzrvSwHzvZgT4hvg2GyGqeR+UOU/eLSEt4wAoXEua+VaR7NTKKwx1X9bPlh1VMBEVEno+IWvkRBbidFGzTeAqQ==}
-    dev: false
 
   github.com/foundry-rs/forge-std/978ac6fadb62f5f0b723c996f64be52eddba6801:
     resolution: {tarball: https://codeload.github.com/foundry-rs/forge-std/tar.gz/978ac6fadb62f5f0b723c996f64be52eddba6801}

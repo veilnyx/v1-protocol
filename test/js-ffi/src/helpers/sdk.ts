@@ -19,16 +19,32 @@ import { Fp, Fr, Point, poseidonHash } from "@zkfi-tech/babyjubjub";
 import { circuits } from "./zk";
 import { ShieldedAccount } from "@zkfi-tech/account";
 
-const treeDepth = 32;
+const addressTreeDepth = 20;
+const commitmentTreeDepth = 25;
 const zeroElement = Fp.from(keccak256(stringToBytes("zkFi"))).toHex();
 const hashFunction = (a: any, b: any) => poseidonHash([a, b]);
-export const tree = new MerkleTree(treeDepth, [], {
+
+export const commitmentTree = new MerkleTree(commitmentTreeDepth, [], {
   zeroElement,
   hashFunction,
 });
+export const addressTree = new MerkleTree(addressTreeDepth, [], {
+  zeroElement,
+  hashFunction,
+});
+
 const account = ShieldedAccount.generate(
   Fr.from(keccak256(stringToBytes("sender"))).val
 );
+
+const revokerPublicKey = Point.fromArray([
+  BigInt(
+    "8116072818876777666029027213729376705234613448128995613697283149497235402123"
+  ),
+  BigInt(
+    "4598772416842731049226007701899382609184728232075557894618791492264594188716"
+  ),
+]);
 
 const encryptionPublicKey = Point.fromArray([
   BigInt(
@@ -46,9 +62,12 @@ export const getSDKInstance = () => {
     transport: http(),
   });
 
-  const treeSource = new MockTreeSource(tree);
+  const commitmentTreeSource = new MockTreeSource(commitmentTree);
+  const addressTreeSource = new MockTreeSource(addressTree);
   const addressResolver = new MockAddressResolver();
   const notesSource = new MockNotesSource();
+
+  addressTreeSource.insert(account.rootAddress);
 
   const zkfi = new Core({
     chainId: foundry.id,
@@ -59,14 +78,21 @@ export const getSDKInstance = () => {
     circuits,
     snarkJs,
     services: {
-      treeSource,
+      commitmentTreeSource,
+      addressTreeSource,
       addressResolver,
       notesSource,
       contractSource: {} as any,
     },
   });
 
-  zkfi.getEncryptionPublicKey = async () => encryptionPublicKey;
+  zkfi.getCompliancePublicKeys = async () => ({
+    id: 0,
+    revokerPublicKey,
+    encryptionPublicKey,
+    isActive: true,
+  });
+
   zkfi.getFeeEstimate = async () => BigInt(parseEther("0.001"));
 
   return zkfi;

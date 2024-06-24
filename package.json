@@ -17,6 +17,7 @@
     "poseidon-solidity": "^0.0.5"
   },
   "devDependencies": {
+    "@zk-kit/imt.sol": "2.0.0-beta.12",
     "forge-std": "github:foundry-rs/forge-std#v1.8.2"
   }
 }

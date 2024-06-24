@@ -13,24 +13,24 @@ contract PoolProxyDeploy is BaseScript {
         address adaptorHandler = _getContract("AdaptorHandler");
         address poolImpl = _getContract("PoolImpl");
 
-        uint256 commitmentTreeDepth = _config.commitmentTreeDepth();
         uint256 addressTreeDepth = _config.addressTreeDepth();
+        uint256 commitmentTreeDepth = _config.commitmentTreeDepth();
         AssetType initAssetType = _config.initAssetType();
         address[] memory initAssetAddresses = _config.initAssetAddresses();
+        address sanctionedScreener = _config.sanctionScreener();
 
         bytes memory initializeData = abi.encodeCall(
             Pool.initialize,
-            (
-                commitmentTreeDepth,
-                addressTreeDepth,
-                verifier,
-                adaptorHandler,
-                _config.sanctionScreener(),
-                initAssetType,
-                initAssetAddresses
-            )
+            (addressTreeDepth, commitmentTreeDepth, verifier, adaptorHandler)
         );
 
-        new ERC1967Proxy(address(poolImpl), initializeData);
+        address proxyAddress = address(
+            new ERC1967Proxy(address(poolImpl), initializeData)
+        );
+
+        Pool pool = Pool(proxyAddress);
+
+        pool.addAssets(initAssetType, initAssetAddresses);
+        pool.setSanctionScreener(sanctionedScreener);
     }
 }

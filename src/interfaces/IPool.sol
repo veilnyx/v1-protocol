@@ -50,21 +50,18 @@ interface IPool {
     error UnexpectedFee();
     error UnknownMerkleRoot();
     error DoubleSpend(uint256 markedNullifier);
-    error UnsupportedProxy();
+    error UnsupportedAdaptor();
     error DuplicateAsset(address assetAddress);
     error UnsupportedAsset(uint24 assetId);
+    error InvalidComplianceKeys(uint256 id);
 
     /////////////////////////////////////////
-    //         WRITE METHODS               //
+    //         ADMIN WRITE METHODS         //
     ////////////////////////////////////////
 
-    function register(
-        uint256 addr,
-        bytes calldata publicKeys,
-        bytes calldata signature
-    ) external;
+    function pause() external;
 
-    function transact(ZTransaction memory ztx) external;
+    function unpause() external;
 
     function addAssets(
         AssetType assetType,
@@ -78,7 +75,19 @@ interface IPool {
         uint256[2] calldata encryptionKeys
     ) external;
 
-    function changeComplianceKeyStatus(uint256 index, bool status) external;
+    function setComplianceKeysStatus(uint256 index, bool status) external;
+
+    /////////////////////////////////////////
+    //        PUBLIC WRITE METHODS         //
+    ////////////////////////////////////////
+
+    function registerAddress(
+        uint256 addr,
+        bytes calldata publicKeys,
+        bytes calldata signature
+    ) external;
+
+    function transact(ZTransaction memory ztx) external;
 
     /////////////////////////////////////////
     //         READ METHODS                //
@@ -100,8 +109,8 @@ interface IPool {
         address assetAddress
     ) external view returns (Asset memory);
 
-    function getComplianceKey(
-        uint256 index
+    function getComplianceKeys(
+        uint256 revokerId
     ) external view returns (ComplianceKeys memory);
 
     function isMarkedNullifier(uint256 nullifier) external view returns (bool);
@@ -126,8 +135,4 @@ interface IPool {
     function getAddressTreeDepth() external view returns (uint256);
 
     function isKnownRoot(uint256 root) external view returns (bool);
-
-    function getRevokerPublicKey() external view returns (uint256, uint256);
-
-    function getEncryptionPublicKey() external view returns (uint256, uint256);
 }

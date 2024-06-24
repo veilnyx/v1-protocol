@@ -2,12 +2,13 @@
 pragma solidity ^0.8.20;
 
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
+import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 import {Pool} from "src/core/Pool.sol";
 import {Verifier22} from "src/verifiers/Verifier22.sol";
 import {Verifier, VerifierInfo} from "src/core/Verifier.sol";
 import {AdaptorHandler} from "src/core/AdaptorHandler.sol";
 import {Asset, AssetType} from "src/libraries/Asset.sol";
-import {ZTransaction} from "src/libraries/ZTransaction.sol";
+import {ZTransaction, ComplianceKeys} from "src/libraries/ZTransaction.sol";
 import {MockERC20} from "test/mocks/MockERC20.sol";
 import {BaseTest} from "./BaseTest.t.sol";
 import {Config} from "script/Config.sol";
@@ -17,8 +18,8 @@ contract PoolTest is BaseTest {
     AdaptorHandler public adaptorHandler;
     Pool public pool;
 
-    uint256 public commitmentTreeDepth = 25;
     uint256 public addressTreeDepth = 20;
+    uint256 public commitmentTreeDepth = 25;
     address public entryPoint;
 
     MockERC20 public token1;
@@ -37,11 +38,7 @@ contract PoolTest is BaseTest {
             addr: address(v22),
             selector: v22.verifyProof.selector
         });
-        verifier = new Verifier(
-            vInfos,
-            fixture.revokerPublicKey,
-            fixture.encryptionPublicKey
-        );
+        verifier = new Verifier(vInfos);
         adaptorHandler = new AdaptorHandler();
         Config config = new Config();
         entryPoint = address(0);
@@ -71,17 +68,32 @@ contract PoolTest is BaseTest {
 
         bytes memory initData = abi.encodeWithSelector(
             pool.initialize.selector,
-            commitmentTreeDepth,
             addressTreeDepth,
+            commitmentTreeDepth,
             address(verifier),
-            address(adaptorHandler),
-            config.sanctionScreener(),
-            assetType,
-            assetAddresses
+            address(adaptorHandler)
         );
 
         ERC1967Proxy poolProxy = new ERC1967Proxy(address(pool), initData);
         pool = Pool(address(poolProxy));
+        pool.addAssets(assetType, assetAddresses);
+        pool.setSanctionScreener(config.sanctionScreener());
+        pool.registerComplianceKeys(
+            fixture.revokerPublicKey,
+            fixture.encryptionPublicKey
+        );
+
+        bytes memory publicKeys = new bytes(64);
+        bytes32 msgHash = MessageHashUtils.toEthSignedMessageHash(
+            bytes.concat(bytes32(fixture.senderAccount.rootAddress), publicKeys)
+        );
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(uint256(123), msgHash);
+        bytes memory signature = abi.encodePacked(r, s, v);
+        pool.registerAddress(
+            fixture.senderAccount.rootAddress,
+            publicKeys,
+            signature
+        );
     }
 
     function _mintAsset(
