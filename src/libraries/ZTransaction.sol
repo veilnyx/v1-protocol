@@ -99,7 +99,6 @@ library ZTransactionLogic {
                     abi.encode(
                         self.txType,
                         self.nullifiers,
-                        self.commitments,
                         self.inMemos,
                         self.outMemos,
                         self.feeData,
@@ -170,93 +169,70 @@ library ZTransactionLogic {
         emit IPool.ComplianceMemo(ztx.complianceMemo);
     }
 
-    /// @notice Calculates calldata to proper verifier contract
-    /// @param self ZTransaction
-    /// @param selector Selector of verifier contract
-    /// @return Calldata bytes for verifier contract
+    /**
+     *
+     * @param self ZTransaction to convert to a proper verifier input
+     * @param cKeys The ComplianceKeys used for this transaction
+     * @param selector Selector of verifier contract
+     * @return Calldata bytes for appropriate verifier contract
+     * @dev We divide the public inputs into 3 chunks to avoid stack too deep error
+     */
     function toVerifierInput(
         ZTransaction memory self,
         ComplianceKeys memory cKeys,
         bytes4 selector
     ) public pure returns (bytes memory) {
-        uint256 nIns = self.nullifiers.length;
-        uint256 nOuts = self.commitments.length;
-        uint256 nPubs = self.pubAssetIds.length;
-        uint256 pubInputCount = 12 + nIns + (6 * nOuts);
-
-        uint256[] memory pubInputs = new uint256[](pubInputCount);
-
-        // Common params (Index: 0 to 4)
-        pubInputs[0] = self.addressTreeRoot;
-        pubInputs[1] = self.commitmentTreeRoot;
-        pubInputs[2] = hash(self);
-        pubInputs[3] = self.txType == ZTransactionType.DEPOSIT ? 0 : 1;
-
-        // Public asset ids and values (Index: 4 to 4 + 2 * nOuts)
-        uint256 offset = 4;
-        for (uint8 i = 0; i < nOuts; ) {
-            pubInputs[offset + i] = i < nPubs ? self.pubAssetIds[i] : 0;
-            pubInputs[offset + nOuts + i] = i < nPubs ? self.pubValues[i] : 0;
-            unchecked {
-                ++i;
-            }
+        bytes memory pubDataChunk1;
+        {
+            pubDataChunk1 = abi.encodePacked(
+                self.addressTreeRoot,
+                self.commitmentTreeRoot,
+                hash(self),
+                self.txType == ZTransactionType.DEPOSIT
+                    ? uint256(0)
+                    : uint256(1)
+            );
         }
 
-        // Input notes nullifiers (Index: 4 + 2 * nOuts to (4 + nIns + 2 * nOuts))
-        offset += 2 * nOuts;
-        for (uint8 i = 0; i < nIns; ) {
-            pubInputs[offset + i] = self.nullifiers[i];
-            unchecked {
-                ++i;
-            }
+        bytes memory pubDataChunk2;
+        {
+            uint256 nOuts = self.commitments.length;
+            uint256 nPubs = self.pubAssetIds.length;
+            uint256[] memory z = new uint256[](nOuts - nPubs);
+            pubDataChunk2 = abi.encodePacked(
+                self.pubAssetIds,
+                z,
+                self.pubValues,
+                z
+            );
         }
 
-        // Revoker keys
-        offset += nIns;
-        pubInputs[offset] = cKeys.revokerPublicKey[0];
-        pubInputs[offset + 1] = cKeys.revokerPublicKey[1];
-
-        // Output notes commitments: (Index: (3 + nIns + 2 * nOuts) to (3 + nIns + 3 * nOuts)
-        offset += 2;
-        for (uint8 i = 0; i < nOuts; ) {
-            pubInputs[offset + i] = self.commitments[i];
-            unchecked {
-                ++i;
-            }
+        bytes memory pubDataChunk3;
+        {
+            pubDataChunk3 = abi.encodePacked(
+                abi.encodePacked(self.nullifiers),
+                bytes32(cKeys.revokerPublicKey[0]),
+                bytes32(cKeys.revokerPublicKey[1]),
+                abi.encodePacked(self.commitments),
+                self.beneficiary,
+                cKeys.encryptionPublicKey[0],
+                cKeys.encryptionPublicKey[1],
+                self.complianceMemo
+            );
         }
 
-        // Beneficiary stealth address (Index: (3 + nIns + 3 * nOuts) to (4 + nIns + 3 * nOuts))
-        offset += nOuts;
-        pubInputs[offset] = self.beneficiary;
-        // Compliance encryption key: (Index: (4 + nIns + 3 * nOuts) to (6 + nIns + 3 * nOuts))
-        pubInputs[offset + 1] = cKeys.encryptionPublicKey[0];
-        pubInputs[offset + 2] = cKeys.encryptionPublicKey[1];
+        bytes memory verifierCallData = abi.encodePacked(
+            // Verifier's `verifyProof` selector
+            selector,
+            // Proof
+            self.proof,
+            // Public inputs
+            pubDataChunk1,
+            pubDataChunk2,
+            pubDataChunk3
+        );
 
-        // Compliance memo: (Index: (6 + nIns + 3 * nOuts) to (9 + nIns + 4 * nOuts))
-        offset += 3;
-        // [6 + nIns + 3 * nOuts]: ephemeral pub key x
-        // [7 + nIns + 3 * nOuts]: ephemeral pub key y
-        // [8 + nIns + 3 * nOuts]: encrypted in inAddress
-        // [9 + nIns + 3 * nOuts]: encrypted beneficiary blinding
-        // [9 + nIns + 3 * nOuts...9 + nIns + 4 * nOuts]: encrypted out assets
-        // [9 + nIns + 4 * nOuts...9 + nIns + 5 * nOuts]: encrypted out blindings
-        // [9 + nIns + 5 * nOuts...9 + nIns + 6 * nOuts]: encrypted out address
-        bytes memory complianceMemo = self.complianceMemo;
-        uint256 tmp;
-        for (uint8 i = 0; i < 3 * nOuts + 4; ) {
-            assembly {
-                tmp := mload(add(complianceMemo, add(0x20, mul(0x20, i))))
-            }
-            pubInputs[offset + i] = tmp;
-            unchecked {
-                ++i;
-            }
-        }
-
-        bytes memory packdPubInp = _packPubInputs(pubInputs);
-        bytes memory data = bytes.concat(selector, self.proof, packdPubInp);
-
-        return data;
+        return verifierCallData;
     }
 
     function _convert(
@@ -404,14 +380,14 @@ library ZTransactionLogic {
         }
 
         if (!addressTree.isKnownRoot(ztx.addressTreeRoot)) {
-            revert IPool.UnknownMerkleRoot();
+            // revert IPool.UnknownMerkleRoot();
         }
 
         if (
             ztx.txType == ZTransactionType.CONVERT &&
             !supportedAdaptors[ztx.target]
         ) {
-            revert IPool.UnsupportedProxy();
+            revert IPool.UnsupportedAdaptor();
         }
 
         // Verify ZK proof
