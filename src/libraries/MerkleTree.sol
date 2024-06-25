@@ -3,6 +3,7 @@ pragma solidity ^0.8.18;
 
 import {PoseidonT3} from "poseidon-solidity/PoseidonT3.sol";
 import {PoseidonT2} from "poseidon-solidity/PoseidonT2.sol";
+import {FIELD_SIZE, ZERO_LEAF} from "../core/Constants.sol";
 
 struct MerkleTree {
     uint256 depth;
@@ -15,14 +16,11 @@ struct MerkleTree {
 
 library MerkleTreeLogic {
     error MerkleTreeFull();
-    
-    uint256 public constant FIELD_SIZE =
-        21888242871839275222246405745257275088548364400416034343698204186575808495617;
-    uint256 public constant ZERO_LEAF = uint256(keccak256("zkFi")) % FIELD_SIZE;
-    uint8 public constant ROOT_HISTORY_SIZE = 101;
+
+    uint8 public constant ROOT_HISTORY_SIZE = 100;
 
     modifier whenTreeNotFull(MerkleTree storage self) {
-        if(self.nextLeafIndex >= (2 ** self.depth)) {
+        if (self.nextLeafIndex >= (2 ** self.depth)) {
             revert MerkleTreeFull();
         }
         _;
@@ -221,7 +219,10 @@ library MerkleTreeLogic {
         return false;
     }
 
-    function getMerkleRoot(MerkleTree storage self, uint8 rootIndex) external view returns(uint256) {
+    function getMerkleRoot(
+        MerkleTree storage self,
+        uint8 rootIndex
+    ) external view returns (uint256) {
         return self.roots[rootIndex];
     }
 }

@@ -3,6 +3,7 @@ pragma solidity ^0.8.24;
 
 import {Test} from "forge-std/Test.sol";
 import {MerkleTree, MerkleTreeLogic} from "src/libraries/MerkleTree.sol";
+import {FIELD_SIZE, ZERO_LEAF} from "src/core/Constants.sol";
 import {BinaryIMT as BinaryIMTLogic, BinaryIMTData} from "@zk-kit/imt/BinaryIMT.sol";
 import {PoseidonT3} from "poseidon-solidity/PoseidonT3.sol";
 import {PoseidonT2} from "poseidon-solidity/PoseidonT2.sol";
@@ -23,14 +24,14 @@ contract MerkleTreeLogicTest is Test {
         BinaryIMTLogic.init(
             _binaryIMTToCheckCommitmentTreeRoot,
             commitmentTreeDepth,
-            MerkleTreeLogic.ZERO_LEAF
+            ZERO_LEAF
         );
 
         MerkleTreeLogic.init(_addressTree, addressTreeDepth);
         BinaryIMTLogic.init(
             _binaryIMTToCheckAddressTreeRoot,
             addressTreeDepth,
-            MerkleTreeLogic.ZERO_LEAF
+            ZERO_LEAF
         );
     }
 
@@ -40,26 +41,23 @@ contract MerkleTreeLogicTest is Test {
 
     function test_commitmentTree_initialization() public view {
         assertEq(_commitmentTree.depth, commitmentTreeDepth);
-        assertEq(_commitmentTree.zeroes[0], MerkleTreeLogic.ZERO_LEAF);
-        assertEq(_commitmentTree.lastSubtrees[0], MerkleTreeLogic.ZERO_LEAF);
+        assertEq(_commitmentTree.zeroes[0], ZERO_LEAF);
+        assertEq(_commitmentTree.lastSubtrees[0], ZERO_LEAF);
         assertEq(_commitmentTree.nextLeafIndex, 0);
         assertEq(_commitmentTree.currentRootIndex, 0);
     }
 
     function test_addressTree_initialization() public view {
         assertEq(_addressTree.depth, addressTreeDepth);
-        assertEq(_addressTree.zeroes[0], MerkleTreeLogic.ZERO_LEAF);
-        assertEq(_addressTree.lastSubtrees[0], MerkleTreeLogic.ZERO_LEAF);
+        assertEq(_addressTree.zeroes[0], ZERO_LEAF);
+        assertEq(_addressTree.lastSubtrees[0], ZERO_LEAF);
         assertEq(_addressTree.nextLeafIndex, 0);
         assertEq(_addressTree.currentRootIndex, 0);
     }
 
     function test_binaryIMT_initialization() public view {
         assertEq(_binaryIMTToCheckAddressTreeRoot.depth, addressTreeDepth);
-        assertEq(
-            _binaryIMTToCheckAddressTreeRoot.zeroes[0],
-            MerkleTreeLogic.ZERO_LEAF
-        );
+        assertEq(_binaryIMTToCheckAddressTreeRoot.zeroes[0], ZERO_LEAF);
         assertEq(_binaryIMTToCheckAddressTreeRoot.numberOfLeaves, 0);
     }
 
@@ -183,10 +181,10 @@ contract MerkleTreeLogicTest is Test {
     function test_rootsOnCommitmentTreeDuoLeafInsertion() public {
         uint256 commitmentLeaf1 = uint256(
             keccak256(abi.encode("commitment1"))
-        ) % MerkleTreeLogic.FIELD_SIZE;
+        ) % FIELD_SIZE;
         uint256 commitmentLeaf2 = uint256(
             keccak256(abi.encode("commitment2"))
-        ) % MerkleTreeLogic.FIELD_SIZE;
+        ) % FIELD_SIZE;
 
         // inserting both leaves together in the commitment tree
         commitments.push(commitmentLeaf1);
@@ -217,10 +215,10 @@ contract MerkleTreeLogicTest is Test {
     function test_isRootKnown() public {
         uint256 commitmentLeaf1 = uint256(
             keccak256(abi.encode("commitment1"))
-        ) % MerkleTreeLogic.FIELD_SIZE;
+        ) % FIELD_SIZE;
         uint256 commitmentLeaf2 = uint256(
             keccak256(abi.encode("commitment2"))
-        ) % MerkleTreeLogic.FIELD_SIZE;
+        ) % FIELD_SIZE;
 
         // inserting both leaves together in the commitment tree
         commitments.push(commitmentLeaf1);
@@ -265,8 +263,7 @@ contract MerkleTreeLogicTest is Test {
     function test_rootsOnCommitmentTreeQuadLeafInsertion() public {
         for (uint i = 0; i < 4; i++) {
             commitments.push(
-                uint256(keccak256(abi.encode("commitment", i + 1))) %
-                    MerkleTreeLogic.FIELD_SIZE
+                uint256(keccak256(abi.encode("commitment", i + 1))) % FIELD_SIZE
             );
         }
 
