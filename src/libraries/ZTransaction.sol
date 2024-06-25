@@ -175,7 +175,7 @@ library ZTransactionLogic {
      * @param cKeys The ComplianceKeys used for this transaction
      * @param selector Selector of verifier contract
      * @return Calldata bytes for appropriate verifier contract
-     * @dev We divide the public inputs into 3 chunks to avoid stack too deep error
+     * @dev We divide the public inputs into 2 chunks to avoid stack too deep error
      */
     function toVerifierInput(
         ZTransaction memory self,
@@ -184,32 +184,27 @@ library ZTransactionLogic {
     ) public pure returns (bytes memory) {
         bytes memory pubDataChunk1;
         {
+            uint256 nOuts = self.commitments.length;
+            uint256 nPubs = self.pubAssetIds.length;
+            uint256[] memory zeros = new uint256[](nOuts - nPubs);
+
             pubDataChunk1 = abi.encodePacked(
                 self.addressTreeRoot,
                 self.commitmentTreeRoot,
                 hash(self),
                 self.txType == ZTransactionType.DEPOSIT
                     ? uint256(0)
-                    : uint256(1)
+                    : uint256(1),
+                self.pubAssetIds,
+                zeros,
+                self.pubValues,
+                zeros
             );
         }
 
         bytes memory pubDataChunk2;
         {
-            uint256 nOuts = self.commitments.length;
-            uint256 nPubs = self.pubAssetIds.length;
-            uint256[] memory z = new uint256[](nOuts - nPubs);
             pubDataChunk2 = abi.encodePacked(
-                self.pubAssetIds,
-                z,
-                self.pubValues,
-                z
-            );
-        }
-
-        bytes memory pubDataChunk3;
-        {
-            pubDataChunk3 = abi.encodePacked(
                 abi.encodePacked(self.nullifiers),
                 bytes32(cKeys.revokerPublicKey[0]),
                 bytes32(cKeys.revokerPublicKey[1]),
@@ -228,8 +223,7 @@ library ZTransactionLogic {
             self.proof,
             // Public inputs
             pubDataChunk1,
-            pubDataChunk2,
-            pubDataChunk3
+            pubDataChunk2
         );
 
         return verifierCallData;
