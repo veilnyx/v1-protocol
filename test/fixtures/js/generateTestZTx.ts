@@ -1,12 +1,10 @@
-import { readFileSync, writeFileSync } from "fs";
+import { writeFileSync } from "fs";
 import {
-  Hex,
   keccak256,
   parseEther,
   parseUnits,
   sliceHex,
   stringToBytes,
-  toHex,
   zeroAddress,
 } from "viem";
 import { Fr } from "@zkfi-tech/babyjubjub";
@@ -17,9 +15,7 @@ import {
   TransactionType,
 } from "@zkfi-tech/shared-types";
 import { Core } from "@zkfi-tech/core";
-import { ZTransaction } from "@zkfi-tech/zk-prover";
-import { Note } from "@zkfi-tech/transaction";
-import { getSDKInstance } from "./helpers/sdk";
+import { getSDKInstance } from "./sdk";
 
 const senderAccount = ShieldedAccount.generate(
   Fr.from(keccak256(stringToBytes("sender"))).val
@@ -33,7 +29,7 @@ const paymasterAddress = sliceHex(keccak256(stringToBytes("paymaster")), 0, 20);
 const wethAssetId = 0x010001;
 const usdcAssetId = 0x010002;
 
-const dirFixtures = "../fixtures/ztx";
+const dirFixtures = "test/fixtures/ztx";
 
 const depositReqs = {
   deposit_1000_weth_without_fee: {

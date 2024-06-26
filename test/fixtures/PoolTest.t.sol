@@ -11,6 +11,7 @@ import {Asset, AssetType} from "src/libraries/Asset.sol";
 import {ZTransaction, ComplianceKeys} from "src/libraries/ZTransaction.sol";
 import {MockERC20} from "test/mocks/MockERC20.sol";
 import {BaseTest} from "./BaseTest.t.sol";
+import {console2} from "forge-std/console2.sol";
 
 contract PoolTest is BaseTest {
     Verifier public verifier;

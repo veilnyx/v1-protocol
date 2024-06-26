@@ -13,7 +13,7 @@ import {
   MockAddressResolver,
   MockNotesSource,
   MockTreeSource,
-} from "./services";
+} from "./mockServices";
 import MerkleTree from "fixed-merkle-tree";
 import { Fp, poseidonHash } from "@zkfi-tech/babyjubjub";
 import { circuits } from "./zk";

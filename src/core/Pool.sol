@@ -156,7 +156,7 @@ contract Pool is
     function verifyTransactionProof(
         ZTransaction calldata ztx
     ) external view returns (bool) {
-        ComplianceKeys memory cKeys = _complianceKeys[ztx.complianceKeysId];
+        ComplianceKeys memory cKeys = _complianceKeys[ztx.revokerId];
         return IVerifier(verifier).verifyTransactionProof(ztx, cKeys);
     }
 

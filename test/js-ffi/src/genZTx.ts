@@ -10,7 +10,10 @@ async function mockDeposit(zkfi: Core) {
   const encoded = readFileSync("../mocks/deposit.txt", "utf-8") as Hex;
   const ztx = ZTransaction.decode(encoded) as any;
 
-  const notes = ztx.outMemos.map((m: Hex) => Note.fromMemo(m, zkfi.account));
+  const revokerData = await zkfi.getRevokerData(0);
+  const notes = ztx.outMemos.map((m: Hex) =>
+    Note.fromMemo(m, zkfi.account, revokerData.revokerPublicKey)
+  );
   notes.forEach((n, i) => (n.leafIndex = i));
 
   //@ts-ignore
@@ -28,16 +31,13 @@ async function main() {
   mockDeposit(zkfi);
 
   const req = parseTransactionRequest();
-  const opts = { viaBundler: false };
+  const opts = { viaBundler: false, revokerId: 0 };
 
   const tx = await zkfi.createTransaction(req, opts);
   const signedTx = await zkfi.signTransaction(tx);
   const ztx = await zkfi.proveTransaction(signedTx);
 
   const encoded = ztx.encode();
-  // const inp = ztx.toSolidityInput();
-
-  // const encoded = encodeZTransaction(inp);
 
   process.stdout.write(encoded);
 }

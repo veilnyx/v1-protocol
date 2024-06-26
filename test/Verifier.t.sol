@@ -7,7 +7,6 @@ import {Verifier, VerifierInfo} from "src/core/Verifier.sol";
 import {Verifier22} from "src/verifiers/Verifier22.sol";
 import {ZTransaction, ZTransactionType} from "src/libraries/ZTransaction.sol";
 import {TransactionRequest} from "test/helpers/TransactionRequest.sol";
-import {ZKFi, ZAccount} from "test/helpers/ZKFi.sol";
 import {BaseTest} from "test/fixtures/BaseTest.t.sol";
 
 contract VerifierTest is BaseTest {
