@@ -29,4 +29,6 @@ abstract contract PoolStorage {
 
     uint16 internal _revokerCount;
     mapping(uint256 => RevokerData) internal _revokers;
+
+    mapping(address paymaster => mapping(uint24 assetId => uint256 feeAmount)) internal _paymasterFees;
 }

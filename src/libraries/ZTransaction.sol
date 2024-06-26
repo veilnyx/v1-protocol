@@ -8,6 +8,7 @@ import {Verifier} from "../core/Verifier.sol";
 import {IAdaptorHandler} from "../interfaces/IAdaptorHandler.sol";
 import {Asset, AssetLogic} from "./Asset.sol";
 import {MerkleTree, MerkleTreeLogic} from "./MerkleTree.sol";
+import {console} from "forge-std/Test.sol";
 
 /// @title ZTransactionType enum representing types of shielded transactions
 enum ZTransactionType {
@@ -31,6 +32,12 @@ struct RevokerData {
     uint256[2] revokerPublicKey;
     uint256[2] encryptionPublicKey;
     bytes metadata;
+}
+
+/// @title VerifierAndAdpAddress struct representing verifier and adaptor handler addresses to reduce no. of params for the `execute` function
+struct VerifierAndAdpAddress {
+    address verifier;
+    address adaptorHandler;
 }
 
 /// @title ZTransaction struct representing shielded transaction
@@ -118,8 +125,6 @@ library ZTransactionLogic {
     /// @param assets Mapping of assetId to Asset
     /// @param adaptors Mapping of supported external adaptor addresses
     /// @param markedNullifiers Mapping of nullifiers that are already marked
-    /// @param verifier Verifier contract address
-    /// @param adaptorHandler Adaptor contract address
     function execute(
         ZTransaction memory ztx,
         MerkleTree storage addressTree,
@@ -128,8 +133,8 @@ library ZTransactionLogic {
         mapping(address => bool) storage adaptors,
         mapping(uint256 => bool) storage markedNullifiers,
         mapping(uint256 => RevokerData) storage revokers,
-        address verifier,
-        address adaptorHandler
+        VerifierAndAdpAddress memory verifierAndAdpAddress,
+        mapping(address => mapping(uint24 => uint256)) storage paymasterFees
     ) external {
         _validateTransaction(
             addressTree,
@@ -137,12 +142,12 @@ library ZTransactionLogic {
             adaptors,
             markedNullifiers,
             revokers,
-            verifier,
+            verifierAndAdpAddress.verifier,
             ztx
         );
 
         // Transfer any fees
-        _transferFee(assets, ztx);
+        _transferFee(ztx, paymasterFees);
 
         // Receive any deposits
         if (ztx.txType == ZTransactionType.DEPOSIT) {
@@ -161,8 +166,12 @@ library ZTransactionLogic {
 
         // Perform any conversions
         if (ztx.txType == ZTransactionType.CONVERT) {
-            _transferToExceptFee(assets, adaptorHandler, ztx);
-            _convert(assets, adaptorHandler, ztx);
+            _transferToExceptFee(
+                assets,
+                verifierAndAdpAddress.adaptorHandler,
+                ztx
+            );
+            _convert(assets, verifierAndAdpAddress.adaptorHandler, ztx);
         }
 
         _mintNotes(commitmentTree, ztx.commitments, ztx.inMemos, ztx.outMemos);
@@ -285,19 +294,14 @@ library ZTransactionLogic {
     }
 
     function _transferFee(
-        mapping(uint24 => Asset) storage assets,
-        ZTransaction memory ztx
+        ZTransaction memory ztx,
+        mapping(address => mapping(uint24 => uint256)) storage paymasterFees
     ) internal {
         uint256 feeValue = uint256(uint96(ztx.feeData));
-
+        console.log("Fee value:", feeValue);
         if (feeValue != 0) {
             address paymaster = address(bytes20(bytes32(ztx.feeData)));
-            AssetLogic.transferAsset({
-                assets: assets,
-                to: paymaster,
-                assetId: ztx.pubAssetIds[0],
-                value: feeValue
-            });
+            paymasterFees[paymaster][ztx.pubAssetIds[0]] += feeValue;
         }
     }
 

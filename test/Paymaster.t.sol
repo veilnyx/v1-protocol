@@ -1,25 +1,28 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {Test} from "forge-std/Test.sol";
+import {Test, console} from "forge-std/Test.sol";
 import {EntryPoint} from "@account-abstraction/contracts/core/EntryPoint.sol";
 import {PackedUserOperation} from "@account-abstraction/contracts/interfaces/PackedUserOperation.sol";
 import {Pool} from "src/core/Pool.sol";
+import {PoolTest} from "test/fixtures/PoolTest.t.sol";
+import {PoolTransactTest} from "test/helpers/PoolTransact.t.sol";
 import {Paymaster} from "src/core/Paymaster.sol";
 import {ZTransaction, ZTransactionType} from "src/libraries/ZTransaction.sol";
 
-contract PaymasterTest is Test {
+contract PaymasterTest is PoolTest {
     address public mockPool;
-    address public entryPoint;
     Paymaster public paymaster;
 
     uint24 defaultAssetId = 65537;
     uint256 defaultFeeValue = 0.1 ether;
 
     function setUp() public {
-        mockPool = address(uint160(uint256(keccak256("pool"))));
+        _initFixture();
+        mockPool = address(pool);
         entryPoint = address(new EntryPoint());
         paymaster = new Paymaster(entryPoint, mockPool);
+        console.log("Paymaster address: ", address(paymaster));
         paymaster.updateAssetFee(defaultAssetId, defaultFeeValue);
     }
 
@@ -84,5 +87,25 @@ contract PaymasterTest is Test {
         vm.stopPrank();
 
         assertEq(flag, 0);
+    }
+
+    function test_paymasterFeeCollection() external {
+        uint256 value = 1000 ether;
+        vm.deal(address(this), value);
+
+        paymaster.depositToEntryPoint{value: value}();
+        _mintAsset(asset1, address(this), INITIAL_DEPOSIT);
+        _mintAsset(asset2, address(this), INITIAL_DEPOSIT);
+        _approveAsset(asset1, address(pool), INITIAL_DEPOSIT);
+        _approveAsset(asset2, address(pool), 1000e6);
+
+        ZTransaction memory depositZTx = _loadZTx("deposit_1000_weth_usdc_with_fee");
+        pool.transact(depositZTx);
+
+        ZTransaction memory withdrawZTx = _loadZTx("withdraw_500_weth_with_weth_fee");
+        pool.transact(withdrawZTx);
+
+        vm.prank(address(paymaster));
+        assertEq(pool.getPaymasterFee(defaultAssetId), defaultFeeValue);
     }
 }

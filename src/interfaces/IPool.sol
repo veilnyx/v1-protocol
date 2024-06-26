@@ -49,13 +49,13 @@ interface IPool {
     error AddressAlreadyRegistered(uint256 addr);
     error BadArguments();
     error InvalidProof();
-    error UnexpectedFee();
     error UnknownMerkleRoot();
     error DoubleSpend(uint256 markedNullifier);
     error UnsupportedAdaptor();
     error DuplicateAsset(address assetAddress);
     error UnsupportedAsset(uint24 assetId);
     error InvalidRevoker(uint256 id);
+    error NoFeeToClaim(address paymaster, uint24 assetId);
 
     /////////////////////////////////////////
     //         ADMIN WRITE METHODS         //

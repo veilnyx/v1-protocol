@@ -14,7 +14,7 @@ import {IAdaptorHandler} from "../interfaces/IAdaptorHandler.sol";
 import {IScreener} from "../interfaces/IScreener.sol";
 import {PoolStorage} from "../base/PoolStorage.sol";
 import {Asset, AssetType, AssetLogic} from "../libraries/Asset.sol";
-import {ZTransaction, ZTransactionLogic, RevokerData} from "../libraries/ZTransaction.sol";
+import {ZTransaction, ZTransactionLogic, RevokerData, VerifierAndAdpAddress} from "../libraries/ZTransaction.sol";
 import {MerkleTree, MerkleTreeLogic} from "../libraries/MerkleTree.sol";
 
 contract Pool is
@@ -95,7 +95,12 @@ contract Pool is
         });
 
         _revokers[id] = revokerData;
-        emit RevokerRegistered(id, revokerPublicKey, encryptionPublicKey, revokerMetadata);
+        emit RevokerRegistered(
+            id,
+            revokerPublicKey,
+            encryptionPublicKey,
+            revokerMetadata
+        );
 
         _revokerCount += 1;
     }
@@ -142,16 +147,44 @@ contract Pool is
     function transact(
         ZTransaction memory ztx
     ) external nonReentrant whenNotPaused {
+        VerifierAndAdpAddress
+            memory verifierAndAdpAddr = VerifierAndAdpAddress({
+                verifier: verifier,
+                adaptorHandler: adaptorHandler
+            });
+
         ztx.execute({
-            commitmentTree: _commitmentTree,
             addressTree: _addressTree,
+            commitmentTree: _commitmentTree,
             assets: _assets,
             adaptors: _adaptors,
             markedNullifiers: _markedNullifiers,
             revokers: _revokers,
-            verifier: verifier,
-            adaptorHandler: adaptorHandler
+            verifierAndAdpAddress: verifierAndAdpAddr,
+            paymasterFees: _paymasterFees
         });
+    }
+
+    function claimPaymasterFeeCollected(
+        uint24 assetId
+    ) external nonReentrant whenNotPaused {
+        address paymaster = msg.sender;
+        uint256 fee = _paymasterFees[paymaster][assetId];
+        if (fee == 0) {
+            revert NoFeeToClaim(paymaster, assetId);
+        }
+
+        _paymasterFees[paymaster][assetId] = 0;
+        AssetLogic.transferAsset({
+            assets: _assets,
+            to: paymaster,
+            assetId: assetId,
+            value: fee
+        });
+    }
+
+    function getPaymasterFee(uint24 assertId) external view returns (uint256) {
+        return _paymasterFees[msg.sender][assertId];
     }
 
     /////////////////////////////////////////
