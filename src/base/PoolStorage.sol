@@ -3,7 +3,7 @@ pragma solidity ^0.8.24;
 
 import {MerkleTree} from "../libraries/MerkleTree.sol";
 import {Asset, AssetType} from "../libraries/Asset.sol";
-import {ComplianceKeys} from "../libraries/ZTransaction.sol";
+import {RevokerData} from "../libraries/ZTransaction.sol";
 
 abstract contract PoolStorage {
     uint256 public constant FIELD_SIZE =
@@ -27,6 +27,6 @@ abstract contract PoolStorage {
 
     mapping(address => bool) internal _adaptors;
 
-    uint16 internal _complianceKeysCount;
-    mapping(uint256 => ComplianceKeys) internal _complianceKeys;
+    uint16 internal _revokerCount;
+    mapping(uint256 => RevokerData) internal _revokers;
 }

@@ -6,7 +6,7 @@ import {PoolTest} from "test/fixtures/PoolTest.t.sol";
 import {IPool} from "src/interfaces/IPool.sol";
 import {AssetType, Asset} from "src/libraries/Asset.sol";
 import {MerkleTree} from "src/libraries/MerkleTree.sol";
-import {ComplianceKeys} from "src/libraries/ZTransaction.sol";
+import {RevokerData} from "src/libraries/ZTransaction.sol";
 import {PoolStorage} from "src/base/PoolStorage.sol";
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 
@@ -42,26 +42,31 @@ contract PoolInitTest is PoolTest {
     }
 
     ///////////////////////////
-    /// Compliance Keys Tests//
+    ////// Revoker Tests  /////
     ///////////////////////////
-    function test_registerComplianceKey() external {
+    function test_registerRevoker() external {
         (
             uint256[2] memory revokerKeys,
             uint256[2] memory encryptionKeys
-        ) = _getComplianceKeyArrays();
+        ) = _getRevokerArrays();
 
-        vm.expectEmit(true, true, false, true);
-        emit IPool.RegisterComplianceKeys(0, revokerKeys, encryptionKeys);
+        vm.expectEmit(true, true, true, true);
+        emit IPool.RevokerRegistered(
+            1,
+            revokerKeys,
+            encryptionKeys,
+            revokerMetaData
+        ); // one revoker already registered in PoolTest::_initFixture()
 
-        pool.registerComplianceKeys(revokerKeys, encryptionKeys);
+        pool.registerRevoker(revokerKeys, encryptionKeys, revokerMetaData);
     }
 
-    function test_revertWhenNonOwnerAddsCompliance() external {
+    function test_revertWhenNonOwnerAddsRevoker() external {
         address random = makeAddr("random");
         (
             uint256[2] memory revokerKeys,
             uint256[2] memory encryptionKeys
-        ) = _getComplianceKeyArrays();
+        ) = _getRevokerArrays();
 
         vm.expectRevert(
             abi.encodeWithSelector(
@@ -70,18 +75,18 @@ contract PoolInitTest is PoolTest {
             )
         );
         vm.prank(random);
-        pool.registerComplianceKeys(revokerKeys, encryptionKeys);
+        pool.registerRevoker(revokerKeys, encryptionKeys, revokerMetaData);
     }
 
-    function test_getComplianceKeys() external {
+    function test_getRevoker() external {
         (
             uint256[2] memory revokerKeys,
             uint256[2] memory encryptionKeys
-        ) = _getComplianceKeyArrays();
+        ) = _getRevokerArrays();
 
-        pool.registerComplianceKeys(revokerKeys, encryptionKeys);
+        pool.registerRevoker(revokerKeys, encryptionKeys, revokerMetaData);
 
-        ComplianceKeys memory cKeys = pool.getComplianceKeys(0);
+        RevokerData memory cKeys = pool.getRevoker(1); // one revoker already registered in PoolTest::_initFixture()
         assertEq(cKeys.revokerPublicKey[0], revokerKeys[0]);
         assertEq(cKeys.revokerPublicKey[1], revokerKeys[1]);
         assertEq(cKeys.encryptionPublicKey[0], encryptionKeys[0]);
@@ -90,20 +95,22 @@ contract PoolInitTest is PoolTest {
         assertTrue(cKeys.isActive);
     }
 
-    function test_setComplianceKeysStatus() external {
+    function test_setRevokerStatus() external {
         (
             uint256[2] memory revokerKeys,
             uint256[2] memory encryptionKeys
-        ) = _getComplianceKeyArrays();
+        ) = _getRevokerArrays();
 
-        pool.registerComplianceKeys(revokerKeys, encryptionKeys);
-        pool.setComplianceKeysStatus(0, false);
+        pool.registerRevoker(revokerKeys, encryptionKeys, revokerMetaData);
+        vm.expectEmit(true, true, true, true);
+        emit IPool.RevokerStatusUpdated(1, false);
+        pool.setRevokerStatus(1, false);
 
-        ComplianceKeys memory complianceKey = pool.getComplianceKeys(0);
-        assertEq(complianceKey.isActive, false);
+        RevokerData memory revoker = pool.getRevoker(1);
+        assertEq(revoker.isActive, false);
     }
 
-    function _getComplianceKeyArrays()
+    function _getRevokerArrays()
         internal
         pure
         returns (

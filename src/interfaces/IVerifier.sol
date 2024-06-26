@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {ZTransaction, ComplianceKeys} from "../libraries/ZTransaction.sol";
+import {ZTransaction, RevokerData} from "../libraries/ZTransaction.sol";
 
 interface IVerifier {
     error BadArguments();
 
     function verifyTransactionProof(
         ZTransaction memory ztx,
-        ComplianceKeys memory cKeys
+        RevokerData memory cKeys
     ) external view returns (bool);
 
     function getVerifierId(

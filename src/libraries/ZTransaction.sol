@@ -24,12 +24,13 @@ enum MemoType {
     FULL
 }
 
-/// @title ComplianceKeys struct representing compliance encryption keys
-struct ComplianceKeys {
+/// @title RevokerData struct representing revoker details
+struct RevokerData {
     uint16 id;
     bool isActive;
     uint256[2] revokerPublicKey;
     uint256[2] encryptionPublicKey;
+    bytes metadata;
 }
 
 /// @title ZTransaction struct representing shielded transaction
@@ -52,7 +53,7 @@ struct ComplianceKeys {
 /// @param target           This is either a withdraw address in case of `WITHDRAW` transaction or
 ///                         a targetted adaptor address in case of `CONVERT` transaction
 /// @param targetPayload    Payload for target contract (if applicable)
-/// @param complianceKeysId Id of compliance keys used for this transaction
+/// @param revokerId Id of compliance keys used for this transaction
 /// @param complianceMemo   Encrypted compliance data
 struct ZTransaction {
     ZTransactionType txType;
@@ -74,7 +75,7 @@ struct ZTransaction {
     address target;
     bytes targetPayload;
     // Compliance params
-    uint16 complianceKeysId;
+    uint16 revokerId;
     bytes complianceMemo;
 }
 
@@ -126,7 +127,7 @@ library ZTransactionLogic {
         mapping(uint24 => Asset) storage assets,
         mapping(address => bool) storage adaptors,
         mapping(uint256 => bool) storage markedNullifiers,
-        mapping(uint256 => ComplianceKeys) storage complianceKeys,
+        mapping(uint256 => RevokerData) storage revokers,
         address verifier,
         address adaptorHandler
     ) external {
@@ -135,7 +136,7 @@ library ZTransactionLogic {
             commitmentTree,
             adaptors,
             markedNullifiers,
-            complianceKeys,
+            revokers,
             verifier,
             ztx
         );
@@ -172,14 +173,14 @@ library ZTransactionLogic {
     /**
      *
      * @param self ZTransaction to convert to a proper verifier input
-     * @param cKeys The ComplianceKeys used for this transaction
+     * @param cKeys The RevokerData used for this transaction
      * @param selector Selector of verifier contract
      * @return Calldata bytes for appropriate verifier contract
      * @dev We divide the public inputs into 2 chunks to avoid stack too deep error
      */
     function toVerifierInput(
         ZTransaction memory self,
-        ComplianceKeys memory cKeys,
+        RevokerData memory cKeys,
         bytes4 selector
     ) public pure returns (bytes memory) {
         bytes memory pubDataChunk1;
@@ -358,14 +359,14 @@ library ZTransactionLogic {
         MerkleTree storage commitmentTree,
         mapping(address => bool) storage supportedAdaptors,
         mapping(uint256 => bool) storage markedNullifiers,
-        mapping(uint256 => ComplianceKeys) storage cKeysMap,
+        mapping(uint256 => RevokerData) storage cKeysMap,
         address verifier,
         ZTransaction memory ztx
     ) internal {
-        ComplianceKeys memory cKeys = cKeysMap[ztx.complianceKeysId];
+        RevokerData memory cKeys = cKeysMap[ztx.revokerId];
 
         if (!cKeys.isActive) {
-            revert IPool.InvalidComplianceKeys(ztx.complianceKeysId);
+            revert IPool.InvalidRevoker(ztx.revokerId);
         }
 
         // Check recent merkle root

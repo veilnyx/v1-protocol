@@ -14,7 +14,7 @@ import {IAdaptorHandler} from "../interfaces/IAdaptorHandler.sol";
 import {IScreener} from "../interfaces/IScreener.sol";
 import {PoolStorage} from "../base/PoolStorage.sol";
 import {Asset, AssetType, AssetLogic} from "../libraries/Asset.sol";
-import {ZTransaction, ZTransactionLogic, ComplianceKeys} from "../libraries/ZTransaction.sol";
+import {ZTransaction, ZTransactionLogic, RevokerData} from "../libraries/ZTransaction.sol";
 import {MerkleTree, MerkleTreeLogic} from "../libraries/MerkleTree.sol";
 
 contract Pool is
@@ -79,35 +79,33 @@ contract Pool is
         _adaptors[adaptorAddress] = enable;
     }
 
-    function registerComplianceKeys(
+    function registerRevoker(
         uint256[2] calldata revokerPublicKey,
-        uint256[2] calldata encryptionPublicKey
+        uint256[2] calldata encryptionPublicKey,
+        bytes calldata revokerMetadata
     ) external onlyOwner {
-        uint16 id = _complianceKeysCount;
+        uint16 id = _revokerCount;
 
-        ComplianceKeys memory complianceKeys = ComplianceKeys({
+        RevokerData memory revokerData = RevokerData({
             id: id,
+            isActive: true,
             revokerPublicKey: revokerPublicKey,
             encryptionPublicKey: encryptionPublicKey,
-            isActive: true
+            metadata: revokerMetadata
         });
 
-        _complianceKeys[id] = complianceKeys;
-        emit RegisterComplianceKeys(id, revokerPublicKey, encryptionPublicKey);
+        _revokers[id] = revokerData;
+        emit RevokerRegistered(id, revokerPublicKey, encryptionPublicKey, revokerMetadata);
 
-        _complianceKeysCount += 1;
+        _revokerCount += 1;
     }
 
-    function setComplianceKeysStatus(
-        uint256 id,
-        bool isActive
-    ) external onlyOwner {
-        _complianceKeys[id].isActive = isActive;
+    function setRevokerStatus(uint256 id, bool isActive) external onlyOwner {
+        _revokers[id].isActive = isActive;
+        emit IPool.RevokerStatusUpdated(id, isActive);
     }
 
-    function setSanctionScreener(
-        address screener
-    ) external onlyOwner {
+    function setSanctionScreener(address screener) external onlyOwner {
         sanctionScreener = screener;
     }
 
@@ -150,7 +148,7 @@ contract Pool is
             assets: _assets,
             adaptors: _adaptors,
             markedNullifiers: _markedNullifiers,
-            complianceKeys: _complianceKeys,
+            revokers: _revokers,
             verifier: verifier,
             adaptorHandler: adaptorHandler
         });
@@ -163,14 +161,12 @@ contract Pool is
     function verifyTransactionProof(
         ZTransaction calldata ztx
     ) external view returns (bool) {
-        ComplianceKeys memory cKeys = _complianceKeys[ztx.complianceKeysId];
+        RevokerData memory cKeys = _revokers[ztx.revokerId];
         return IVerifier(verifier).verifyTransactionProof(ztx, cKeys);
     }
 
-    function getComplianceKeys(
-        uint256 id
-    ) external view returns (ComplianceKeys memory) {
-        return _complianceKeys[id];
+    function getRevoker(uint256 id) external view returns (RevokerData memory) {
+        return _revokers[id];
     }
 
     function assetCount(AssetType assetType) external view returns (uint24) {

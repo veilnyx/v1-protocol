@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {ZTransaction, ZTransactionType, ComplianceKeys} from "../libraries/ZTransaction.sol";
+import {ZTransaction, ZTransactionType, RevokerData} from "../libraries/ZTransaction.sol";
 import {AssetType, Asset} from "../libraries/Asset.sol";
 import {PoolStorage} from "src/base/PoolStorage.sol";
 
@@ -21,11 +21,13 @@ interface IPool {
         uint256 leafIndex,
         bytes publicKeys
     );
-    event RegisterComplianceKeys(
+    event RevokerRegistered(
         uint256 indexed id,
         uint256[2] revokerPublicKey,
-        uint256[2] encryptionPublicKey
+        uint256[2] encryptionPublicKey,
+        bytes metadata
     );
+    event RevokerStatusUpdated(uint256 indexed id, bool status);
     event InputNoteMemos(bytes inMemos);
     event ComplianceMemo(bytes complianceMemo);
     event NullifierMarked(uint256 indexed nullifier);
@@ -53,7 +55,7 @@ interface IPool {
     error UnsupportedAdaptor();
     error DuplicateAsset(address assetAddress);
     error UnsupportedAsset(uint24 assetId);
-    error InvalidComplianceKeys(uint256 id);
+    error InvalidRevoker(uint256 id);
 
     /////////////////////////////////////////
     //         ADMIN WRITE METHODS         //
@@ -70,12 +72,13 @@ interface IPool {
 
     function addAdaptorSupport(address proxyAddress, bool enable) external;
 
-    function registerComplianceKeys(
+    function registerRevoker(
         uint256[2] calldata revokerKeys,
-        uint256[2] calldata encryptionKeys
+        uint256[2] calldata encryptionKeys,
+        bytes calldata metadata
     ) external;
 
-    function setComplianceKeysStatus(uint256 index, bool status) external;
+    function setRevokerStatus(uint256 index, bool status) external;
 
     /////////////////////////////////////////
     //        PUBLIC WRITE METHODS         //
@@ -109,9 +112,9 @@ interface IPool {
         address assetAddress
     ) external view returns (Asset memory);
 
-    function getComplianceKeys(
+    function getRevoker(
         uint256 revokerId
-    ) external view returns (ComplianceKeys memory);
+    ) external view returns (RevokerData memory);
 
     function isMarkedNullifier(uint256 nullifier) external view returns (bool);
 

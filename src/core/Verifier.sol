@@ -2,7 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {IVerifier} from "../interfaces/IVerifier.sol";
-import {ZTransaction, ZTransactionType, ZTransactionLogic, ComplianceKeys} from "../libraries/ZTransaction.sol";
+import {ZTransaction, ZTransactionType, ZTransactionLogic, RevokerData} from "../libraries/ZTransaction.sol";
 import {MerkleTree} from "../libraries/MerkleTree.sol";
 
 struct VerifierInfo {
@@ -31,7 +31,7 @@ contract Verifier is IVerifier {
 
     function verifyTransactionProof(
         ZTransaction memory ztx,
-        ComplianceKeys memory cKeys
+        RevokerData memory cKeys
     ) public view returns (bool) {
         VerifierInfo memory vInfo = getVerifier(
             ztx.nullifiers.length,
