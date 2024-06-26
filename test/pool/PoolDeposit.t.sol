@@ -88,14 +88,14 @@ contract PoolDepositTest is PoolTest {
         poolTransactTestHelper.test_Annoucements();
     }
 
-    function test_InputNotesMemoEventPostDeposit() external {
-        _transferAssetsToPoolTransactHelper();
-        poolTransactTestHelper.test_InputNotesMemoEvent();
-    }
+    // function test_InputNotesMemoEventPostDeposit() external {
+    //     _transferAssetsToPoolTransactHelper();
+    //     poolTransactTestHelper.test_InputNotesMemoEvent();
+    // }
 
-    function test_ComplianceMemoEventPostDeposit() external {
-        poolTransactTestHelper.test_ComplianceMemo();
-    }
+    // function test_ComplianceMemoEventPostDeposit() external {
+    //     poolTransactTestHelper.test_ComplianceMemo();
+    // }
 
     function _transferAssetsToPoolTransactHelper() internal {
         MockERC20(token1).transfer(

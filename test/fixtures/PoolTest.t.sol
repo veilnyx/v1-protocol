@@ -8,10 +8,11 @@ import {Verifier22} from "src/verifiers/Verifier22.sol";
 import {Verifier, VerifierInfo} from "src/core/Verifier.sol";
 import {AdaptorHandler} from "src/core/AdaptorHandler.sol";
 import {Asset, AssetType} from "src/libraries/Asset.sol";
-import {ZTransaction, ComplianceKeys} from "src/libraries/ZTransaction.sol";
+import {ZTransaction, RevokerData} from "src/libraries/ZTransaction.sol";
 import {MockERC20} from "test/mocks/MockERC20.sol";
 import {BaseTest} from "./BaseTest.t.sol";
 import {Config} from "script/Config.sol";
+import {console2} from "forge-std/console2.sol";
 
 contract PoolTest is BaseTest {
     Verifier public verifier;
@@ -27,6 +28,8 @@ contract PoolTest is BaseTest {
 
     Asset public asset1;
     Asset public asset2;
+
+    bytes revokerMetaData = abi.encode("Revoker 1", "Organization 1");
 
     uint256 constant INITIAL_DEPOSIT = 1000 ether;
 
@@ -78,9 +81,10 @@ contract PoolTest is BaseTest {
         pool = Pool(address(poolProxy));
         pool.addAssets(assetType, assetAddresses);
         pool.setSanctionScreener(config.sanctionScreener());
-        pool.registerComplianceKeys(
+        pool.registerRevoker(
             fixture.revokerPublicKey,
-            fixture.encryptionPublicKey
+            fixture.encryptionPublicKey,
+            revokerMetaData
         );
 
         bytes memory publicKeys = new bytes(64);

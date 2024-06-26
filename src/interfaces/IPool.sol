@@ -3,18 +3,13 @@ pragma solidity ^0.8.24;
 
 import {ZTransaction, ZTransactionType, RevokerData} from "../libraries/ZTransaction.sol";
 import {AssetType, Asset} from "../libraries/Asset.sol";
-import {PoolStorage} from "src/base/PoolStorage.sol";
+import {PoolStorage} from "../base/PoolStorage.sol";
 
 interface IPool {
     /////////////////////////////////////////
     //            EVENTS                   //
     ////////////////////////////////////////
 
-    event Announcement(
-        uint256 indexed leafIndex,
-        uint256 indexed commitment,
-        bytes outMemo
-    );
     event RegisterAddress(
         address indexed sender,
         uint256 indexed addr,
@@ -28,18 +23,22 @@ interface IPool {
         bytes metadata
     );
     event RevokerStatusUpdated(uint256 indexed id, bool status);
-    event InputNoteMemos(bytes inMemos);
-    event ComplianceMemo(bytes complianceMemo);
     event NullifierMarked(uint256 indexed nullifier);
+
     event AssetAdded(address indexed assetAddress, uint24 assetId);
 
-    // how do i know its mine & whether im sender or receiver
-    event ZTransactionLog(
+    // Commitments
+    event Commitment(uint256 indexed leafIndex, uint256 indexed commitment);
+
+    event Receipt(
         ZTransactionType indexed txType,
-        uint256 revokerId,
-        bytes historyMemo,
-        bytes[] memos,
-        uint256 endLeafIndex
+        uint16 indexed revokerId,
+        uint32 lastLeafIndex,
+        address target,
+        uint256 feeData,
+        bytes assetMemo, // sent memo in case of transfer or calc from pub assets
+        bytes complianceMemo,
+        bytes[] noteMemos
     );
 
     /////////////////////////////////////////
@@ -49,7 +48,8 @@ interface IPool {
     error AddressAlreadyRegistered(uint256 addr);
     error BadArguments();
     error InvalidProof();
-    error UnknownMerkleRoot();
+    error UnknownCommitmentTreeRoot();
+    error UnknownAddressTreeRoot();
     error DoubleSpend(uint256 markedNullifier);
     error UnsupportedAdaptor();
     error DuplicateAsset(address assetAddress);

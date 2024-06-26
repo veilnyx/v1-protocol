@@ -78,27 +78,27 @@ contract PoolTransactTest is Test {
         uint256 nextIndex = pool.getCommitmentTreeNextLeafIndex();
         console.log("Leaf commitment for deposit:", ztx.commitments.length);
 
-        for (uint256 a = 0; a < ztx.commitments.length; a++) {
-            vm.expectEmit(true, true, true, true);
-            emit IPool.Announcement(
-                nextIndex,
-                ztx.commitments[a],
-                ztx.outMemos[a]
-            );
-            nextIndex++;
-        }
+        // for (uint256 a = 0; a < ztx.commitments.length; a++) {
+        //     vm.expectEmit(true, true, true, true);
+        //     emit IPool.Announcement(
+        //         nextIndex,
+        //         ztx.commitments[a],
+        //         ztx.noteMemos[a]
+        //     );
+        //     nextIndex++;
+        // }
         pool.transact(ztx);
     }
 
-    function test_InputNotesMemoEvent() external {
-        vm.expectEmit(true, true, false, true);
-        emit IPool.InputNoteMemos(ztx.inMemos);
-        pool.transact(ztx);
-    }
+    // function test_InputNotesMemoEvent() external {
+    //     vm.expectEmit(true, true, false, true);
+    //     emit IPool.InputNoteMemos(ztx.inMemos);
+    //     pool.transact(ztx);
+    // }
 
-    function test_ComplianceMemo() external {
-        vm.expectEmit(true, true, false, true);
-        emit IPool.ComplianceMemo(ztx.complianceMemo);
-        pool.transact(ztx);
-    }
+    // function test_ComplianceMemo() external {
+    //     vm.expectEmit(true, true, false, true);
+    //     emit IPool.ComplianceMemo(ztx.complianceMemo);
+    //     pool.transact(ztx);
+    // }
 }

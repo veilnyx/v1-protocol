@@ -5,6 +5,7 @@ import {PoseidonT4} from "poseidon-solidity/PoseidonT4.sol";
 import {IPool} from "../interfaces/IPool.sol";
 import {IVerifier} from "../interfaces/IVerifier.sol";
 import {Verifier} from "../core/Verifier.sol";
+import {FIELD_SIZE} from "../core/Constants.sol";
 import {IAdaptorHandler} from "../interfaces/IAdaptorHandler.sol";
 import {Asset, AssetLogic} from "./Asset.sol";
 import {MerkleTree, MerkleTreeLogic} from "./MerkleTree.sol";
@@ -50,9 +51,9 @@ struct VerifierAndAdpAddress {
 /// @param pubValues        Values (in same order of asset ids) for public asset transfers
 /// @param nullifiers       Revealed nullifiers of input/spent notes
 /// @param commitments      New commitments of output notes to be inserted in tree
-/// @param inMemos          Memo for input notes (helpful for parsing transaction history). This is
-///                         encrypted (by sender's key), packed indices of input notes
-/// @param outMemos         Memos for output notes. This is list of encrypted notes' fields.
+/// @param assetMemo        This is empty for non-TRANSFER transactions. For TRANSFER transactions,
+///                         this is encrypted assets using sender's key that were transferred to receiver.
+/// @param noteMemos         Memos for output notes. This is list of encrypted notes' fields.
 /// @param feeData          Packed fee data (20-byte paymaster address + 12-byte fee value)
 /// @param beneficiary      Stealth address for any public fund to shielded account (e.g. in CONVERT type tx)
 /// @param beneficiaryMemo  Memo for beneficiary stealth address. This is encrypted blinding factor which
@@ -60,38 +61,30 @@ struct VerifierAndAdpAddress {
 /// @param target           This is either a withdraw address in case of `WITHDRAW` transaction or
 ///                         a targetted adaptor address in case of `CONVERT` transaction
 /// @param targetPayload    Payload for target contract (if applicable)
-/// @param revokerId Id of compliance keys used for this transaction
+/// @param revokerId        Id of revoker used for this transaction
 /// @param complianceMemo   Encrypted compliance data
 struct ZTransaction {
     ZTransactionType txType;
-    bytes proof;
+    uint16 revokerId;
     uint256 addressTreeRoot;
     uint256 commitmentTreeRoot;
-    // Public data
+    uint256 feeData;
+    bytes proof;
+    // bytes complianceData; // revokerId + complianceMemo
     uint24[] pubAssetIds; // First index is always fee asset
     uint256[] pubValues;
-    // Notes info
     uint256[] nullifiers;
     uint256[] commitments;
-    bytes inMemos;
-    bytes[] outMemos;
-    // Fees info
-    uint256 feeData;
-    uint256 beneficiary;
-    bytes beneficiaryMemo;
-    address target;
-    bytes targetPayload;
-    // Compliance params
-    uint16 revokerId;
+    bytes[] noteMemos;
+    bytes assetMemo;
     bytes complianceMemo;
+    bytes targetData; // target address + payload
+    bytes refundData; // refund address + memo
 }
 
 /// @title ZTransactionLogic library for shielded transaction logic
 library ZTransactionLogic {
     using MerkleTreeLogic for MerkleTree;
-
-    uint256 constant FIELD_SIZE =
-        21888242871839275222246405745257275088548364400416034343698204186575808495617;
 
     /// @notice Calculates the hash of a ZTransaction
     /// @dev All of the omitted fields of ZTransaction for hashing are public inputs
@@ -106,13 +99,12 @@ library ZTransactionLogic {
                 keccak256(
                     abi.encode(
                         self.txType,
-                        self.nullifiers,
-                        self.inMemos,
-                        self.outMemos,
                         self.feeData,
-                        self.beneficiaryMemo,
-                        self.target,
-                        self.targetPayload
+                        self.nullifiers,
+                        self.noteMemos,
+                        self.assetMemo,
+                        self.targetData,
+                        self.refundData
                     )
                 )
             ) % FIELD_SIZE;
@@ -161,7 +153,7 @@ library ZTransactionLogic {
 
         // Transfer any withdrawals
         if (ztx.txType == ZTransactionType.WITHDRAW) {
-            _transferToExceptFee(assets, ztx.target, ztx);
+            _transferToExceptFee(assets, address(bytes20(ztx.targetData)), ztx);
         }
 
         // Perform any conversions
@@ -174,9 +166,51 @@ library ZTransactionLogic {
             _convert(assets, verifierAndAdpAddress.adaptorHandler, ztx);
         }
 
-        _mintNotes(commitmentTree, ztx.commitments, ztx.inMemos, ztx.outMemos);
+        uint256 lastLeafIndex = _mintNotes(
+            commitmentTree,
+            ztx.commitments
+            // ztx.noteMemos
+        );
 
-        emit IPool.ComplianceMemo(ztx.complianceMemo);
+        _emitReceipt(ztx, lastLeafIndex);
+    }
+
+    function _emitReceipt(
+        ZTransaction memory ztx,
+        uint256 lastLeafIdx
+    ) internal {
+        bytes memory assetMemo;
+        if (ztx.txType == ZTransactionType.TRANSFER) {
+            // Encrypted transacted assets
+            assetMemo = ztx.assetMemo;
+        } else {
+            // Publicly transacted assets
+            bytes32 asset;
+            for (uint8 i = 0; i < ztx.pubAssetIds.length; ) {
+                // Asset value is assumed to be 28 bytes max
+                asset = bytes31(
+                    bytes.concat(
+                        bytes3(ztx.pubAssetIds[i]),
+                        bytes28(bytes32(ztx.pubValues[i]))
+                    )
+                );
+                assetMemo = abi.encodePacked(assetMemo, asset);
+                unchecked {
+                    ++i;
+                }
+            }
+        }
+
+        emit IPool.Receipt(
+            ztx.txType,
+            ztx.revokerId,
+            uint32(lastLeafIdx),
+            address(bytes20(ztx.targetData)),
+            ztx.feeData,
+            assetMemo,
+            ztx.complianceMemo,
+            ztx.noteMemos
+        );
     }
 
     /**
@@ -219,7 +253,7 @@ library ZTransactionLogic {
                 bytes32(cKeys.revokerPublicKey[0]),
                 bytes32(cKeys.revokerPublicKey[1]),
                 abi.encodePacked(self.commitments),
-                self.beneficiary,
+                bytes32(self.refundData),
                 cKeys.encryptionPublicKey[0],
                 cKeys.encryptionPublicKey[1],
                 self.complianceMemo
@@ -248,10 +282,10 @@ library ZTransactionLogic {
             uint24[] memory outAssetIds,
             uint256[] memory outValues
         ) = IAdaptorHandler(adaptorHandler).handleAdaptor(
-                ztx.target,
+                address(bytes20(ztx.targetData)),
                 ztx.pubAssetIds,
                 ztx.pubValues,
-                ztx.targetPayload
+                ztx.targetData
             );
 
         _receiveAssetsFrom(assets, adaptorHandler, outAssetIds, outValues);
@@ -265,23 +299,24 @@ library ZTransactionLogic {
 
         for (uint8 i = 0; i < cmLen; ) {
             newCommitments[i] = ztx.commitments[i];
-            newMemos[i] = ztx.outMemos[i];
+            newMemos[i] = ztx.noteMemos[i];
 
             unchecked {
                 ++i;
             }
         }
 
+        uint256 refundAddr = uint256(bytes32(ztx.refundData));
         for (uint8 i = 0; i < outLen; ) {
             newCommitments[i + cmLen] = PoseidonT4.hash(
-                [outAssetIds[i], ztx.beneficiary, outValues[i]]
+                [outAssetIds[i], refundAddr, outValues[i]]
             );
             newMemos[i + cmLen] = abi.encodePacked(
                 MemoType.SEMI,
                 outAssetIds[i],
-                ztx.beneficiary,
+                refundAddr,
                 outValues[i],
-                ztx.beneficiaryMemo
+                ztx.refundData
             );
 
             unchecked {
@@ -290,7 +325,7 @@ library ZTransactionLogic {
         }
 
         ztx.commitments = newCommitments;
-        ztx.outMemos = newMemos;
+        ztx.noteMemos = newMemos;
     }
 
     function _transferFee(
@@ -373,25 +408,27 @@ library ZTransactionLogic {
             revert IPool.InvalidRevoker(ztx.revokerId);
         }
 
-        // Check recent merkle root
-        if (!commitmentTree.isKnownRoot(ztx.commitmentTreeRoot)) {
-            revert IPool.UnknownMerkleRoot();
+        if (!addressTree.isKnownRoot(ztx.addressTreeRoot)) {
+            // TODO: reintroduce this check
+            // console2.log("ztx.addressTreeRoot", ztx.addressTreeRoot);
+            // console2.log("addressTreeRoot", addressTree.getMerkleRoot(1));
+            // revert IPool.UnknownAddressTreeRoot();
         }
 
-        if (!addressTree.isKnownRoot(ztx.addressTreeRoot)) {
-            // revert IPool.UnknownMerkleRoot();
+        // Check recent merkle root
+        if (!commitmentTree.isKnownRoot(ztx.commitmentTreeRoot)) {
+            revert IPool.UnknownCommitmentTreeRoot();
         }
 
         if (
             ztx.txType == ZTransactionType.CONVERT &&
-            !supportedAdaptors[ztx.target]
+            !supportedAdaptors[address(bytes20(ztx.targetData))]
         ) {
             revert IPool.UnsupportedAdaptor();
         }
 
         // Verify ZK proof
         if (!Verifier(verifier).verifyTransactionProof(ztx, cKeys)) {
-            // TODO: might have to include `verifyTransactionProof` in ZTransactionLogic library if merkle tree has to be sent for
             revert IPool.InvalidProof();
         }
 
@@ -420,24 +457,29 @@ library ZTransactionLogic {
 
     function _mintNotes(
         MerkleTree storage tree,
-        uint256[] memory commitments,
-        bytes memory inMemos,
-        bytes[] memory outMemos
-    ) internal {
+        uint256[] memory commitments
+    )
+        internal
+        returns (
+            // bytes[] memory outMemos
+            uint256
+        )
+    {
         uint256 nextIndex = MerkleTreeLogic.insert(tree, commitments);
         uint256 cmLen = commitments.length;
 
         for (uint256 i = 0; i < cmLen; ) {
-            emit IPool.Announcement(
-                nextIndex - cmLen + i,
-                commitments[i],
-                outMemos[i]
-            );
+            // emit IPool.Announcement(
+            //     nextIndex - cmLen + i,
+            //     commitments[i],
+            //     outMemos[i]
+            // );
+            emit IPool.Commitment(nextIndex - cmLen + i, commitments[i]);
             unchecked {
                 ++i;
             }
         }
 
-        emit IPool.InputNoteMemos(inMemos);
+        return nextIndex - 1;
     }
 }
