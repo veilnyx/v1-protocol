@@ -14,11 +14,25 @@ contract PaymasterTest is PoolTest {
     address public mockPool;
     Paymaster public paymaster;
 
-    uint24 defaultAssetId = 65537;
-    uint256 defaultFeeValue = 0.1 ether;
+    uint24 defaultAssetId;
+    uint256 defaultFeeValue = 0.001 ether;
+
+    modifier depositTx() {
+        _mintAsset(asset1, address(this), INITIAL_DEPOSIT);
+        _mintAsset(asset2, address(this), INITIAL_DEPOSIT);
+        _approveAsset(asset1, address(pool), INITIAL_DEPOSIT);
+        _approveAsset(asset2, address(pool), 1000e6);
+
+        ZTransaction memory depositZTx = _loadZTx(
+            "deposit_1000_weth_usdc_without_fee"
+        );
+        pool.transact(depositZTx);
+        _;
+    }
 
     function setUp() public {
         _initFixture();
+        defaultAssetId = asset1.id;
         mockPool = address(pool);
         entryPoint = address(new EntryPoint());
         paymaster = new Paymaster(entryPoint, mockPool);
@@ -89,23 +103,32 @@ contract PaymasterTest is PoolTest {
         assertEq(flag, 0);
     }
 
-    function test_paymasterFeeCollection() external {
+    function test_paymasterFeeBalUpdateInPool() external depositTx {
         uint256 value = 1000 ether;
         vm.deal(address(this), value);
 
         paymaster.depositToEntryPoint{value: value}();
-        _mintAsset(asset1, address(this), INITIAL_DEPOSIT);
-        _mintAsset(asset2, address(this), INITIAL_DEPOSIT);
-        _approveAsset(asset1, address(pool), INITIAL_DEPOSIT);
-        _approveAsset(asset2, address(pool), 1000e6);
 
-        ZTransaction memory depositZTx = _loadZTx("deposit_1000_weth_usdc_with_fee");
-        pool.transact(depositZTx);
-
-        ZTransaction memory withdrawZTx = _loadZTx("withdraw_500_weth_with_weth_fee");
+        ZTransaction memory withdrawZTx = _loadZTx("withdraw_1_weth_with_fee");
         pool.transact(withdrawZTx);
 
+        uint256 assetFeeByPaymaster = paymaster.getAssetFee(defaultAssetId);
         vm.prank(address(paymaster));
-        assertEq(pool.getPaymasterFee(defaultAssetId), defaultFeeValue);
+        assertEq(pool.getPaymasterFee(defaultAssetId), assetFeeByPaymaster);
+    }
+
+    function test_paymasterFeeClaim() external depositTx {
+        uint256 value = 1000 ether;
+        vm.deal(address(this), value);
+        paymaster.depositToEntryPoint{value: value}();
+
+        ZTransaction memory withdrawZTx = _loadZTx("withdraw_1_weth_with_fee");
+        pool.transact(withdrawZTx);
+
+        vm.startPrank(address(paymaster));
+        pool.claimPaymasterFeeCollected(defaultAssetId);
+
+        assertEq(pool.getPaymasterFee(defaultAssetId), 0);
+        assertEq(token1.balanceOf(address(paymaster)), defaultFeeValue);
     }
 }

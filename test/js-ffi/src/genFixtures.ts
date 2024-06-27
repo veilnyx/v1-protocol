@@ -108,14 +108,14 @@ const withdrawReqs = {
     viaBundler: true,
     paymaster: paymasterAddress,
   }, */
-  withdraw_1_weth_without_fee: {
+  withdraw_1_weth_with_fee: {
     type: TransactionType.WITHDRAW,
     assetIds: [wethAssetId],
     values: [parseEther("1")],
-    feeAssetId: 0,
+    feeAssetId: wethAssetId,
     to: withdrawAddress,
-    viaBundler: false,
-    paymaster: zeroAddress,
+    viaBundler: true,
+    paymaster: `0x${"F8Cde1763BE3fe82a0f8CDc9625985f56d4294b9"}` as `0x${string}`,
     revokerId: 0,
   },
 };
@@ -180,8 +180,8 @@ const createMockZTx = async (
 
   const signedTx = await zkfi.signTransaction(tx);
   const ztx = await zkfi.proveTransaction(signedTx);
-  console.log("rootAddr", zkfi.account.rootAddress);
-  console.log("ztx.root", ztx.addressTreeRoot.toString());
+  // console.log("rootAddr", zkfi.account.rootAddress);
+  // console.log("ztx.root", ztx.addressTreeRoot.toString());
 
   const encoded = ztx.encode();
   writeFileSync(`${dirFixtures}/${name}.txt`, encoded);
@@ -201,7 +201,7 @@ async function mockNotes(depositName: string, zkfi: Core) {
   });
 
   depositNotes.forEach((n, i) => (n.leafIndex = i));
-  console.log("Note created:", inspect(depositNotes));;
+  // console.log("Note created:", inspect(depositNotes));;
 
   //@ts-ignore
   zkfi.notesSource.mockNotes(depositNotes[0].assetId, [depositNotes[0]]);
@@ -220,7 +220,7 @@ async function main() {
   await createMockZTx(depositName, depositReqs[depositName], zkfi);
   await mockNotes(depositName, zkfi);
 
-  const withdrawName = "withdraw_1_weth_without_fee";
+  const withdrawName = "withdraw_1_weth_with_fee";
   await createMockZTx(withdrawName, withdrawReqs[withdrawName], zkfi);
   // await mockNotes(depositName, zkfi);
 
