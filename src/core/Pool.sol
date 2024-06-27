@@ -14,7 +14,7 @@ import {IAdaptorHandler} from "../interfaces/IAdaptorHandler.sol";
 import {IScreener} from "../interfaces/IScreener.sol";
 import {PoolStorage} from "../base/PoolStorage.sol";
 import {Asset, AssetType, AssetLogic} from "../libraries/Asset.sol";
-import {ZTransaction, ZTransactionLogic, RevokerData, VerifierAndAdpAddress} from "../libraries/ZTransaction.sol";
+import {ZTransaction, ZTransactionLogic, RevokerData} from "../libraries/ZTransaction.sol";
 import {MerkleTree, MerkleTreeLogic} from "../libraries/MerkleTree.sol";
 
 contract Pool is
@@ -147,20 +147,19 @@ contract Pool is
     function transact(
         ZTransaction memory ztx
     ) external nonReentrant whenNotPaused {
-        VerifierAndAdpAddress
-            memory verifierAndAdpAddr = VerifierAndAdpAddress({
-                verifier: verifier,
-                adaptorHandler: adaptorHandler
-            });
-
-        ztx.execute({
+        ztx._validateTransaction({
             addressTree: _addressTree,
             commitmentTree: _commitmentTree,
-            assets: _assets,
-            adaptors: _adaptors,
+            supportedAdaptors: _adaptors,
             markedNullifiers: _markedNullifiers,
             revokers: _revokers,
-            verifierAndAdpAddress: verifierAndAdpAddr,
+            verifier: verifier
+        });
+
+        ztx.execute({
+            commitmentTree: _commitmentTree,
+            assets: _assets,
+            adaptorHandler: adaptorHandler,
             paymasterFees: _paymasterFees
         });
     }
@@ -198,7 +197,9 @@ contract Pool is
         return IVerifier(verifier).verifyTransactionProof(ztx, cKeys);
     }
 
-    function getRevokerData(uint256 id) external view returns (RevokerData memory) {
+    function getRevokerData(
+        uint256 id
+    ) external view returns (RevokerData memory) {
         return _revokers[id];
     }
 

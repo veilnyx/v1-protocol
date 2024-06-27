@@ -35,12 +35,6 @@ struct RevokerData {
     bytes metadata;
 }
 
-/// @title VerifierAndAdpAddress struct representing verifier and adaptor handler addresses to reduce no. of params for the `execute` function
-struct VerifierAndAdpAddress {
-    address verifier;
-    address adaptorHandler;
-}
-
 /// @title ZTransaction struct representing shielded transaction
 ///
 /// @param txType           Type of transaction
@@ -112,32 +106,17 @@ library ZTransactionLogic {
 
     /// @notice Executes a shielded transaction
     /// @param ztx ZTransaction to be executed
-    /// @param addressTree Address `MerkleTree` state in this contract
     /// @param commitmentTree Commitment `MerkleTree` state in this contract
     /// @param assets Mapping of assetId to Asset
-    /// @param adaptors Mapping of supported external adaptor addresses
-    /// @param markedNullifiers Mapping of nullifiers that are already marked
+    /// @param adaptorHandler Address of the adaptor handler contract responsible for handling DeFi adaptor ops
+    /// @param paymasterFees Mapping of paymaster address to assetId to fee value
     function execute(
         ZTransaction memory ztx,
-        MerkleTree storage addressTree,
         MerkleTree storage commitmentTree,
         mapping(uint24 => Asset) storage assets,
-        mapping(address => bool) storage adaptors,
-        mapping(uint256 => bool) storage markedNullifiers,
-        mapping(uint256 => RevokerData) storage revokers,
-        VerifierAndAdpAddress memory verifierAndAdpAddress,
+        address adaptorHandler,
         mapping(address => mapping(uint24 => uint256)) storage paymasterFees
     ) external {
-        _validateTransaction(
-            addressTree,
-            commitmentTree,
-            adaptors,
-            markedNullifiers,
-            revokers,
-            verifierAndAdpAddress.verifier,
-            ztx
-        );
-
         // Transfer any fees
         _transferFee(ztx, paymasterFees);
 
@@ -158,12 +137,8 @@ library ZTransactionLogic {
 
         // Perform any conversions
         if (ztx.txType == ZTransactionType.CONVERT) {
-            _transferToExceptFee(
-                assets,
-                verifierAndAdpAddress.adaptorHandler,
-                ztx
-            );
-            _convert(assets, verifierAndAdpAddress.adaptorHandler, ztx);
+            _transferToExceptFee(assets, adaptorHandler, ztx);
+            _convert(assets, adaptorHandler, ztx);
         }
 
         uint256 lastLeafIndex = _mintNotes(
@@ -175,7 +150,120 @@ library ZTransactionLogic {
         _emitReceipt(ztx, lastLeafIndex);
     }
 
-    function _emitReceipt(
+    /**
+     *
+     * @param self ZTransaction to convert to a proper verifier input
+     * @param revokerData The RevokerData used for this transaction
+     * @param selector Selector of verifier contract
+     * @return Calldata bytes for appropriate verifier contract
+     * @dev We divide the public inputs into 2 chunks to avoid stack too deep error
+     */
+    function toVerifierInput(
+        ZTransaction memory self,
+        RevokerData memory revokerData,
+        bytes4 selector
+    ) public pure returns (bytes memory) {
+        bytes memory pubDataChunk1;
+        {
+            uint256 nOuts = self.commitments.length;
+            uint256 nPubs = self.pubAssetIds.length;
+            uint256[] memory zeros = new uint256[](nOuts - nPubs);
+
+            pubDataChunk1 = abi.encodePacked(
+                self.addressTreeRoot,
+                self.commitmentTreeRoot,
+                hash(self),
+                self.txType == ZTransactionType.DEPOSIT
+                    ? uint256(0)
+                    : uint256(1),
+                self.pubAssetIds,
+                zeros,
+                self.pubValues,
+                zeros
+            );
+        }
+
+        bytes memory pubDataChunk2;
+        {
+            pubDataChunk2 = abi.encodePacked(
+                abi.encodePacked(self.nullifiers),
+                bytes32(revokerData.revokerPublicKey[0]),
+                bytes32(revokerData.revokerPublicKey[1]),
+                abi.encodePacked(self.commitments),
+                bytes32(self.refundData),
+                revokerData.encryptionPublicKey[0],
+                revokerData.encryptionPublicKey[1],
+                self.complianceMemo
+            );
+        }
+
+        bytes memory verifierCallData = abi.encodePacked(
+            // Verifier's `verifyProof` selector
+            selector,
+            // Proof
+            self.proof,
+            // Public inputs
+            pubDataChunk1,
+            pubDataChunk2
+        );
+
+        return verifierCallData;
+    }
+
+     /////////////////////////////////////////
+    //         INTERNAL METHODS            //
+    ////////////////////////////////////////
+
+    /// @notice Validates a shielded transaction
+    /// @param ztx ZTransaction to be executed
+    /// @param addressTree Address `MerkleTree` state in this contract
+    /// @param commitmentTree Commitment `MerkleTree` state in this contract
+    /// @param supportedAdaptors Mapping of supported external adaptor addresses
+    /// @param markedNullifiers Mapping of nullifiers that are already marked
+    function _validateTransaction(
+        ZTransaction memory ztx,
+        MerkleTree storage addressTree,
+        MerkleTree storage commitmentTree,
+        mapping(address => bool) storage supportedAdaptors,
+        mapping(uint256 => bool) storage markedNullifiers,
+        mapping(uint256 => RevokerData) storage revokers,
+        address verifier
+    ) internal {
+        RevokerData memory revokerData = revokers[ztx.revokerId];
+
+        if (!revokerData.isActive) {
+            revert IPool.InvalidRevoker(ztx.revokerId);
+        }
+
+        if (!addressTree.isKnownRoot(ztx.addressTreeRoot)) {
+            // TODO: reintroduce this check
+            // console2.log("ztx.addressTreeRoot", ztx.addressTreeRoot);
+            // console2.log("addressTreeRoot", addressTree.getMerkleRoot(1));
+            // revert IPool.UnknownAddressTreeRoot();
+        }
+
+        // Check recent merkle root
+        if (!commitmentTree.isKnownRoot(ztx.commitmentTreeRoot)) {
+            revert IPool.UnknownCommitmentTreeRoot();
+        }
+
+        if (
+            ztx.txType == ZTransactionType.CONVERT &&
+            !supportedAdaptors[address(bytes20(ztx.targetData))]
+        ) {
+            revert IPool.UnsupportedAdaptor();
+        }
+
+        // Verify ZK proof
+        if (!Verifier(verifier).verifyTransactionProof(ztx, revokerData)) {
+            revert IPool.InvalidProof();
+        }
+
+        // Check double spend and mark nullifiers
+        _checkAndMarkNullifiers(markedNullifiers, ztx.nullifiers);
+    }
+
+      function _emitReceipt(
         ZTransaction memory ztx,
         uint256 lastLeafIdx
     ) internal {
@@ -211,66 +299,6 @@ library ZTransactionLogic {
             ztx.complianceMemo,
             ztx.noteMemos
         );
-    }
-
-    /**
-     *
-     * @param self ZTransaction to convert to a proper verifier input
-     * @param cKeys The RevokerData used for this transaction
-     * @param selector Selector of verifier contract
-     * @return Calldata bytes for appropriate verifier contract
-     * @dev We divide the public inputs into 2 chunks to avoid stack too deep error
-     */
-    function toVerifierInput(
-        ZTransaction memory self,
-        RevokerData memory cKeys,
-        bytes4 selector
-    ) public pure returns (bytes memory) {
-        bytes memory pubDataChunk1;
-        {
-            uint256 nOuts = self.commitments.length;
-            uint256 nPubs = self.pubAssetIds.length;
-            uint256[] memory zeros = new uint256[](nOuts - nPubs);
-
-            pubDataChunk1 = abi.encodePacked(
-                self.addressTreeRoot,
-                self.commitmentTreeRoot,
-                hash(self),
-                self.txType == ZTransactionType.DEPOSIT
-                    ? uint256(0)
-                    : uint256(1),
-                self.pubAssetIds,
-                zeros,
-                self.pubValues,
-                zeros
-            );
-        }
-
-        bytes memory pubDataChunk2;
-        {
-            pubDataChunk2 = abi.encodePacked(
-                abi.encodePacked(self.nullifiers),
-                bytes32(cKeys.revokerPublicKey[0]),
-                bytes32(cKeys.revokerPublicKey[1]),
-                abi.encodePacked(self.commitments),
-                bytes32(self.refundData),
-                cKeys.encryptionPublicKey[0],
-                cKeys.encryptionPublicKey[1],
-                self.complianceMemo
-            );
-        }
-
-        bytes memory verifierCallData = abi.encodePacked(
-            // Verifier's `verifyProof` selector
-            selector,
-            // Proof
-            self.proof,
-            // Public inputs
-            pubDataChunk1,
-            pubDataChunk2
-        );
-
-        return verifierCallData;
     }
 
     function _convert(
@@ -391,49 +419,6 @@ library ZTransactionLogic {
                 ++i;
             }
         }
-    }
-
-    function _validateTransaction(
-        MerkleTree storage addressTree,
-        MerkleTree storage commitmentTree,
-        mapping(address => bool) storage supportedAdaptors,
-        mapping(uint256 => bool) storage markedNullifiers,
-        mapping(uint256 => RevokerData) storage cKeysMap,
-        address verifier,
-        ZTransaction memory ztx
-    ) internal {
-        RevokerData memory cKeys = cKeysMap[ztx.revokerId];
-
-        if (!cKeys.isActive) {
-            revert IPool.InvalidRevoker(ztx.revokerId);
-        }
-
-        if (!addressTree.isKnownRoot(ztx.addressTreeRoot)) {
-            // TODO: reintroduce this check
-            // console2.log("ztx.addressTreeRoot", ztx.addressTreeRoot);
-            // console2.log("addressTreeRoot", addressTree.getMerkleRoot(1));
-            // revert IPool.UnknownAddressTreeRoot();
-        }
-
-        // Check recent merkle root
-        if (!commitmentTree.isKnownRoot(ztx.commitmentTreeRoot)) {
-            revert IPool.UnknownCommitmentTreeRoot();
-        }
-
-        if (
-            ztx.txType == ZTransactionType.CONVERT &&
-            !supportedAdaptors[address(bytes20(ztx.targetData))]
-        ) {
-            revert IPool.UnsupportedAdaptor();
-        }
-
-        // Verify ZK proof
-        if (!Verifier(verifier).verifyTransactionProof(ztx, cKeys)) {
-            revert IPool.InvalidProof();
-        }
-
-        // Check double spend and mark nullifiers
-        _checkAndMarkNullifiers(markedNullifiers, ztx.nullifiers);
     }
 
     /// @dev This also prevents any duplicate nullifiers

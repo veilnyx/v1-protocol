@@ -14,7 +14,7 @@ import {IAdaptorHandler} from "../../src/interfaces/IAdaptorHandler.sol";
 import {IScreener} from "../../src/interfaces/IScreener.sol";
 import {PoolStorage} from "../../src/base/PoolStorage.sol";
 import {Asset, AssetType, AssetLogic} from "../../src/libraries/Asset.sol";
-import {ZTransaction, ZTransactionLogic, RevokerData, VerifierAndAdpAddress} from "./MockZTransaction.sol";
+import {ZTransaction, ZTransactionLogic, RevokerData} from "./MockZTransaction.sol";
 import {MerkleTree, MerkleTreeLogic} from "../../src/libraries/MerkleTree.sol";
 
 contract MockPool is

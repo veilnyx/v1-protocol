@@ -29,12 +29,6 @@ struct RevokerData {
     bytes metadata;
 }
 
-/// @title VerifierAndAdpAddress struct representing verifier and adaptor handler addresses to reduce no. of params for the `execute` function
-struct VerifierAndAdpAddress {
-    address verifier;
-    address adaptorHandler;
-}
-
 /// @title ZTransaction struct representing shielded transaction
 ///
 /// @param txType           Type of transaction
