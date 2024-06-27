@@ -20,6 +20,7 @@ import { Core } from "@zkfi-tech/core";
 import { ZTransaction } from "@zkfi-tech/zk-prover";
 import { Note } from "@zkfi-tech/transaction";
 import { getSDKInstance } from "./helpers/sdk";
+import { inspect } from "util";
 
 const senderAccount = ShieldedAccount.generate(
   Fr.from(keccak256(stringToBytes("sender"))).val
@@ -115,6 +116,7 @@ const withdrawReqs = {
     to: withdrawAddress,
     viaBundler: false,
     paymaster: zeroAddress,
+    revokerId: 0,
   },
 };
 
@@ -185,25 +187,29 @@ const createMockZTx = async (
   writeFileSync(`${dirFixtures}/${name}.txt`, encoded);
 };
 
-// async function mockNotes(depositName: string, zkfi: Core) {
-//   const encoded = readFileSync(
-//     `${dirFixtures}/${depositName}.txt`,
-//     "utf-8"
-//   ) as Hex;
-//   const ztx = ZTransaction.decode(encoded) as any;
+async function mockNotes(depositName: string, zkfi: Core) {
+  const encoded = readFileSync(
+    `${dirFixtures}/${depositName}.txt`,
+    "utf-8"
+  ) as Hex;
+  const ztx = ZTransaction.decode(encoded) as any;
+  const revokerData = await zkfi.getRevokerData(0);
+  const revokerPublicKey = revokerData.revokerPublicKey;
 
-//   const depositNotes = ztx.outMemos.map((m: Hex) => {
-//     return Note.fromMemo(m, zkfi.account);
-//   });
-//   depositNotes.forEach((n, i) => (n.leafIndex = i));
+  const depositNotes = ztx.noteMemos.map((m: Hex) => {
+    return Note.fromMemo(m, zkfi.account, revokerPublicKey);
+  });
 
-//   //@ts-ignore
-//   zkfi.notesSource.mockNotes(depositNotes[0].assetId, [depositNotes[0]]);
-//   //@ts-ignore
-//   zkfi.notesSource.mockNotes(depositNotes[1].assetId, [depositNotes[1]]);
-//   //@ts-ignore
-//   depositNotes.forEach((n) => zkfi.treeSource.insert(n.commitment));
-// }
+  depositNotes.forEach((n, i) => (n.leafIndex = i));
+  console.log("Note created:", inspect(depositNotes));;
+
+  //@ts-ignore
+  zkfi.notesSource.mockNotes(depositNotes[0].assetId, [depositNotes[0]]);
+  //@ts-ignore
+  zkfi.notesSource.mockNotes(depositNotes[1].assetId, [depositNotes[1]]);
+  //@ts-ignore
+  depositNotes.forEach((n) => zkfi.commitmentTreeSource.insert(n.commitment));
+}
 
 async function main() {
   const zkfi = getSDKInstance();
@@ -212,10 +218,14 @@ async function main() {
   const depositName = "deposit_1000_weth_usdc_without_fee";
   // const depositName = "deposit_1_weth";
   await createMockZTx(depositName, depositReqs[depositName], zkfi);
+  await mockNotes(depositName, zkfi);
+
+  const withdrawName = "withdraw_1_weth_without_fee";
+  await createMockZTx(withdrawName, withdrawReqs[withdrawName], zkfi);
   // await mockNotes(depositName, zkfi);
+
   // const reqs = {
   //   ...withdrawReqs,
-  //   ...transferReqs,
   // };
   // for (const [name, req] of Object.entries(reqs)) {
   //   await createMockZTx(name, req as any, zkfi);

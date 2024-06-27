@@ -112,7 +112,7 @@ interface IPool {
         address assetAddress
     ) external view returns (Asset memory);
 
-    function getRevoker(
+    function getRevokerData(
         uint256 revokerId
     ) external view returns (RevokerData memory);
 

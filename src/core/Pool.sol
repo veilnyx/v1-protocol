@@ -198,7 +198,7 @@ contract Pool is
         return IVerifier(verifier).verifyTransactionProof(ztx, cKeys);
     }
 
-    function getRevoker(uint256 id) external view returns (RevokerData memory) {
+    function getRevokerData(uint256 id) external view returns (RevokerData memory) {
         return _revokers[id];
     }
 

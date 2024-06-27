@@ -86,7 +86,7 @@ contract PoolInitTest is PoolTest {
 
         pool.registerRevoker(revokerKeys, encryptionKeys, revokerMetaData);
 
-        RevokerData memory cKeys = pool.getRevoker(1); // one revoker already registered in PoolTest::_initFixture()
+        RevokerData memory cKeys = pool.getRevokerData(1); // one revoker already registered in PoolTest::_initFixture()
         assertEq(cKeys.revokerPublicKey[0], revokerKeys[0]);
         assertEq(cKeys.revokerPublicKey[1], revokerKeys[1]);
         assertEq(cKeys.encryptionPublicKey[0], encryptionKeys[0]);
@@ -106,7 +106,7 @@ contract PoolInitTest is PoolTest {
         emit IPool.RevokerStatusUpdated(1, false);
         pool.setRevokerStatus(1, false);
 
-        RevokerData memory revoker = pool.getRevoker(1);
+        RevokerData memory revoker = pool.getRevokerData(1);
         assertEq(revoker.isActive, false);
     }
 
