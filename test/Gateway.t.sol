@@ -59,7 +59,7 @@ contract GatewayTest is Test {
         ZTransaction memory ztx;
         uint24[] memory pubAssetIds = new uint24[](1);
         pubAssetIds[0] = 0x010001;
-        ztx.pubAssetIds = pubAssetIds;
+        // ztx.pubAssetIds = pubAssetIds;
         ztx.feeData = uint256(
             bytes32(
                 bytes.concat(

@@ -35,7 +35,9 @@ interface IPool {
         uint16 indexed revokerId,
         uint32 lastLeafIndex,
         address target,
-        uint256 feeData,
+        uint24 feeAssetId,
+        uint96 feeValue,
+        address paymaster,
         bytes assetMemo, // sent memo in case of transfer or calc from pub assets
         bytes complianceMemo,
         bytes[] noteMemos

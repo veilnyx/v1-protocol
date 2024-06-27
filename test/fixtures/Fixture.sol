@@ -18,7 +18,7 @@ struct Fixture {
 }
 
 library FixtureLib {
-    function load(Vm vm) public returns (Fixture memory) {
+    function load(Vm vm) public view returns (Fixture memory) {
         string memory path = string.concat(
             vm.projectRoot(),
             "/test/fixtures/config.json"

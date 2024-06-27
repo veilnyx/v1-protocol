@@ -174,8 +174,6 @@ const createMockZTx = async (
 
   const signedTx = await zkfi.signTransaction(tx);
   const ztx = await zkfi.proveTransaction(signedTx);
-  console.log("rootAddr", zkfi.account.rootAddress);
-  console.log("ztx.root", ztx.addressTreeRoot.toString());
 
   const encoded = ztx.encode();
   writeFileSync(`${dirFixtures}/${name}.txt`, encoded);

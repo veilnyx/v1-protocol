@@ -64,8 +64,8 @@ contract PaymasterTest is PoolTest {
         ZTransaction memory ztx;
         PackedUserOperation memory userOp;
 
-        ztx.pubAssetIds = new uint24[](1);
-        ztx.pubAssetIds[0] = defaultAssetId;
+        // ztx.pubAssetIds = new uint24[](1);
+        // ztx.pubAssetIds[0] = defaultAssetId;
         ztx.feeData = uint256(
             bytes32(
                 bytes.concat(
@@ -99,10 +99,14 @@ contract PaymasterTest is PoolTest {
         _approveAsset(asset1, address(pool), INITIAL_DEPOSIT);
         _approveAsset(asset2, address(pool), 1000e6);
 
-        ZTransaction memory depositZTx = _loadZTx("deposit_1000_weth_usdc_with_fee");
+        ZTransaction memory depositZTx = _loadZTx(
+            "deposit_1000_weth_usdc_with_fee"
+        );
         pool.transact(depositZTx);
 
-        ZTransaction memory withdrawZTx = _loadZTx("withdraw_500_weth_with_weth_fee");
+        ZTransaction memory withdrawZTx = _loadZTx(
+            "withdraw_500_weth_with_weth_fee"
+        );
         pool.transact(withdrawZTx);
 
         vm.prank(address(paymaster));
