@@ -6,12 +6,13 @@ import {PoseidonT2} from "poseidon-solidity/PoseidonT2.sol";
 import {FIELD_SIZE, ZERO_LEAF} from "../core/Constants.sol";
 
 struct MerkleTree {
-    uint256 depth;
-    uint256 nextLeafIndex;
-    uint256 currentRootIndex;
-    mapping(uint256 => uint256) roots;
-    mapping(uint256 => uint256) zeroes;
-    mapping(uint256 => uint256) lastSubtrees;
+    uint8 depth;
+    uint8 currentRootIndex;
+    uint32 nextLeafIndex;
+    uint40 capacity;
+    mapping(uint8 => uint256) roots;
+    mapping(uint8 => uint256) zeroes;
+    mapping(uint8 => uint256) lastSubtrees;
 }
 
 library MerkleTreeLogic {
@@ -20,14 +21,15 @@ library MerkleTreeLogic {
     uint8 public constant ROOT_HISTORY_SIZE = 100;
 
     modifier whenTreeNotFull(MerkleTree storage self) {
-        if (self.nextLeafIndex >= (2 ** self.depth)) {
+        if (self.nextLeafIndex >= self.capacity) {
             revert MerkleTreeFull();
         }
         _;
     }
 
-    function init(MerkleTree storage self, uint256 depth) public {
+    function init(MerkleTree storage self, uint8 depth) public {
         self.depth = depth;
+        self.capacity = uint32(2 ** depth);
 
         uint256 zero = ZERO_LEAF;
         for (uint8 i = 0; i < depth; ) {
@@ -71,36 +73,40 @@ library MerkleTreeLogic {
 
     function insert(
         MerkleTree storage self,
-        uint256 userAddress
+        uint256 leaf
     ) public whenTreeNotFull(self) returns (uint256) {
         uint256 depth = self.depth;
 
-        uint256 currentLevelHash = PoseidonT2.hash([userAddress]);
-        uint256 currentLevelIndex = self.nextLeafIndex;
+        uint256 currentLevelHash = leaf;
+        uint32 currentLevelIndex = self.nextLeafIndex;
 
         uint256 left;
         uint256 right;
 
-        for (uint256 l = 0; l < depth; l++) {
+        for (uint8 i = 0; i < depth; ) {
             if (currentLevelIndex % 2 == 0) {
                 // Insertion on the left leaf
                 left = currentLevelHash;
-                right = self.zeroes[l];
-                self.lastSubtrees[l] = currentLevelHash;
+                right = self.zeroes[i];
+                self.lastSubtrees[i] = currentLevelHash;
             } else {
                 // insertion on the right leaf
-                left = self.lastSubtrees[l];
+                left = self.lastSubtrees[i];
                 right = currentLevelHash;
             }
             // preparing for next level
             currentLevelHash = hashLeaves(left, right);
             currentLevelIndex /= 2;
+
+            unchecked {
+                ++i;
+            }
         }
 
-        self.nextLeafIndex++;
-        uint256 newRootIndex = (self.currentRootIndex + 1) % ROOT_HISTORY_SIZE;
+        uint8 newRootIndex = (self.currentRootIndex + 1) % ROOT_HISTORY_SIZE;
         self.currentRootIndex = newRootIndex;
         self.roots[newRootIndex] = currentLevelHash;
+        self.nextLeafIndex = self.nextLeafIndex + 1;
 
         return self.nextLeafIndex;
     }
@@ -110,8 +116,8 @@ library MerkleTreeLogic {
         uint256 leaf1,
         uint256 leaf2
     ) public whenTreeNotFull(self) returns (uint256) {
-        uint256 depth = self.depth;
-        uint256 nextIndex = self.nextLeafIndex;
+        uint8 depth = self.depth;
+        uint32 nextIndex = self.nextLeafIndex;
 
         // Index at current level
         uint256 currentLevelIndex = nextIndex / 2;
@@ -139,7 +145,7 @@ library MerkleTreeLogic {
             }
         }
 
-        uint256 newRootIndex = (self.currentRootIndex + 1) % ROOT_HISTORY_SIZE;
+        uint8 newRootIndex = (self.currentRootIndex + 1) % ROOT_HISTORY_SIZE;
         self.currentRootIndex = newRootIndex;
         self.roots[newRootIndex] = currentLevelHash;
 
@@ -154,8 +160,8 @@ library MerkleTreeLogic {
         uint256 leaf3,
         uint256 leaf4
     ) public whenTreeNotFull(self) returns (uint256) {
-        uint256 depth = self.depth;
-        uint256 nextIndex = self.nextLeafIndex;
+        uint8 depth = self.depth;
+        uint32 nextIndex = self.nextLeafIndex;
 
         // Implicitely inserts 2 zero leaf nodes
         if (nextIndex % 4 != 0) {
@@ -189,7 +195,7 @@ library MerkleTreeLogic {
             }
         }
 
-        uint256 newRootIndex = (self.currentRootIndex + 1) % ROOT_HISTORY_SIZE;
+        uint8 newRootIndex = (self.currentRootIndex + 1) % ROOT_HISTORY_SIZE;
         self.currentRootIndex = newRootIndex;
         self.roots[newRootIndex] = currentLevelHash;
 
@@ -204,8 +210,8 @@ library MerkleTreeLogic {
         if (_root == 0) {
             return false;
         }
-        uint256 _currentRootIndex = self.currentRootIndex;
-        uint256 i = _currentRootIndex; // currentRootIndex -> 0
+        uint8 _currentRootIndex = self.currentRootIndex;
+        uint8 i = _currentRootIndex; // currentRootIndex -> 0
         do {
             if (_root == self.roots[i]) {
                 return true;

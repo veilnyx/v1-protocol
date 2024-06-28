@@ -78,7 +78,7 @@ export const getSDKInstance = () => {
     isActive: true,
   });
 
-  zkfi.getFeeEstimate = async () => BigInt(parseEther("0.001"));
+  zkfi.getPaymasterFee = async () => BigInt(parseEther("0.001"));
 
   return zkfi;
 };

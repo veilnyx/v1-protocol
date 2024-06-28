@@ -29,8 +29,8 @@ contract MockPool is
     using ZTransactionLogic for ZTransaction;
 
     function initialize(
-        uint256 addressTreeDepth,
-        uint256 commitmentTreeDepth,
+        uint8 addressTreeDepth,
+        uint8 commitmentTreeDepth,
         address verifier_,
         address adaptorHandler_
     ) external initializer {
