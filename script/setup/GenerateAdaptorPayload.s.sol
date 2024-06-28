@@ -11,7 +11,7 @@ import {Pool} from "src/core/Pool.sol";
 contract GenerateAdaptorPayload is Script {
     function run() external pure returns (bytes memory) {
         bytes memory swapOutPayloadForConvertZTx = abi.encode(
-            uint24(65538), // USDC
+            uint24(65540), // USDC
             address(0), // beneficiary: Any EVM address or address(0) which will send out tokens to AdaptorHandler.sol. Then the AdaptorHandler.sol transfers them to the Pool.
             uint256(0) // minOut (for uniswap slippage protection, set to 0 for now)
         );

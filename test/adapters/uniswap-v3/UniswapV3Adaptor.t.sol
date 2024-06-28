@@ -3,24 +3,20 @@ pragma solidity 0.8.24;
 pragma abicoder v2;
 
 import {BaseScript} from "script/BaseScript.sol";
-import {BaseTest} from "test/fixtures/BaseTest.t.sol";
+import {PoolTest} from "test/fixtures/PoolTest.t.sol";
 import {Pool} from "src/core/Pool.sol";
-import {Paymaster} from "src/core/Paymaster.sol";
-import {ZkFiDeploy} from "script/deploy/ZkFi.s.sol";
 import {ZTransaction} from "src/libraries/ZTransaction.sol";
 import {UniswapV3Adapter} from "src/adaptors/uniswap-v3/UniswapV3Adapter.sol";
 import {IWToken} from "src/interfaces/IWToken.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {Asset} from "src/libraries/Asset.sol";
+import {Asset, AssetType} from "src/libraries/Asset.sol";
 import {console} from "forge-std/console.sol";
 
-contract UniswapV3AdaptorTest is BaseTest, BaseScript {
-    error CheckChainAssetConfig();
+contract UniswapV3AdaptorTest is PoolTest, BaseScript {
+    error CheckChainConfig();
 
-    Pool pool;
     UniswapV3Adapter uniswapV3Adapter;
     address uniswapSwapRouter02;
-    Paymaster paymaster;
     address public WETH;
     address public USDC;
     IWToken public iWETH;
@@ -29,54 +25,68 @@ contract UniswapV3AdaptorTest is BaseTest, BaseScript {
     address public user = 0x689EcF264657302052c3dfBD631e4c20d3ED0baB;
 
     function setUp() external {
-        if (!shouldTestRun()) return;
+        require(shouldTestRun(), "UniswapV3AdaptorTest: Chain not supported");
+        _initFixture();
+
         WETH = _config.initAssetAddresses()[0];
         if (WETH == address(0)) {
-            revert CheckChainAssetConfig();
+            revert CheckChainConfig();
         }
         USDC = _config.initAssetAddresses()[1];
         if (USDC == address(0)) {
-            revert CheckChainAssetConfig();
+            revert CheckChainConfig();
+        }
+
+        uniswapSwapRouter02 = _config.uniswapSwapRouter02();
+        if (uniswapSwapRouter02 == address(0)) {
+            revert CheckChainConfig();
         }
 
         iWETH = IWToken(WETH);
-        ZkFiDeploy zkFiDeployer = new ZkFiDeploy();
-        (pool, uniswapSwapRouter02) = zkFiDeployer.run();
 
+        // deploying Uniswap adaptor
         uniswapV3Adapter = new UniswapV3Adapter(
             uniswapSwapRouter02,
             address(pool)
         );
-
         console.log("Uniswap adaptor:", address(uniswapV3Adapter));
 
         // TODO: Use a cheat code for Uni adp. address for consistency
         address poolOwner = pool.owner();
-        vm.prank(poolOwner);
+        vm.startPrank(poolOwner);
         pool.addAdaptorSupport(address(uniswapV3Adapter), true);
+
+        AssetType assetType = AssetType.ERC20;
+        address[] memory assetAddresses = new address[](2);
+        assetAddresses[0] = WETH;
+        assetAddresses[1] = USDC;
+        pool.addAssets(assetType, assetAddresses);
+        vm.stopPrank();
 
         vm.deal(user, INITIAL_SUPPLY * 2);
         vm.startPrank(user);
         iWETH.deposit{value: INITIAL_SUPPLY}();
         iWETH.approve(address(pool), INITIAL_SUPPLY);
-        ZTransaction memory ztxWethDeposit = _loadZTx("deposit_1_weth");
+        ZTransaction memory ztxWethDeposit = _loadZTx(
+            "deposit_1_original_weth"
+        );
         pool.transact(ztxWethDeposit);
         vm.stopPrank();
     }
 
     function testUniswapZkFiAdaptorDeploy() external view {
-        if (!shouldTestRun()) return;
         assert(address(uniswapV3Adapter) != address(0));
     }
 
     function testWethToUSDCSwapToPool() public /* zkFiSetup */ {
-        if (!shouldTestRun()) return;
         console.log("Initiating WETH<>USDC swap");
         uint256 poolUSDCBalBeforeConvert = IERC20(USDC).balanceOf(
             address(pool)
         );
 
-        ZTransaction memory ztxDeposit = _loadZTx("swap_1e16_weth_to_usdc");
+        ZTransaction memory ztxDeposit = _loadZTx(
+            "swap_1e16_orig_weth_to_usdc"
+        );
         pool.transact(ztxDeposit);
 
         // Asserts
@@ -86,15 +96,15 @@ contract UniswapV3AdaptorTest is BaseTest, BaseScript {
         assert(poolUSDCBalPostConvert > poolUSDCBalBeforeConvert);
     }
 
-    function testWethToUSDCSwapToPoolViaBundler() public /* zkFiSetup */ {
-        if (!shouldTestRun()) return;
+
+    function testWethToUSDCSwapToPoolViaBundler() public {
         console.log("Initiating WETH<>USDC swap");
         uint256 poolUSDCBalBeforeConvert = IERC20(USDC).balanceOf(
             address(pool)
         );
 
         ZTransaction memory ztxDeposit = _loadZTx(
-            "swap_1e16_weth_to_usdc_via_bundler"
+            "swap_1e16_orig_weth_to_usdc_via_bundler"
         );
         pool.transact(ztxDeposit);
 
@@ -138,7 +148,7 @@ contract UniswapV3AdaptorTest is BaseTest, BaseScript {
     //     uint256 userUSDCBalBeforeConvert = IERC20(USDC).balanceOf(user);
 
     //     ZTransaction memory ztxDeposit = _loadZTx(
-    //         "swap_1e16_weth_to_usdc"
+    //         "swap_1e16_orig_weth_to_usdc"
     //     );
     //     pool.transact(ztxDeposit);
 

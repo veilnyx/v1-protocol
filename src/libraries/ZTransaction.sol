@@ -9,8 +9,6 @@ import {IAdaptorHandler} from "../interfaces/IAdaptorHandler.sol";
 import {Asset, AssetLogic} from "./Asset.sol";
 import {MerkleTree, MerkleTreeLogic} from "./MerkleTree.sol";
 
-import {console2} from "forge-std/console2.sol";
-
 /// @title ZTransactionType enum representing types of shielded transactions
 enum ZTransactionType {
     DEPOSIT,
@@ -32,7 +30,6 @@ struct RevokerData {
     bool isActive;
     uint256[2] revokerPublicKey;
     uint256[2] encryptionPublicKey;
-    bytes metadata;
 }
 
 /// @title ZTransaction struct representing shielded transaction

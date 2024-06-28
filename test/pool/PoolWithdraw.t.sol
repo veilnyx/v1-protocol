@@ -14,6 +14,11 @@ contract PoolWithdrawTest is PoolTest {
     Pool internal _pool;
     ZTransaction withdrawZTx;
     PoolTransactTest poolTransactTestHelper;
+    uint256 defaultFeeValue = 0.001 ether;
+    address withdrawerUsedInZTxFixture =
+        0x855511cc3694f64379908437D6D64458dC76D024;
+    address paymasterUsedInZTxFixture =
+        0xFEFcc139ED357999ED60C6a013947328d52e7D97;
 
     function setUp() public {
         _initFixture();
@@ -64,6 +69,25 @@ contract PoolWithdrawTest is PoolTest {
         uint256 balance1 = token1.balanceOf(address(pool));
         pool.transact(withdrawZTx);
         assertEq(token1.balanceOf(address(pool)), balance1 - 500 ether);
+    }
+
+    function test_assetBalPostWithdrawWithFee() public {
+        // setup
+        uint256 balance1 = token1.balanceOf(address(pool));
+        
+        ZTransaction memory withdrawZTxWithFee = _loadZTx(
+            "withdraw_500_weth_with_weth_fee"
+        );
+        // transferring fees to pool
+        _mintAsset(asset1, address(this), defaultFeeValue);
+        token1.transfer(address(pool), defaultFeeValue);
+
+        // action
+        pool.transact(withdrawZTxWithFee);
+        
+        // assertion
+        uint256 expectedPoolBal = (balance1 - 500 ether) + defaultFeeValue; // should retain the paymaster fee
+        assertEq(token1.balanceOf(address(pool)), expectedPoolBal);
     }
 
     function test_revertOnDoubleSpend() external {

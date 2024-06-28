@@ -91,8 +91,7 @@ contract Pool is
             id: id,
             isActive: true,
             revokerPublicKey: revokerPublicKey,
-            encryptionPublicKey: encryptionPublicKey,
-            metadata: revokerMetadata
+            encryptionPublicKey: encryptionPublicKey
         });
 
         _revokers[id] = revokerData;
