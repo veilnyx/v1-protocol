@@ -210,7 +210,7 @@ library ZTransactionLogic {
         return verifierCallData;
     }
 
-     /////////////////////////////////////////
+    /////////////////////////////////////////
     //         INTERNAL METHODS            //
     ////////////////////////////////////////
 
@@ -263,7 +263,7 @@ library ZTransactionLogic {
         _checkAndMarkNullifiers(markedNullifiers, ztx.nullifiers);
     }
 
-      function _emitReceipt(
+    function _emitReceipt(
         ZTransaction memory ztx,
         uint256 lastLeafIdx
     ) internal {
@@ -361,7 +361,6 @@ library ZTransactionLogic {
         mapping(address => mapping(uint24 => uint256)) storage paymasterFees
     ) internal {
         uint256 feeValue = uint256(uint96(ztx.feeData));
-        console.log("Fee value:", feeValue);
         if (feeValue != 0) {
             address paymaster = address(bytes20(bytes32(ztx.feeData)));
             paymasterFees[paymaster][ztx.pubAssetIds[0]] += feeValue;

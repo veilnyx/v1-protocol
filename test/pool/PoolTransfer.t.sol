@@ -21,7 +21,7 @@ contract PoolTransferTest is PoolTest {
         _mintAsset(asset2, address(this), INITIAL_DEPOSIT);
 
         ZTransaction memory initialDepositZTrxn = _loadZTx(
-            "deposit_1000_weth_without_fee"
+            "deposit_1000_weth_usdc_without_fee"
         ); // deposit setup
 
         transferZTx = _loadZTx("transfer_500_weth_without_fee"); // actual ztx to test

@@ -9,7 +9,7 @@ import {MockERC20} from "test/mocks/MockERC20.sol";
 import {MockAttacker} from "test/mocks/MockAttacker.t.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-contract PoolDepositTest is PoolTest {
+contract PoolReentrancyTest is PoolTest {
     ZTransaction attackerWithdrawZtx;
     PoolTransactTest poolTransactTestHelper;
     MockAttacker attacker;
@@ -21,7 +21,7 @@ contract PoolDepositTest is PoolTest {
         _approveAsset(asset1, address(pool), INITIAL_DEPOSIT);
 
         ZTransaction memory bulkDepositZtx = _loadZTx(
-            "deposit_1000_weth_without_fee"
+            "deposit_1000_weth_usdc_without_fee"
         );
         pool.transact(bulkDepositZtx);
 

@@ -18,13 +18,6 @@ contract PoolDepositTest is PoolTest {
         _mintAsset(asset1, address(this), INITIAL_DEPOSIT);
         _mintAsset(asset2, address(this), INITIAL_DEPOSIT);
 
-        /**
-        // running the js-ffi `getBalances` script
-        string[] memory shellScripts = new string[](1);
-        shellScripts[0] = "script/shell/genFixtures.sh";
-        vm.ffi(shellScripts);
-        */
-
         depositZTx = _loadZTx("deposit_1000_weth_usdc_without_fee");
         poolTransactTestHelper = new PoolTransactTest(
             depositZTx,
@@ -42,15 +35,6 @@ contract PoolDepositTest is PoolTest {
         _approveAsset(asset1, address(pool), INITIAL_DEPOSIT);
         _approveAsset(asset2, address(pool), 1000e6);
         pool.transact(depositZTx);
-
-        /**
-        string memory path = string.concat(
-            vm.projectRoot(),
-            ("/test/fixtures/balances.txt")
-        );
-        string memory balanceFile = vm.readFile(path);
-        console.log("Read bal:", balanceFile);
-         */
 
         assertEq(token1.balanceOf(address(pool)), balance1 + INITIAL_DEPOSIT);
         assertEq(token2.balanceOf(address(pool)), balance2 + 1000e6); // USDC is 6 decimals

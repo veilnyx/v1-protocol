@@ -89,16 +89,7 @@ const withdrawReqs = {
     to: "0xbE5c5b64F8Fd981d7A896ECA561220062317Faa9",
     viaBundler: false,
     paymaster: zeroAddress,
-  },
-  withdraw_500_weth_without_fee: {
-    type: TransactionType.WITHDRAW,
-    assetIds: [wethAssetId],
-    values: [parseEther("500")],
-    feeAssetId: 0,
-    to: withdrawAddress,
-    viaBundler: false,
-    paymaster: zeroAddress,
-  },
+  },*/
   withdraw_500_weth_with_weth_fee: {
     type: TransactionType.WITHDRAW,
     assetIds: [wethAssetId],
@@ -107,7 +98,18 @@ const withdrawReqs = {
     to: withdrawAddress,
     viaBundler: true,
     paymaster: paymasterAddress,
-  }, */
+    revokerId: 0,
+  }, 
+  withdraw_500_weth_without_fee: {
+    type: TransactionType.WITHDRAW,
+    assetIds: [wethAssetId],
+    values: [parseEther("500")],
+    feeAssetId: 0,
+    to: withdrawAddress,
+    viaBundler: false,
+    paymaster: zeroAddress,
+    revokerId: 0,
+  },
   withdraw_1_weth_with_fee: {
     type: TransactionType.WITHDRAW,
     assetIds: [wethAssetId],
@@ -121,7 +123,6 @@ const withdrawReqs = {
 };
 
 const transferReqs = {
-  /**
   transfer_500_weth_without_fee: {
     type: TransactionType.TRANSFER,
     assetIds: [wethAssetId],
@@ -130,6 +131,7 @@ const transferReqs = {
     to: receiverAccount.shieldedAddress.pack(),
     viaBundler: false,
     paymaster: zeroAddress,
+    revokerId: 0,
   },
   transfer_500_weth_with_weth_fee: {
     type: TransactionType.TRANSFER,
@@ -139,8 +141,8 @@ const transferReqs = {
     to: receiverAccount.shieldedAddress.pack(),
     viaBundler: true,
     paymaster: paymasterAddress,
+    revokerId: 0,
   },
-  */
   transfer_1_weth_without_fee: {
     type: TransactionType.TRANSFER,
     assetIds: [wethAssetId],
@@ -216,20 +218,16 @@ async function main() {
 
   // Pre-deposit 1000 token of assets - 0x010001 and 0x010002
   const depositName = "deposit_1000_weth_usdc_without_fee";
-  // const depositName = "deposit_1_weth";
   await createMockZTx(depositName, depositReqs[depositName], zkfi);
   await mockNotes(depositName, zkfi);
 
-  const withdrawName = "withdraw_1_weth_with_fee";
-  await createMockZTx(withdrawName, withdrawReqs[withdrawName], zkfi);
-  // await mockNotes(depositName, zkfi);
-
-  // const reqs = {
-  //   ...withdrawReqs,
-  // };
-  // for (const [name, req] of Object.entries(reqs)) {
-  //   await createMockZTx(name, req as any, zkfi);
-  // }
+  const reqs = {
+    ...withdrawReqs,
+    ...transferReqs,
+  };
+  for (const [name, req] of Object.entries(reqs)) {
+    await createMockZTx(name, req as any, zkfi);
+  }
 }
 
 main()

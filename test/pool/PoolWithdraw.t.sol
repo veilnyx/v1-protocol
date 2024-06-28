@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {Test} from "forge-std/Test.sol";
+import {Test, console} from "forge-std/Test.sol";
 import {console2} from "forge-std/console2.sol";
 import {IPool} from "src/interfaces/IPool.sol";
 import {Pool} from "src/core/Pool.sol";
@@ -20,10 +20,10 @@ contract PoolWithdrawTest is PoolTest {
         _mintAsset(asset1, address(this), INITIAL_DEPOSIT);
         _mintAsset(asset2, address(this), INITIAL_DEPOSIT);
 
-        // running the js-ffi `getBalances` script
         /**
+        // running the js-ffi `getBalances` script
         string memory depositFixture = vm.readFile(
-            "test/fixtures/ztx/deposit_1000_weth_without_fee"
+            "test/fixtures/ztx/deposit_1000_weth_usdc_without_fee"
         );
 
         string memory withdrawFixture = vm.readFile(
@@ -34,14 +34,15 @@ contract PoolWithdrawTest is PoolTest {
             bytes(depositFixture).length == 0 ||
             bytes(withdrawFixture).length == 0
         ) {
+            console.log("Generating zTx fixtures");
             string[] memory shellScripts = new string[](1);
-            shellScripts[0] = "script/shell/genFixtures.sh";
+            shellScripts[0] = "script/genFixtures.sh";
             vm.ffi(shellScripts);
         }
          */
 
         ZTransaction memory initialDepositZTrxn = _loadZTx(
-            "deposit_1000_weth_without_fee"
+            "deposit_1000_weth_usdc_without_fee"
         ); // deposit setup
 
         withdrawZTx = _loadZTx("withdraw_500_weth_without_fee"); // actual ztx to test
