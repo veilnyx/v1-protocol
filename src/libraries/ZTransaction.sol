@@ -136,7 +136,6 @@ library ZTransactionLogic {
     /// @param paymasterFees Mapping of paymaster address to assetId to fee value
     function execute(
         ZTransaction calldata ztx,
-        MerkleTree storage addressTree,
         MerkleTree storage commitmentTree,
         mapping(uint24 => Asset) storage assets,
         address adaptorHandler,

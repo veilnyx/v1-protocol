@@ -152,7 +152,7 @@ contract Pool is
             commitmentTree: _commitmentTree,
             supportedAdaptors: _adaptors,
             markedNullifiers: _markedNullifiers,
-            revokers: _revokers,
+            revokerDataMap: _revokers,
             verifier: verifier
         });
 
