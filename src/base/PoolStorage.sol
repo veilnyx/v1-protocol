@@ -6,10 +6,6 @@ import {Asset, AssetType} from "../libraries/Asset.sol";
 import {RevokerData} from "../libraries/ZTransaction.sol";
 
 abstract contract PoolStorage {
-    uint256 public constant FIELD_SIZE =
-        21888242871839275222246405745257275088548364400416034343698204186575808495617;
-    uint256 public constant ZERO_LEAF = uint256(keccak256("zkFi")) % FIELD_SIZE;
-
     address public verifier;
     address public adaptorHandler;
     address public sanctionScreener;
@@ -30,5 +26,6 @@ abstract contract PoolStorage {
     uint16 internal _revokerCount;
     mapping(uint256 => RevokerData) internal _revokers;
 
-    mapping(address paymaster => mapping(uint24 assetId => uint256 feeAmount)) internal _paymasterFees;
+    mapping(address paymaster => mapping(uint24 assetId => uint256 feeAmount))
+        internal _paymasterFees;
 }
