@@ -94,6 +94,8 @@ interface IPool {
 
     function transact(ZTransaction memory ztx) external;
 
+    function withdrawPaymasterFee(uint24 assetId) external;
+
     /////////////////////////////////////////
     //         READ METHODS                //
     ////////////////////////////////////////
@@ -114,6 +116,11 @@ interface IPool {
         address assetAddress
     ) external view returns (Asset memory);
 
+    function getPaymasterFee(
+        uint24 assertId,
+        address paymaster
+    ) external view returns (uint256);
+
     function getRevokerData(
         uint256 revokerId
     ) external view returns (RevokerData memory);
@@ -128,16 +135,26 @@ interface IPool {
 
     function getCommitmentTreeDepth() external view returns (uint256);
 
+    function getAddressTreeDepth() external view returns (uint256);
+
     function getCommitmentTreeNextLeafIndex() external view returns (uint256);
 
+    function getAddressTreeNextLeafIndex() external view returns (uint256);
+
     function getCommitmentTreeLastRoot() external view returns (uint256);
+
+    function getAddressTreeLastRoot() external view returns (uint256);
 
     function getCommitmentTreeCurrentRootIndex()
         external
         view
         returns (uint256);
 
-    function getAddressTreeDepth() external view returns (uint256);
+    function getAddressTreeCurrentRootIndex() external view returns (uint256);
 
-    function isKnownRoot(uint256 root) external view returns (bool);
+    function isKnownCommitmentTreeRoot(
+        uint256 root
+    ) external view returns (bool);
+
+    function isKnownAddressTreeRoot(uint256 root) external view returns (bool);
 }

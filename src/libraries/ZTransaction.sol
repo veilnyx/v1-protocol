@@ -128,6 +128,53 @@ library ZTransactionLogic {
         return txHash;
     }
 
+    ///@notice Validates a shielded transaction
+    /// @param ztx ZTransaction to be executed
+    /// @param addressTree Address `MerkleTree` state in this contract
+    /// @param commitmentTree Commitment `MerkleTree` state in this contract
+    /// @param supportedAdaptors Mapping of supported external adaptor addresses
+    /// @param markedNullifiers Mapping of nullifiers that are already marked
+    function validate(
+        ZTransaction calldata ztx,
+        MerkleTree storage addressTree,
+        MerkleTree storage commitmentTree,
+        mapping(address => bool) storage supportedAdaptors,
+        mapping(uint256 => bool) storage markedNullifiers,
+        mapping(uint256 => RevokerData) storage revokerDataMap,
+        address verifier
+    ) external {
+        RevokerData memory revokerData = revokerDataMap[ztx.revokerId];
+
+        if (!revokerData.isActive) {
+            revert IPool.InvalidRevoker(ztx.revokerId);
+        }
+
+        if (!addressTree.isKnownRoot(ztx.addressTreeRoot)) {
+            // TODO: reintroduce this check
+            // revert IPool.UnknownAddressTreeRoot();
+        }
+
+        // Check recent merkle root
+        if (!commitmentTree.isKnownRoot(ztx.commitmentTreeRoot)) {
+            revert IPool.UnknownCommitmentTreeRoot();
+        }
+
+        if (
+            ztx.txType == ZTransactionType.CONVERT &&
+            !supportedAdaptors[address(bytes20(ztx.targetData))]
+        ) {
+            revert IPool.UnsupportedAdaptor();
+        }
+
+        // Verify ZK proof
+        if (!_verifyProof(ztx, revokerData, verifier)) {
+            revert IPool.InvalidProof();
+        }
+
+        // Check double spend and mark nullifiers
+        _checkAndMarkNullifiers(markedNullifiers, ztx.nullifiers);
+    }
+
     /// @notice Executes a shielded transaction
     /// @param ztx ZTransaction to be executed
     /// @param commitmentTree Commitment `MerkleTree` state in this contract
@@ -138,8 +185,8 @@ library ZTransactionLogic {
         ZTransaction calldata ztx,
         MerkleTree storage commitmentTree,
         mapping(uint24 => Asset) storage assets,
-        address adaptorHandler,
-        mapping(address => mapping(uint24 => uint256)) storage paymasterFees
+        mapping(address => mapping(uint24 => uint256)) storage paymasterFees,
+        address adaptorHandler
     ) external {
         Params memory params = _copyParamsToMemory(ztx);
         MemoParams memory memoParams = _copyMemoParamsToMemory(ztx);
@@ -319,53 +366,6 @@ library ZTransactionLogic {
                 ++i;
             }
         }
-    }
-
-    ///@notice Validates a shielded transaction
-    /// @param ztx ZTransaction to be executed
-    /// @param addressTree Address `MerkleTree` state in this contract
-    /// @param commitmentTree Commitment `MerkleTree` state in this contract
-    /// @param supportedAdaptors Mapping of supported external adaptor addresses
-    /// @param markedNullifiers Mapping of nullifiers that are already marked
-    function _validateTransaction(
-        ZTransaction calldata ztx,
-        MerkleTree storage addressTree,
-        MerkleTree storage commitmentTree,
-        mapping(address => bool) storage supportedAdaptors,
-        mapping(uint256 => bool) storage markedNullifiers,
-        mapping(uint256 => RevokerData) storage revokerDataMap,
-        address verifier
-    ) internal {
-        RevokerData memory revokerData = revokerDataMap[ztx.revokerId];
-
-        if (!revokerData.isActive) {
-            revert IPool.InvalidRevoker(ztx.revokerId);
-        }
-
-        if (!addressTree.isKnownRoot(ztx.addressTreeRoot)) {
-            // TODO: reintroduce this check
-            // revert IPool.UnknownAddressTreeRoot();
-        }
-
-        // Check recent merkle root
-        if (!commitmentTree.isKnownRoot(ztx.commitmentTreeRoot)) {
-            revert IPool.UnknownCommitmentTreeRoot();
-        }
-
-        if (
-            ztx.txType == ZTransactionType.CONVERT &&
-            !supportedAdaptors[address(bytes20(ztx.targetData))]
-        ) {
-            revert IPool.UnsupportedAdaptor();
-        }
-
-        // Verify ZK proof
-        if (!_verifyProof(ztx, revokerData, verifier)) {
-            revert IPool.InvalidProof();
-        }
-
-        // Check double spend and mark nullifiers
-        _checkAndMarkNullifiers(markedNullifiers, ztx.nullifiers);
     }
 
     function _verifyProof(
