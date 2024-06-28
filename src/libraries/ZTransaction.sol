@@ -32,7 +32,6 @@ struct RevokerData {
     bool isActive;
     uint256[2] revokerPublicKey;
     uint256[2] encryptionPublicKey;
-    bytes metadata;
 }
 
 /// @title ZTransaction struct representing shielded transaction
@@ -150,8 +149,7 @@ library ZTransactionLogic {
         }
 
         if (!addressTree.isKnownRoot(ztx.addressTreeRoot)) {
-            // TODO: reintroduce this check
-            // revert IPool.UnknownAddressTreeRoot();
+            revert IPool.UnknownAddressTreeRoot();
         }
 
         // Check recent merkle root
