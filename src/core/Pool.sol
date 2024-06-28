@@ -147,8 +147,7 @@ contract Pool is
     function transact(
         ZTransaction calldata ztx
     ) external nonReentrant whenNotPaused {
-        uint256 gasLeftBeforeExecution = gasleft();
-        ztx._validateTransaction({
+        ztx.validate({
             addressTree: _addressTree,
             commitmentTree: _commitmentTree,
             supportedAdaptors: _adaptors,
@@ -160,18 +159,12 @@ contract Pool is
         ztx.execute({
             commitmentTree: _commitmentTree,
             assets: _assets,
-            adaptorHandler: adaptorHandler,
-            paymasterFees: _paymasterFees
+            paymasterFees: _paymasterFees,
+            adaptorHandler: adaptorHandler
         });
-
-        uint256 gasLeftAfterExecution = gasleft();
-        console2.log(
-            "Gas used:",
-            gasLeftBeforeExecution - gasLeftAfterExecution
-        );
     }
 
-    function claimPaymasterFeeCollected(
+    function withdrawPaymasterFee(
         uint24 assetId
     ) external nonReentrant whenNotPaused {
         address paymaster = msg.sender;
@@ -187,10 +180,6 @@ contract Pool is
             assetId: assetId,
             value: fee
         });
-    }
-
-    function getPaymasterFee(uint24 assertId) external view returns (uint256) {
-        return _paymasterFees[msg.sender][assertId];
     }
 
     /////////////////////////////////////////
@@ -237,6 +226,13 @@ contract Pool is
         return _assets[id];
     }
 
+    function getPaymasterFee(
+        uint24 assertId,
+        address paymaster
+    ) external view returns (uint256) {
+        return _paymasterFees[paymaster][assertId];
+    }
+
     function isAdaptorSupported(
         address adaptorAddress
     ) external view returns (bool) {
@@ -268,12 +264,24 @@ contract Pool is
         return _commitmentTree.depth;
     }
 
+    function getAddressTreeDepth() external view returns (uint256) {
+        return _addressTree.depth;
+    }
+
     function getCommitmentTreeNextLeafIndex() external view returns (uint256) {
         return _commitmentTree.nextLeafIndex;
     }
 
+    function getAddressTreeNextLeafIndex() external view returns (uint256) {
+        return _addressTree.nextLeafIndex;
+    }
+
     function getCommitmentTreeLastRoot() external view returns (uint256) {
         return _commitmentTree.roots[_commitmentTree.currentRootIndex];
+    }
+
+    function getAddressTreeLastRoot() external view returns (uint256) {
+        return _addressTree.roots[_addressTree.currentRootIndex];
     }
 
     function getCommitmentTreeCurrentRootIndex()
@@ -284,12 +292,18 @@ contract Pool is
         return _commitmentTree.currentRootIndex;
     }
 
-    function getAddressTreeDepth() external view returns (uint256) {
-        return _addressTree.depth;
+    function getAddressTreeCurrentRootIndex() external view returns (uint256) {
+        return _addressTree.currentRootIndex;
     }
 
-    function isKnownRoot(uint256 root) external view returns (bool) {
+    function isKnownCommitmentTreeRoot(
+        uint256 root
+    ) external view returns (bool) {
         return _commitmentTree.isKnownRoot(root);
+    }
+
+    function isKnownAddressTreeRoot(uint256 root) external view returns (bool) {
+        return _addressTree.isKnownRoot(root);
     }
 
     function _authorizeUpgrade(
