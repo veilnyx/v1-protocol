@@ -16,6 +16,7 @@ import {PoolStorage} from "../base/PoolStorage.sol";
 import {Asset, AssetType, AssetLogic} from "../libraries/Asset.sol";
 import {ZTransaction, ZTransactionLogic, RevokerData} from "../libraries/ZTransaction.sol";
 import {MerkleTree, MerkleTreeLogic} from "../libraries/MerkleTree.sol";
+import {console2} from "forge-std/console2.sol";
 
 contract Pool is
     IPool,
@@ -147,6 +148,7 @@ contract Pool is
     function transact(
         ZTransaction calldata ztx
     ) external nonReentrant whenNotPaused {
+        uint256 gasLeftBeforeExecution = gasleft();
         ztx._validateTransaction({
             addressTree: _addressTree,
             commitmentTree: _commitmentTree,
@@ -162,6 +164,12 @@ contract Pool is
             adaptorHandler: adaptorHandler,
             paymasterFees: _paymasterFees
         });
+
+        uint256 gasLeftAfterExecution = gasleft();
+        console2.log(
+            "Gas used:",
+            gasLeftBeforeExecution - gasLeftAfterExecution
+        );
     }
 
     function claimPaymasterFeeCollected(
