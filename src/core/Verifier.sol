@@ -7,8 +7,8 @@ import {MerkleTree} from "../libraries/MerkleTree.sol";
 
 struct VerifierInfo {
     uint16 id;
-    address addr;
     bytes4 selector;
+    address addr;
 }
 
 contract Verifier is IVerifier {
@@ -30,20 +30,18 @@ contract Verifier is IVerifier {
     }
 
     function verifyTransactionProof(
-        ZTransaction memory ztx,
-        RevokerData memory cKeys
+        uint16 vId,
+        bytes calldata vParams
     ) public view returns (bool) {
-        VerifierInfo memory vInfo = getVerifier(
-            ztx.nullifiers.length,
-            ztx.commitments.length
-        );
+        VerifierInfo memory vInfo = verifiers[vId];
 
         if (vInfo.addr == address(0)) {
             revert("Verifier: verifier not found");
         }
 
-        bytes memory vInp = ztx.toVerifierInput(cKeys, vInfo.selector);
-        (bool success, bytes memory result) = vInfo.addr.staticcall(vInp);
+        (bool success, bytes memory result) = vInfo.addr.staticcall(
+            bytes.concat(vInfo.selector, vParams)
+        );
 
         if (!success) {
             revert("Verification call failed");
@@ -52,17 +50,14 @@ contract Verifier is IVerifier {
         return uint8(result[31]) == 1;
     }
 
-    function getVerifier(
-        uint256 nIns,
-        uint256 nOuts
-    ) public view returns (VerifierInfo memory) {
-        return verifiers[getVerifierId(nIns, nOuts)];
+    function getVerifier(uint16 vId) public view returns (VerifierInfo memory) {
+        return verifiers[vId];
     }
 
     function getVerifierId(
         uint256 nIns,
         uint256 nOuts
-    ) public pure returns (uint256 id) {
-        return nIns * 10 + nOuts;
+    ) public pure returns (uint16 id) {
+        return uint16(nIns * 10 + nOuts);
     }
 }

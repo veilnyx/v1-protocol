@@ -7,19 +7,30 @@ import {IAdaptorHandler} from "../interfaces/IAdaptorHandler.sol";
 import {IAdaptor} from "../interfaces/IAdaptor.sol";
 import {IPool} from "../interfaces/IPool.sol";
 import {Asset, AssetType} from "../libraries/Asset.sol";
+import {PubAsset} from "../libraries/ZTransaction.sol";
 
 contract AdaptorHandler is IAdaptorHandler {
     using SafeERC20 for IERC20;
 
     function handleAdaptor(
         address target,
-        uint24[] calldata inAssetIds,
-        uint256[] calldata inValues,
+        PubAsset[] calldata pubAssets,
         bytes calldata targetPayload
-    ) external payable returns (uint24[] memory, uint256[] memory) {
+    ) external payable returns (PubAsset[] memory) {
+        uint24[] memory inAssetIds = new uint24[](pubAssets.length);
+        uint256[] memory inValues = new uint256[](pubAssets.length);
+        for (uint8 i = 0; i < pubAssets.length; ) {
+            inAssetIds[i] = pubAssets[i].id;
+            inValues[i] = pubAssets[i].value;
+
+            unchecked {
+                ++i;
+            }
+        }
+
         (bool success, bytes memory res) = target.delegatecall(
             abi.encodeCall(
-                IAdaptor.adaptorConnect,
+                IAdaptor.handleAssets,
                 (inAssetIds, inValues, targetPayload)
             )
         );
@@ -33,6 +44,9 @@ contract AdaptorHandler is IAdaptorHandler {
 
         Asset memory asset;
         uint256 assetBalance;
+
+        PubAsset[] memory outPubAssets = new PubAsset[](outAssetIds.length);
+
         for (uint8 i = 0; i < outAssetIds.length; ) {
             asset = IPool(msg.sender).getAsset(outAssetIds[i]);
 
@@ -51,11 +65,13 @@ contract AdaptorHandler is IAdaptorHandler {
 
             IERC20(asset.assetAddress).forceApprove(msg.sender, outValues[i]);
 
+            outPubAssets[i] = PubAsset(outAssetIds[i], uint224(outValues[i]));
+
             unchecked {
                 ++i;
             }
         }
 
-        return (outAssetIds, outValues);
+        return outPubAssets;
     }
 }

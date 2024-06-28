@@ -7,12 +7,12 @@ interface IVerifier {
     error BadArguments();
 
     function verifyTransactionProof(
-        ZTransaction memory ztx,
-        RevokerData memory cKeys
+        uint16 vId,
+        bytes memory vInp
     ) external view returns (bool);
 
     function getVerifierId(
         uint256 nIns,
         uint256 nOuts
-    ) external pure returns (uint256 id);
+    ) external pure returns (uint16 id);
 }

@@ -4,12 +4,12 @@ pragma solidity ^0.8.24;
 import {PoseidonT4} from "poseidon-solidity/PoseidonT4.sol";
 import {IPool} from "../interfaces/IPool.sol";
 import {IVerifier} from "../interfaces/IVerifier.sol";
-import {Verifier} from "../core/Verifier.sol";
 import {FIELD_SIZE} from "../core/Constants.sol";
 import {IAdaptorHandler} from "../interfaces/IAdaptorHandler.sol";
 import {Asset, AssetLogic} from "./Asset.sol";
 import {MerkleTree, MerkleTreeLogic} from "./MerkleTree.sol";
-import {console} from "forge-std/Test.sol";
+
+import {console2} from "forge-std/console2.sol";
 
 /// @title ZTransactionType enum representing types of shielded transactions
 enum ZTransactionType {
@@ -63,17 +63,40 @@ struct ZTransaction {
     uint256 addressTreeRoot;
     uint256 commitmentTreeRoot;
     uint256 feeData;
-    bytes proof;
-    // bytes complianceData; // revokerId + complianceMemo
-    uint24[] pubAssetIds; // First index is always fee asset
-    uint256[] pubValues;
+    uint248[] pubAssets; // (assetId + value)[]
     uint256[] nullifiers;
     uint256[] commitments;
+    bytes proof;
     bytes[] noteMemos;
     bytes assetMemo;
     bytes complianceMemo;
     bytes targetData; // target address + payload
     bytes refundData; // refund address + memo
+}
+
+struct PubAsset {
+    uint24 id;
+    uint224 value;
+}
+
+struct Params {
+    ZTransactionType txType;
+    uint16 revokerId;
+    uint24 feeAssetId;
+    uint96 feeValue;
+    address paymaster;
+    address target;
+    PubAsset[] pubAssets;
+    uint256 refundAddress;
+    bytes targetPayload;
+}
+
+struct MemoParams {
+    uint256[] commitments;
+    bytes[] noteMemos;
+    bytes complianceMemo;
+    bytes assetMemo;
+    bytes refundAddressMemo;
 }
 
 /// @title ZTransactionLogic library for shielded transaction logic
@@ -88,20 +111,21 @@ library ZTransactionLogic {
     /// @param self ZTransaction
     /// @return Hash of the transaction
     function hash(ZTransaction memory self) public pure returns (uint256) {
-        return
-            uint256(
-                keccak256(
-                    abi.encode(
-                        self.txType,
-                        self.feeData,
-                        self.nullifiers,
-                        self.noteMemos,
-                        self.assetMemo,
-                        self.targetData,
-                        self.refundData
-                    )
+        uint256 txHash = uint256(
+            keccak256(
+                abi.encode(
+                    self.txType,
+                    self.feeData,
+                    self.nullifiers,
+                    self.noteMemos,
+                    self.assetMemo,
+                    self.targetData,
+                    self.refundData
                 )
-            ) % FIELD_SIZE;
+            )
+        ) % FIELD_SIZE;
+
+        return txHash;
     }
 
     /// @notice Executes a shielded transaction
@@ -111,63 +135,61 @@ library ZTransactionLogic {
     /// @param adaptorHandler Address of the adaptor handler contract responsible for handling DeFi adaptor ops
     /// @param paymasterFees Mapping of paymaster address to assetId to fee value
     function execute(
-        ZTransaction memory ztx,
+        ZTransaction calldata ztx,
+        MerkleTree storage addressTree,
         MerkleTree storage commitmentTree,
         mapping(uint24 => Asset) storage assets,
         address adaptorHandler,
         mapping(address => mapping(uint24 => uint256)) storage paymasterFees
     ) external {
-        // Transfer any fees
-        _transferFee(ztx, paymasterFees);
+        Params memory params = _copyParamsToMemory(ztx);
+        MemoParams memory memoParams = _copyMemoParamsToMemory(ztx);
+
+        // Transfer paymaster fees
+        _transferPaymasterFee(paymasterFees, params);
 
         // Receive any deposits
         if (ztx.txType == ZTransactionType.DEPOSIT) {
-            _receiveAssetsFrom(
-                assets,
-                msg.sender,
-                ztx.pubAssetIds,
-                ztx.pubValues
-            );
+            _receivePubAssets(assets, params.pubAssets, msg.sender);
         }
 
         // Transfer any withdrawals
         if (ztx.txType == ZTransactionType.WITHDRAW) {
-            _transferToExceptFee(assets, address(bytes20(ztx.targetData)), ztx);
+            _transferPubAssets(assets, params.pubAssets, params.target);
         }
 
         // Perform any conversions
         if (ztx.txType == ZTransactionType.CONVERT) {
-            _transferToExceptFee(assets, adaptorHandler, ztx);
-            _convert(assets, adaptorHandler, ztx);
+            _transferPubAssets(assets, params.pubAssets, adaptorHandler);
+            _handleAdaptor(assets, adaptorHandler, params, memoParams);
         }
 
-        uint256 lastLeafIndex = _mintNotes(
-            commitmentTree,
-            ztx.commitments
-            // ztx.noteMemos
-        );
-
-        _emitReceipt(ztx, lastLeafIndex);
+        _printNotes(commitmentTree, params, memoParams);
     }
 
     /**
      *
      * @param self ZTransaction to convert to a proper verifier input
      * @param revokerData The RevokerData used for this transaction
-     * @param selector Selector of verifier contract
      * @return Calldata bytes for appropriate verifier contract
      * @dev We divide the public inputs into 2 chunks to avoid stack too deep error
      */
     function toVerifierInput(
-        ZTransaction memory self,
-        RevokerData memory revokerData,
-        bytes4 selector
+        ZTransaction calldata self,
+        RevokerData memory revokerData
     ) public pure returns (bytes memory) {
         bytes memory pubDataChunk1;
         {
             uint256 nOuts = self.commitments.length;
-            uint256 nPubs = self.pubAssetIds.length;
-            uint256[] memory zeros = new uint256[](nOuts - nPubs);
+            uint256 nPubs = self.pubAssets.length;
+            bytes memory padZeroBytes = new bytes((nOuts - nPubs) * 32);
+
+            uint256[] memory pubAssetIds = new uint256[](nPubs);
+            uint256[] memory pubValues = new uint256[](nPubs);
+            for (uint8 i; i < nPubs; ++i) {
+                pubAssetIds[i] = uint24(bytes3(bytes31(self.pubAssets[i])));
+                pubValues[i] = uint224(self.pubAssets[i]);
+            }
 
             pubDataChunk1 = abi.encodePacked(
                 self.addressTreeRoot,
@@ -176,10 +198,10 @@ library ZTransactionLogic {
                 self.txType == ZTransactionType.DEPOSIT
                     ? uint256(0)
                     : uint256(1),
-                self.pubAssetIds,
-                zeros,
-                self.pubValues,
-                zeros
+                pubAssetIds,
+                padZeroBytes,
+                pubValues,
+                padZeroBytes
             );
         }
 
@@ -187,8 +209,8 @@ library ZTransactionLogic {
         {
             pubDataChunk2 = abi.encodePacked(
                 abi.encodePacked(self.nullifiers),
-                bytes32(revokerData.revokerPublicKey[0]),
-                bytes32(revokerData.revokerPublicKey[1]),
+                revokerData.revokerPublicKey[0],
+                revokerData.revokerPublicKey[1],
                 abi.encodePacked(self.commitments),
                 bytes32(self.refundData),
                 revokerData.encryptionPublicKey[0],
@@ -197,39 +219,125 @@ library ZTransactionLogic {
             );
         }
 
-        bytes memory verifierCallData = abi.encodePacked(
-            // Verifier's `verifyProof` selector
-            selector,
-            // Proof
+        bytes memory verifierParams = abi.encodePacked(
             self.proof,
-            // Public inputs
             pubDataChunk1,
             pubDataChunk2
         );
 
-        return verifierCallData;
+        return verifierParams;
     }
 
-    /////////////////////////////////////////
-    //         INTERNAL METHODS            //
-    ////////////////////////////////////////
+    function _handleAdaptor(
+        mapping(uint24 => Asset) storage assets,
+        address adaptorHandler,
+        Params memory params,
+        MemoParams memory memoParams
+    ) internal {
+        PubAsset[] memory outPubAssets = IAdaptorHandler(adaptorHandler)
+            .handleAdaptor(
+                params.target,
+                params.pubAssets,
+                params.targetPayload
+            );
 
-    /// @notice Validates a shielded transaction
+        _receivePubAssets(assets, outPubAssets, adaptorHandler);
+
+        uint256 outLen = outPubAssets.length;
+
+        uint256[] memory pubCms = new uint256[](outLen);
+        bytes[] memory pubMemos = new bytes[](outLen);
+
+        for (uint8 i = 0; i < outLen; ++i) {
+            pubCms[i] = PoseidonT4.hash(
+                [
+                    outPubAssets[i].id,
+                    params.refundAddress,
+                    outPubAssets[i].value
+                ]
+            );
+            pubMemos[i] = abi.encodePacked(
+                MemoType.SEMI,
+                outPubAssets[i].id,
+                params.refundAddress,
+                outPubAssets[i].value,
+                memoParams.refundAddressMemo
+            );
+        }
+
+        memoParams.commitments = _concat(memoParams.commitments, pubCms);
+        memoParams.noteMemos = _concat(memoParams.noteMemos, pubMemos);
+    }
+
+    function _transferPaymasterFee(
+        mapping(address => mapping(uint24 => uint256)) storage paymasterFees,
+        Params memory params
+    ) internal {
+        uint256 feeValue = params.feeValue;
+
+        if (feeValue != 0) {
+            paymasterFees[params.paymaster][params.feeAssetId] += feeValue;
+        }
+    }
+
+    function _receivePubAssets(
+        mapping(uint24 => Asset) storage assets,
+        PubAsset[] memory pubAssets,
+        address from
+    ) internal {
+        uint256 count = pubAssets.length;
+
+        for (uint8 i = 0; i < count; ) {
+            AssetLogic.receiveAsset({
+                assets: assets,
+                from: from,
+                assetId: pubAssets[i].id,
+                value: pubAssets[i].value
+            });
+
+            unchecked {
+                ++i;
+            }
+        }
+    }
+
+    function _transferPubAssets(
+        mapping(uint24 => Asset) storage assets,
+        PubAsset[] memory pubAssets,
+        address to
+    ) internal {
+        uint256 count = pubAssets.length;
+
+        for (uint8 i = 0; i < count; ) {
+            AssetLogic.transferAsset({
+                assets: assets,
+                to: to,
+                assetId: pubAssets[i].id,
+                value: pubAssets[i].value
+            });
+
+            unchecked {
+                ++i;
+            }
+        }
+    }
+
+    ///@notice Validates a shielded transaction
     /// @param ztx ZTransaction to be executed
     /// @param addressTree Address `MerkleTree` state in this contract
     /// @param commitmentTree Commitment `MerkleTree` state in this contract
     /// @param supportedAdaptors Mapping of supported external adaptor addresses
     /// @param markedNullifiers Mapping of nullifiers that are already marked
     function _validateTransaction(
-        ZTransaction memory ztx,
+        ZTransaction calldata ztx,
         MerkleTree storage addressTree,
         MerkleTree storage commitmentTree,
         mapping(address => bool) storage supportedAdaptors,
         mapping(uint256 => bool) storage markedNullifiers,
-        mapping(uint256 => RevokerData) storage revokers,
+        mapping(uint256 => RevokerData) storage revokerDataMap,
         address verifier
     ) internal {
-        RevokerData memory revokerData = revokers[ztx.revokerId];
+        RevokerData memory revokerData = revokerDataMap[ztx.revokerId];
 
         if (!revokerData.isActive) {
             revert IPool.InvalidRevoker(ztx.revokerId);
@@ -237,8 +345,6 @@ library ZTransactionLogic {
 
         if (!addressTree.isKnownRoot(ztx.addressTreeRoot)) {
             // TODO: reintroduce this check
-            // console2.log("ztx.addressTreeRoot", ztx.addressTreeRoot);
-            // console2.log("addressTreeRoot", addressTree.getMerkleRoot(1));
             // revert IPool.UnknownAddressTreeRoot();
         }
 
@@ -255,7 +361,7 @@ library ZTransactionLogic {
         }
 
         // Verify ZK proof
-        if (!Verifier(verifier).verifyTransactionProof(ztx, revokerData)) {
+        if (!_verifyProof(ztx, revokerData, verifier)) {
             revert IPool.InvalidProof();
         }
 
@@ -263,161 +369,17 @@ library ZTransactionLogic {
         _checkAndMarkNullifiers(markedNullifiers, ztx.nullifiers);
     }
 
-    function _emitReceipt(
-        ZTransaction memory ztx,
-        uint256 lastLeafIdx
-    ) internal {
-        bytes memory assetMemo;
-        if (ztx.txType == ZTransactionType.TRANSFER) {
-            // Encrypted transacted assets
-            assetMemo = ztx.assetMemo;
-        } else {
-            // Publicly transacted assets
-            bytes32 asset;
-            for (uint8 i = 0; i < ztx.pubAssetIds.length; ) {
-                // Asset value is assumed to be 28 bytes max
-                asset = bytes31(
-                    bytes.concat(
-                        bytes3(ztx.pubAssetIds[i]),
-                        bytes28(bytes32(ztx.pubValues[i]))
-                    )
-                );
-                assetMemo = abi.encodePacked(assetMemo, asset);
-                unchecked {
-                    ++i;
-                }
-            }
-        }
-
-        emit IPool.Receipt(
-            ztx.txType,
-            ztx.revokerId,
-            uint32(lastLeafIdx),
-            address(bytes20(ztx.targetData)),
-            ztx.feeData,
-            assetMemo,
-            ztx.complianceMemo,
-            ztx.noteMemos
+    function _verifyProof(
+        ZTransaction calldata ztx,
+        RevokerData memory revokerData,
+        address verifier
+    ) internal view returns (bool) {
+        uint16 vId = IVerifier(verifier).getVerifierId(
+            ztx.nullifiers.length,
+            ztx.commitments.length
         );
-    }
-
-    function _convert(
-        mapping(uint24 => Asset) storage assets,
-        address adaptorHandler,
-        ZTransaction memory ztx
-    ) internal {
-        (
-            uint24[] memory outAssetIds,
-            uint256[] memory outValues
-        ) = IAdaptorHandler(adaptorHandler).handleAdaptor(
-                address(bytes20(ztx.targetData)),
-                ztx.pubAssetIds,
-                ztx.pubValues,
-                ztx.targetData
-            );
-
-        _receiveAssetsFrom(assets, adaptorHandler, outAssetIds, outValues);
-
-        uint256 cmLen = ztx.commitments.length;
-        uint256 outLen = outAssetIds.length;
-        uint256 newCmLen = cmLen + outLen;
-
-        uint256[] memory newCommitments = new uint256[](newCmLen);
-        bytes[] memory newMemos = new bytes[](newCmLen);
-
-        for (uint8 i = 0; i < cmLen; ) {
-            newCommitments[i] = ztx.commitments[i];
-            newMemos[i] = ztx.noteMemos[i];
-
-            unchecked {
-                ++i;
-            }
-        }
-
-        uint256 refundAddr = uint256(bytes32(ztx.refundData));
-        for (uint8 i = 0; i < outLen; ) {
-            newCommitments[i + cmLen] = PoseidonT4.hash(
-                [outAssetIds[i], refundAddr, outValues[i]]
-            );
-            newMemos[i + cmLen] = abi.encodePacked(
-                MemoType.SEMI,
-                outAssetIds[i],
-                refundAddr,
-                outValues[i],
-                ztx.refundData
-            );
-
-            unchecked {
-                ++i;
-            }
-        }
-
-        ztx.commitments = newCommitments;
-        ztx.noteMemos = newMemos;
-    }
-
-    function _transferFee(
-        ZTransaction memory ztx,
-        mapping(address => mapping(uint24 => uint256)) storage paymasterFees
-    ) internal {
-        uint256 feeValue = uint256(uint96(ztx.feeData));
-        if (feeValue != 0) {
-            address paymaster = address(bytes20(bytes32(ztx.feeData)));
-            paymasterFees[paymaster][ztx.pubAssetIds[0]] += feeValue;
-        }
-    }
-
-    function _transferToExceptFee(
-        mapping(uint24 => Asset) storage assets,
-        address to,
-        ZTransaction memory ztx
-    ) internal {
-        uint256 pubAssetCount = ztx.pubAssetIds.length;
-        uint256 feeValue = uint256(uint96(ztx.feeData));
-        ztx.pubValues[0] = ztx.pubValues[0] - feeValue;
-
-        if (ztx.pubValues[0] != 0) {
-            AssetLogic.transferAsset({
-                assets: assets,
-                to: to,
-                assetId: ztx.pubAssetIds[0],
-                value: ztx.pubValues[0]
-            });
-        }
-
-        for (uint8 i = 1; i < pubAssetCount; ) {
-            AssetLogic.transferAsset({
-                assets: assets,
-                to: to,
-                assetId: ztx.pubAssetIds[i],
-                value: ztx.pubValues[i]
-            });
-
-            unchecked {
-                ++i;
-            }
-        }
-    }
-
-    function _receiveAssetsFrom(
-        mapping(uint24 => Asset) storage assets,
-        address from,
-        uint24[] memory assetIds,
-        uint256[] memory values
-    ) internal {
-        uint256 count = assetIds.length;
-        for (uint8 i = 0; i < count; ) {
-            AssetLogic.receiveAsset({
-                assets: assets,
-                from: from,
-                assetId: assetIds[i],
-                value: values[i]
-            });
-
-            unchecked {
-                ++i;
-            }
-        }
+        bytes memory vInp = toVerifierInput(ztx, revokerData);
+        return IVerifier(verifier).verifyTransactionProof(vId, vInp);
     }
 
     /// @dev This also prevents any duplicate nullifiers
@@ -439,31 +401,134 @@ library ZTransactionLogic {
         }
     }
 
-    function _mintNotes(
+    function _printNotes(
         MerkleTree storage tree,
-        uint256[] memory commitments
-    )
-        internal
-        returns (
-            // bytes[] memory outMemos
-            uint256
-        )
-    {
-        uint256 nextIndex = MerkleTreeLogic.insert(tree, commitments);
-        uint256 cmLen = commitments.length;
+        Params memory params,
+        MemoParams memory memoParams
+    ) internal {
+        uint256 numCommitments = memoParams.commitments.length;
+        uint256 nextIndex = MerkleTreeLogic.insert(
+            tree,
+            memoParams.commitments
+        );
 
-        for (uint256 i = 0; i < cmLen; ) {
-            // emit IPool.Announcement(
-            //     nextIndex - cmLen + i,
-            //     commitments[i],
-            //     outMemos[i]
-            // );
-            emit IPool.Commitment(nextIndex - cmLen + i, commitments[i]);
+        for (uint8 i = 0; i < numCommitments; ++i) {
+            emit IPool.Commitment(
+                nextIndex - numCommitments + i,
+                memoParams.commitments[i]
+            );
+        }
+
+        emit IPool.Receipt(
+            params.txType,
+            params.revokerId,
+            uint32(nextIndex - 1),
+            params.target,
+            params.feeAssetId,
+            params.feeValue,
+            params.paymaster,
+            memoParams.assetMemo,
+            memoParams.complianceMemo,
+            memoParams.noteMemos
+        );
+    }
+
+    function _copyParamsToMemory(
+        ZTransaction calldata ztx
+    ) internal pure returns (Params memory) {
+        Params memory params;
+        uint256 pubLen = ztx.pubAssets.length;
+
+        params.pubAssets = new PubAsset[](pubLen);
+        for (uint8 i = 0; i < pubLen; ++i) {
+            // Extract first 3 bytes assetId
+            params.pubAssets[i].id = uint24(bytes3(bytes31(ztx.pubAssets[i])));
+            // Extract last 28 bytes value
+            params.pubAssets[i].value = uint224(ztx.pubAssets[i]);
+        }
+
+        if (pubLen != 0) {
+            params.feeAssetId = params.pubAssets[0].id;
+            params.feeValue = uint96(ztx.feeData);
+            params.paymaster = address(bytes20(bytes32(ztx.feeData)));
+            params.pubAssets[0].value =
+                params.pubAssets[0].value -
+                params.feeValue;
+        }
+
+        params.txType = ztx.txType;
+        params.revokerId = ztx.revokerId;
+        params.target = address(bytes20(ztx.targetData));
+        if (params.target != address(0)) {
+            params.targetPayload = bytes(ztx.targetData[20:]);
+        }
+
+        if (ztx.txType == ZTransactionType.CONVERT) {
+            params.refundAddress = uint256(bytes32(ztx.refundData));
+        }
+
+        return params;
+    }
+
+    function _copyMemoParamsToMemory(
+        ZTransaction calldata ztx
+    ) internal pure returns (MemoParams memory) {
+        MemoParams memory memoParams;
+
+        memoParams.commitments = ztx.commitments;
+        memoParams.noteMemos = ztx.noteMemos;
+        memoParams.complianceMemo = ztx.complianceMemo;
+
+        if (ztx.txType == ZTransactionType.TRANSFER) {
+            memoParams.assetMemo = ztx.assetMemo;
+        } else {
+            memoParams.assetMemo = abi.encodePacked(ztx.pubAssets);
+        }
+
+        if (ztx.txType == ZTransactionType.CONVERT) {
+            memoParams.refundAddressMemo = ztx.refundData[32:];
+        }
+
+        return memoParams;
+    }
+
+    function _concat(
+        uint256[] memory a,
+        uint256[] memory b
+    ) internal pure returns (uint256[] memory) {
+        uint256[] memory result = new uint256[](a.length + b.length);
+        for (uint8 i = 0; i < a.length; ) {
+            result[i] = a[i];
             unchecked {
                 ++i;
             }
         }
+        for (uint8 i = 0; i < b.length; ) {
+            result[a.length + i] = b[i];
+            unchecked {
+                ++i;
+            }
+        }
+        return result;
+    }
 
-        return nextIndex - 1;
+    function _concat(
+        bytes[] memory a,
+        bytes[] memory b
+    ) internal pure returns (bytes[] memory) {
+        bytes[] memory result = new bytes[](a.length + b.length);
+        for (uint8 i = 0; i < a.length; ) {
+            result[i] = a[i];
+            unchecked {
+                ++i;
+            }
+        }
+        for (uint8 i = 0; i < b.length; ) {
+            result[a.length + i] = b[i];
+            unchecked {
+                ++i;
+            }
+        }
+        return result;
     }
 }

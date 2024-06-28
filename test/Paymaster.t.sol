@@ -78,8 +78,8 @@ contract PaymasterTest is PoolTest {
         ZTransaction memory ztx;
         PackedUserOperation memory userOp;
 
-        ztx.pubAssetIds = new uint24[](1);
-        ztx.pubAssetIds[0] = defaultAssetId;
+        // ztx.pubAssetIds = new uint24[](1);
+        // ztx.pubAssetIds[0] = defaultAssetId;
         ztx.feeData = uint256(
             bytes32(
                 bytes.concat(

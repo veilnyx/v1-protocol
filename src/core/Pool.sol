@@ -61,7 +61,7 @@ contract Pool is
 
     function addAssets(
         AssetType assetType,
-        address[] memory assetAddresses
+        address[] calldata assetAddresses
     ) external onlyOwner {
         _assetCounts[assetType] = AssetLogic.addAssets({
             assetIds: _assetIds,
@@ -145,7 +145,7 @@ contract Pool is
     }
 
     function transact(
-        ZTransaction memory ztx
+        ZTransaction calldata ztx
     ) external nonReentrant whenNotPaused {
         ztx._validateTransaction({
             addressTree: _addressTree,
@@ -193,8 +193,13 @@ contract Pool is
     function verifyTransactionProof(
         ZTransaction calldata ztx
     ) external view returns (bool) {
-        RevokerData memory cKeys = _revokers[ztx.revokerId];
-        return IVerifier(verifier).verifyTransactionProof(ztx, cKeys);
+        RevokerData memory revokerData = _revokers[ztx.revokerId];
+        uint16 vId = IVerifier(verifier).getVerifierId(
+            ztx.nullifiers.length,
+            ztx.commitments.length
+        );
+        bytes memory vParams = ztx.toVerifierInput(revokerData);
+        return IVerifier(verifier).verifyTransactionProof(vId, vParams);
     }
 
     function getRevokerData(

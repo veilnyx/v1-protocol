@@ -3,7 +3,7 @@ pragma solidity ^0.8.24;
 
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import { AdaptorBase } from "src/base/AdaptorBase.sol";
+import {AdaptorBase} from "src/base/AdaptorBase.sol";
 import {Asset, AssetType} from "src/libraries/Asset.sol";
 import {ISwapRouter02} from "./ISwapRouter02.sol";
 import {console} from "forge-std/Test.sol";
@@ -23,7 +23,7 @@ contract UniswapV3Adapter is AdaptorBase {
     }
 
     /// @dev Will be called by the zkFi AdaptorHandler.sol to execute the swap.
-    function adaptorConnect(
+    function handleAssets(
         uint24[] calldata inAssetIds,
         uint256[] calldata inValues,
         bytes calldata payload

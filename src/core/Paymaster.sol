@@ -167,7 +167,7 @@ contract Paymaster is IPaymaster, Ownable {
             (ZTransaction)
         );
 
-        uint24 feeAssetId = ztx.pubAssetIds[0];
+        uint24 feeAssetId = uint24(ztx.pubAssets[0]);
         uint256 feeValue = uint256(uint96(ztx.feeData));
         address paymaster = address(bytes20(bytes32(ztx.feeData)));
 
