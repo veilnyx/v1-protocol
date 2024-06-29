@@ -129,7 +129,7 @@ contract PaymasterTest is PoolTest {
         pool.transact(withdrawZTx);
 
         vm.startPrank(address(paymaster));
-        pool.withdrawPaymasterFee(defaultAssetId);
+        pool.withdrawPaymasterFee(defaultAssetId, address(paymaster));
 
         assertEq(pool.getPaymasterFee(defaultAssetId, address(paymaster)), 0);
         assertEq(token1.balanceOf(address(paymaster)), defaultFeeValue);
