@@ -77,7 +77,7 @@ contract PoolTransferTest is PoolTest {
         vm.expectRevert(
             abi.encodeWithSelector(
                 IPool.DoubleSpend.selector,
-                transferZTx.nullifiers[0]
+                transferZTx.nullifiers[1]
             )
         );
         pool.transact(transferZTx);

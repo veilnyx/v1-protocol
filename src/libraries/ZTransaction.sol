@@ -138,7 +138,7 @@ library ZTransactionLogic {
         mapping(address => bool) storage supportedAdaptors,
         mapping(uint256 => RevokerData) storage revokerDataMap,
         address verifier
-    ) view external {
+    ) external view {
         RevokerData memory revokerData = revokerDataMap[ztx.revokerId];
 
         if (!revokerData.isActive) {
@@ -146,10 +146,9 @@ library ZTransactionLogic {
         }
 
         if (!addressTree.isKnownRoot(ztx.addressTreeRoot)) {
-            // revert IPool.UnknownAddressTreeRoot();
+            revert IPool.UnknownAddressTreeRoot();
         }
 
-        // Check recent merkle root
         if (!commitmentTree.isKnownRoot(ztx.commitmentTreeRoot)) {
             revert IPool.UnknownCommitmentTreeRoot();
         }
@@ -205,8 +204,8 @@ library ZTransactionLogic {
         }
 
         _printNotes(commitmentTree, params, memoParams);
-         
-         // Check double spend and mark nullifiers
+
+        // Check double spend and mark nullifiers
         _checkAndMarkNullifiers(
             markedNullifiers,
             ztx.nullifiers,
@@ -392,19 +391,25 @@ library ZTransactionLogic {
             "_checkAndMarkNullifiers::nullifier length:",
             nullifiers.length
         );
-        for (uint256 i = 0; i < nullifiers.length; ) {
-            if (markedNullifiers[nullifiers[i]] > 0) {
-                revert IPool.DoubleSpend(nullifiers[i]);
+        for (uint8 i = uint8(nullifiers.length); i > 0; ) {
+            uint8 index = i - 1;
+
+            if (markedNullifiers[nullifiers[index]] > 0) {
+                revert IPool.DoubleSpend(nullifiers[index]);
             }
 
-            markedNullifiers[nullifiers[i]] = currentLeafIndex;
-            currentLeafIndex--;
+            markedNullifiers[nullifiers[index]] = currentLeafIndex;
+            --currentLeafIndex;
+            emit IPool.NullifierMarked(nullifiers[index]);
 
-            console2.log("NullifierMarked:", nullifiers[i], markedNullifiers[nullifiers[i]]);
-            emit IPool.NullifierMarked(nullifiers[i]);
+            console2.log(
+                "NullifierMarked:",
+                nullifiers[index],
+                markedNullifiers[nullifiers[index]]
+            );
 
             unchecked {
-                ++i;
+                --i;
             }
         }
     }

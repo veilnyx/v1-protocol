@@ -30,8 +30,8 @@ const receiverAccount = ShieldedAccount.generate(
 );
 const withdrawAddress = sliceHex(keccak256(stringToBytes("withdraw")), 0, 20);
 const paymasterAddress = sliceHex(keccak256(stringToBytes("paymaster")), 0, 20);
-console.log("Withdraw address:", withdrawAddress);
-console.log("Paymaster address:", paymasterAddress);
+// console.log("Withdraw address:", withdrawAddress);
+// console.log("Paymaster address:", paymasterAddress);
 
 const mockWethAssetId = 0x010001;
 const mockUsdcAssetId = 0x010002;
@@ -246,12 +246,12 @@ async function main() {
   await createMockZTx(depositName, depositReqs[depositName], zkfi);
   await mockNotes(depositName, zkfi);
 
-  // const reqs = {
-  //   ...withdrawReqs,
-  // };
-  // for (const [name, req] of Object.entries(reqs)) {
-  //   await createMockZTx(name, req as any, zkfi);
-  // }
+  const reqs = {
+    ...withdrawReqs,
+  };
+  for (const [name, req] of Object.entries(reqs)) {
+    await createMockZTx(name, req as any, zkfi);
+  }
 }
 
 main()

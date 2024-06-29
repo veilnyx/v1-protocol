@@ -42,9 +42,9 @@ contract PoolTransactTest is Test {
     }
 
     function test_nullifiersMarked() public {
-        for (uint256 i = 0; i < ztx.nullifiers.length; i++) {
+        for (uint256 i = ztx.nullifiers.length; i > 0; i--) {
             vm.expectEmit(true, true, true, true);
-            emit IPool.NullifierMarked(ztx.nullifiers[i]);
+            emit IPool.NullifierMarked(ztx.nullifiers[i - 1]);
         }
 
         pool.transact(ztx);

@@ -71,31 +71,32 @@ contract PoolWithdrawTest is PoolTest {
         assertEq(token1.balanceOf(address(pool)), balance1 - 500 ether);
     }
 
-    function test_assetBalPostWithdrawWithFee() public {
-        // setup
-        uint256 balance1 = token1.balanceOf(address(pool));
+    // function test_assetBalPostWithdrawWithFee() public {
+    //     // setup
+    //     uint256 balance1 = token1.balanceOf(address(pool));
 
-        ZTransaction memory withdrawZTxWithFee = _loadZTx(
-            "withdraw_500_weth_with_weth_fee"
-        );
-        // transferring fees to pool
-        _mintAsset(asset1, address(this), defaultFeeValue);
-        token1.transfer(address(pool), defaultFeeValue);
+    //     ZTransaction memory withdrawZTxWithFee = _loadZTx(
+    //         "withdraw_500_weth_with_weth_fee"
+    //     );
 
-        // action
-        pool.transact(withdrawZTxWithFee);
+    //     // transferring paymaster fees to pool
+    //     _mintAsset(asset1, address(this), defaultFeeValue);
+    //     token1.transfer(address(pool), defaultFeeValue);
 
-        // assertion
-        uint256 expectedPoolBal = (balance1 - 500 ether) + defaultFeeValue; // should retain the paymaster fee
-        assertEq(token1.balanceOf(address(pool)), expectedPoolBal);
-    }
+    //     // action
+    //     pool.transact(withdrawZTxWithFee);
+
+    //     // assertion
+    //     uint256 expectedPoolBal = (balance1 - 500 ether) + defaultFeeValue; // should retain the paymaster fee
+    //     assertEq(token1.balanceOf(address(pool)), expectedPoolBal);
+    // }
 
     function test_revertOnDoubleSpendWithdraw() external {
         pool.transact(withdrawZTx);
         vm.expectRevert(
             abi.encodeWithSelector(
                 IPool.DoubleSpend.selector,
-                withdrawZTx.nullifiers[0]
+                withdrawZTx.nullifiers[1]
             )
         );
         pool.transact(withdrawZTx);

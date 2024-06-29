@@ -53,7 +53,7 @@ contract PoolDepositTest is PoolTest {
         vm.expectRevert(
             abi.encodeWithSelector(
                 IPool.DoubleSpend.selector,
-                depositZTx.nullifiers[0]
+                depositZTx.nullifiers[1]
             )
         );
         pool.transact(depositZTx);
