@@ -16,7 +16,6 @@ import {PoolStorage} from "../base/PoolStorage.sol";
 import {Asset, AssetType, AssetLogic} from "../libraries/Asset.sol";
 import {ZTransaction, ZTransactionLogic, RevokerData} from "../libraries/ZTransaction.sol";
 import {MerkleTree, MerkleTreeLogic} from "../libraries/MerkleTree.sol";
-import {console2} from "forge-std/console2.sol";
 
 contract Pool is
     IPool,
@@ -34,7 +33,8 @@ contract Pool is
         uint8 addressTreeDepth,
         uint8 commitmentTreeDepth,
         address verifier_,
-        address adaptorHandler_
+        address adaptorHandler_,
+        address screener_
     ) external initializer {
         __Ownable_init(msg.sender);
         __UUPSUpgradeable_init();
@@ -43,6 +43,7 @@ contract Pool is
 
         verifier = verifier_;
         adaptorHandler = adaptorHandler_;
+        screener = screener_;
 
         _addressTree.init(addressTreeDepth);
         _commitmentTree.init(commitmentTreeDepth);
@@ -110,8 +111,8 @@ contract Pool is
         emit IPool.RevokerStatusUpdated(id, isActive);
     }
 
-    function setSanctionScreener(address screener) external onlyOwner {
-        sanctionScreener = screener;
+    function setScreener(address screener_) external onlyOwner {
+        screener = screener_;
     }
 
     /////////////////////////////////////////
@@ -286,7 +287,6 @@ contract Pool is
     }
 
     function getAddressTreeLastRoot() external view returns (uint256) {
-        console2.log("currentRootIndex:", _addressTree.currentRootIndex);
         return _addressTree.roots[_addressTree.currentRootIndex];
     }
 

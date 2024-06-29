@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-interface IScreener {
-    error SanctionedAddress(address addr);
+import {ISanctionList} from "./ISanctionList.sol";
 
-    function isSanctioned(address addr) external view returns (bool);
+interface IScreener is ISanctionList {
+    error SanctionedAddress(address addr);
 }

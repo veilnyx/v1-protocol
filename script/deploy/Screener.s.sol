@@ -1,0 +1,12 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.24;
+
+import {Screener} from "src/core/Screener.sol";
+import {BaseScript} from "../BaseScript.sol";
+
+contract ScreenerDeploy is BaseScript {
+    function run() external broadcast {
+        address sanctionList = _config.sanctionList();
+        new Screener(sanctionList);
+    }
+}

@@ -9,6 +9,7 @@ abstract contract PoolStorage {
     address public verifier;
     address public adaptorHandler;
     address public sanctionScreener;
+    address public screener;
 
     MerkleTree internal _addressTree;
     mapping(uint256 => bool) internal _addressRegistered;
@@ -19,7 +20,8 @@ abstract contract PoolStorage {
     mapping(uint24 assetId => Asset asset) _assets;
 
     MerkleTree internal _commitmentTree;
-    mapping(uint256 nullifier => uint256 _commitmentTreeLeafIndex) internal _markedNullifiers;
+    mapping(uint256 nullifier => uint256 _commitmentTreeLeafIndex)
+        internal _markedNullifiers;
 
     mapping(address => bool) internal _adaptors;
 
