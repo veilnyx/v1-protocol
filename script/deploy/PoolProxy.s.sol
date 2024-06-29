@@ -13,8 +13,8 @@ contract PoolProxyDeploy is BaseScript {
         address adaptorHandler = _getContract("AdaptorHandler");
         address poolImpl = _getContract("PoolImpl");
 
-        uint256 addressTreeDepth = _config.addressTreeDepth();
-        uint256 commitmentTreeDepth = _config.commitmentTreeDepth();
+        uint8 addressTreeDepth = _config.addressTreeDepth();
+        uint8 commitmentTreeDepth = _config.commitmentTreeDepth();
         AssetType initAssetType = _config.initAssetType();
         address[] memory initAssetAddresses = _config.initAssetAddresses();
         address sanctionedScreener = _config.sanctionScreener();

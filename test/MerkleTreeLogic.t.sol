@@ -14,8 +14,8 @@ contract MerkleTreeLogicTest is Test {
     BinaryIMTData internal _binaryIMTToCheckCommitmentTreeRoot;
     BinaryIMTData internal _binaryIMTToCheckAddressTreeRoot;
 
-    uint256 public constant commitmentTreeDepth = 20;
-    uint256 public constant addressTreeDepth = 10;
+    uint8 public constant commitmentTreeDepth = 20;
+    uint8 public constant addressTreeDepth = 10;
 
     uint256[] public commitments;
 
@@ -74,7 +74,7 @@ contract MerkleTreeLogicTest is Test {
     ////////////////////////////////////////
 
     function test_revertWhenAddressTreeFull() external {
-        _addressTree.nextLeafIndex = 2 ** addressTreeDepth;
+        _addressTree.nextLeafIndex = uint32(2 ** addressTreeDepth);
         uint256 commitmentLeaf = uint256(keccak256(abi.encode("commitment")));
 
         vm.expectRevert(
@@ -151,7 +151,7 @@ contract MerkleTreeLogicTest is Test {
     ///////////////////////////////////////////
 
     function test_revertWhenCommitmentTreeFull() external {
-        _commitmentTree.nextLeafIndex = 2 ** commitmentTreeDepth;
+        _commitmentTree.nextLeafIndex = uint32(2 ** commitmentTreeDepth);
         uint256 commitmentLeaf = uint256(keccak256(abi.encode("commitment")));
         commitments.push(commitmentLeaf);
 

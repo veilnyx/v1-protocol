@@ -131,7 +131,7 @@ interface IPool {
         uint256[] calldata nullifiers
     ) external view returns (bool[] memory);
 
-    function zeroes(uint256 level) external view returns (uint256);
+    function zeroes(uint8 level) external view returns (uint256);
 
     function getCommitmentTreeDepth() external view returns (uint256);
 

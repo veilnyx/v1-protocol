@@ -31,8 +31,8 @@ contract Pool is
     using ZTransactionLogic for ZTransaction;
 
     function initialize(
-        uint256 addressTreeDepth,
-        uint256 commitmentTreeDepth,
+        uint8 addressTreeDepth,
+        uint8 commitmentTreeDepth,
         address verifier_,
         address adaptorHandler_
     ) external initializer {
@@ -138,10 +138,10 @@ contract Pool is
 
         address sender = ECDSA.recover(msgHash, signature);
 
-        uint256 regIdx = _addressTree.insert(addr);
+        uint256 nextIndex = _addressTree.insert(addr);
         _addressRegistered[addr] = true;
 
-        emit RegisterAddress(sender, addr, regIdx, publicKeys);
+        emit RegisterAddress(sender, addr, nextIndex - 1, publicKeys);
     }
 
     function transact(
@@ -260,7 +260,7 @@ contract Pool is
         return markedArr;
     }
 
-    function zeroes(uint256 level) external view returns (uint256) {
+    function zeroes(uint8 level) external view returns (uint256) {
         return _commitmentTree.zeroes[level];
     }
 
