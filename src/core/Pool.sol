@@ -165,7 +165,8 @@ contract Pool is
     }
 
     function withdrawPaymasterFee(
-        uint24 assetId
+        uint24 assetId,
+        address to
     ) external nonReentrant whenNotPaused {
         address paymaster = msg.sender;
         uint256 fee = _paymasterFees[paymaster][assetId];
@@ -176,7 +177,7 @@ contract Pool is
         _paymasterFees[paymaster][assetId] = 0;
         AssetLogic.transferAsset({
             assets: _assets,
-            to: paymaster,
+            to: to,
             assetId: assetId,
             value: fee
         });

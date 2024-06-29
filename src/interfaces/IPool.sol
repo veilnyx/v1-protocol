@@ -92,9 +92,9 @@ interface IPool {
         bytes calldata signature
     ) external;
 
-    function transact(ZTransaction memory ztx) external;
+    function transact(ZTransaction calldata ztx) external;
 
-    function withdrawPaymasterFee(uint24 assetId) external;
+    function withdrawPaymasterFee(uint24 assetId, address to) external;
 
     /////////////////////////////////////////
     //         READ METHODS                //
