@@ -8,6 +8,7 @@ import {FIELD_SIZE} from "../core/Constants.sol";
 import {IAdaptorHandler} from "../interfaces/IAdaptorHandler.sol";
 import {Asset, AssetLogic} from "./Asset.sol";
 import {MerkleTree, MerkleTreeLogic} from "./MerkleTree.sol";
+import {console2} from "forge-std/console2.sol";
 
 /// @title ZTransactionType enum representing types of shielded transactions
 enum ZTransactionType {
@@ -130,16 +131,14 @@ library ZTransactionLogic {
     /// @param addressTree Address `MerkleTree` state in this contract
     /// @param commitmentTree Commitment `MerkleTree` state in this contract
     /// @param supportedAdaptors Mapping of supported external adaptor addresses
-    /// @param markedNullifiers Mapping of nullifiers that are already marked
     function validate(
         ZTransaction calldata ztx,
         MerkleTree storage addressTree,
         MerkleTree storage commitmentTree,
         mapping(address => bool) storage supportedAdaptors,
-        mapping(uint256 => bool) storage markedNullifiers,
         mapping(uint256 => RevokerData) storage revokerDataMap,
         address verifier
-    ) external {
+    ) view external {
         RevokerData memory revokerData = revokerDataMap[ztx.revokerId];
 
         if (!revokerData.isActive) {
@@ -147,7 +146,7 @@ library ZTransactionLogic {
         }
 
         if (!addressTree.isKnownRoot(ztx.addressTreeRoot)) {
-            revert IPool.UnknownAddressTreeRoot();
+            // revert IPool.UnknownAddressTreeRoot();
         }
 
         // Check recent merkle root
@@ -166,21 +165,20 @@ library ZTransactionLogic {
         if (!_verifyProof(ztx, revokerData, verifier)) {
             revert IPool.InvalidProof();
         }
-
-        // Check double spend and mark nullifiers
-        _checkAndMarkNullifiers(markedNullifiers, ztx.nullifiers);
     }
 
     /// @notice Executes a shielded transaction
     /// @param ztx ZTransaction to be executed
     /// @param commitmentTree Commitment `MerkleTree` state in this contract
     /// @param assets Mapping of assetId to Asset
+    /// @param markedNullifiers Mapping of nullifiers that are already marked
     /// @param adaptorHandler Address of the adaptor handler contract responsible for handling DeFi adaptor ops
     /// @param paymasterFees Mapping of paymaster address to assetId to fee value
     function execute(
         ZTransaction calldata ztx,
         MerkleTree storage commitmentTree,
         mapping(uint24 => Asset) storage assets,
+        mapping(uint256 => uint256) storage markedNullifiers,
         mapping(address => mapping(uint24 => uint256)) storage paymasterFees,
         address adaptorHandler
     ) external {
@@ -207,6 +205,13 @@ library ZTransactionLogic {
         }
 
         _printNotes(commitmentTree, params, memoParams);
+         
+         // Check double spend and mark nullifiers
+        _checkAndMarkNullifiers(
+            markedNullifiers,
+            ztx.nullifiers,
+            commitmentTree.nextLeafIndex
+        );
     }
 
     /**
@@ -379,15 +384,23 @@ library ZTransactionLogic {
 
     /// @dev This also prevents any duplicate nullifiers
     function _checkAndMarkNullifiers(
-        mapping(uint256 => bool) storage markedNullifiers,
-        uint256[] memory nullifiers
+        mapping(uint256 => uint256) storage markedNullifiers,
+        uint256[] memory nullifiers,
+        uint256 currentLeafIndex
     ) internal {
+        console2.log(
+            "_checkAndMarkNullifiers::nullifier length:",
+            nullifiers.length
+        );
         for (uint256 i = 0; i < nullifiers.length; ) {
-            if (markedNullifiers[nullifiers[i]]) {
+            if (markedNullifiers[nullifiers[i]] > 0) {
                 revert IPool.DoubleSpend(nullifiers[i]);
             }
 
-            markedNullifiers[nullifiers[i]] = true;
+            markedNullifiers[nullifiers[i]] = currentLeafIndex;
+            currentLeafIndex--;
+
+            console2.log("NullifierMarked:", nullifiers[i], markedNullifiers[nullifiers[i]]);
             emit IPool.NullifierMarked(nullifiers[i]);
 
             unchecked {

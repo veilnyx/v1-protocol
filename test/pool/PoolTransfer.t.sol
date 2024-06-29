@@ -64,12 +64,15 @@ contract PoolTransferTest is PoolTest {
         pool.transact(transferZTxWithFee);
 
         vm.prank(paymasterUsedInZTxFixture);
-        uint256 paymasterFee = pool.getPaymasterFee(asset1.id);
+        uint256 paymasterFee = pool.getPaymasterFee(
+            asset1.id,
+            paymasterUsedInZTxFixture
+        );
         assertEq(token1.balanceOf(address(pool)), balance1 + paymasterFee);
         assertEq(paymasterFee, defaultFeeValue);
     }
 
-    function test_revertOnDoubleSpend() external {
+    function test_revertOnDoubleSpendTransfer() external {
         pool.transact(transferZTx);
         vm.expectRevert(
             abi.encodeWithSelector(

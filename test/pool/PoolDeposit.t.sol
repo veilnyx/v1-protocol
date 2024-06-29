@@ -40,12 +40,14 @@ contract PoolDepositTest is PoolTest {
         assertEq(token2.balanceOf(address(pool)), balance2 + 1000e6); // USDC is 6 decimals
     }
 
-    function test_revertOnDoubleSpend() external {
+    function test_revertOnDoubleSpendDeposit() external {
         _approveAsset(asset1, address(pool), INITIAL_DEPOSIT);
         _approveAsset(asset2, address(pool), 1000e6);
         pool.transact(depositZTx);
 
         // re-depositing
+        _mintAsset(asset1, address(this), INITIAL_DEPOSIT);
+        _mintAsset(asset2, address(this), INITIAL_DEPOSIT);
         _approveAsset(asset1, address(pool), INITIAL_DEPOSIT);
         _approveAsset(asset2, address(pool), 1000e6);
         vm.expectRevert(

@@ -151,7 +151,6 @@ contract Pool is
             addressTree: _addressTree,
             commitmentTree: _commitmentTree,
             supportedAdaptors: _adaptors,
-            markedNullifiers: _markedNullifiers,
             revokerDataMap: _revokers,
             verifier: verifier
         });
@@ -159,6 +158,7 @@ contract Pool is
         ztx.execute({
             commitmentTree: _commitmentTree,
             assets: _assets,
+            markedNullifiers: _markedNullifiers,
             paymasterFees: _paymasterFees,
             adaptorHandler: adaptorHandler
         });
@@ -240,7 +240,11 @@ contract Pool is
     }
 
     function isMarkedNullifier(uint256 nullifier) external view returns (bool) {
-        return _markedNullifiers[nullifier];
+        if (_markedNullifiers[nullifier] > 0) {
+            return true;
+        } else {
+            return false;
+        }
     }
 
     function areMarkedNullifiers(
@@ -248,7 +252,7 @@ contract Pool is
     ) external view returns (bool[] memory) {
         bool[] memory markedArr = new bool[](nullifiers.length);
         for (uint256 i = 0; i < nullifiers.length; ) {
-            markedArr[i] = _markedNullifiers[nullifiers[i]];
+            markedArr[i] = _markedNullifiers[nullifiers[i]] > 0 ? true : false;
             unchecked {
                 ++i;
             }
@@ -281,6 +285,7 @@ contract Pool is
     }
 
     function getAddressTreeLastRoot() external view returns (uint256) {
+        console2.log("currentRootIndex:", _addressTree.currentRootIndex);
         return _addressTree.roots[_addressTree.currentRootIndex];
     }
 
