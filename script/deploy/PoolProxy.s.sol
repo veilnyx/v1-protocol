@@ -11,15 +11,17 @@ contract PoolProxyDeploy is BaseScript {
     function run() external broadcast {
         address verifier = _getContract("Verifier");
         address adaptorHandler = _getContract("AdaptorHandler");
-        address poolImpl = _getContract("PoolImpl");
         address screener = _getContract("Screener");
         address hasher = _getContract("Hasher");
+        address poolImpl = _getContract("PoolImpl");
 
         uint8 addressTreeDepth = _config.addressTreeDepth();
         uint8 commitmentTreeDepth = _config.commitmentTreeDepth();
         uint256 withdrawFeeBps = _config.withdrawFeeBps();
         AssetType initAssetType = _config.initAssetType();
         address[] memory initAssetAddresses = _config.initAssetAddresses();
+        uint256[2] memory revokerPublicKey = _config.revokerPublicKey();
+        uint256[2] memory encryptionPublicKey = _config.encryptionPublicKey();
 
         bytes memory initializeData = abi.encodeCall(
             Pool.initialize,
@@ -41,5 +43,8 @@ contract PoolProxyDeploy is BaseScript {
         Pool pool = Pool(proxyAddress);
 
         pool.addAssets(initAssetType, initAssetAddresses);
+
+        bytes memory metadata = abi.encode("Test Revoker", "Test Description");
+        pool.registerRevoker(revokerPublicKey, encryptionPublicKey, metadata);
     }
 }
