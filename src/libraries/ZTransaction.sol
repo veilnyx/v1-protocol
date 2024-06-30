@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.24;
 
-import {PoseidonT4} from "poseidon-solidity/PoseidonT4.sol";
 import {IPool} from "../interfaces/IPool.sol";
 import {IVerifier} from "../interfaces/IVerifier.sol";
+import {IHasher} from "../interfaces/IHasher.sol";
 import {FIELD_SIZE} from "../core/Constants.sol";
 import {IAdaptorHandler} from "../interfaces/IAdaptorHandler.sol";
 import {Asset, AssetLogic} from "./Asset.sol";
@@ -25,6 +25,10 @@ enum MemoType {
 }
 
 /// @title RevokerData struct representing revoker details
+/// @param id                   Id of revoker
+/// @param isActive             Flag indicating if revoker is enabled or disabled
+/// @param revokerPublicKey     Public key of revoker
+/// @param encryptionPublicKey  Public key of encryption with this revoker
 struct RevokerData {
     uint16 id;
     bool isActive;
@@ -34,43 +38,43 @@ struct RevokerData {
 
 /// @title ZTransaction struct representing shielded transaction
 ///
-/// @param txType           Type of transaction
-/// @param proof            Abi encoded proof
-/// @param addressTreeRoot          Recent merkle root of address tree
-/// @param commitmentTreeRoot       Recent merkle root of commitment tree
-/// @param pubAssetIds      Asset ids for public asset transfers (if applicable, fee asset is always first)
-/// @param pubValues        Values (in same order of asset ids) for public asset transfers
-/// @param nullifiers       Revealed nullifiers of input/spent notes
-/// @param commitments      New commitments of output notes to be inserted in tree
-/// @param assetMemo        This is empty for non-TRANSFER transactions. For TRANSFER transactions,
-///                         this is encrypted assets using sender's key that were transferred to receiver.
-/// @param noteMemos         Memos for output notes. This is list of encrypted notes' fields.
-/// @param feeData          Packed fee data (20-byte paymaster address + 12-byte fee value)
-/// @param beneficiary      Stealth address for any public fund to shielded account (e.g. in CONVERT type tx)
-/// @param beneficiaryMemo  Memo for beneficiary stealth address. This is encrypted blinding factor which
-///                         is used to generate `beneficiary` stealth address
-/// @param target           This is either a withdraw address in case of `WITHDRAW` transaction or
-///                         a targetted adaptor address in case of `CONVERT` transaction
-/// @param targetPayload    Payload for target contract (if applicable)
-/// @param revokerId        Id of revoker used for this transaction
-/// @param complianceMemo   Encrypted compliance data
+/// @param txType               Type of transaction
+/// @param revokerId            Id of revoker used for this transaction
+/// @param addressTreeRoot      Recent merkle root of address tree
+/// @param commitmentTreeRoot   Recent merkle root of commitment tree
+/// @param feeData              Packed fee data (20-byte paymaster address + 12-byte fee value)
+/// @param pubAssets            Encoded (assetId + value) for publicly spent assets. If applicable, fee asset is
+///                             the first element in this array
+/// @param nullifiers           Revealed nullifiers of input/spent notes
+/// @param commitments          New commitments of output notes to be inserted in tree
+/// @param proof                Abi encoded ZK proof
+/// @param noteMemos            Memos for output notes. This is list of encrypted notes' fields.
+/// @param assetMemo            This is empty for non-TRANSFER transactions. For TRANSFER transactions,
+///                             this is encrypted assets using sender's key that were transferred to receiver.
+/// @param complianceMemo       Encrypted compliance data that was created using compliance encryption key
+/// @param targetData           Target address (first 20-bytes) for withdraw/adapter concatenated with payload
+/// @param refundData           Refund address (first 32-byte) for public deposit to shielded account
+///                             concatenated with refund memo
 struct ZTransaction {
     ZTransactionType txType;
     uint16 revokerId;
     uint256 addressTreeRoot;
     uint256 commitmentTreeRoot;
     uint256 feeData;
-    uint248[] pubAssets; // (assetId + value)[]
+    uint248[] pubAssets;
     uint256[] nullifiers;
     uint256[] commitments;
     bytes proof;
     bytes[] noteMemos;
     bytes assetMemo;
     bytes complianceMemo;
-    bytes targetData; // target address + payload
-    bytes refundData; // refund address + memo
+    bytes targetData;
+    bytes refundData;
 }
 
+/// @title PubAsset struct representing public asset details
+/// @param id     Asset id
+/// @param value  Asset value
 struct PubAsset {
     uint24 id;
     uint224 value;
@@ -180,6 +184,7 @@ library ZTransactionLogic {
         mapping(uint24 => Asset) storage assets,
         mapping(address => mapping(uint24 => uint256)) storage paymasterFees,
         mapping(uint24 => uint256) storage withdrawFees,
+        address hasher,
         address adaptorHandler,
         uint256 withdrawFeeBps
     ) external {
@@ -214,7 +219,7 @@ library ZTransactionLogic {
                 adaptorHandler,
                 0
             );
-            _handleAdaptor(assets, adaptorHandler, params, memoParams);
+            _handleAdaptor(assets, hasher, adaptorHandler, params, memoParams);
         }
 
         _printNotes(commitmentTree, params, memoParams);
@@ -283,6 +288,7 @@ library ZTransactionLogic {
 
     function _handleAdaptor(
         mapping(uint24 => Asset) storage assets,
+        address hasher,
         address adaptorHandler,
         Params memory params,
         MemoParams memory memoParams
@@ -302,7 +308,7 @@ library ZTransactionLogic {
         bytes[] memory pubMemos = new bytes[](outLen);
 
         for (uint8 i = 0; i < outLen; ++i) {
-            pubCms[i] = PoseidonT4.hash(
+            pubCms[i] = IHasher(hasher).hash(
                 [
                     outPubAssets[i].id,
                     params.refundAddress,

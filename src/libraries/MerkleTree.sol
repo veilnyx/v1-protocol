@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.18;
 
-import {PoseidonT3} from "poseidon-solidity/PoseidonT3.sol";
-import {PoseidonT2} from "poseidon-solidity/PoseidonT2.sol";
+import {IHasher} from "../interfaces/IHasher.sol";
 import {FIELD_SIZE, ZERO_LEAF} from "../core/Constants.sol";
 
 struct MerkleTree {
@@ -10,6 +9,7 @@ struct MerkleTree {
     uint8 currentRootIndex;
     uint32 nextLeafIndex;
     uint40 capacity;
+    address hasher;
     mapping(uint8 => uint256) roots;
     mapping(uint8 => uint256) zeroes;
     mapping(uint8 => uint256) lastSubtrees;
@@ -27,15 +27,16 @@ library MerkleTreeLogic {
         _;
     }
 
-    function init(MerkleTree storage self, uint8 depth) public {
+    function init(MerkleTree storage self, uint8 depth, address hasher) public {
         self.depth = depth;
+        self.hasher = hasher;
         self.capacity = uint32(2 ** depth);
 
         uint256 zero = ZERO_LEAF;
         for (uint8 i = 0; i < depth; ) {
             self.zeroes[i] = zero;
             self.lastSubtrees[i] = zero;
-            zero = hashLeaves(zero, zero);
+            zero = IHasher(hasher).hash([zero, zero]);
 
             unchecked {
                 ++i;
@@ -65,10 +66,11 @@ library MerkleTreeLogic {
     }
 
     function hashLeaves(
+        MerkleTree storage self,
         uint256 leaf1,
         uint256 leaf2
-    ) public pure returns (uint256) {
-        return PoseidonT3.hash([leaf1, leaf2]);
+    ) public view returns (uint256) {
+        return IHasher(self.hasher).hash([leaf1, leaf2]);
     }
 
     function insert(
@@ -95,7 +97,7 @@ library MerkleTreeLogic {
                 right = currentLevelHash;
             }
             // preparing for next level
-            currentLevelHash = hashLeaves(left, right);
+            currentLevelHash = hashLeaves(self, left, right);
             currentLevelIndex /= 2;
 
             unchecked {
@@ -122,7 +124,7 @@ library MerkleTreeLogic {
         // Index at current level
         uint256 currentLevelIndex = nextIndex / 2;
 
-        uint256 currentLevelHash = hashLeaves(leaf1, leaf2);
+        uint256 currentLevelHash = hashLeaves(self, leaf1, leaf2);
         uint256 left;
         uint256 right;
 
@@ -137,7 +139,7 @@ library MerkleTreeLogic {
                 left = self.lastSubtrees[i];
                 right = currentLevelHash;
             }
-            currentLevelHash = hashLeaves(left, right);
+            currentLevelHash = hashLeaves(self, left, right);
             currentLevelIndex /= 2;
 
             unchecked {
@@ -170,8 +172,9 @@ library MerkleTreeLogic {
 
         uint256 currentLevelIndex = nextIndex / 4;
         uint256 currentLevelHash = hashLeaves(
-            hashLeaves(leaf1, leaf2),
-            hashLeaves(leaf3, leaf4)
+            self,
+            hashLeaves(self, leaf1, leaf2),
+            hashLeaves(self, leaf3, leaf4)
         );
 
         uint256 left;
@@ -187,7 +190,7 @@ library MerkleTreeLogic {
                 left = self.lastSubtrees[i];
                 right = currentLevelHash;
             }
-            currentLevelHash = hashLeaves(left, right);
+            currentLevelHash = hashLeaves(self, left, right);
             currentLevelIndex /= 2;
 
             unchecked {
@@ -225,7 +228,7 @@ library MerkleTreeLogic {
         return false;
     }
 
-    function getMerkleRoot(
+    function getRoot(
         MerkleTree storage self,
         uint8 rootIndex
     ) external view returns (uint256) {

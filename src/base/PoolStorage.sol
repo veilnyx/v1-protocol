@@ -8,6 +8,7 @@ import {RevokerData} from "../libraries/ZTransaction.sol";
 abstract contract PoolStorage {
     address public verifier;
     address public adaptorHandler;
+    address public hasher;
     address public screener;
 
     MerkleTree internal _addressTree;

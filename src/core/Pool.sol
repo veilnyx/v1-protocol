@@ -35,6 +35,7 @@ contract Pool is
         address verifier_,
         address adaptorHandler_,
         address screener_,
+        address hasher_,
         uint256 withdrawFeeBps_
     ) external initializer {
         __Ownable_init(msg.sender);
@@ -44,11 +45,12 @@ contract Pool is
 
         verifier = verifier_;
         adaptorHandler = adaptorHandler_;
+        hasher = hasher_;
         screener = screener_;
         _withdrawFeeBps = withdrawFeeBps_;
 
-        _addressTree.init(addressTreeDepth);
-        _commitmentTree.init(commitmentTreeDepth);
+        _addressTree.init(addressTreeDepth, hasher_);
+        _commitmentTree.init(commitmentTreeDepth, hasher_);
     }
 
     /////////////////////////////////////////
@@ -169,6 +171,7 @@ contract Pool is
             withdrawFees: _withdrawFees,
             paymasterFees: _paymasterFees,
             adaptorHandler: adaptorHandler,
+            hasher: hasher,
             withdrawFeeBps: _withdrawFeeBps
         });
     }

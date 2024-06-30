@@ -1,14 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {Test} from "forge-std/Test.sol";
+import {BaseTest} from "test/fixtures/BaseTest.t.sol";
+import {IHasher} from "src/interfaces/IHasher.sol";
 import {MerkleTree, MerkleTreeLogic} from "src/libraries/MerkleTree.sol";
 import {FIELD_SIZE, ZERO_LEAF} from "src/core/Constants.sol";
 import {BinaryIMT as BinaryIMTLogic, BinaryIMTData} from "@zk-kit/imt/BinaryIMT.sol";
-import {PoseidonT3} from "poseidon-solidity/PoseidonT3.sol";
-import {PoseidonT2} from "poseidon-solidity/PoseidonT2.sol";
 
-contract MerkleTreeLogicTest is Test {
+contract MerkleTreeLogicTest is BaseTest {
     MerkleTree internal _commitmentTree;
     MerkleTree internal _addressTree;
     BinaryIMTData internal _binaryIMTToCheckCommitmentTreeRoot;
@@ -19,15 +18,26 @@ contract MerkleTreeLogicTest is Test {
 
     uint256[] public commitments;
 
+    IHasher hasher;
+
+    constructor() {
+        address hasherAddr = _deployHasher();
+        hasher = IHasher(hasherAddr);
+    }
+
     function setUp() external {
-        MerkleTreeLogic.init(_commitmentTree, commitmentTreeDepth);
+        MerkleTreeLogic.init(
+            _commitmentTree,
+            commitmentTreeDepth,
+            address(hasher)
+        );
         BinaryIMTLogic.init(
             _binaryIMTToCheckCommitmentTreeRoot,
             commitmentTreeDepth,
             ZERO_LEAF
         );
 
-        MerkleTreeLogic.init(_addressTree, addressTreeDepth);
+        MerkleTreeLogic.init(_addressTree, addressTreeDepth, address(hasher));
         BinaryIMTLogic.init(
             _binaryIMTToCheckAddressTreeRoot,
             addressTreeDepth,
@@ -61,11 +71,11 @@ contract MerkleTreeLogicTest is Test {
         assertEq(_binaryIMTToCheckAddressTreeRoot.numberOfLeaves, 0);
     }
 
-    function test_hashLeaves() public pure {
+    function test_hashLeaves() public view {
         uint256 leaf1 = 1;
         uint256 leaf2 = 2;
-        uint256 h = MerkleTreeLogic.hashLeaves(leaf1, leaf2);
-        uint256 expected = PoseidonT3.hash([leaf1, leaf2]);
+        uint256 h = MerkleTreeLogic.hashLeaves(_commitmentTree, leaf1, leaf2);
+        uint256 expected = hasher.hash([leaf1, leaf2]);
         assertEq(h, expected);
     }
 
@@ -85,35 +95,29 @@ contract MerkleTreeLogicTest is Test {
 
     function test_singleAddressInsertion() public {
         uint256 userAddress = 1;
-        uint256 userAddressHashed = PoseidonT2.hash([userAddress]);
         MerkleTreeLogic.insert(_addressTree, userAddress);
         assertEq(_addressTree.nextLeafIndex, 1);
         assertEq(_addressTree.currentRootIndex, 1);
-        assertEq(_addressTree.lastSubtrees[0], userAddressHashed);
+        assertEq(_addressTree.lastSubtrees[0], userAddress);
     }
 
     function test_multipleAddressInsertion() public {
         uint256 userAddress1 = 1;
         uint256 userAddress2 = 2;
-        uint256 userAddress1Hashed = PoseidonT2.hash([userAddress1]);
-        uint256 userAddress2Hashed = PoseidonT2.hash([userAddress2]);
         MerkleTreeLogic.insert(_addressTree, userAddress1);
         MerkleTreeLogic.insert(_addressTree, userAddress2);
         assertEq(_addressTree.nextLeafIndex, 2);
         assertEq(_addressTree.currentRootIndex, 2);
         assertEq(
             _addressTree.lastSubtrees[1],
-            MerkleTreeLogic.hashLeaves(userAddress1Hashed, userAddress2Hashed)
+            MerkleTreeLogic.hashLeaves(_addressTree, userAddress1, userAddress2)
         );
     }
 
     function test_rootsOnSingleAddressInsertion() public {
         uint256 userAddress = 1;
         MerkleTreeLogic.insert(_addressTree, userAddress);
-        BinaryIMTLogic.insert(
-            _binaryIMTToCheckAddressTreeRoot,
-            PoseidonT2.hash([userAddress])
-        ); // BinaryIMT::insert() expects the leaf to be already hashed
+        BinaryIMTLogic.insert(_binaryIMTToCheckAddressTreeRoot, userAddress); // BinaryIMT::insert() expects the leaf to be already hashed
 
         uint256 binaryIMTRoot = _binaryIMTToCheckAddressTreeRoot.root;
         uint256 addressTreeRoot = _addressTree.roots[
@@ -129,14 +133,8 @@ contract MerkleTreeLogicTest is Test {
         MerkleTreeLogic.insert(_addressTree, userAddress1);
         MerkleTreeLogic.insert(_addressTree, userAddress2);
 
-        BinaryIMTLogic.insert(
-            _binaryIMTToCheckAddressTreeRoot,
-            PoseidonT2.hash([userAddress1])
-        ); // BinaryIMT::insert() expects the leaf to be already hashed
-        BinaryIMTLogic.insert(
-            _binaryIMTToCheckAddressTreeRoot,
-            PoseidonT2.hash([userAddress2])
-        ); // BinaryIMT::insert() expects the leaf to be already hashed
+        BinaryIMTLogic.insert(_binaryIMTToCheckAddressTreeRoot, userAddress1); // BinaryIMT::insert() expects the leaf to be already hashed
+        BinaryIMTLogic.insert(_binaryIMTToCheckAddressTreeRoot, userAddress2); // BinaryIMT::insert() expects the leaf to be already hashed
 
         uint256 binaryIMTRoot = _binaryIMTToCheckAddressTreeRoot.root;
         uint256 addressTreeRoot = _addressTree.roots[
@@ -165,6 +163,7 @@ contract MerkleTreeLogicTest is Test {
         uint256 commitmentLeaf1 = uint256(keccak256(abi.encode("commitment1")));
         uint256 commitmentLeaf2 = uint256(keccak256(abi.encode("commitment2")));
         uint256 commitmentsHashed = MerkleTreeLogic.hashLeaves(
+            _commitmentTree,
             commitmentLeaf1,
             commitmentLeaf2
         );
@@ -242,6 +241,7 @@ contract MerkleTreeLogicTest is Test {
 
             if (i % 2 == 0) {
                 leafDuoHashes[leafDuoIndex] = MerkleTreeLogic.hashLeaves(
+                    _commitmentTree,
                     commitments[i - 2],
                     commitments[i - 1]
                 );
@@ -249,6 +249,7 @@ contract MerkleTreeLogicTest is Test {
             }
         }
         uint256 commitmentsHashed = MerkleTreeLogic.hashLeaves(
+            _commitmentTree,
             leafDuoHashes[0],
             leafDuoHashes[1]
         );

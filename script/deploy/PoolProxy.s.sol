@@ -13,6 +13,7 @@ contract PoolProxyDeploy is BaseScript {
         address adaptorHandler = _getContract("AdaptorHandler");
         address poolImpl = _getContract("PoolImpl");
         address screener = _getContract("Screener");
+        address hasher = _getContract("Hasher");
 
         uint8 addressTreeDepth = _config.addressTreeDepth();
         uint8 commitmentTreeDepth = _config.commitmentTreeDepth();
@@ -28,6 +29,7 @@ contract PoolProxyDeploy is BaseScript {
                 verifier,
                 adaptorHandler,
                 screener,
+                hasher,
                 withdrawFeeBps
             )
         );

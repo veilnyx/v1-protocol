@@ -10,7 +10,7 @@ import {AdaptorHandler} from "src/core/AdaptorHandler.sol";
 import {Asset, AssetType} from "src/libraries/Asset.sol";
 import {ZTransaction, RevokerData} from "src/libraries/ZTransaction.sol";
 import {MockERC20} from "test/mocks/MockERC20.sol";
-import {MockScrenner} from "test/mocks/MockScreener.sol";
+import {MockScreener} from "test/mocks/MockScreener.sol";
 import {BaseTest} from "./BaseTest.t.sol";
 import {console2} from "forge-std/console2.sol";
 
@@ -26,7 +26,7 @@ contract PoolTest is BaseTest {
     MockERC20 public token1;
     MockERC20 public token2;
 
-    MockScrenner public screener;
+    MockScreener public screener;
 
     Asset public asset1;
     Asset public asset2;
@@ -74,16 +74,20 @@ contract PoolTest is BaseTest {
         assetAddresses[0] = address(token1);
         assetAddresses[1] = address(token2);
 
-        screener = new MockScrenner();
+        screener = new MockScreener();
+        address hasher = _deployHasher();
 
-        bytes memory initData = abi.encodeWithSelector(
-            pool.initialize.selector,
-            fixture.addressTreeDepth,
-            fixture.commitmentTreeDepth,
-            address(verifier),
-            address(adaptorHandler),
-            address(screener),
-            fixture.withdrawFeeBps
+        bytes memory initData = abi.encodeCall(
+            Pool.initialize,
+            (
+                fixture.addressTreeDepth,
+                fixture.commitmentTreeDepth,
+                address(verifier),
+                address(adaptorHandler),
+                address(screener),
+                hasher,
+                fixture.withdrawFeeBps
+            )
         );
 
         ERC1967Proxy poolProxy = new ERC1967Proxy(address(pool), initData);

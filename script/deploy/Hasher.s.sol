@@ -1,25 +1,11 @@
-// SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.20;
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.24;
 
-import {Test} from "forge-std/Test.sol";
-import {ZTransactionType, ZTransaction} from "src/libraries/ZTransaction.sol";
 import {Hasher} from "src/core/Hasher.sol";
-import {Fixture, FixtureLib} from "test/fixtures/Fixture.sol";
+import {BaseScript} from "../BaseScript.sol";
 
-abstract contract BaseTest is Test {
-    Fixture public fixture;
-
-    function _setUp() internal {
-        fixture = FixtureLib.load(vm);
-    }
-
-    function _loadZTx(
-        string memory name
-    ) internal view returns (ZTransaction memory) {
-        return FixtureLib.loadZTx(name, vm);
-    }
-
-    function _deployHasher() internal returns (address) {
+contract HasherDeployer is BaseScript {
+    function run() external broadcast {
         string memory t3Path = string.concat(
             vm.projectRoot(),
             "/src/poseidon/t3.txt"
@@ -41,7 +27,6 @@ abstract contract BaseTest is Test {
             poseidonT4 := create(0, add(t4Bytecode, 0x20), mload(t4Bytecode))
         }
 
-        address hasher = address(new Hasher(poseidonT3, poseidonT4));
-        return hasher;
+        new Hasher(poseidonT3, poseidonT4);
     }
 }
