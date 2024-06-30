@@ -9,8 +9,8 @@ import {ZKFi} from "test/helpers/ZKFi.sol";
 import {ShieldedAccount} from "test/helpers/ShieldedAccount.sol";
 
 struct Fixture {
-    uint256 addressTreeDepth;
-    uint256 commitmentTreeDepth;
+    uint8 addressTreeDepth;
+    uint8 commitmentTreeDepth;
     uint256 withdrawFeeBps;
     uint256[2] revokerPublicKey;
     uint256[2] encryptionPublicKey;
@@ -29,13 +29,11 @@ library FixtureLib {
         Fixture memory fixture;
 
         // Tree params
-        fixture.addressTreeDepth = vm.parseJsonUint(
-            configJson,
-            ".addressTreeDepth"
+        fixture.addressTreeDepth = uint8(
+            vm.parseJsonUint(configJson, ".addressTreeDepth")
         );
-        fixture.commitmentTreeDepth = vm.parseJsonUint(
-            configJson,
-            ".commitmentTreeDepth"
+        fixture.commitmentTreeDepth = uint8(
+            vm.parseJsonUint(configJson, ".commitmentTreeDepth")
         );
 
         // Fee
