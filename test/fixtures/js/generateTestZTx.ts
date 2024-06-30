@@ -19,7 +19,7 @@ import {
 import { Core } from "@zkfi-tech/core";
 import { ZTransaction } from "@zkfi-tech/zk-prover";
 import { Note } from "@zkfi-tech/transaction";
-import { getSDKInstance } from "./helpers/sdk";
+import { getSDKInstance } from "./sdk";
 import { inspect } from "util";
 
 const senderAccount = ShieldedAccount.generate(
@@ -34,7 +34,7 @@ const paymasterAddress = sliceHex(keccak256(stringToBytes("paymaster")), 0, 20);
 const wethAssetId = 0x010001;
 const usdcAssetId = 0x010002;
 
-const dirFixtures = "../fixtures/ztx";
+const dirFixtures = "test/fixtures/ztx";
 
 const depositReqs = {
   deposit_1000_weth_without_fee: {
@@ -199,7 +199,7 @@ async function mockNotes(depositName: string, zkfi: Core) {
   });
 
   depositNotes.forEach((n, i) => (n.leafIndex = i));
-  console.log("Note created:", inspect(depositNotes));;
+  console.log("Note created:", inspect(depositNotes));
 
   //@ts-ignore
   zkfi.notesSource.mockNotes(depositNotes[0].assetId, [depositNotes[0]]);
@@ -216,10 +216,10 @@ async function main() {
   const depositName = "deposit_1000_weth_usdc_without_fee";
   // const depositName = "deposit_1_weth";
   await createMockZTx(depositName, depositReqs[depositName], zkfi);
-  await mockNotes(depositName, zkfi);
+  // await mockNotes(depositName, zkfi);
 
-  const withdrawName = "withdraw_1_weth_without_fee";
-  await createMockZTx(withdrawName, withdrawReqs[withdrawName], zkfi);
+  // const withdrawName = "withdraw_1_weth_without_fee";
+  // await createMockZTx(withdrawName, withdrawReqs[withdrawName], zkfi);
   // await mockNotes(depositName, zkfi);
 
   // const reqs = {

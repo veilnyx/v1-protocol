@@ -11,6 +11,7 @@ import {ShieldedAccount} from "test/helpers/ShieldedAccount.sol";
 struct Fixture {
     uint256 addressTreeDepth;
     uint256 commitmentTreeDepth;
+    uint256 withdrawFeeBps;
     uint256[2] revokerPublicKey;
     uint256[2] encryptionPublicKey;
     ShieldedAccount senderAccount;
@@ -35,6 +36,12 @@ library FixtureLib {
         fixture.commitmentTreeDepth = vm.parseJsonUint(
             configJson,
             ".commitmentTreeDepth"
+        );
+
+        // Fee
+        fixture.withdrawFeeBps = vm.parseJsonUint(
+            configJson,
+            ".withdrawFeeBps"
         );
 
         // Compliance Keys

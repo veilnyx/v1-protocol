@@ -12,7 +12,6 @@ import {ZTransaction, RevokerData} from "src/libraries/ZTransaction.sol";
 import {MockERC20} from "test/mocks/MockERC20.sol";
 import {MockScrenner} from "test/mocks/MockScreener.sol";
 import {BaseTest} from "./BaseTest.t.sol";
-import {Config} from "script/Config.sol";
 import {console2} from "forge-std/console2.sol";
 
 contract PoolTest is BaseTest {
@@ -20,8 +19,8 @@ contract PoolTest is BaseTest {
     AdaptorHandler public adaptorHandler;
     Pool public pool;
 
-    uint256 public addressTreeDepth = 20;
-    uint256 public commitmentTreeDepth = 25;
+    uint256 public addressTreeDepth;
+    uint256 public commitmentTreeDepth;
     address public entryPoint;
 
     MockERC20 public token1;
@@ -37,6 +36,11 @@ contract PoolTest is BaseTest {
     uint256 constant INITIAL_DEPOSIT = 1000 ether;
 
     function _initFixture() internal virtual {
+        BaseTest._setUp();
+
+        addressTreeDepth = fixture.addressTreeDepth;
+        commitmentTreeDepth = fixture.commitmentTreeDepth;
+
         Verifier22 v22 = new Verifier22();
         VerifierInfo[] memory vInfos = new VerifierInfo[](1);
         vInfos[0] = VerifierInfo({
@@ -46,8 +50,6 @@ contract PoolTest is BaseTest {
         });
         verifier = new Verifier(vInfos);
         adaptorHandler = new AdaptorHandler();
-        Config config = new Config();
-        entryPoint = address(0);
 
         pool = new Pool();
 
@@ -76,11 +78,12 @@ contract PoolTest is BaseTest {
 
         bytes memory initData = abi.encodeWithSelector(
             pool.initialize.selector,
-            addressTreeDepth,
-            commitmentTreeDepth,
+            fixture.addressTreeDepth,
+            fixture.commitmentTreeDepth,
             address(verifier),
             address(adaptorHandler),
-            address(screener)
+            address(screener),
+            fixture.withdrawFeeBps
         );
 
         ERC1967Proxy poolProxy = new ERC1967Proxy(address(pool), initData);

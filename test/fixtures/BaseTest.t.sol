@@ -8,7 +8,7 @@ import {Fixture, FixtureLib} from "test/fixtures/Fixture.sol";
 abstract contract BaseTest is Test {
     Fixture public fixture;
 
-    constructor() {
+    function _setUp() internal {
         fixture = FixtureLib.load(vm);
     }
 

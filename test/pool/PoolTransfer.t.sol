@@ -64,7 +64,7 @@ contract PoolTransferTest is PoolTest {
         pool.transact(transferZTxWithFee);
 
         vm.prank(paymasterUsedInZTxFixture);
-        uint256 paymasterFee = pool.getPaymasterFee(
+        uint256 paymasterFee = pool.getCollectedPaymasterFee(
             asset1.id,
             paymasterUsedInZTxFixture
         );
