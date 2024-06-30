@@ -34,7 +34,8 @@ contract Pool is
         uint8 commitmentTreeDepth,
         address verifier_,
         address adaptorHandler_,
-        address screener_
+        address screener_,
+        uint256 withdrawFeeBps_
     ) external initializer {
         __Ownable_init(msg.sender);
         __UUPSUpgradeable_init();
@@ -44,6 +45,7 @@ contract Pool is
         verifier = verifier_;
         adaptorHandler = adaptorHandler_;
         screener = screener_;
+        _withdrawFeeBps = withdrawFeeBps_;
 
         _addressTree.init(addressTreeDepth);
         _commitmentTree.init(commitmentTreeDepth);
@@ -115,6 +117,10 @@ contract Pool is
         screener = screener_;
     }
 
+    function setWithdrawFeeBips(uint256 feeBps) external onlyOwner {
+        _withdrawFeeBps = feeBps;
+    }
+
     /////////////////////////////////////////
     //        PUBLIC WRITE METHODS         //
     ////////////////////////////////////////
@@ -160,8 +166,10 @@ contract Pool is
         ztx.execute({
             commitmentTree: _commitmentTree,
             assets: _assets,
+            withdrawFees: _withdrawFees,
             paymasterFees: _paymasterFees,
-            adaptorHandler: adaptorHandler
+            adaptorHandler: adaptorHandler,
+            withdrawFeeBps: _withdrawFeeBps
         });
     }
 
@@ -228,7 +236,17 @@ contract Pool is
         return _assets[id];
     }
 
-    function getPaymasterFee(
+    function getWithdrawFeeBps() external view returns (uint256) {
+        return _withdrawFeeBps;
+    }
+
+    function getCollectedWithdrawFee(
+        uint24 assetId
+    ) external view returns (uint256) {
+        return _withdrawFees[assetId];
+    }
+
+    function getCollectedPaymasterFee(
         uint24 assertId,
         address paymaster
     ) external view returns (uint256) {

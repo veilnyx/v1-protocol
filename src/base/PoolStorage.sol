@@ -8,7 +8,6 @@ import {RevokerData} from "../libraries/ZTransaction.sol";
 abstract contract PoolStorage {
     address public verifier;
     address public adaptorHandler;
-    address public sanctionScreener;
     address public screener;
 
     MerkleTree internal _addressTree;
@@ -28,6 +27,8 @@ abstract contract PoolStorage {
     uint16 internal _revokerCount;
     mapping(uint256 => RevokerData) internal _revokers;
 
+    uint256 internal _withdrawFeeBps; // 1 bip = 1% / 100
+    mapping(uint24 => uint256) internal _withdrawFees;
     mapping(address paymaster => mapping(uint24 assetId => uint256 feeAmount))
         internal _paymasterFees;
 }

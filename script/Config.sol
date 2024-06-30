@@ -18,6 +18,7 @@ contract Config is Script {
     uint256 internal immutable _encryptionPublicKeyY;
     uint8 internal immutable _addressTreeDepth;
     uint8 internal immutable _commitmentTreeDepth;
+    uint256 internal immutable _withdrawFeeBps;
     address internal _entryPoint;
     address internal _gateway;
     address internal _paymaster;
@@ -81,6 +82,11 @@ contract Config is Script {
             string.concat(chainPrefix, ".paymaster")
         );
 
+        _withdrawFeeBps = vm.parseJsonUint(
+            configJson,
+            string.concat(chainPrefix, ".withdrawFeeBps")
+        );
+
         _wToken = vm.parseJsonAddress(
             configJson,
             string.concat(chainPrefix, ".wToken")
@@ -131,6 +137,10 @@ contract Config is Script {
 
     function paymaster() external view returns (address) {
         return _paymaster;
+    }
+
+    function withdrawFeeBps() external view returns (uint256) {
+        return _withdrawFeeBps;
     }
 
     function entryPoint() external view returns (address) {

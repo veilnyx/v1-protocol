@@ -82,6 +82,10 @@ interface IPool {
 
     function setRevokerStatus(uint256 index, bool status) external;
 
+    function setScreener(address screener) external;
+
+    function setWithdrawFeeBips(uint256 feeBips) external;
+
     /////////////////////////////////////////
     //        PUBLIC WRITE METHODS         //
     ////////////////////////////////////////
@@ -116,9 +120,13 @@ interface IPool {
         address assetAddress
     ) external view returns (Asset memory);
 
-    function getPaymasterFee(
+    function getCollectedPaymasterFee(
         uint24 assertId,
         address paymaster
+    ) external view returns (uint256);
+
+    function getCollectedWithdrawFee(
+        uint24 assetId
     ) external view returns (uint256);
 
     function getRevokerData(

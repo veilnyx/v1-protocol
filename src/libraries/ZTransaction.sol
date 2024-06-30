@@ -179,7 +179,9 @@ library ZTransactionLogic {
         MerkleTree storage commitmentTree,
         mapping(uint24 => Asset) storage assets,
         mapping(address => mapping(uint24 => uint256)) storage paymasterFees,
-        address adaptorHandler
+        mapping(uint24 => uint256) storage withdrawFees,
+        address adaptorHandler,
+        uint256 withdrawFeeBps
     ) external {
         Params memory params = _copyParamsToMemory(ztx);
         MemoParams memory memoParams = _copyMemoParamsToMemory(ztx);
@@ -194,12 +196,24 @@ library ZTransactionLogic {
 
         // Transfer any withdrawals
         if (ztx.txType == ZTransactionType.WITHDRAW) {
-            _transferPubAssets(assets, params.pubAssets, params.target);
+            _transferPubAssets(
+                assets,
+                withdrawFees,
+                params.pubAssets,
+                params.target,
+                withdrawFeeBps
+            );
         }
 
         // Perform any conversions
         if (ztx.txType == ZTransactionType.CONVERT) {
-            _transferPubAssets(assets, params.pubAssets, adaptorHandler);
+            _transferPubAssets(
+                assets,
+                withdrawFees,
+                params.pubAssets,
+                adaptorHandler,
+                0
+            );
             _handleAdaptor(assets, adaptorHandler, params, memoParams);
         }
 
@@ -342,18 +356,27 @@ library ZTransactionLogic {
 
     function _transferPubAssets(
         mapping(uint24 => Asset) storage assets,
+        mapping(uint24 => uint256) storage withdrawFees,
         PubAsset[] memory pubAssets,
-        address to
+        address to,
+        uint256 feeBps
     ) internal {
         uint256 count = pubAssets.length;
 
+        uint256 fee;
         for (uint8 i = 0; i < count; ) {
+            fee = feeBps == 0 ? 0 : (pubAssets[i].value * feeBps) / 10000;
+
             AssetLogic.transferAsset({
                 assets: assets,
                 to: to,
                 assetId: pubAssets[i].id,
-                value: pubAssets[i].value
+                value: pubAssets[i].value - fee
             });
+
+            if (fee != 0) {
+                withdrawFees[pubAssets[i].id] += fee;
+            }
 
             unchecked {
                 ++i;

@@ -115,7 +115,7 @@ contract PaymasterTest is PoolTest {
         uint256 assetFeeByPaymaster = paymaster.getAssetFee(defaultAssetId);
         vm.prank(address(paymaster));
         assertEq(
-            pool.getPaymasterFee(defaultAssetId, address(paymaster)),
+            pool.getCollectedPaymasterFee(defaultAssetId, address(paymaster)),
             assetFeeByPaymaster
         );
     }
@@ -131,7 +131,10 @@ contract PaymasterTest is PoolTest {
         vm.startPrank(address(paymaster));
         pool.withdrawPaymasterFee(defaultAssetId, address(paymaster));
 
-        assertEq(pool.getPaymasterFee(defaultAssetId, address(paymaster)), 0);
+        assertEq(
+            pool.getCollectedPaymasterFee(defaultAssetId, address(paymaster)),
+            0
+        );
         assertEq(token1.balanceOf(address(paymaster)), defaultFeeValue);
     }
 }
