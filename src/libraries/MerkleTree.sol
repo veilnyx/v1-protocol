@@ -48,7 +48,7 @@ library MerkleTreeLogic {
     function insert(
         MerkleTree storage self,
         uint256[] memory leaves
-    ) internal returns (uint256) {
+    ) internal returns (uint32) {
         uint256 nLeaves = leaves.length;
         if (nLeaves == 1) {
             return insert(self, self.zeroes[0], leaves[0]);
@@ -74,7 +74,7 @@ library MerkleTreeLogic {
     function insert(
         MerkleTree storage self,
         uint256 leaf
-    ) public whenTreeNotFull(self) returns (uint256) {
+    ) public whenTreeNotFull(self) returns (uint32) {
         uint256 depth = self.depth;
 
         uint256 currentLevelHash = leaf;
@@ -115,7 +115,7 @@ library MerkleTreeLogic {
         MerkleTree storage self,
         uint256 leaf1,
         uint256 leaf2
-    ) public whenTreeNotFull(self) returns (uint256) {
+    ) public whenTreeNotFull(self) returns (uint32) {
         uint8 depth = self.depth;
         uint32 nextIndex = self.nextLeafIndex;
 
@@ -159,7 +159,7 @@ library MerkleTreeLogic {
         uint256 leaf2,
         uint256 leaf3,
         uint256 leaf4
-    ) public whenTreeNotFull(self) returns (uint256) {
+    ) public whenTreeNotFull(self) returns (uint32) {
         uint8 depth = self.depth;
         uint32 nextIndex = self.nextLeafIndex;
 
