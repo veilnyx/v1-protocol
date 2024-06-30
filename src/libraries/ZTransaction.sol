@@ -8,7 +8,6 @@ import {FIELD_SIZE} from "../core/Constants.sol";
 import {IAdaptorHandler} from "../interfaces/IAdaptorHandler.sol";
 import {Asset, AssetLogic} from "./Asset.sol";
 import {MerkleTree, MerkleTreeLogic} from "./MerkleTree.sol";
-import {console2} from "forge-std/console2.sol";
 
 /// @title ZTransactionType enum representing types of shielded transactions
 enum ZTransactionType {
@@ -130,15 +129,17 @@ library ZTransactionLogic {
     /// @param ztx ZTransaction to be executed
     /// @param addressTree Address `MerkleTree` state in this contract
     /// @param commitmentTree Commitment `MerkleTree` state in this contract
+    /// @param markedNullifiers Mapping of nullifiers that are already marked
     /// @param supportedAdaptors Mapping of supported external adaptor addresses
     function validate(
         ZTransaction calldata ztx,
         MerkleTree storage addressTree,
         MerkleTree storage commitmentTree,
+        mapping(uint256 => uint32) storage markedNullifiers,
         mapping(address => bool) storage supportedAdaptors,
         mapping(uint256 => RevokerData) storage revokerDataMap,
         address verifier
-    ) external view {
+    ) external {
         RevokerData memory revokerData = revokerDataMap[ztx.revokerId];
 
         if (!revokerData.isActive) {
@@ -160,7 +161,8 @@ library ZTransactionLogic {
             revert IPool.UnsupportedAdaptor();
         }
 
-        // Verify ZK proof
+        _checkAndMarkNullifiers(ztx, commitmentTree, markedNullifiers);
+
         if (!_verifyProof(ztx, revokerData, verifier)) {
             revert IPool.InvalidProof();
         }
@@ -170,14 +172,12 @@ library ZTransactionLogic {
     /// @param ztx ZTransaction to be executed
     /// @param commitmentTree Commitment `MerkleTree` state in this contract
     /// @param assets Mapping of assetId to Asset
-    /// @param markedNullifiers Mapping of nullifiers that are already marked
     /// @param adaptorHandler Address of the adaptor handler contract responsible for handling DeFi adaptor ops
     /// @param paymasterFees Mapping of paymaster address to assetId to fee value
     function execute(
         ZTransaction calldata ztx,
         MerkleTree storage commitmentTree,
         mapping(uint24 => Asset) storage assets,
-        mapping(uint256 => uint256) storage markedNullifiers,
         mapping(address => mapping(uint24 => uint256)) storage paymasterFees,
         address adaptorHandler
     ) external {
@@ -204,13 +204,6 @@ library ZTransactionLogic {
         }
 
         _printNotes(commitmentTree, params, memoParams);
-
-        // Check double spend and mark nullifiers
-        _checkAndMarkNullifiers(
-            markedNullifiers,
-            ztx.nullifiers,
-            commitmentTree.nextLeafIndex
-        );
     }
 
     /**
@@ -383,33 +376,23 @@ library ZTransactionLogic {
 
     /// @dev This also prevents any duplicate nullifiers
     function _checkAndMarkNullifiers(
-        mapping(uint256 => uint256) storage markedNullifiers,
-        uint256[] memory nullifiers,
-        uint256 currentLeafIndex
+        ZTransaction calldata ztx,
+        MerkleTree storage commitmentTree,
+        mapping(uint256 => uint32) storage markedNullifiers
     ) internal {
-        console2.log(
-            "_checkAndMarkNullifiers::nullifier length:",
-            nullifiers.length
-        );
-        for (uint8 i = uint8(nullifiers.length); i > 0; ) {
-            uint8 index = i - 1;
+        uint256 numNullifiers = ztx.nullifiers.length;
+        uint32 nextIdx = commitmentTree.nextLeafIndex;
 
-            if (markedNullifiers[nullifiers[index]] > 0) {
-                revert IPool.DoubleSpend(nullifiers[index]);
+        for (uint8 i = 0; i < numNullifiers; ) {
+            uint256 nullifier = ztx.nullifiers[i];
+            if (markedNullifiers[nullifier] != 0) {
+                revert IPool.DoubleSpend(nullifier);
             }
 
-            markedNullifiers[nullifiers[index]] = currentLeafIndex;
-            --currentLeafIndex;
-            emit IPool.NullifierMarked(nullifiers[index]);
-
-            console2.log(
-                "NullifierMarked:",
-                nullifiers[index],
-                markedNullifiers[nullifiers[index]]
-            );
+            markedNullifiers[nullifier] = nextIdx + 1;
 
             unchecked {
-                --i;
+                ++i;
             }
         }
     }

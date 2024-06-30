@@ -151,6 +151,7 @@ contract Pool is
         ztx.validate({
             addressTree: _addressTree,
             commitmentTree: _commitmentTree,
+            markedNullifiers: _markedNullifiers,
             supportedAdaptors: _adaptors,
             revokerDataMap: _revokers,
             verifier: verifier
@@ -159,7 +160,6 @@ contract Pool is
         ztx.execute({
             commitmentTree: _commitmentTree,
             assets: _assets,
-            markedNullifiers: _markedNullifiers,
             paymasterFees: _paymasterFees,
             adaptorHandler: adaptorHandler
         });
