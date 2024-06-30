@@ -75,7 +75,7 @@ library MerkleTreeLogic {
         MerkleTree storage self,
         uint256 leaf
     ) public whenTreeNotFull(self) returns (uint32) {
-        uint256 depth = self.depth;
+        uint8 depth = self.depth;
 
         uint256 currentLevelHash = leaf;
         uint32 currentLevelIndex = self.nextLeafIndex;
