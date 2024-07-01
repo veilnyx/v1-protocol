@@ -9,6 +9,7 @@ import {PoolTest} from "test/fixtures/PoolTest.t.sol";
 import {IPool} from "src/interfaces/IPool.sol";
 import {MockERC20} from "test/mocks/MockERC20.sol";
 
+
 contract PoolDepositTest is PoolTest {
     ZTransaction depositZTx;
     PoolTransactTest poolTransactTestHelper;
@@ -53,7 +54,7 @@ contract PoolDepositTest is PoolTest {
         vm.expectRevert(
             abi.encodeWithSelector(
                 IPool.DoubleSpend.selector,
-                depositZTx.nullifiers[1]
+                depositZTx.nullifiers[0]
             )
         );
         pool.transact(depositZTx);
@@ -69,19 +70,15 @@ contract PoolDepositTest is PoolTest {
         poolTransactTestHelper.test_leafAddedToCommitmentTree();
     }
 
-    function test_AnnoucementEventsOnDeposit() external {
+    function test_CommitmentEventsOnDeposit() external {
         _transferAssetsToPoolTransactHelper();
-        poolTransactTestHelper.test_Annoucements();
+        poolTransactTestHelper.test_CommitmentEvents();
     }
 
-    // function test_InputNotesMemoEventPostDeposit() external {
-    //     _transferAssetsToPoolTransactHelper();
-    //     poolTransactTestHelper.test_InputNotesMemoEvent();
-    // }
-
-    // function test_ComplianceMemoEventPostDeposit() external {
-    //     poolTransactTestHelper.test_ComplianceMemo();
-    // }
+     function test_ReceiptEventOnDeposit() external {
+        _transferAssetsToPoolTransactHelper();
+        poolTransactTestHelper.test_ReceiptEvent();
+    }
 
     function _transferAssetsToPoolTransactHelper() internal {
         MockERC20(token1).transfer(

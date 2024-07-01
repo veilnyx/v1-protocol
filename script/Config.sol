@@ -53,6 +53,8 @@ contract Config is Script {
             vm.parseJsonUint(configJson, ".common.commitmentTreeDepth")
         );
 
+        withdrawFeeBps = vm.parseJsonUint(configJson, ".common.withdrawFeeBps");
+
         // chain specific config
         string memory chainPrefix = string.concat(".", vm.toString(chainId));
 
@@ -69,11 +71,6 @@ contract Config is Script {
         paymaster = vm.parseJsonAddress(
             configJson,
             string.concat(chainPrefix, ".paymaster")
-        );
-
-        withdrawFeeBps = vm.parseJsonUint(
-            configJson,
-            string.concat(chainPrefix, ".withdrawFeeBps")
         );
 
         wToken = vm.parseJsonAddress(

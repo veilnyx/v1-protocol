@@ -47,7 +47,7 @@ contract Pool is
         adaptorHandler = adaptorHandler_;
         hasher = hasher_;
         screener = screener_;
-        _withdrawFeeBps = withdrawFeeBps_;
+        withdrawFeeBps = withdrawFeeBps_;
 
         _addressTree.init(addressTreeDepth, hasher_);
         _commitmentTree.init(commitmentTreeDepth, hasher_);
@@ -120,7 +120,7 @@ contract Pool is
     }
 
     function setWithdrawFeeBips(uint256 feeBps) external onlyOwner {
-        _withdrawFeeBps = feeBps;
+        withdrawFeeBps = feeBps;
     }
 
     /////////////////////////////////////////
@@ -172,7 +172,7 @@ contract Pool is
             paymasterFees: _paymasterFees,
             adaptorHandler: adaptorHandler,
             hasher: hasher,
-            withdrawFeeBps: _withdrawFeeBps
+            withdrawFeeBps: withdrawFeeBps
         });
     }
 
@@ -239,10 +239,6 @@ contract Pool is
         return _assets[id];
     }
 
-    function getWithdrawFeeBps() external view returns (uint256) {
-        return _withdrawFeeBps;
-    }
-
     function getCollectedWithdrawFee(
         uint24 assetId
     ) external view returns (uint256) {
@@ -287,19 +283,19 @@ contract Pool is
         return _commitmentTree.zeroes[level];
     }
 
-    function getCommitmentTreeDepth() external view returns (uint256) {
+    function getCommitmentTreeDepth() external view returns (uint8) {
         return _commitmentTree.depth;
     }
 
-    function getAddressTreeDepth() external view returns (uint256) {
+    function getAddressTreeDepth() external view returns (uint8) {
         return _addressTree.depth;
     }
 
-    function getCommitmentTreeNextLeafIndex() external view returns (uint256) {
+    function getCommitmentTreeNextLeafIndex() external view returns (uint32) {
         return _commitmentTree.nextLeafIndex;
     }
 
-    function getAddressTreeNextLeafIndex() external view returns (uint256) {
+    function getAddressTreeNextLeafIndex() external view returns (uint32) {
         return _addressTree.nextLeafIndex;
     }
 

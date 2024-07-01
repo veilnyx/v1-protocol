@@ -14,7 +14,9 @@ contract PoolWithdrawTest is PoolTest {
     Pool internal _pool;
     ZTransaction withdrawZTx;
     PoolTransactTest poolTransactTestHelper;
-    uint256 defaultFeeValue = 0.001 ether;
+    uint256 withdrawAmt;
+    uint256 feeBps = 5;
+    uint256 defaultPaymasterFee = 0.001 ether;
     address withdrawerUsedInZTxFixture =
         0x855511cc3694f64379908437D6D64458dC76D024;
     address paymasterUsedInZTxFixture =
@@ -67,36 +69,48 @@ contract PoolWithdrawTest is PoolTest {
 
     function test_assetBalPostWithdraw() external {
         uint256 balance1 = token1.balanceOf(address(pool));
+        withdrawAmt = uint224(withdrawZTx.pubAssets[0]);
+        uint256 expectedBalPostWithdraw = balance1 -
+            withdrawAmt +
+            (withdrawAmt * feeBps) /
+            10000; // should retain the withdrawal fee
+
         pool.transact(withdrawZTx);
-        assertEq(token1.balanceOf(address(pool)), balance1 - 500 ether);
+
+        assertEq(token1.balanceOf(address(pool)), expectedBalPostWithdraw);
     }
 
-    // function test_assetBalPostWithdrawWithFee() public {
-    //     // setup
-    //     uint256 balance1 = token1.balanceOf(address(pool));
+    function test_assetBalPostWithdrawWithFee() public {
+        // setup
+        uint256 balance1 = token1.balanceOf(address(pool));
 
-    //     ZTransaction memory withdrawZTxWithFee = _loadZTx(
-    //         "withdraw_500_weth_with_weth_fee"
-    //     );
+        ZTransaction memory withdrawZTxWithFee = _loadZTx(
+            "withdraw_500_weth_with_weth_fee"
+        );
+        withdrawAmt = uint224(withdrawZTxWithFee.pubAssets[0]); // will include the paymaster fee
 
-    //     // transferring paymaster fees to pool
-    //     _mintAsset(asset1, address(this), defaultFeeValue);
-    //     token1.transfer(address(pool), defaultFeeValue);
+        console.log("paymaster fee:", defaultPaymasterFee);
+        console.log("withdraw amt:", withdrawAmt);
 
-    //     // action
-    //     pool.transact(withdrawZTxWithFee);
+        // action
+        pool.transact(withdrawZTxWithFee);
 
-    //     // assertion
-    //     uint256 expectedPoolBal = (balance1 - 500 ether) + defaultFeeValue; // should retain the paymaster fee
-    //     assertEq(token1.balanceOf(address(pool)), expectedPoolBal);
-    // }
+        // assertion
+        uint256 expectedBalPostWithdraw = balance1 -
+            withdrawAmt +
+            defaultPaymasterFee +
+            ((withdrawAmt - defaultPaymasterFee) * feeBps) /
+            10000; // should retain the paymaster fee + withdrawal fee. withdraw fee is charged on the remaining amount after paymaster fee is deducted.
+
+        assertEq(token1.balanceOf(address(pool)), expectedBalPostWithdraw);
+    }
 
     function test_revertOnDoubleSpendWithdraw() external {
         pool.transact(withdrawZTx);
         vm.expectRevert(
             abi.encodeWithSelector(
                 IPool.DoubleSpend.selector,
-                withdrawZTx.nullifiers[1]
+                withdrawZTx.nullifiers[0]
             )
         );
         pool.transact(withdrawZTx);
@@ -129,17 +143,21 @@ contract PoolWithdrawTest is PoolTest {
         poolTransactTestHelper.test_leafAddedToCommitmentTree();
     }
 
-    function test_AnnoucementEventsOnWithdraw500WethWithoutFee() external {
-        poolTransactTestHelper.test_Annoucements();
+    function test_CommitmentEventsOnWithdraw500WethWithoutFee() external {
+        poolTransactTestHelper.test_CommitmentEvents();
     }
 
-    function test_AnnoucementEventsOnWithdraw500WethWithFee() external {
+    function test_ReceiptEventOnWithdraw500WethWithoutFee() external {
+        poolTransactTestHelper.test_ReceiptEvent();
+    }
+
+    function test_CommitmentEventsOnWithdraw500WethWithFee() external {
         ZTransaction memory updateZTx = _loadZTx(
             "withdraw_500_weth_with_weth_fee"
         );
         poolTransactTestHelper.updateZTxToExecute(updateZTx);
 
-        poolTransactTestHelper.test_Annoucements();
+        poolTransactTestHelper.test_CommitmentEvents();
     }
 
     function test_ComplianceMemoEventOnWithdraw500WethWithoutFee() external {

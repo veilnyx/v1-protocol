@@ -191,8 +191,8 @@ library ZTransactionLogic {
         Params memory params = _copyParamsToMemory(ztx);
         MemoParams memory memoParams = _copyMemoParamsToMemory(ztx);
 
-        // Transfer paymaster fees
-        _transferPaymasterFee(paymasterFees, params);
+        // Credit paymaster fees
+        _creditPaymasterFee(paymasterFees, params);
 
         // Receive any deposits
         if (ztx.txType == ZTransactionType.DEPOSIT) {
@@ -328,7 +328,7 @@ library ZTransactionLogic {
         memoParams.noteMemos = _concat(memoParams.noteMemos, pubMemos);
     }
 
-    function _transferPaymasterFee(
+    function _creditPaymasterFee(
         mapping(address => mapping(uint24 => uint256)) storage paymasterFees,
         Params memory params
     ) internal {
@@ -419,6 +419,7 @@ library ZTransactionLogic {
             }
 
             markedNullifiers[nullifier] = nextIdx + 1;
+            emit IPool.NullifierMarked(nullifier, markedNullifiers[nullifier]);
 
             unchecked {
                 ++i;

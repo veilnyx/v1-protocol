@@ -56,9 +56,6 @@ contract PoolTransferTest is PoolTest {
         ZTransaction memory transferZTxWithFee = _loadZTx(
             "transfer_500_weth_with_weth_fee"
         );
-        // transferring fees to pool
-        _mintAsset(asset1, address(this), defaultFeeValue);
-        token1.transfer(address(pool), defaultFeeValue);
 
         // action
         pool.transact(transferZTxWithFee);
@@ -68,7 +65,7 @@ contract PoolTransferTest is PoolTest {
             asset1.id,
             paymasterUsedInZTxFixture
         );
-        assertEq(token1.balanceOf(address(pool)), balance1 + paymasterFee);
+        assertEq(token1.balanceOf(address(pool)), balance1);
         assertEq(paymasterFee, defaultFeeValue);
     }
 
@@ -77,7 +74,7 @@ contract PoolTransferTest is PoolTest {
         vm.expectRevert(
             abi.encodeWithSelector(
                 IPool.DoubleSpend.selector,
-                transferZTx.nullifiers[1]
+                transferZTx.nullifiers[0]
             )
         );
         pool.transact(transferZTx);
@@ -110,17 +107,21 @@ contract PoolTransferTest is PoolTest {
         poolTransactTestHelper.test_leafAddedToCommitmentTree();
     }
 
-    function test_AnnoucementEventsOnTransfer500WethWithoutFee() external {
-        poolTransactTestHelper.test_Annoucements();
+    function test_CommitmentEventsOnTransfer500WethWithoutFee() external {
+        poolTransactTestHelper.test_CommitmentEvents();
     }
 
-    function test_AnnoucementEventsOnTransfer500WethWithFee() external {
+    function test_ReceiptEventOnTransfer500WethWithoutFee() external {
+        poolTransactTestHelper.test_ReceiptEvent();
+    }
+
+    function test_CommitmentEventsOnTransfer500WethWithFee() external {
         ZTransaction memory updateZTx = _loadZTx(
             "transfer_500_weth_with_weth_fee"
         );
         poolTransactTestHelper.updateZTxToExecute(updateZTx);
 
-        poolTransactTestHelper.test_Annoucements();
+        poolTransactTestHelper.test_CommitmentEvents();
     }
 
     function test_ComplianceMemoEventOnTransfer500WethWithoutFee() external {

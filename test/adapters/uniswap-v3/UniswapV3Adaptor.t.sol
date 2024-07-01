@@ -49,6 +49,7 @@ contract UniswapV3AdaptorTest is PoolTest, BaseScript {
             uniswapSwapRouter02,
             address(pool)
         );
+        /// @dev update convert req fixture with this adaptor addr as `to`
         console.log("Uniswap adaptor:", address(uniswapV3Adapter));
 
         // TODO: Use a cheat code for Uni adp. address for consistency
@@ -65,8 +66,8 @@ contract UniswapV3AdaptorTest is PoolTest, BaseScript {
 
         vm.deal(user, INITIAL_SUPPLY * 2);
         vm.startPrank(user);
-        iWETH.deposit{value: INITIAL_SUPPLY}();
-        iWETH.approve(address(pool), INITIAL_SUPPLY);
+        iWETH.deposit{value: INITIAL_SUPPLY}(); // wrapping eth to weth
+        iWETH.approve(address(pool), INITIAL_SUPPLY); // depositing weth to pool
         ZTransaction memory ztxWethDeposit = _loadZTx(
             "deposit_1_original_weth"
         );
@@ -95,7 +96,6 @@ contract UniswapV3AdaptorTest is PoolTest, BaseScript {
         console.log("Pool USDC bal after swap:", poolUSDCBalPostConvert);
         assert(poolUSDCBalPostConvert > poolUSDCBalBeforeConvert);
     }
-
 
     function testWethToUSDCSwapToPoolViaBundler() public {
         console.log("Initiating WETH<>USDC swap");

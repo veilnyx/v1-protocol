@@ -23,7 +23,7 @@ interface IPool {
         bytes metadata
     );
     event RevokerStatusUpdated(uint256 indexed id, bool status);
-    event NullifierMarked(uint256 indexed nullifier);
+    event NullifierMarked(uint256 indexed nullifier, uint32 markLeafIndex);
 
     event AssetAdded(address indexed assetAddress, uint24 assetId);
 
@@ -141,13 +141,13 @@ interface IPool {
 
     function zeroes(uint8 level) external view returns (uint256);
 
-    function getCommitmentTreeDepth() external view returns (uint256);
+    function getCommitmentTreeDepth() external view returns (uint8);
 
-    function getAddressTreeDepth() external view returns (uint256);
+    function getAddressTreeDepth() external view returns (uint8);
 
-    function getCommitmentTreeNextLeafIndex() external view returns (uint256);
+    function getCommitmentTreeNextLeafIndex() external view returns (uint32);
 
-    function getAddressTreeNextLeafIndex() external view returns (uint256);
+    function getAddressTreeNextLeafIndex() external view returns (uint32);
 
     function getCommitmentTreeLastRoot() external view returns (uint256);
 

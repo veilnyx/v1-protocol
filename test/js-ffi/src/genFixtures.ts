@@ -60,16 +60,6 @@ const depositReqs = {
     paymaster: zeroAddress,
     revokerId: 0,
   },
-  deposit_1000_weth_usdc_with_fee: {
-    type: TransactionType.DEPOSIT,
-    assetIds: [mockWethAssetId, mockUsdcAssetId],
-    values: [parseEther("1000"), parseUnits("1000", 6)],
-    feeAssetId: 0,
-    to: senderAccount.shieldedAddress.pack(),
-    viaBundler: true,
-    paymaster: paymasterAddress,
-    revokerId: 0,
-  },
   deposit_1_weth: {
     type: TransactionType.DEPOSIT,
     assetIds: [mockWethAssetId],
@@ -155,7 +145,7 @@ const transferReqs = {
     paymaster: paymasterAddress,
     feeAssetId: mockWethAssetId,
     revokerId: 0,
-  },
+  }/*,
   transfer_1_weth_without_fee: {
     type: TransactionType.TRANSFER,
     assetIds: [mockWethAssetId],
@@ -165,6 +155,7 @@ const transferReqs = {
     viaBundler: false,
     paymaster: zeroAddress,
   },
+  **/
 };
 
 const convertReqs = {
@@ -173,7 +164,7 @@ const convertReqs = {
     assetIds: [wethAssetId],
     values: [parseEther("0.01")],
     feeAssetId: 0,
-    to: "0xF8Cde1763BE3fe82a0f8CDc9625985f56d4294b9", // adaptor to which the ZkFi Convertor will call to execute swap
+    to: "0x03E98aE18908eBc2Fe82e646E4DFB628963383c1", // adaptor to which the ZkFi Convertor will call to execute swap
     revokerId: 0,
     viaBundler: false,
     paymaster: zeroAddress,
@@ -183,7 +174,7 @@ const convertReqs = {
     type: TransactionType.CONVERT,
     assetIds: [wethAssetId],
     values: [parseEther("0.01")],
-    to: "0xF8Cde1763BE3fe82a0f8CDc9625985f56d4294b9", // adaptor to which the ZkFi Convertor will call to execute swap
+    to: "0x03E98aE18908eBc2Fe82e646E4DFB628963383c1", // adaptor to which the ZkFi Convertor will call to execute swap
     revokerId: 0,
     feeAssetId: wethAssetId,
     viaBundler: true,
@@ -248,6 +239,7 @@ async function main() {
 
   const reqs = {
     ...withdrawReqs,
+    ...transferReqs,
   };
   for (const [name, req] of Object.entries(reqs)) {
     await createMockZTx(name, req as any, zkfi);
