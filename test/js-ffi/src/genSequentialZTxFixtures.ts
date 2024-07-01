@@ -41,6 +41,7 @@ const depositReqs = {
     to: senderAccount.shieldedAddress.pack(),
     viaBundler: false,
     paymaster: zeroAddress,
+    revokerId: 0
   }
 };
 
@@ -53,6 +54,7 @@ const withdrawReqs = {
     to: withdrawAddress,
     viaBundler: false,
     paymaster: zeroAddress,
+    revokerId: 0
   }
 };
 
@@ -65,6 +67,7 @@ const transferReqs = {
     to: receiverAccount.shieldedAddress.pack(),
     viaBundler: false,
     paymaster: zeroAddress,
+    revokerId: 0
   }
 };
 
@@ -77,6 +80,7 @@ const convertReqs = {
     to: "0x67aD37B223C2EA3357456b6160199b98D9478799",  // adaptor to which the ZkFi Convertor will call to execute swap
     viaBundler: false,
     paymaster: zeroAddress,
+    revokerId: 0,
     payload:
       "0x000000000000000000000000000000000000000000000000000000000001000200000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000", // beneficiary: pool address (address(0))
   }
@@ -87,7 +91,7 @@ const createMockZTx = async (
   req: TransactionRequest & TransactionOptions,
   zkfi: Core
 ) => {
-  const opts = { viaBundler: req.viaBundler, paymaster: req.paymaster };
+  const opts = { viaBundler: req.viaBundler, paymaster: req.paymaster, revokerId: req.revokerId };
   const tx = await zkfi.createTransaction(req as any, opts);
 
   const signedTx = await zkfi.signTransaction(tx);
@@ -102,8 +106,10 @@ async function mockDepositNotes(depositName: string, zkfi: Core) {
     "utf-8"
   ) as Hex;
   const ztx = ZTransaction.decode(encoded) as any;
+  const revokerData = await zkfi.getRevokerData(0);
+  const revokerPublicKey = revokerData.revokerPublicKey;
 
-  const notes = ztx.outMemos.map((m: Hex) => Note.fromMemo(m, zkfi.account));
+  const notes = ztx.noteMemos.map((m: Hex) => Note.fromMemo(m, zkfi.account, revokerPublicKey));
   notes.forEach((n, i) => (n.leafIndex = i));
 
   //@ts-ignore
@@ -111,7 +117,7 @@ async function mockDepositNotes(depositName: string, zkfi: Core) {
   //@ts-ignore
   zkfi.notesSource.mockNotes(notes[1].assetId, [notes[1]]);
   //@ts-ignore
-  notes.forEach((n) => zkfi.treeSource.insert(n.commitment));
+  notes.forEach((n) => zkfi.commitmentTreeSource.insert(n.commitment));
 }
 
 async function mockWithdrawNotes(withdrawName: string, zkfi: Core) {
@@ -120,16 +126,18 @@ async function mockWithdrawNotes(withdrawName: string, zkfi: Core) {
     "utf-8"
   ) as Hex;
   const ztx = ZTransaction.decode(encoded) as any;
+  const revokerData = await zkfi.getRevokerData(0);
+  const revokerPublicKey = revokerData.revokerPublicKey;
 
-  const notes = ztx.outMemos.map((m: Hex) => Note.fromMemo(m, zkfi.account));
-  notes.forEach((n, i) => (n.leafIndex = i + 2)); // considering 2 notes of deposit
+  const notes = ztx.noteMemos.map((m: Hex) => Note.fromMemo(m, zkfi.account, revokerPublicKey));
+  notes.forEach((n, i) => (n.leafIndex = i + 2)); // considering 2 notes of deposit already exists
 
   //@ts-ignore
   zkfi.notesSource.mockNotes(notes[0].assetId, [notes[0]]);
   //@ts-ignore
   zkfi.notesSource.mockNotes(notes[1].assetId, [notes[1]]);
   //@ts-ignore
-  notes.forEach((n) => zkfi.treeSource.insert(n.commitment));
+  notes.forEach((n) => zkfi.commitmentTreeSource.insert(n.commitment));
 }
 
 async function main() {
