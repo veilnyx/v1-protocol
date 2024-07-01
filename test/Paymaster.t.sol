@@ -5,7 +5,7 @@ import {Test, console} from "forge-std/Test.sol";
 import {EntryPoint} from "@account-abstraction/contracts/core/EntryPoint.sol";
 import {PackedUserOperation} from "@account-abstraction/contracts/interfaces/PackedUserOperation.sol";
 import {Pool} from "src/core/Pool.sol";
-import {PoolTest} from "test/fixtures/PoolTest.t.sol";
+import {PoolTest} from "test/fixtures/PoolTest.sol";
 import {PoolTransactTest} from "test/helpers/PoolTransact.t.sol";
 import {Paymaster} from "src/core/Paymaster.sol";
 import {ZTransaction, ZTransactionType} from "src/libraries/ZTransaction.sol";

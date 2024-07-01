@@ -5,10 +5,9 @@ import {Test, console} from "forge-std/Test.sol";
 import {console2} from "forge-std/console2.sol";
 import {ZTransaction} from "src/libraries/ZTransaction.sol";
 import {PoolTransactTest} from "test/helpers/PoolTransact.t.sol";
-import {PoolTest} from "test/fixtures/PoolTest.t.sol";
+import {PoolTest} from "test/fixtures/PoolTest.sol";
 import {IPool} from "src/interfaces/IPool.sol";
 import {MockERC20} from "test/mocks/MockERC20.sol";
-
 
 contract PoolDepositTest is PoolTest {
     ZTransaction depositZTx;
@@ -75,7 +74,7 @@ contract PoolDepositTest is PoolTest {
         poolTransactTestHelper.test_CommitmentEvents();
     }
 
-     function test_ReceiptEventOnDeposit() external {
+    function test_ReceiptEventOnDeposit() external {
         _transferAssetsToPoolTransactHelper();
         poolTransactTestHelper.test_ReceiptEvent();
     }
