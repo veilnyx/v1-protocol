@@ -16,6 +16,7 @@ import {PoolStorage} from "../base/PoolStorage.sol";
 import {Asset, AssetType, AssetLogic} from "../libraries/Asset.sol";
 import {ZTransaction, ZTransactionLogic, RevokerData} from "../libraries/ZTransaction.sol";
 import {MerkleTree, MerkleTreeLogic} from "../libraries/MerkleTree.sol";
+import {REGISTER_ADDRESS_MESSASGE_PREFIX} from "./Constants.sol";
 
 contract Pool is
     IPool,
@@ -128,29 +129,36 @@ contract Pool is
     ////////////////////////////////////////
 
     function registerAddress(
-        uint256 addr,
-        bytes calldata publicKeys,
+        bytes calldata shieldedAddress,
         bytes calldata signature
     ) external whenNotPaused {
-        if (_addressRegistered[addr]) {
-            revert AddressAlreadyRegistered(addr);
+        uint256 rootAddress = uint256(bytes32(shieldedAddress));
+
+        if (_addressRegistered[rootAddress]) {
+            revert AddressAlreadyRegistered(rootAddress);
         }
 
-        // Each public key is 32 bytes long
-        if (publicKeys.length != 64) {
+        // Since shielded address = rootAddress (32-byte) + sign public key (32-byte) +
+        // view public key (32-byte)
+        if (shieldedAddress.length != 96) {
             revert BadArguments();
         }
 
         bytes32 msgHash = MessageHashUtils.toEthSignedMessageHash(
-            bytes.concat(bytes32(addr), publicKeys)
+            bytes.concat(REGISTER_ADDRESS_MESSASGE_PREFIX, shieldedAddress)
         );
 
         address sender = ECDSA.recover(msgHash, signature);
 
-        uint256 nextIndex = _addressTree.insert(addr);
-        _addressRegistered[addr] = true;
+        uint256 nextIndex = _addressTree.insert(rootAddress);
+        _addressRegistered[rootAddress] = true;
 
-        emit RegisterAddress(sender, addr, nextIndex - 1, publicKeys);
+        emit RegisterAddress(
+            sender,
+            rootAddress,
+            nextIndex - 1,
+            shieldedAddress
+        );
     }
 
     function transact(

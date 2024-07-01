@@ -100,17 +100,18 @@ contract PoolTest is BaseTest {
             revokerMetaData
         );
 
-        bytes memory publicKeys = new bytes(64);
+        bytes memory shieldedAddress = bytes.concat(
+            bytes32(fixture.senderAccount.rootAddress),
+            keccak256(bytes("sign")),
+            keccak256(bytes("view"))
+        );
+
         bytes32 msgHash = MessageHashUtils.toEthSignedMessageHash(
-            bytes.concat(bytes32(fixture.senderAccount.rootAddress), publicKeys)
+            shieldedAddress
         );
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(uint256(123), msgHash);
         bytes memory signature = abi.encodePacked(r, s, v);
-        pool.registerAddress(
-            fixture.senderAccount.rootAddress,
-            publicKeys,
-            signature
-        );
+        pool.registerAddress(shieldedAddress, signature);
     }
 
     function _mintAsset(

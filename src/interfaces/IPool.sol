@@ -12,7 +12,7 @@ interface IPool {
 
     event RegisterAddress(
         address indexed sender,
-        uint256 indexed addr,
+        uint256 indexed rootAddress,
         uint256 leafIndex,
         bytes publicKeys
     );
@@ -91,8 +91,7 @@ interface IPool {
     ////////////////////////////////////////
 
     function registerAddress(
-        uint256 addr,
-        bytes calldata publicKeys,
+        bytes calldata shieldedAddress,
         bytes calldata signature
     ) external;
 
