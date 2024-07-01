@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.24;
 
+import {FIELD_SIZE} from "../base/Constants.sol";
+import {Asset, AssetLogic} from "./Asset.sol";
+import {MerkleTree, MerkleTreeLogic} from "./MerkleTree.sol";
 import {IPool} from "../interfaces/IPool.sol";
 import {IVerifier} from "../interfaces/IVerifier.sol";
 import {IHasher} from "../interfaces/IHasher.sol";
-import {FIELD_SIZE} from "../core/Constants.sol";
 import {IAdaptorHandler} from "../interfaces/IAdaptorHandler.sol";
-import {Asset, AssetLogic} from "./Asset.sol";
-import {MerkleTree, MerkleTreeLogic} from "./MerkleTree.sol";
 
 /// @title ZTransactionType enum representing types of shielded transactions
 enum ZTransactionType {

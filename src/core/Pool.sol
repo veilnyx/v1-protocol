@@ -16,7 +16,7 @@ import {PoolStorage} from "../base/PoolStorage.sol";
 import {Asset, AssetType, AssetLogic} from "../libraries/Asset.sol";
 import {ZTransaction, ZTransactionLogic, RevokerData} from "../libraries/ZTransaction.sol";
 import {MerkleTree, MerkleTreeLogic} from "../libraries/MerkleTree.sol";
-import {REGISTER_ADDRESS_MESSASGE_PREFIX} from "./Constants.sol";
+import {REGISTER_ADDRESS_MESSASGE_PREFIX} from "../base/Constants.sol";
 
 contract Pool is
     IPool,
