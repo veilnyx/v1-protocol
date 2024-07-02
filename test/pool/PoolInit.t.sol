@@ -2,7 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {Test} from "forge-std/Test.sol";
-import {PoolTest} from "test/fixtures/PoolTest.t.sol";
+import {PoolTest} from "test/fixtures/PoolTest.sol";
 import {IPool} from "src/interfaces/IPool.sol";
 import {AssetType, Asset} from "src/libraries/Asset.sol";
 import {MerkleTree} from "src/libraries/MerkleTree.sol";

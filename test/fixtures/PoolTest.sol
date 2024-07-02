@@ -11,7 +11,7 @@ import {Asset, AssetType} from "src/libraries/Asset.sol";
 import {ZTransaction, RevokerData} from "src/libraries/ZTransaction.sol";
 import {MockERC20} from "test/mocks/MockERC20.sol";
 import {MockScreener} from "test/mocks/MockScreener.sol";
-import {BaseTest} from "./BaseTest.t.sol";
+import {BaseTest} from "./BaseTest.sol";
 import {console2} from "forge-std/console2.sol";
 
 contract PoolTest is BaseTest {
@@ -100,17 +100,18 @@ contract PoolTest is BaseTest {
             revokerMetaData
         );
 
-        bytes memory publicKeys = new bytes(64);
+        bytes memory shieldedAddress = bytes.concat(
+            bytes32(fixture.senderAccount.rootAddress),
+            keccak256(bytes("sign")),
+            keccak256(bytes("view"))
+        );
+
         bytes32 msgHash = MessageHashUtils.toEthSignedMessageHash(
-            bytes.concat(bytes32(fixture.senderAccount.rootAddress), publicKeys)
+            shieldedAddress
         );
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(uint256(123), msgHash);
         bytes memory signature = abi.encodePacked(r, s, v);
-        pool.registerAddress(
-            fixture.senderAccount.rootAddress,
-            publicKeys,
-            signature
-        );
+        pool.registerAddress(shieldedAddress, signature);
     }
 
     function _mintAsset(

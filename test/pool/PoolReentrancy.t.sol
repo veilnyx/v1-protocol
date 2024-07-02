@@ -4,7 +4,7 @@ pragma solidity ^0.8.24;
 import {Test, console} from "forge-std/Test.sol";
 import {ZTransaction} from "src/libraries/ZTransaction.sol";
 import {PoolTransactTest} from "test/helpers/PoolTransact.t.sol";
-import {PoolTest} from "test/fixtures/PoolTest.t.sol";
+import {PoolTest} from "test/fixtures/PoolTest.sol";
 import {MockERC20} from "test/mocks/MockERC20.sol";
 import {MockAttacker} from "test/mocks/MockAttacker.t.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";

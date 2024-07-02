@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {BaseTest} from "test/fixtures/BaseTest.t.sol";
+import {BinaryIMT as BinaryIMTLogic, BinaryIMTData} from "@zk-kit/imt/BinaryIMT.sol";
 import {IHasher} from "src/interfaces/IHasher.sol";
 import {MerkleTree, MerkleTreeLogic} from "src/libraries/MerkleTree.sol";
-import {FIELD_SIZE, ZERO_LEAF} from "src/core/Constants.sol";
-import {BinaryIMT as BinaryIMTLogic, BinaryIMTData} from "@zk-kit/imt/BinaryIMT.sol";
+import {FIELD_SIZE, ZERO_LEAF} from "src/base/Constants.sol";
+import {BaseTest} from "test/fixtures/BaseTest.sol";
 
 contract MerkleTreeLogicTest is BaseTest {
     MerkleTree internal _commitmentTree;

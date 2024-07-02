@@ -2,7 +2,7 @@
 pragma solidity ^0.8.18;
 
 import {IHasher} from "../interfaces/IHasher.sol";
-import {FIELD_SIZE, ZERO_LEAF} from "../core/Constants.sol";
+import {FIELD_SIZE, ZERO_LEAF} from "../base/Constants.sol";
 
 struct MerkleTree {
     uint8 depth;
