@@ -12,7 +12,8 @@ abstract contract PoolStorage {
     address public screener;
 
     MerkleTree internal _addressTree;
-    mapping(uint256 => bool) internal _addressRegistered;
+    mapping(uint256 => bool) internal _rootAddresses;
+    mapping(address => uint256) internal _publicAddresses;
 
     /// Asset ids are are 3 bytes long - 1 byte for asset type and 2 bytes for asset uid
     mapping(AssetType => uint16) internal _assetCounts;

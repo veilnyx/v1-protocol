@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifie–: MIT
 pragma solidity ^0.8.24;
 
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
@@ -29,6 +29,15 @@ contract Pool is
     using MerkleTreeLogic for MerkleTree;
     using ZTransactionLogic for ZTransaction;
 
+    /// @notice Initializes the Pool contract with the given parameters.
+    /// @dev Pool is an UUPSUpgradeable contract, so it needs to be initialized.
+    /// @param addressTreeDepth The depth of the address tree.
+    /// @param commitmentTreeDepth The depth of the commitment tree.
+    /// @param verifier_ The address of the verifier contract. Verifier contract verifies the ZTx's zk proof.
+    /// @param adaptorHandler_ The address of the adaptor handler contract, responsible for delegate calling adaptors of external DeFi protocols.
+    /// @param screener_ The address of the screener contract, responsible for screening sanctioned addresseses.
+    /// @param hasher_ The address of the hasher contract. It provides a single interface to Poseidon hashing functions
+    /// @param withdrawFeeBps_ The fee in basis points (1/10000) that is charged for withdrawing assets from the pool.
     function initialize(
         uint8 addressTreeDepth,
         uint8 commitmentTreeDepth,
@@ -110,6 +119,25 @@ contract Pool is
         _revokerCount += 1;
     }
 
+    function withdrawProtocolFee(
+        uint24 assetId,
+        address to
+    ) external nonReentrant onlyOwner {
+        address owner = msg.sender;
+        uint256 withdrawFeeCollected = _withdrawFees[assetId];
+        if (withdrawFeeCollected == 0) {
+            revert NoFeeToClaim(owner, assetId);
+        }
+
+        _withdrawFees[assetId] = 0;
+        AssetLogic.transferAsset({
+            assets: _assets,
+            to: to,
+            assetId: assetId,
+            value: withdrawFeeCollected
+        });
+    }
+
     function setRevokerStatus(uint256 id, bool isActive) external onlyOwner {
         _revokers[id].isActive = isActive;
         emit IPool.RevokerStatusUpdated(id, isActive);
@@ -132,8 +160,8 @@ contract Pool is
         bytes calldata publicKeys,
         bytes calldata signature
     ) external whenNotPaused {
-        if (_addressRegistered[addr]) {
-            revert AddressAlreadyRegistered(addr);
+        if (_rootAddresses[addr]) {
+            revert RootAddrAlreadyRegistered(addr);
         }
 
         // Each public key is 32 bytes long
@@ -147,8 +175,13 @@ contract Pool is
 
         address sender = ECDSA.recover(msgHash, signature);
 
+        if (_publicAddresses[sender] > 0) {
+            revert PublicAddrAlreadyRegistered(sender);
+        }
+
         uint256 nextIndex = _addressTree.insert(addr);
-        _addressRegistered[addr] = true;
+        _rootAddresses[addr] = true;
+        _publicAddresses[sender] = addr;
 
         emit RegisterAddress(sender, addr, nextIndex - 1, publicKeys);
     }
@@ -201,14 +234,13 @@ contract Pool is
 
     function verifyTransactionProof(
         ZTransaction calldata ztx
-    ) external view returns (bool) {
+    ) external view returns (bool result) {
         RevokerData memory revokerData = _revokers[ztx.revokerId];
-        uint16 vId = IVerifier(verifier).getVerifierId(
-            ztx.nullifiers.length,
-            ztx.commitments.length
-        );
-        bytes memory vParams = ztx.toVerifierInput(revokerData);
-        return IVerifier(verifier).verifyTransactionProof(vId, vParams);
+
+        result = ztx._verifyProof({
+            revokerData: revokerData,
+            verifier: verifier
+        });
     }
 
     function getRevokerData(
@@ -232,6 +264,8 @@ contract Pool is
         return _assets[assetId];
     }
 
+    /// @notice Returns the data of an asset.
+    /// @param assetAddress The address of the asset.
     function getAsset(
         address assetAddress
     ) external view returns (Asset memory) {
