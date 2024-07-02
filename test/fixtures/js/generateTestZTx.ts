@@ -19,8 +19,7 @@ import {
 import { Core } from "@zkfi-tech/core";
 import { ZTransaction } from "@zkfi-tech/zk-prover";
 import { Note } from "@zkfi-tech/transaction";
-import { getSDKInstance } from "./helpers/sdk";
-import { inspect } from "util";
+import { getSDKInstance } from "./sdk";
 
 const senderAccount = ShieldedAccount.generate(
   Fr.from(keccak256(stringToBytes("sender"))).val
@@ -37,7 +36,7 @@ const mockWethAssetId = 0x010001;
 const mockUsdcAssetId = 0x010002;
 const wethAssetId = 0x010003;
 
-const dirFixtures = "../fixtures/ztx";
+const dirFixtures = "../ztx";
 
 const depositReqs = {
   deposit_1000_weth_without_fee: {
