@@ -16,19 +16,13 @@ import {PoolStorage} from "../base/PoolStorage.sol";
 import {Asset, AssetType, AssetLogic} from "../libraries/Asset.sol";
 import {ZTransaction, ZTransactionLogic, RevokerData} from "../libraries/ZTransaction.sol";
 import {MerkleTree, MerkleTreeLogic} from "../libraries/MerkleTree.sol";
-import {REGISTER_ADDRESS_MESSASGE_PREFIX} from "../base/Constants.sol";
+import {DOMAIN_NAME, DOMAIN_VERSION, LABYRINTH_TYPEHASH, REGISTRATION_SIGNING_MSG} from "../base/Constants.sol";
 import {console2} from "forge-std/console2.sol";
+import {EIP712Upgradeable} from "@openzeppelin/contracts-upgradeable/utils/cryptography/EIP712Upgradeable.sol";
 
-struct EIP712Domain {
-    string name;
-    string version;
-    uint256 chainId;
-    address verifyingContract;
-}
-
-struct SigningDataStruct {
-    bytes shieldedAddress;
+struct Labyrinth {
     string message;
+    bytes shieldedAddress;
 }
 
 contract Pool is
@@ -38,7 +32,8 @@ contract Pool is
     OwnableUpgradeable,
     ReentrancyGuardUpgradeable,
     PausableUpgradeable,
-    PoolStorage
+    PoolStorage,
+    EIP712Upgradeable
 {
     using MerkleTreeLogic for MerkleTree;
     using ZTransactionLogic for ZTransaction;
@@ -65,6 +60,7 @@ contract Pool is
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
         __Pausable_init();
+        __EIP712_init(DOMAIN_NAME, DOMAIN_VERSION);
 
         verifier = verifier_;
         adaptorHandler = adaptorHandler_;
@@ -185,72 +181,32 @@ contract Pool is
             revert BadArguments();
         }
 
-        // preparing domainSeperator
-        bytes32 domainSeperatorTypeHash = keccak256(
-            "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
-        );
-
-        EIP712Domain memory eip712Domain = EIP712Domain({
-            name: "zkFi",
-            version: "1",
-            chainId: 11155420, // OP Sepolia
-            verifyingContract: address(this)
+        Labyrinth memory labyrinth = Labyrinth({
+            message: REGISTRATION_SIGNING_MSG,
+            shieldedAddress: shieldedAddress
         });
 
-        bytes32 domainSeperator = keccak256(
-            abi.encode(
-                domainSeperatorTypeHash,
-                bytes(eip712Domain.name),
-                bytes(eip712Domain.version),
-                eip712Domain.chainId, // OP Sepolia
-                eip712Domain.verifyingContract
-            )
+        bytes32 msgStructHash = _hashMsgData(labyrinth);
+        bytes32 typedDataDigest = EIP712Upgradeable._hashTypedDataV4(
+            msgStructHash
         );
 
-        console2.log("Pool::domainSeparator:");
-        console2.logBytes32(domainSeperator);
+        address sender = ECDSA.recover(typedDataDigest, signature);
 
-        // preparing signing data struct hash
-        bytes32 signingDataTypeHash = keccak256(
-            "SigningDataStruct(bytes shieldedAddress,string message)"
+        if (_publicAddresses[sender] > 0) {
+            revert PublicAddrAlreadyRegistered(sender);
+        }
+
+        uint256 nextIndex = _addressTree.insert(rootAddress);
+        _rootAddresses[rootAddress] = true;
+        _publicAddresses[sender] = rootAddress;
+
+        emit RegisterAddress(
+            sender,
+            rootAddress,
+            nextIndex - 1,
+            shieldedAddress
         );
-
-        bytes32 signingData = keccak256(
-            abi.encode(
-                signingDataTypeHash,
-                shieldedAddress,
-                keccak256(bytes(REGISTER_ADDRESS_MESSASGE_PREFIX))
-            )
-        );
-
-        console2.log("Pool::signingData:");
-        console2.logBytes32(signingData);
-
-        bytes32 msgHash = MessageHashUtils.toTypedDataHash(
-            domainSeperator,
-            signingData
-        );
-
-        console2.log("Pool:: msgHash: ");
-        console2.logBytes32(msgHash);
-
-        address sender = ECDSA.recover(msgHash, signature);
-        console2.log("sender addr recovered:", sender);
-
-        // if (_publicAddresses[sender] > 0) {
-        //     revert PublicAddrAlreadyRegistered(sender);
-        // }
-
-        // uint256 nextIndex = _addressTree.insert(rootAddress);
-        // _rootAddresses[rootAddress] = true;
-        // _publicAddresses[sender] = rootAddress;
-
-        // emit RegisterAddress(
-        //     sender,
-        //     rootAddress,
-        //     nextIndex - 1,
-        //     shieldedAddress
-        // );
     }
 
     function transact(
@@ -428,6 +384,19 @@ contract Pool is
 
     function isKnownAddressTreeRoot(uint256 root) external view returns (bool) {
         return _addressTree.isKnownRoot(root);
+    }
+
+    function _hashMsgData(
+        Labyrinth memory labyrinth
+    ) internal pure returns (bytes32) {
+        return
+            keccak256(
+                abi.encode(
+                    LABYRINTH_TYPEHASH,
+                    keccak256(bytes(labyrinth.message)), // string
+                    keccak256(labyrinth.shieldedAddress) // bytes
+                )
+            );
     }
 
     function _authorizeUpgrade(
