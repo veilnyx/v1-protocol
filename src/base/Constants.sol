@@ -5,8 +5,9 @@ uint256 constant FIELD_SIZE = 21888242871839275222246405745257275088548364400416
 
 uint256 constant ZERO_LEAF = uint256(keccak256("zkFi")) % FIELD_SIZE;
 
-string constant DOMAIN_NAME = "Labyrinth";
-string constant DOMAIN_VERSION = "1";
-bytes32 constant LABYRINTH_TYPEHASH = keccak256("Labyrinth(string message,bytes shieldedAddress)");
-string constant REGISTRATION_SIGNING_MSG = "Register Shielded Address";
-
+string constant EIP712_DOMAIN_NAME = "Labyrinth";
+string constant EIP712_DOMAIN_VERSION = "1";
+bytes32 constant EIP712_TYPEHASH_REGISTER_ADDRESS = keccak256(
+    "RegisterAddress(string message,bytes shieldedAddress)"
+);
+string constant MESSAGE_REGISTER_ADDRESS = "Register Shielded Address";

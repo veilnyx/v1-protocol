@@ -7,6 +7,7 @@ import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/U
 import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
+import {EIP712Upgradeable} from "@openzeppelin/contracts-upgradeable/utils/cryptography/EIP712Upgradeable.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {IVerifier} from "../interfaces/IVerifier.sol";
 import {IPool} from "../interfaces/IPool.sol";
@@ -16,14 +17,7 @@ import {PoolStorage} from "../base/PoolStorage.sol";
 import {Asset, AssetType, AssetLogic} from "../libraries/Asset.sol";
 import {ZTransaction, ZTransactionLogic, RevokerData} from "../libraries/ZTransaction.sol";
 import {MerkleTree, MerkleTreeLogic} from "../libraries/MerkleTree.sol";
-import {DOMAIN_NAME, DOMAIN_VERSION, LABYRINTH_TYPEHASH, REGISTRATION_SIGNING_MSG} from "../base/Constants.sol";
-import {console2} from "forge-std/console2.sol";
-import {EIP712Upgradeable} from "@openzeppelin/contracts-upgradeable/utils/cryptography/EIP712Upgradeable.sol";
-
-struct Labyrinth {
-    string message;
-    bytes shieldedAddress;
-}
+import {EIP712_DOMAIN_NAME, EIP712_DOMAIN_VERSION, EIP712_TYPEHASH_REGISTER_ADDRESS, MESSAGE_REGISTER_ADDRESS} from "../base/Constants.sol";
 
 contract Pool is
     IPool,
@@ -32,8 +26,8 @@ contract Pool is
     OwnableUpgradeable,
     ReentrancyGuardUpgradeable,
     PausableUpgradeable,
-    PoolStorage,
-    EIP712Upgradeable
+    EIP712Upgradeable,
+    PoolStorage
 {
     using MerkleTreeLogic for MerkleTree;
     using ZTransactionLogic for ZTransaction;
@@ -60,7 +54,7 @@ contract Pool is
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
         __Pausable_init();
-        __EIP712_init(DOMAIN_NAME, DOMAIN_VERSION);
+        __EIP712_init(EIP712_DOMAIN_NAME, EIP712_DOMAIN_VERSION);
 
         verifier = verifier_;
         adaptorHandler = adaptorHandler_;
@@ -133,10 +127,9 @@ contract Pool is
         uint24 assetId,
         address to
     ) external nonReentrant onlyOwner {
-        address owner = msg.sender;
         uint256 withdrawFeeCollected = _withdrawFees[assetId];
         if (withdrawFeeCollected == 0) {
-            revert NoFeeToClaim(owner, assetId);
+            revert NoFeeToClaim(msg.sender, assetId);
         }
 
         _withdrawFees[assetId] = 0;
@@ -172,7 +165,7 @@ contract Pool is
         uint256 rootAddress = uint256(bytes32(shieldedAddress));
 
         if (_rootAddresses[rootAddress]) {
-            revert RootAddrAlreadyRegistered(rootAddress);
+            revert RootAddressAlreadyRegistered(rootAddress);
         }
 
         // Since shielded address = rootAddress (32-byte) + sign public key (32-byte) +
@@ -181,23 +174,15 @@ contract Pool is
             revert BadArguments();
         }
 
-        Labyrinth memory labyrinth = Labyrinth({
-            message: REGISTRATION_SIGNING_MSG,
-            shieldedAddress: shieldedAddress
-        });
+        bytes32 hashStruct = _hashRegsiterAddressStruct(shieldedAddress);
+        bytes32 hashTypedData = _hashTypedDataV4(hashStruct);
+        address sender = ECDSA.recover(hashTypedData, signature);
 
-        bytes32 msgStructHash = _hashMsgData(labyrinth);
-        bytes32 typedDataDigest = EIP712Upgradeable._hashTypedDataV4(
-            msgStructHash
-        );
-
-        address sender = ECDSA.recover(typedDataDigest, signature);
-
-        if (_publicAddresses[sender] > 0) {
-            revert PublicAddrAlreadyRegistered(sender);
+        if (_publicAddresses[sender] != 0) {
+            revert PublicAddressAlreadyRegistered(sender);
         }
 
-        uint256 nextIndex = _addressTree.insert(rootAddress);
+        uint32 nextIndex = _addressTree.insert(rootAddress);
         _rootAddresses[rootAddress] = true;
         _publicAddresses[sender] = rootAddress;
 
@@ -386,15 +371,15 @@ contract Pool is
         return _addressTree.isKnownRoot(root);
     }
 
-    function _hashMsgData(
-        Labyrinth memory labyrinth
+    function _hashRegsiterAddressStruct(
+        bytes calldata shieldedAddress
     ) internal pure returns (bytes32) {
         return
             keccak256(
                 abi.encode(
-                    LABYRINTH_TYPEHASH,
-                    keccak256(bytes(labyrinth.message)), // string
-                    keccak256(labyrinth.shieldedAddress) // bytes
+                    EIP712_TYPEHASH_REGISTER_ADDRESS,
+                    keccak256(bytes(MESSAGE_REGISTER_ADDRESS)),
+                    keccak256(shieldedAddress)
                 )
             );
     }

@@ -13,7 +13,7 @@ interface IPool {
     event RegisterAddress(
         address indexed sender,
         uint256 indexed rootAddress,
-        uint256 leafIndex,
+        uint32 leafIndex,
         bytes publicKeys
     );
     event RevokerRegistered(
@@ -47,8 +47,8 @@ interface IPool {
     //            ERRORS                   //
     ////////////////////////////////////////
 
-    error RootAddrAlreadyRegistered(uint256 addr);
-    error PublicAddrAlreadyRegistered(address addr);
+    error RootAddressAlreadyRegistered(uint256 addr);
+    error PublicAddressAlreadyRegistered(address addr);
     error BadArguments();
     error InvalidProof();
     error UnknownCommitmentTreeRoot();
