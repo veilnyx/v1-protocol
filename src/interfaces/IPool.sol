@@ -68,7 +68,7 @@ interface IPool {
     /// @notice Can only be called by the owner.
     function pause() external;
 
-     /// @notice Unpauses the contract.
+    /// @notice Unpauses the contract.
     /// @notice Can only be called by the owner.
     function unpause() external;
 
@@ -87,7 +87,7 @@ interface IPool {
     /// @param enable Whether to enable or disable the adaptor.
     function addAdaptorSupport(address adaptorAddress, bool enable) external;
 
-     /// @notice Registers a new revoker. Revokers are responsible for deanonymizing transactions along with a network of Guardians.
+    /// @notice Registers a new revoker. Revokers are responsible for deanonymizing transactions along with a network of Guardians.
     /// @notice Can only be called by the owner.
     /// @param revokerPublicKey The public key of the revoker. Public key represents a point of the elliptic curve, hence it is a pair of two 256-bit integers.
     /// @param encryptionPublicKey The guardian network's public key used for encrypting the transactions.
@@ -98,14 +98,11 @@ interface IPool {
         bytes calldata revokerMetadata
     ) external;
 
-     /// @notice A function to withdraw the collected withdrawal fee for an asset by the protocol.
+    /// @notice A function to withdraw the collected withdrawal fee for an asset by the protocol.
     /// @notice Can only be called by the owner.
     /// @param assetId The id of the asset for which the paymaster wants to claim the fee.
     /// @param to The address to which the fee will be transferred.
-    function withdrawProtocolFee(
-        uint24 assetId,
-        address to
-    ) external;
+    function withdrawProtocolFee(uint24 assetId, address to) external;
 
     /// @notice Updates the status of a revoker.
     /// @notice Can only be called by the owner.
@@ -123,11 +120,10 @@ interface IPool {
     //        PUBLIC WRITE METHODS         //
     ////////////////////////////////////////
 
-     /// @notice Registers a new user using their address hash in the protocol.
+    /// @notice Registers a new user using their address hash in the protocol.
     /// @notice Can only be called when the contract is not paused.
-    /// @param addr 
-    /// @param publicKeys 
-    /// @param signature The signature of the user.
+    /// @param shieldedAddress The user's shielded address as created by the zkFi SDK. 96 bytes = 32 bytes rootAddress + 32 bytes sign public key + 32 bytes view public key
+    /// @param signature The signature of the user on the message.
     function registerAddress(
         bytes calldata shieldedAddress,
         bytes calldata signature
@@ -138,7 +134,7 @@ interface IPool {
     /// @param ztx The ZTx to be executed.
     function transact(ZTransaction calldata ztx) external;
 
-     /// @notice A function to call by a paymaster contract to claim the asset wise fees collected for the ERC-4337 transactions they catered to.
+    /// @notice A function to call by a paymaster contract to claim the asset wise fees collected for the ERC-4337 transactions they catered to.
     /// @notice Can only be called when the contract is not paused.
     /// @param assetId The id of the asset for which the paymaster wants to claim the fee.
     /// @param to The address to which the fee will be transferred.
@@ -193,7 +189,6 @@ interface IPool {
     function getRevokerData(
         uint256 revokerId
     ) external view returns (RevokerData memory);
-
 
     /// @notice Returns if an external adaptor is supported.
     /// @param adaptorAddress The address of the adaptor.

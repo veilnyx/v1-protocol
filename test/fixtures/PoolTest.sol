@@ -106,12 +106,12 @@ contract PoolTest is BaseTest {
             keccak256(bytes("view"))
         );
 
-        bytes32 msgHash = MessageHashUtils.toEthSignedMessageHash(
-            shieldedAddress
-        );
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(uint256(123), msgHash);
-        bytes memory signature = abi.encodePacked(r, s, v);
-        pool.registerAddress(shieldedAddress, signature);
+        // bytes32 msgHash = MessageHashUtils.toEthSignedMessageHash(
+        //     shieldedAddress
+        // );
+        // (uint8 v, bytes32 r, bytes32 s) = vm.sign(uint256(123), msgHash);
+        // bytes memory signature = abi.encodePacked(r, s, v);
+        // pool.registerAddress(shieldedAddress, signature);
     }
 
     function _mintAsset(

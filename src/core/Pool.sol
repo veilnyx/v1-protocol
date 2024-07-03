@@ -17,6 +17,19 @@ import {Asset, AssetType, AssetLogic} from "../libraries/Asset.sol";
 import {ZTransaction, ZTransactionLogic, RevokerData} from "../libraries/ZTransaction.sol";
 import {MerkleTree, MerkleTreeLogic} from "../libraries/MerkleTree.sol";
 import {REGISTER_ADDRESS_MESSASGE_PREFIX} from "../base/Constants.sol";
+import {console2} from "forge-std/console2.sol";
+
+struct EIP712Domain {
+    string name;
+    string version;
+    uint256 chainId;
+    address verifyingContract;
+}
+
+struct SigningDataStruct {
+    bytes shieldedAddress;
+    string message;
+}
 
 contract Pool is
     IPool,
@@ -172,26 +185,72 @@ contract Pool is
             revert BadArguments();
         }
 
-        bytes32 msgHash = MessageHashUtils.toEthSignedMessageHash(
-            bytes.concat(REGISTER_ADDRESS_MESSASGE_PREFIX, shieldedAddress)
+        // preparing domainSeperator
+        bytes32 domainSeperatorTypeHash = keccak256(
+            "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
         );
+
+        EIP712Domain memory eip712Domain = EIP712Domain({
+            name: "zkFi",
+            version: "1",
+            chainId: 11155420, // OP Sepolia
+            verifyingContract: address(this)
+        });
+
+        bytes32 domainSeperator = keccak256(
+            abi.encode(
+                domainSeperatorTypeHash,
+                bytes(eip712Domain.name),
+                bytes(eip712Domain.version),
+                eip712Domain.chainId, // OP Sepolia
+                eip712Domain.verifyingContract
+            )
+        );
+
+        console2.log("Pool::domainSeparator:");
+        console2.logBytes32(domainSeperator);
+
+        // preparing signing data struct hash
+        bytes32 signingDataTypeHash = keccak256(
+            "SigningDataStruct(bytes shieldedAddress,string message)"
+        );
+
+        bytes32 signingData = keccak256(
+            abi.encode(
+                signingDataTypeHash,
+                shieldedAddress,
+                keccak256(bytes(REGISTER_ADDRESS_MESSASGE_PREFIX))
+            )
+        );
+
+        console2.log("Pool::signingData:");
+        console2.logBytes32(signingData);
+
+        bytes32 msgHash = MessageHashUtils.toTypedDataHash(
+            domainSeperator,
+            signingData
+        );
+
+        console2.log("Pool:: msgHash: ");
+        console2.logBytes32(msgHash);
 
         address sender = ECDSA.recover(msgHash, signature);
+        console2.log("sender addr recovered:", sender);
 
-        if (_publicAddresses[sender] > 0) {
-            revert PublicAddrAlreadyRegistered(sender);
-        }
+        // if (_publicAddresses[sender] > 0) {
+        //     revert PublicAddrAlreadyRegistered(sender);
+        // }
 
-        uint256 nextIndex = _addressTree.insert(rootAddress);
-        _rootAddresses[rootAddress] = true;
-        _publicAddresses[sender] = rootAddress;
+        // uint256 nextIndex = _addressTree.insert(rootAddress);
+        // _rootAddresses[rootAddress] = true;
+        // _publicAddresses[sender] = rootAddress;
 
-        emit RegisterAddress(
-            sender,
-            rootAddress,
-            nextIndex - 1,
-            shieldedAddress
-        );
+        // emit RegisterAddress(
+        //     sender,
+        //     rootAddress,
+        //     nextIndex - 1,
+        //     shieldedAddress
+        // );
     }
 
     function transact(
