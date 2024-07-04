@@ -14,7 +14,7 @@ interface IPool {
         address indexed sender,
         uint256 indexed rootAddress,
         uint32 leafIndex,
-        bytes publicKeys
+        bytes shieldedAddress
     );
     event RevokerRegistered(
         uint256 indexed id,
