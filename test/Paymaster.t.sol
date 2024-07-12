@@ -36,14 +36,13 @@ contract PaymasterTest is PoolTest {
         mockPool = address(pool);
         entryPoint = address(new EntryPoint());
         paymaster = new Paymaster(entryPoint, mockPool);
-        console.log("Paymaster address: ", address(paymaster));
-        paymaster.updateAssetFee(defaultAssetId, defaultFeeValue);
+        paymaster.setAssetFee(defaultAssetId, defaultFeeValue);
     }
 
     function test_updateFeeAsset() public {
         uint24 assetId = 65538;
         uint256 feeValue = 0.1 ether;
-        paymaster.updateAssetFee(assetId, feeValue);
+        paymaster.setAssetFee(assetId, feeValue);
         assertEq(paymaster.getAssetFee(assetId), feeValue);
 
         bool isSupported = paymaster.isAssetFeeSupported(assetId);
@@ -78,7 +77,12 @@ contract PaymasterTest is PoolTest {
         ZTransaction memory ztx;
         PackedUserOperation memory userOp;
 
-        // ztx.pubAssetIds = new uint24[](1);
+        ztx.pubAssets = new uint248[](1);
+        ztx.pubAssets[0] = uint248(
+            bytes31(
+                bytes.concat(bytes3(defaultAssetId), bytes12(uint96(10 ether)))
+            )
+        );
         // ztx.pubAssetIds[0] = defaultAssetId;
         ztx.feeData = uint256(
             bytes32(
