@@ -17,6 +17,8 @@ contract PaymasterTest is PoolTest {
     uint24 defaultAssetId;
     uint256 defaultFeeValue = 0.001 ether;
 
+    PackedUserOperation userOp;
+
     modifier depositTx() {
         _mintAsset(asset1, address(this), INITIAL_DEPOSIT);
         _mintAsset(asset2, address(this), INITIAL_DEPOSIT);
@@ -24,9 +26,33 @@ contract PaymasterTest is PoolTest {
         _approveAsset(asset2, address(pool), 1000e6);
 
         ZTransaction memory depositZTx = _loadZTx(
-            "deposit_1000_weth_usdc_without_fee"
+            "deposit_1000_weth_without_fee"
         );
         pool.transact(depositZTx);
+        _;
+    }
+
+    modifier createPackedUserOps() {
+        ZTransaction memory ztx;
+
+        ztx.pubAssets = new uint248[](1);
+        ztx.pubAssets[0] = uint248(
+            bytes31(
+                bytes.concat(bytes3(defaultAssetId), bytes12(uint96(10 ether)))
+            )
+        );
+
+        ztx.feeData = uint256(
+            bytes32(
+                bytes.concat(
+                    bytes20(address(paymaster)),
+                    bytes12(uint96(0.1 ether))
+                )
+            )
+        );
+
+        userOp.sender = address(pool);
+        userOp.callData = abi.encodeCall(Pool.transact, (ztx));
         _;
     }
 
@@ -49,7 +75,7 @@ contract PaymasterTest is PoolTest {
         assertTrue(isSupported);
     }
 
-    function test_depositEntryPoint() public {
+    function test_depositAndWithdrawEntryPoint() public {
         uint256 value = 1000 ether;
         vm.deal(address(this), value);
 
@@ -73,9 +99,34 @@ contract PaymasterTest is PoolTest {
         assertEq(withdrawAddress.balance, withdrawValue);
     }
 
-    function test_validatePaymasterUserOp() public {
+    function test_withdrawAsset() public {
+        uint256 value = 10 ether;
+        vm.deal(address(this), value);
+        (bool success, ) = address(paymaster).call{value: value}("");
+        assertTrue(success);
+
+        address withdraw = makeAddr("withdraw");
+        paymaster.withdrawAsset(address(0), payable(withdraw), value);
+
+        assertEq(withdraw.balance, value);
+    }
+
+    ///////////////////////////////////////////
+    /// Paymaster UserOp Validation tests /////
+    //////////////////////////////////////////
+    function test_revertWhenSenderIsNotPool() public createPackedUserOps {
+        userOp.sender = address(0);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(Paymaster.InvalidSender.selector, address(0))
+        );
+        vm.startPrank(entryPoint);
+        paymaster.validatePaymasterUserOp(userOp, bytes32(0), 0);
+        vm.stopPrank();
+    }
+
+    function test_revertWhenPaymasterFeesIsNotEnough() public {
         ZTransaction memory ztx;
-        PackedUserOperation memory userOp;
 
         ztx.pubAssets = new uint248[](1);
         ztx.pubAssets[0] = uint248(
@@ -83,19 +134,33 @@ contract PaymasterTest is PoolTest {
                 bytes.concat(bytes3(defaultAssetId), bytes12(uint96(10 ether)))
             )
         );
-        // ztx.pubAssetIds[0] = defaultAssetId;
+
+        uint256 lowFeeValue = defaultFeeValue / 2;
+
         ztx.feeData = uint256(
             bytes32(
                 bytes.concat(
                     bytes20(address(paymaster)),
-                    bytes12(uint96(0.1 ether))
+                    bytes12(uint96(lowFeeValue))
                 )
             )
         );
 
-        userOp.sender = mockPool;
+        userOp.sender = address(pool);
         userOp.callData = abi.encodeCall(Pool.transact, (ztx));
 
+        vm.prank(entryPoint);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                Paymaster.InsufficientFee.selector,
+                lowFeeValue,
+                defaultFeeValue
+            )
+        );
+        paymaster.validatePaymasterUserOp(userOp, bytes32(0), 0);
+    }
+
+      function test_validatePaymasterUserOp() public createPackedUserOps {
         vm.startPrank(entryPoint);
         (, uint256 flag) = paymaster.validatePaymasterUserOp(
             userOp,

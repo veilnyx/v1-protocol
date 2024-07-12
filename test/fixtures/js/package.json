@@ -4,9 +4,7 @@
     "description": "",
     "main": "index.js",
     "scripts": {
-        "genZTx": "npx ts-node src/genZTx.ts",
-        "genAccount": "npx ts-node src/genAccount.ts",
-        "genFixtures": "npx ts-node src/genFixtures.ts",
+        "genFixtures": "npx ts-node ./generateTestZTx.ts",
         "genSeqReqFixtures": "npx ts-node ./genSequentialZTxFixtures.ts",
         "getBalances": "npx ts-node src/getBalances.ts"
     },
