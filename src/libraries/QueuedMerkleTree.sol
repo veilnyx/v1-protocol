@@ -12,7 +12,7 @@ struct QueuedMerkleTree {
     address hasher;
     uint8 queueSize;
     address verifier;
-    mapping(uint256 => uint256) leavesQueue;
+    mapping(uint256 => uint256) queuedLeaves;
     mapping(uint8 => uint256) roots;
     mapping(uint8 => uint256) zeroes;
     mapping(uint8 => uint256) lastSubtrees;
@@ -48,14 +48,31 @@ library QueuedMerkleTreeLogic {
         self.roots[0] = zero;
     }
 
+    function queueLeaves(
+        QueuedMerkleTree storage self,
+        uint256[] calldata leaves
+    ) public {
+        for (uint8 i = 0; i < leaves.length; ) {
+            self.queuedLeaves[self.nextLeafIndex + i] = leaves[i];
+            unchecked {
+                ++i;
+            }
+        }
+
+        self.nextLeafIndex += uint32(leaves.length);
+    }
+
     function updateSubtree(
         QueuedMerkleTree storage self,
         uint256 newRoot,
         uint256[] memory newSubtree
     ) internal returns (uint256) {
         uint256[] memory leaves = new uint256[](self.queueSize);
-        for (uint8 i = 0; i < self.queueSize; i++) {
-            leaves[i] = self.leavesQueue[i];
+        for (uint8 i = 0; i < self.queueSize; ) {
+            leaves[i] = self.queuedLeaves[i];
+            unchecked {
+                ++i;
+            }
         }
 
         _verifyUpdateProof();
