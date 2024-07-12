@@ -13,6 +13,7 @@ import {MockERC20} from "test/mocks/MockERC20.sol";
 import {MockScreener} from "test/mocks/MockScreener.sol";
 import {BaseTest} from "./BaseTest.sol";
 import {console2} from "forge-std/console2.sol";
+import {MESSAGE_REGISTER_ADDRESS, EIP712_DOMAIN_NAME, EIP712_DOMAIN_VERSION, EIP712_TYPEHASH_REGISTER_ADDRESS} from "src/base/Constants.sol";
 
 contract PoolTest is BaseTest {
     Verifier public verifier;
@@ -34,6 +35,10 @@ contract PoolTest is BaseTest {
     bytes revokerMetaData = abi.encode("Revoker 1", "Organization 1");
 
     uint256 constant INITIAL_DEPOSIT = 1000 ether;
+    bytes32 private constant TYPE_HASH =
+        keccak256(
+            "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
+        );
 
     function _initFixture() internal virtual {
         BaseTest._setUp();
@@ -100,18 +105,17 @@ contract PoolTest is BaseTest {
             revokerMetaData
         );
 
-        bytes memory shieldedAddress = bytes.concat(
+        (, uint256 rootUserPK) = makeAddrAndKey("rootUser");
+        bytes memory rootShieldedAddress = bytes.concat(
             bytes32(fixture.senderAccount.rootAddress),
             keccak256(bytes("sign")),
             keccak256(bytes("view"))
         );
-
-        // bytes32 msgHash = MessageHashUtils.toEthSignedMessageHash(
-        //     shieldedAddress
-        // );
-        // (uint8 v, bytes32 r, bytes32 s) = vm.sign(uint256(123), msgHash);
-        // bytes memory signature = abi.encodePacked(r, s, v);
-        // pool.registerAddress(shieldedAddress, signature);
+        bytes memory signature = _getRegisterAddressSignature(
+            rootUserPK,
+            rootShieldedAddress
+        );
+        pool.registerAddress(rootShieldedAddress, signature);
     }
 
     function _mintAsset(
@@ -160,5 +164,50 @@ contract PoolTest is BaseTest {
             "deposit_1000_weth_usdc_without_fee"
         );
         pool.transact(ztx);
+    }
+
+    //////////////////////////////////////////////////////
+    /// EIP 712 User Registration Functions       ////////
+    //////////////////////////////////////////////////////
+
+    function _getRegisterAddressSignature(
+        uint256 userPK,
+        bytes memory shieldedAddress
+    ) internal view returns (bytes memory) {
+        bytes32 hashTypedData = _getHashTypedRegisterAddressStruct(
+            shieldedAddress
+        );
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(userPK, hashTypedData);
+        return abi.encodePacked(r, s, v);
+    }
+
+    function _getHashTypedRegisterAddressStruct(
+        bytes memory shieldedAddress
+    ) internal view returns (bytes32) {
+        bytes32 hashTypedData = MessageHashUtils.toTypedDataHash(
+            _domainSeperator(),
+            keccak256(
+                abi.encode(
+                    EIP712_TYPEHASH_REGISTER_ADDRESS,
+                    keccak256(bytes(MESSAGE_REGISTER_ADDRESS)),
+                    keccak256(shieldedAddress)
+                )
+            )
+        );
+        return hashTypedData;
+    }
+
+    function _domainSeperator() internal view returns (bytes32) {
+        console2.log("Test::chainID:", block.chainid);
+        return
+            keccak256(
+                abi.encode(
+                    TYPE_HASH,
+                    keccak256(bytes(EIP712_DOMAIN_NAME)),
+                    keccak256(bytes(EIP712_DOMAIN_VERSION)),
+                    block.chainid,
+                    address(pool)
+                )
+            );
     }
 }
