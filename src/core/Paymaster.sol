@@ -24,6 +24,7 @@ contract Paymaster is IPaymaster, Ownable {
     mapping(uint24 => uint256) private _assetFees;
 
     error InvalidPaymaster(address paymaster);
+    error InvalidEntryPoint();
     error InvalidSender(address sender);
     error InvalidCallData();
     error InsufficientFee(uint256 given, uint256 required);
@@ -35,10 +36,12 @@ contract Paymaster is IPaymaster, Ownable {
     }
 
     /**
-     * Add a deposit for this paymaster, used for paying for transaction fees.
+     * Sets fee value for an asset.
+     * @param assetId  - Asset id to update fee for.
+     * @param feeValue - Fee value to set.
      */
-    function depositToEntryPoint() public payable {
-        entryPoint.depositTo{value: msg.value}(address(this));
+    function setAssetFee(uint24 assetId, uint256 feeValue) external onlyOwner {
+        _assetFees[assetId] = feeValue;
     }
 
     /**
@@ -72,15 +75,10 @@ contract Paymaster is IPaymaster, Ownable {
     }
 
     /**
-     * Update fee value for an asset.
-     * @param assetId  - Asset id to update fee for.
-     * @param feeValue - Fee value to set.
+     * Add a deposit for this paymaster, used for paying for transaction fees.
      */
-    function updateAssetFee(
-        uint24 assetId,
-        uint256 feeValue
-    ) external onlyOwner {
-        _assetFees[assetId] = feeValue;
+    function depositToEntryPoint() public payable {
+        entryPoint.depositTo{value: msg.value}(address(this));
     }
 
     /// @inheritdoc IPaymaster
@@ -167,7 +165,7 @@ contract Paymaster is IPaymaster, Ownable {
             (ZTransaction)
         );
 
-        uint24 feeAssetId = uint24(ztx.pubAssets[0]);
+        uint24 feeAssetId = uint24(bytes3(bytes31(ztx.pubAssets[0])));
         uint256 feeValue = uint256(uint96(ztx.feeData));
         address paymaster = address(bytes20(bytes32(ztx.feeData)));
 
@@ -191,7 +189,9 @@ contract Paymaster is IPaymaster, Ownable {
      * Validate the call is made from a valid entrypoint
      */
     function _requireFromEntryPoint() internal virtual {
-        require(msg.sender == address(entryPoint), "Sender not EntryPoint");
+        if (msg.sender != address(entryPoint)) {
+            revert InvalidEntryPoint();
+        }
     }
 
     receive() external payable {}
