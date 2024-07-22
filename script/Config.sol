@@ -11,18 +11,20 @@ struct CommonConfig {
 }
 
 contract Config is Script {
-    uint256 internal immutable _chainId = block.chainid;
-    uint256 internal immutable _revokerPublicKeyX;
-    uint256 internal immutable _revokerPublicKeyY;
-    uint256 internal immutable _encryptionPublicKeyX;
-    uint256 internal immutable _encryptionPublicKeyY;
+    uint256 public immutable chainId = block.chainid;
+    uint256[2] internal _revokerPublicKey;
+    uint256[2] internal _encryptionPublicKey;
+    uint8 public immutable addressTreeDepth;
+    uint8 public immutable commitmentTreeDepth;
+    uint256 public immutable withdrawFeeBps;
+    address public immutable entryPoint;
+    address public immutable gateway;
+    address public immutable paymaster;
+    address public immutable wToken;
+    address public immutable uniswapSwapRouter02;
+    address public immutable sanctionList;
 
-    uint256 internal immutable _treeDepth = 32;
-    address internal _entryPoint;
-    address internal _wToken;
-    address internal _uniswapSwapRouter02;
-
-    AssetType internal immutable _initAssetType;
+    AssetType public immutable initAssetType;
     address[] internal _initAssetAddresses;
 
     constructor() {
@@ -30,88 +32,84 @@ contract Config is Script {
             vm.projectRoot(),
             "/script/config.json"
         );
-        string memory json = vm.readFile(path);
-        _revokerPublicKeyX = vm.parseJsonUint(
-            json,
-            ".common.revokerPublicKey[0]"
-        );
-        _revokerPublicKeyY = vm.parseJsonUint(
-            json,
-            ".common.revokerPublicKey[1]"
-        );
+        string memory configJson = vm.readFile(path);
 
-        _encryptionPublicKeyX = vm.parseJsonUint(
-            json,
-            ".common.encryptionPublicKey[0]"
-        );
+        // common config
+        _revokerPublicKey = [
+            vm.parseJsonUint(configJson, ".common.revokerPublicKey[0]"),
+            vm.parseJsonUint(configJson, ".common.revokerPublicKey[1]")
+        ];
 
-        _encryptionPublicKeyY = vm.parseJsonUint(
-            json,
-            ".common.encryptionPublicKey[1]"
+        _encryptionPublicKey = [
+            vm.parseJsonUint(configJson, ".common.encryptionPublicKey[0]"),
+            vm.parseJsonUint(configJson, ".common.encryptionPublicKey[1]")
+        ];
+
+        addressTreeDepth = uint8(
+            vm.parseJsonUint(configJson, ".common.addressTreeDepth")
         );
 
-        string memory chainPrefix = string.concat(".", vm.toString(_chainId));
-
-        _treeDepth = vm.parseJsonUint(
-            json,
-            string.concat(chainPrefix, ".treeDepth")
+        commitmentTreeDepth = uint8(
+            vm.parseJsonUint(configJson, ".common.commitmentTreeDepth")
         );
 
-        _entryPoint = vm.parseJsonAddress(
-            json,
+        withdrawFeeBps = vm.parseJsonUint(configJson, ".common.withdrawFeeBps");
+
+        // chain specific config
+        string memory chainPrefix = string.concat(".", vm.toString(chainId));
+
+        entryPoint = vm.parseJsonAddress(
+            configJson,
             string.concat(chainPrefix, ".entryPoint")
         );
 
-        _wToken = vm.parseJsonAddress(
-            json,
+        gateway = vm.parseJsonAddress(
+            configJson,
+            string.concat(chainPrefix, ".gateway")
+        );
+
+        paymaster = vm.parseJsonAddress(
+            configJson,
+            string.concat(chainPrefix, ".paymaster")
+        );
+
+        wToken = vm.parseJsonAddress(
+            configJson,
             string.concat(chainPrefix, ".wToken")
         );
 
-        _uniswapSwapRouter02 = vm.parseJsonAddress(
-            json,
+        uniswapSwapRouter02 = vm.parseJsonAddress(
+            configJson,
             string.concat(chainPrefix, ".uniswapSwapRouter02")
         );
 
-        _initAssetType = AssetType(
-            vm.parseJsonUint(json, string.concat(chainPrefix, ".initAssetType"))
+        sanctionList = vm.parseJsonAddress(
+            configJson,
+            string.concat(chainPrefix, ".sanctionList")
+        );
+
+        initAssetType = AssetType(
+            vm.parseJsonUint(
+                configJson,
+                string.concat(chainPrefix, ".initAssetType")
+            )
         );
 
         _initAssetAddresses = vm.parseJsonAddressArray(
-            json,
+            configJson,
             string.concat(chainPrefix, ".initAssetAddresses")
         );
     }
 
     function revokerPublicKey() external view returns (uint256[2] memory) {
-        return [_revokerPublicKeyX, _revokerPublicKeyY];
+        return _revokerPublicKey;
     }
 
     function encryptionPublicKey() external view returns (uint256[2] memory) {
-        return [_encryptionPublicKeyX, _encryptionPublicKeyY];
-    }
-
-    function treeDepth() external pure returns (uint256) {
-        return _treeDepth;
-    }
-
-    function entryPoint() external view returns (address) {
-        return _entryPoint;
-    }
-
-    function wToken() external view returns (address) {
-        return _wToken;
-    }
-
-    function uniswapSwapRouter02() external view returns (address) {
-        return _uniswapSwapRouter02;
-    }
-
-    function initAssetType() external view returns (AssetType) {
-        return _initAssetType;
+        return _encryptionPublicKey;
     }
 
     function initAssetAddresses() external view returns (address[] memory) {
-        address[] memory addresses = _initAssetAddresses;
-        return addresses;
+        return _initAssetAddresses;
     }
 }

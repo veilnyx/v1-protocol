@@ -2,30 +2,50 @@
 pragma solidity ^0.8.20;
 
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
+import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 import {Pool} from "src/core/Pool.sol";
 import {Verifier22} from "src/verifiers/Verifier22.sol";
 import {Verifier, VerifierInfo} from "src/core/Verifier.sol";
-import {Convertor} from "src/core/Convertor.sol";
+import {AdaptorHandler} from "src/core/AdaptorHandler.sol";
 import {Asset, AssetType} from "src/libraries/Asset.sol";
-import {ZTransaction} from "src/libraries/ZTransaction.sol";
+import {ZTransaction, RevokerData} from "src/libraries/ZTransaction.sol";
 import {MockERC20} from "test/mocks/MockERC20.sol";
+import {MockScreener} from "test/mocks/MockScreener.sol";
 import {BaseTest} from "./BaseTest.sol";
+import {console2} from "forge-std/console2.sol";
+import {MESSAGE_REGISTER_ADDRESS, EIP712_DOMAIN_NAME, EIP712_DOMAIN_VERSION, EIP712_TYPEHASH_REGISTER_ADDRESS} from "src/base/Constants.sol";
 
 contract PoolTest is BaseTest {
     Verifier public verifier;
-    Convertor public convertor;
+    AdaptorHandler public adaptorHandler;
     Pool public pool;
 
-    uint256 public treeDepth = 32;
+    uint256 public addressTreeDepth;
+    uint256 public commitmentTreeDepth;
     address public entryPoint;
 
     MockERC20 public token1;
     MockERC20 public token2;
 
+    MockScreener public screener;
+
     Asset public asset1;
     Asset public asset2;
 
+    bytes revokerMetaData = abi.encode("Revoker 1", "Organization 1");
+
+    uint256 constant INITIAL_DEPOSIT = 1000 ether;
+    bytes32 private constant TYPE_HASH =
+        keccak256(
+            "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
+        );
+
     function _initFixture() internal virtual {
+        BaseTest._setUp();
+
+        addressTreeDepth = fixture.addressTreeDepth;
+        commitmentTreeDepth = fixture.commitmentTreeDepth;
+
         Verifier22 v22 = new Verifier22();
         VerifierInfo[] memory vInfos = new VerifierInfo[](1);
         vInfos[0] = VerifierInfo({
@@ -33,13 +53,8 @@ contract PoolTest is BaseTest {
             addr: address(v22),
             selector: v22.verifyProof.selector
         });
-        verifier = new Verifier(
-            vInfos,
-            fixture.revokerPublicKey,
-            fixture.encryptionPublicKey
-        );
-        convertor = new Convertor();
-        entryPoint = address(0);
+        verifier = new Verifier(vInfos);
+        adaptorHandler = new AdaptorHandler();
 
         pool = new Pool();
 
@@ -64,18 +79,43 @@ contract PoolTest is BaseTest {
         assetAddresses[0] = address(token1);
         assetAddresses[1] = address(token2);
 
-        bytes memory initData = abi.encodeWithSelector(
-            pool.initialize.selector,
-            treeDepth,
-            address(verifier),
-            address(convertor),
-            address(entryPoint),
-            assetType,
-            assetAddresses
+        screener = new MockScreener();
+        address hasher = _deployHasher();
+
+        bytes memory initData = abi.encodeCall(
+            Pool.initialize,
+            (
+                fixture.addressTreeDepth,
+                fixture.commitmentTreeDepth,
+                address(verifier),
+                address(adaptorHandler),
+                address(screener),
+                hasher,
+                fixture.withdrawFeeBps
+            )
         );
 
         ERC1967Proxy poolProxy = new ERC1967Proxy(address(pool), initData);
         pool = Pool(address(poolProxy));
+        pool.addAssets(assetType, assetAddresses);
+
+        pool.registerRevoker(
+            fixture.revokerPublicKey,
+            fixture.encryptionPublicKey,
+            revokerMetaData
+        );
+
+        (, uint256 rootUserPK) = makeAddrAndKey("rootUser");
+        bytes memory rootShieldedAddress = bytes.concat(
+            bytes32(fixture.senderAccount.rootAddress),
+            keccak256(bytes("sign")),
+            keccak256(bytes("view"))
+        );
+        bytes memory signature = _getRegisterAddressSignature(
+            rootUserPK,
+            rootShieldedAddress
+        );
+        pool.registerAddress(rootShieldedAddress, signature);
     }
 
     function _mintAsset(
@@ -116,11 +156,58 @@ contract PoolTest is BaseTest {
     }
 
     function _makeInitialDeposit() internal {
-        _mintAsset(asset1, address(this), 1000 ether);
-        _mintAsset(asset2, address(this), 1000 ether);
-        _approveAsset(asset1, address(pool), 1000 ether);
-        _approveAsset(asset2, address(pool), 1000 ether);
-        ZTransaction memory ztx = _loadZTx("deposit_1000_weth_usdc");
+        _mintAsset(asset1, address(this), INITIAL_DEPOSIT);
+        _mintAsset(asset2, address(this), INITIAL_DEPOSIT);
+        _approveAsset(asset1, address(pool), INITIAL_DEPOSIT);
+        _approveAsset(asset2, address(pool), INITIAL_DEPOSIT);
+        ZTransaction memory ztx = _loadZTx(
+            "deposit_1000_weth_usdc_without_fee"
+        );
         pool.transact(ztx);
+    }
+
+    //////////////////////////////////////////////////////
+    /// EIP 712 User Registration Functions       ////////
+    //////////////////////////////////////////////////////
+
+    function _getRegisterAddressSignature(
+        uint256 userPK,
+        bytes memory shieldedAddress
+    ) internal view returns (bytes memory) {
+        bytes32 hashTypedData = _getHashTypedRegisterAddressStruct(
+            shieldedAddress
+        );
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(userPK, hashTypedData);
+        return abi.encodePacked(r, s, v);
+    }
+
+    function _getHashTypedRegisterAddressStruct(
+        bytes memory shieldedAddress
+    ) internal view returns (bytes32) {
+        bytes32 hashTypedData = MessageHashUtils.toTypedDataHash(
+            _domainSeperator(),
+            keccak256(
+                abi.encode(
+                    EIP712_TYPEHASH_REGISTER_ADDRESS,
+                    keccak256(bytes(MESSAGE_REGISTER_ADDRESS)),
+                    keccak256(shieldedAddress)
+                )
+            )
+        );
+        return hashTypedData;
+    }
+
+    function _domainSeperator() internal view returns (bytes32) {
+        console2.log("Test::chainID:", block.chainid);
+        return
+            keccak256(
+                abi.encode(
+                    TYPE_HASH,
+                    keccak256(bytes(EIP712_DOMAIN_NAME)),
+                    keccak256(bytes(EIP712_DOMAIN_VERSION)),
+                    block.chainid,
+                    address(pool)
+                )
+            );
     }
 }

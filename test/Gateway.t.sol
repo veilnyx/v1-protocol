@@ -45,7 +45,7 @@ contract GatewayTest is Test {
         // Deposit to entry point
         vm.deal(address(this), 100 ether);
         paymaster.depositToEntryPoint{value: 100 ether}();
-        paymaster.updateAssetFee(0x010001, 0.1 ether);
+        paymaster.setAssetFee(0x010001, 0.1 ether);
     }
 
     function test_handleWrapAndDeposit() public {
@@ -59,7 +59,7 @@ contract GatewayTest is Test {
         ZTransaction memory ztx;
         uint24[] memory pubAssetIds = new uint24[](1);
         pubAssetIds[0] = 0x010001;
-        ztx.pubAssetIds = pubAssetIds;
+        // ztx.pubAssetIds = pubAssetIds;
         ztx.feeData = uint256(
             bytes32(
                 bytes.concat(

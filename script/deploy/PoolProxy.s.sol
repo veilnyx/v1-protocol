@@ -10,26 +10,41 @@ import {BaseScript} from "../BaseScript.sol";
 contract PoolProxyDeploy is BaseScript {
     function run() external broadcast {
         address verifier = _getContract("Verifier");
-        address convertor = _getContract("Convertor");
+        address adaptorHandler = _getContract("AdaptorHandler");
+        address screener = _getContract("Screener");
+        address hasher = _getContract("Hasher");
         address poolImpl = _getContract("PoolImpl");
 
-        uint256 treeDepth = _config.treeDepth();
-        address entryPoint = _config.entryPoint();
+        uint8 addressTreeDepth = _config.addressTreeDepth();
+        uint8 commitmentTreeDepth = _config.commitmentTreeDepth();
+        uint256 withdrawFeeBps = _config.withdrawFeeBps();
         AssetType initAssetType = _config.initAssetType();
         address[] memory initAssetAddresses = _config.initAssetAddresses();
+        uint256[2] memory revokerPublicKey = _config.revokerPublicKey();
+        uint256[2] memory encryptionPublicKey = _config.encryptionPublicKey();
 
         bytes memory initializeData = abi.encodeCall(
             Pool.initialize,
             (
-                treeDepth,
+                addressTreeDepth,
+                commitmentTreeDepth,
                 verifier,
-                convertor,
-                entryPoint,
-                initAssetType,
-                initAssetAddresses
+                adaptorHandler,
+                screener,
+                hasher,
+                withdrawFeeBps
             )
         );
 
-        new ERC1967Proxy(address(poolImpl), initializeData);
+        address proxyAddress = address(
+            new ERC1967Proxy(address(poolImpl), initializeData)
+        );
+
+        Pool pool = Pool(proxyAddress);
+
+        pool.addAssets(initAssetType, initAssetAddresses);
+
+        bytes memory metadata = abi.encode("Test Revoker", "Test Description");
+        pool.registerRevoker(revokerPublicKey, encryptionPublicKey, metadata);
     }
 }
