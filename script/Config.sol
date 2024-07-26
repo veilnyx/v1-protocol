@@ -22,6 +22,7 @@ contract Config is Script {
     address public immutable paymaster;
     address public immutable wToken;
     address public immutable uniswapSwapRouter02;
+    address public immutable lido;
     address public immutable sanctionList;
 
     AssetType public immutable initAssetType;
@@ -78,11 +79,21 @@ contract Config is Script {
             string.concat(chainPrefix, ".wToken")
         );
 
-        uniswapSwapRouter02 = vm.parseJsonAddress(
+        if(chainId == 11155111) {
+            uniswapSwapRouter02 = vm.parseJsonAddress(
             configJson,
             string.concat(chainPrefix, ".uniswapSwapRouter02")
         );
+        } else {
+            uniswapSwapRouter02 = address(0);
+        }
 
+        if(chainId == 17000) {
+            lido = vm.parseJsonAddress(configJson, string.concat(chainPrefix, ".lido"));
+        } else {
+            lido = address(0);
+        }
+        
         sanctionList = vm.parseJsonAddress(
             configJson,
             string.concat(chainPrefix, ".sanctionList")

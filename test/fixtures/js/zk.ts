@@ -5,9 +5,9 @@ import { CircuitPath, ZTransaction } from "@zkfi-tech/zk-prover";
 
 export const getCircuitPath = (id: number) => {
   return {
-    zKey: `../../v1-circuits/artifacts/${id}/keys.zkey`,
-    wasm: `../../v1-circuits/artifacts/${id}/circuit.wasm`,
-    vKey: `../../v1-circuits/artifacts/${id}/vKey.json`,
+    zKey: `/Users/shiven/documents/code/v1-circuits/artifacts/${id}/keys.zkey`,
+    wasm: `/Users/shiven/documents/code/v1-circuits/artifacts/${id}/circuit.wasm`,
+    vKey: `/Users/shiven/documents/code/v1-circuits/artifacts/${id}/vKey.json`,
   };
 };
 

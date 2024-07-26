@@ -173,13 +173,23 @@ const convertReqs = {
     type: TransactionType.CONVERT,
     assetIds: [wethAssetId],
     values: [parseEther("0.01")],
-    to: "0x03E98aE18908eBc2Fe82e646E4DFB628963383c1", // adaptor to which the ZkFi Convertor will call to execute swap
+    to: "0x03E98aE18908eBc2Fe82e646E4DFB628963383c1", // adaptor to which the ZkFi adaptor handler will call to execute swap
     revokerId: 0,
     feeAssetId: wethAssetId,
     viaBundler: true,
     paymaster: paymasterAddress,
     payload:
       "0x000000000000000000000000000000000000000000000000000000000001000400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000", // refund: pool address (address(0))
+  }, stake_1_orig_weth_on_lido: {
+    type: TransactionType.CONVERT,
+    assetIds: [wethAssetId],
+    values: [parseEther("1")],
+    to: "0x03E98aE18908eBc2Fe82e646E4DFB628963383c1", // adaptor to which the ZkFi adaptor handler will call to execute staking
+    revokerId: 0,
+    feeAssetId: 0,
+    viaBundler: false,
+    paymaster: zeroAddress,
+    payload: "0x" as `0x${string}`,
   }
 };
 
@@ -232,12 +242,12 @@ async function main() {
   const zkfi = getSDKInstance();
 
   // Pre-deposit 1000 token of assets - 0x010001 and 0x010002
-  const depositName = "deposit_1000_weth_without_fee";
+  const depositName = "deposit_1_original_weth";
   await createMockZTx(depositName, depositReqs[depositName], zkfi);
   await mockNotes(depositName, zkfi);
 
-  const withdrawName = "withdraw_1_weth_with_fee";
-  await createMockZTx(withdrawName, withdrawReqs[withdrawName], zkfi);
+  const convertName = "stake_1_orig_weth_on_lido";
+  await createMockZTx(convertName, convertReqs[convertName], zkfi);
 
   // const reqs = {
   //   ...withdrawReqs,
