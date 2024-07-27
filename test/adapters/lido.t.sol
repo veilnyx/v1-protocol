@@ -9,6 +9,7 @@ import {ZTransaction} from "src/libraries/ZTransaction.sol";
 import {LidoAdaptor} from "src/adaptors/lido/lidoAdaptor.sol";
 import {IWToken} from "src/interfaces/IWToken.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import {Asset, AssetType} from "src/libraries/Asset.sol";
 import {console} from "forge-std/console.sol";
 
@@ -17,6 +18,7 @@ contract UniswapV3AdaptorTest is PoolTest, BaseScript {
 
     LidoAdaptor lidoAdaptor;
     address lido;
+    address withdrawalQueueERC721;
     address public stETH;
     address public wstETH;
     address public WETH;
@@ -38,12 +40,13 @@ contract UniswapV3AdaptorTest is PoolTest, BaseScript {
         stETH = _config.initAssetAddresses()[1];
         wstETH = _config.initAssetAddresses()[2];
         lido = _config.lido();
+        withdrawalQueueERC721 = _config.withdrawalQueueERC721();
         if (lido == address(0)) {
             revert CheckChainConfig();
         }
 
         // deploying Uniswap adaptor
-        lidoAdaptor = new LidoAdaptor(lido, WETH, stETH, wstETH, address(pool));
+        lidoAdaptor = new LidoAdaptor(lido, WETH, stETH, wstETH, withdrawalQueueERC721, address(pool));
         /// @dev update convert req fixture with this adaptor addr as `to`
         console.log("Lido adaptor deployed:", address(lidoAdaptor));
 
@@ -90,6 +93,33 @@ contract UniswapV3AdaptorTest is PoolTest, BaseScript {
         console.log("Pool wstEth bal before swap:", poolwstETHBalBeforeStaking);
         console.log("Pool wstEth bal after swap:", poolwstETHBalPostStake);
         assert(poolwstETHBalPostStake > poolwstETHBalBeforeStaking);
+
+         ZTransaction memory ztxDepositWstEth = _loadZTx(
+            "deposit_1_original_wstEth"
+        );
+        pool.transact(ztxDepositWstEth); // mocking some WstEth notes for them to be unstaked for the user
+
+        _wstEthUnStakingOnLido();
+    }
+
+    function _wstEthUnStakingOnLido() internal {
+        console.log("Initiating Unstaking on Lido");
+        uint256 poolwstETHBalBeforeUnStaking = IERC20(wstETH).balanceOf(
+            address(pool)
+        );
+
+        ZTransaction memory ztxStake = _loadZTx(
+            "unstake_wstEth_on_lido"
+        );
+        pool.transact(ztxStake);
+
+        // Asserts
+        uint256 poolwstETHBalPostUnStake = IERC20(wstETH).balanceOf(address(pool));
+        console.log("Pool wstEth bal before swap:", poolwstETHBalBeforeUnStaking);
+        console.log("Pool wstEth bal after swap:", poolwstETHBalPostUnStake);
+        
+        assert(poolwstETHBalPostUnStake < poolwstETHBalBeforeUnStaking);
+        assert(IERC721(withdrawalQueueERC721).balanceOf(user) > 0);
     }
 
 

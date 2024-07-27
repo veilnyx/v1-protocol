@@ -86,8 +86,6 @@ contract UniswapV3Adapter is AdaptorBase {
             outAssetIds = new uint24[](0);
             outValues = new uint256[](0);
         }
-
-        return (outAssetIds, outValues);
     }
 
     /// @param tokenIn The address of the token to be swapped

@@ -53,7 +53,7 @@ struct RevokerData {
 ///                             this is encrypted assets using sender's key that were transferred to receiver.
 /// @param complianceMemo       Encrypted compliance data that was created using compliance encryption key
 /// @param targetData           Target address (first 20-bytes) for withdraw/adapter concatenated with payload
-/// @param refundData           Refund address (first 32-byte) for public deposit to shielded account
+/// @param refundData           Refund address (first 32-byte) for public deposit of converted tokens to recipient's blinded addr (shielded account)
 ///                             concatenated with refund memo
 struct ZTransaction {
     ZTransactionType txType;
@@ -302,6 +302,9 @@ library ZTransactionLogic {
 
         _receivePubAssets(assets, outPubAssets, adaptorHandler);
 
+        /// @dev Creating commitments and output noteMemos for received tokens. This is done on the protocol side for CONVERT txns because the exact value of converted tokens can only be determined after executing the CONVERT tx.
+        /// @dev `refundAddress` is used as the recipient's blinded address.
+        /// @dev `refundAddressMemo` contains the encrypted blinding factor which can only be decrypted by the owner of `refundAddress`. This blinding needs to be submitted as a proof to prove ownership over the refund notes.
         uint256 outLen = outPubAssets.length;
 
         uint256[] memory pubCms = new uint256[](outLen);

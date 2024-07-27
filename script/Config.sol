@@ -23,6 +23,7 @@ contract Config is Script {
     address public immutable wToken;
     address public immutable uniswapSwapRouter02;
     address public immutable lido;
+    address public immutable withdrawalQueueERC721;
     address public immutable sanctionList;
 
     AssetType public immutable initAssetType;
@@ -90,6 +91,7 @@ contract Config is Script {
 
         if(chainId == 17000) {
             lido = vm.parseJsonAddress(configJson, string.concat(chainPrefix, ".lido"));
+            withdrawalQueueERC721 = vm.parseJsonAddress(configJson, string.concat(chainPrefix, ".withdrawalQueueERC721"));
         } else {
             lido = address(0);
         }
