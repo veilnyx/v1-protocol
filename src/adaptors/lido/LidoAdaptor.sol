@@ -13,8 +13,8 @@ import {console} from "forge-std/Test.sol";
 
 contract LidoAdaptor is AdaptorBase {
     error UnsupportedAsset(uint24 assetId);
-    error OnlyWETHSupported();
     error ZeroValues();
+    error ZeroAddress();
 
     ILido public immutable iLido;
     IWithdrawQueueERC721 public immutable iWithdrawQueueERC721;
@@ -88,13 +88,18 @@ contract LidoAdaptor is AdaptorBase {
             }
 
             address withdrawalAddress = abi.decode(payload, (address));
+            if(withdrawalAddress == address(0)) {
+                revert ZeroAddress();
+            }
+
             uint256[] memory amounts = new uint256[](1);
             amounts[0] = stakeValue;
 
             IWstEthToken(wstEth).approve(
                 address(iWithdrawQueueERC721),
                 stakeValue
-            );
+            ); // needed by `Lido::requestWithdrawalsWstETH()`
+            
             iWithdrawQueueERC721.requestWithdrawalsWstETH(
                 amounts,
                 withdrawalAddress
