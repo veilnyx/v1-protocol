@@ -117,5 +117,5 @@ contract LidoAdaptor is AdaptorBase {
 
     /// @dev only for enabling `testWstEthUnstakingOnLido()` test. Pls comment this out for production use.
     // Allow Lido adaptor to receive unwrapped Ether
-    receive() external payable {}
+    // receive() external payable {}
 }

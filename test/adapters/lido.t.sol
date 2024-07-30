@@ -106,7 +106,7 @@ contract LidoAdaptorTest is PoolTest, BaseScript {
 
     /// @dev This test bypasses the Labyrinth protocol and directly tests the Lido integration from the LidoAdaptor.
     /// @dev Pls uncomment the `receive()` on the LidoAdaptor to enable this test.
-    function testWstEthUnStakingOnLido() public {
+    function testWstEthUnStakingOnLidoBypassingLabyrinth() public {
         uint256 initialDeposit = 10 ether;
         vm.deal(address(lidoAdaptor), initialDeposit);
         vm.prank(address(lidoAdaptor));
