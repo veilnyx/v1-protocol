@@ -88,7 +88,7 @@ contract LidoAdaptor is AdaptorBase {
             }
 
             address withdrawalAddress = abi.decode(payload, (address));
-            if(withdrawalAddress == address(0)) {
+            if (withdrawalAddress == address(0)) {
                 revert ZeroAddress();
             }
 
@@ -99,7 +99,7 @@ contract LidoAdaptor is AdaptorBase {
                 address(iWithdrawQueueERC721),
                 stakeValue
             ); // needed by `Lido::requestWithdrawalsWstETH()`
-            
+
             iWithdrawQueueERC721.requestWithdrawalsWstETH(
                 amounts,
                 withdrawalAddress
@@ -114,4 +114,8 @@ contract LidoAdaptor is AdaptorBase {
             IWstEthToken(wstEth).balanceOf(address(this))
         );
     }
+
+    /// @dev only for enabling `testWstEthUnstakingOnLido()` test. Pls comment this out for production use.
+    // Allow Lido adaptor to receive unwrapped Ether
+    receive() external payable {}
 }
