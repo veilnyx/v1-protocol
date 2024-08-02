@@ -80,7 +80,7 @@ contract Config is Script {
             string.concat(chainPrefix, ".wToken")
         );
 
-        if(chainId == 11155111) {
+        if(chainId == 11155111 || chainId == 1) {
             uniswapSwapRouter02 = vm.parseJsonAddress(
             configJson,
             string.concat(chainPrefix, ".uniswapSwapRouter02")
