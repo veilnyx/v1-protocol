@@ -8,6 +8,7 @@ import {IAdaptor} from "../interfaces/IAdaptor.sol";
 import {IPool} from "../interfaces/IPool.sol";
 import {Asset, AssetType} from "../libraries/Asset.sol";
 import {PubAsset} from "../libraries/ZTransaction.sol";
+import {console} from "forge-std/Test.sol";
 
 contract AdaptorHandler is IAdaptorHandler {
     using SafeERC20 for IERC20;
@@ -74,4 +75,7 @@ contract AdaptorHandler is IAdaptorHandler {
 
         return outPubAssets;
     }
+
+    // Allow Lido adaptor to receive unwrapped Ether
+    receive() external payable {}
 }

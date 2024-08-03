@@ -97,7 +97,7 @@ contract UniswapV3AdaptorTest is PoolTest, BaseScript {
         assert(poolUSDCBalPostConvert > poolUSDCBalBeforeConvert);
     }
 
-    function testWethToUSDCSwapToPoolViaBundler() public {
+    function testSwapViaBundler() public {
         console.log("Initiating WETH<>USDC swap");
         uint256 poolUSDCBalBeforeConvert = IERC20(USDC).balanceOf(
             address(pool)
