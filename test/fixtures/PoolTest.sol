@@ -1,19 +1,22 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.20;
+pragma solidity ^0.8.24;
 
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 import {Pool} from "src/core/Pool.sol";
-import {Verifier22} from "src/verifiers/Verifier22.sol";
-import {Verifier, VerifierInfo} from "src/core/Verifier.sol";
+import {VerifierTransact21} from "src/verifiers/VerifierTransact21.sol";
+import {VerifierTransact22} from "src/verifiers/VerifierTransact22.sol";
+import {VerifierRegister} from "src/verifiers/VerifierRegister.sol";
+import {Verifier, TransactionVerifierInfo} from "src/core/Verifier.sol";
 import {AdaptorHandler} from "src/core/AdaptorHandler.sol";
 import {Asset, AssetType} from "src/libraries/Asset.sol";
 import {ZTransaction, RevokerData} from "src/libraries/ZTransaction.sol";
 import {MockERC20} from "test/mocks/MockERC20.sol";
 import {MockScreener} from "test/mocks/MockScreener.sol";
 import {BaseTest} from "./BaseTest.sol";
-import {console2} from "forge-std/console2.sol";
+import {ShieldedAddressRegistrationData, ShieldedAddressLogic} from "src/libraries/ShieldedAddress.sol";
 import {MESSAGE_REGISTER_ADDRESS, EIP712_DOMAIN_NAME, EIP712_DOMAIN_VERSION, EIP712_TYPEHASH_REGISTER_ADDRESS} from "src/base/Constants.sol";
+import {console2} from "forge-std/console2.sol";
 
 contract PoolTest is BaseTest {
     Verifier public verifier;
@@ -46,14 +49,23 @@ contract PoolTest is BaseTest {
         addressTreeDepth = fixture.addressTreeDepth;
         commitmentTreeDepth = fixture.commitmentTreeDepth;
 
-        Verifier22 v22 = new Verifier22();
-        VerifierInfo[] memory vInfos = new VerifierInfo[](1);
-        vInfos[0] = VerifierInfo({
-            id: 2 * 10 + 2,
-            addr: address(v22),
-            selector: v22.verifyProof.selector
+        VerifierTransact21 vt21 = new VerifierTransact21();
+        VerifierTransact22 vt22 = new VerifierTransact22();
+        VerifierRegister vr = new VerifierRegister();
+        TransactionVerifierInfo[] memory vInfos = new TransactionVerifierInfo[](
+            2
+        );
+        vInfos[0] = TransactionVerifierInfo({
+            id: 21,
+            addr: address(vt21),
+            selector: vt21.verifyProof.selector
         });
-        verifier = new Verifier(vInfos);
+        vInfos[1] = TransactionVerifierInfo({
+            id: 22,
+            addr: address(vt22),
+            selector: vt22.verifyProof.selector
+        });
+        verifier = new Verifier(vInfos, address(vr));
         adaptorHandler = new AdaptorHandler();
 
         pool = new Pool();
@@ -105,17 +117,24 @@ contract PoolTest is BaseTest {
             revokerMetaData
         );
 
-        (, uint256 rootUserPK) = makeAddrAndKey("rootUser");
-        bytes memory rootShieldedAddress = bytes.concat(
-            bytes32(fixture.senderAccount.rootAddress),
-            keccak256(bytes("sign")),
-            keccak256(bytes("view"))
-        );
+        (, uint256 senderPk) = makeAddrAndKey("sender");
         bytes memory signature = _getRegisterAddressSignature(
-            rootUserPK,
-            rootShieldedAddress
+            senderPk,
+            bytes.concat(
+                bytes32(fixture.sender.rootAddress),
+                bytes32(fixture.sender.signPublicKey[0]),
+                bytes32(fixture.sender.signPublicKey[1]),
+                bytes32(fixture.sender.viewPublicKey[0]),
+                bytes32(fixture.sender.viewPublicKey[1])
+            )
         );
-        pool.registerAddress(rootShieldedAddress, signature);
+
+        ShieldedAddressRegistrationData
+            memory addressRegData = _loadShieldedAddressRegistrationData(
+                "register_sender"
+            );
+        addressRegData.signature = signature;
+        pool.registerAddress(addressRegData);
     }
 
     function _mintAsset(
@@ -198,7 +217,6 @@ contract PoolTest is BaseTest {
     }
 
     function _domainSeperator() internal view returns (bytes32) {
-        console2.log("Test::chainID:", block.chainid);
         return
             keccak256(
                 abi.encode(

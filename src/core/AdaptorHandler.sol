@@ -8,7 +8,6 @@ import {IAdaptor} from "../interfaces/IAdaptor.sol";
 import {IPool} from "../interfaces/IPool.sol";
 import {Asset, AssetType} from "../libraries/Asset.sol";
 import {PubAsset} from "../libraries/ZTransaction.sol";
-import {console} from "forge-std/Test.sol";
 
 contract AdaptorHandler is IAdaptorHandler {
     using SafeERC20 for IERC20;
@@ -67,6 +66,12 @@ contract AdaptorHandler is IAdaptorHandler {
             IERC20(asset.assetAddress).forceApprove(msg.sender, outValues[i]);
 
             outPubAssets[i] = PubAsset(outAssetIds[i], uint224(outValues[i]));
+
+            // uint248(
+            //     bytes31(
+            //         bytes.concat(bytes3(outAssetIds[i]), bytes28(outValues[i]))
+            //     )
+            // );
 
             unchecked {
                 ++i;

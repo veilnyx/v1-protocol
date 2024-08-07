@@ -4,23 +4,26 @@ import {
   createTestClient,
   http,
   keccak256,
+  padHex,
   parseEther,
   stringToBytes,
+  toHex,
 } from "viem";
 import { foundry } from "viem/chains";
 import { Core } from "@zkfi-tech/core";
+import MerkleTree from "fixed-merkle-tree";
+import { Fp, poseidonHash } from "@zkfi-tech/babyjubjub";
+import { toBigInt } from "@zkfi-tech/utils";
 import {
   MockAddressResolver,
   MockNotesSource,
   MockTreeSource,
 } from "./mockServices";
-import MerkleTree from "fixed-merkle-tree";
-import { Fp, poseidonHash } from "@zkfi-tech/babyjubjub";
 import { circuits } from "./zk";
 import { fixture } from "./fixture";
 
 const {
-  senderAccount,
+  sender: { account: senderAccount },
   revokerPublicKey,
   encryptionPublicKey,
   addressTreeDepth,
@@ -28,7 +31,8 @@ const {
 } = fixture;
 
 const zeroElement = Fp.from(keccak256(stringToBytes("zkFi"))).toHex();
-const hashFunction = (a: any, b: any) => poseidonHash([a, b]);
+const hashFunction = (a: any, b: any) =>
+  padHex(toHex(poseidonHash([toBigInt(a), toBigInt(b)])), { size: 32 });
 
 export const commitmentTree = new MerkleTree(commitmentTreeDepth, [], {
   zeroElement,
@@ -52,7 +56,6 @@ export const getSDKInstance = () => {
   const notesSource = new MockNotesSource();
 
   addressTreeSource.insert(senderAccount.rootAddress);
-  console.log("addrRoot", addressTreeSource.root.toString());
 
   const zkfi = new Core({
     chainId: foundry.id,
