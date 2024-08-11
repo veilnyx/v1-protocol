@@ -16,6 +16,9 @@ struct ShieldedAddressRegistrationData {
 library ShieldedAddressLogic {
     using MerkleTreeLogic for MerkleTree;
 
+    bytes32 constant MASK_PACK =
+        hex"8000000000000000000000000000000000000000000000000000000000000000";
+
     function register(
         ShieldedAddressRegistrationData calldata self,
         MerkleTree storage addressTree,
@@ -48,7 +51,7 @@ library ShieldedAddressLogic {
             publicAddress,
             rootAddress,
             nextIndex - 1,
-            self.shieldedAddress
+            pack(self.shieldedAddress)
         );
     }
 
@@ -60,26 +63,26 @@ library ShieldedAddressLogic {
         return IVerifier(verifier).verifyAddressProof(vInp);
     }
 
-    function compress(
+    function pack(
         bytes calldata shieldedAddress
     ) public pure returns (bytes memory) {
-        bytes32 viewPubKeyX = bytes32(shieldedAddress[32:64]);
-        bytes32 viewPubKeyY = bytes32(shieldedAddress[64:96]);
-        bytes32 signPubKeyX = bytes32(shieldedAddress[96:128]);
-        bytes32 signPubKeyY = bytes32(shieldedAddress[128:160]);
+        bytes32 vx = bytes32(shieldedAddress[32:64]);
+        bytes32 vy = bytes32(shieldedAddress[64:96]);
+        bytes32 sx = bytes32(shieldedAddress[96:128]);
+        bytes32 sy = bytes32(shieldedAddress[128:160]);
 
-        bytes32 mask = hex"8000000000000000000000000000000000000000000000000000000000000000";
+        return
+            abi.encodePacked(
+                shieldedAddress[0:32],
+                _packPoint(vx, vy),
+                _packPoint(sx, sy)
+            );
+    }
 
-        bytes32 v;
-        if (uint256(viewPubKeyX) < FIELD_SIZE_DIV_2) {
-            v = mask | bytes32(viewPubKeyY);
+    function _packPoint(bytes32 x, bytes32 y) internal pure returns (bytes32) {
+        if (uint256(x) > FIELD_SIZE_DIV_2) {
+            return MASK_PACK | y;
         }
-
-        bytes32 s;
-        if (uint256(signPubKeyX) < FIELD_SIZE_DIV_2) {
-            s = mask | bytes32(signPubKeyY);
-        }
-
-        return abi.encodePacked(bytes32(shieldedAddress[0:32]), v, s);
+        return y;
     }
 }

@@ -34,36 +34,17 @@ contract PoolUserRegistration is PoolBaseTest {
         );
     }
 
-    function test_compressShieldedAddress() public view {
-        // ShieldedAddressRegistrationData
-        //     memory data = _loadShieldedAddressRegistrationData(
-        //         "register_sender"
-        //     );
-
+    function test_packShieldedAddress() public view {
         bytes memory compressed = fixture.sender.shieldedAddress;
-        bytes memory uncompressed = bytes.concat(
-            bytes32(fixture.sender.rootAddress),
-            bytes32(fixture.sender.signPublicKey[0]),
-            bytes32(fixture.sender.signPublicKey[1]),
-            bytes32(fixture.sender.viewPublicKey[0]),
-            bytes32(fixture.sender.viewPublicKey[1])
+        bytes memory uncompressed = abi.encodePacked(
+            fixture.sender.rootAddress,
+            fixture.sender.signPublicKey,
+            fixture.sender.viewPublicKey
         );
-
-        console2.log(fixture.sender.signPublicKey[0]);
-
-        bytes memory compressed2 = ShieldedAddressLogic.compress(uncompressed);
-
-        // console2.logBytes(uncompressed);
-        // console2.log("==================");
-        // console2.logBytes(compressed);
-        // console2.log("==================");
-        // console2.logBytes(compressed2);
+        bytes memory compressed2 = ShieldedAddressLogic.pack(uncompressed);
 
         assertEq(compressed2.length, 96);
-        // assertEq(compressed, compressed2);
-        // assertEq(addressRegData.shieldedAddress.length, compressed);
-
-        // assertEq(compressed.length, 32);
+        assertEq(compressed, compressed2);
     }
 
     function test_registerAddress() public {
