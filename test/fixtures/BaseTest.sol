@@ -3,20 +3,33 @@ pragma solidity ^0.8.20;
 
 import {Test} from "forge-std/Test.sol";
 import {ZTransactionType, ZTransaction} from "src/libraries/ZTransaction.sol";
+import {ShieldedAddressRegistrationData} from "src/libraries/ShieldedAddress.sol";
 import {Hasher} from "src/core/Hasher.sol";
 import {Fixture, FixtureLib} from "test/fixtures/Fixture.sol";
+import {MockERC20} from "test/mocks/MockERC20.sol";
 
 abstract contract BaseTest is Test {
     Fixture public fixture;
 
-    function _setUp() internal {
+    MockERC20 public token1;
+    MockERC20 public token2;
+
+    function _setUp() internal virtual {
         fixture = FixtureLib.load(vm);
+        token1 = new MockERC20(address(this));
+        token2 = new MockERC20(address(this));
     }
 
-    function _loadZTx(
+    function _loadShieldedTransaction(
         string memory name
     ) internal view returns (ZTransaction memory) {
-        return FixtureLib.loadZTx(name, vm);
+        return FixtureLib.loadShieldedTransaction(name, vm);
+    }
+
+    function _loadShieldedAddressRegistrationData(
+        string memory name
+    ) internal view returns (ShieldedAddressRegistrationData memory) {
+        return FixtureLib.loadShieldedAddressRegistrationData(name, vm);
     }
 
     function _deployHasher() internal returns (address) {

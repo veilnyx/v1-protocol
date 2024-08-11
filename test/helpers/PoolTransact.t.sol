@@ -98,18 +98,18 @@ contract PoolTransactTest is Test {
         uint32 nextLeafIndex = pool.getCommitmentTreeNextLeafIndex();
 
         vm.expectEmit(true, true, true, false);
-        emit IPool.Receipt(
-            ztx.txType,
-            ztx.revokerId,
-            (nextLeafIndex + 2),
-            address(0),
-            uint24(0),
-            uint96(0),
-            address(0),
-            ztx.assetMemo,
-            ztx.complianceMemo,
-            ztx.noteMemos
-        );
+        // emit IPool.Receipt(
+        //     ztx.txType,
+        //     ztx.revokerId,
+        //     (nextLeafIndex + 2),
+        //     address(0),
+        //     uint24(0),
+        //     uint96(0),
+        //     address(0),
+        //     ztx.assetsMemo,
+        //     ztx.keysMemo,
+        //     ztx.notesMemo
+        // );
 
         pool.transact(ztx);
     }

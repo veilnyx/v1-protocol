@@ -2,6 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {ZTransaction, ZTransactionType, RevokerData} from "../libraries/ZTransaction.sol";
+import {ShieldedAddressRegistrationData} from "../libraries/ShieldedAddress.sol";
 import {AssetType, Asset} from "../libraries/Asset.sol";
 import {PoolStorage} from "../base/PoolStorage.sol";
 
@@ -11,7 +12,7 @@ interface IPool {
     ////////////////////////////////////////
 
     event RegisterAddress(
-        address indexed sender,
+        address indexed publicAddress,
         uint256 indexed rootAddress,
         uint32 leafIndex,
         bytes shieldedAddress
@@ -38,9 +39,10 @@ interface IPool {
         uint24 feeAssetId,
         uint96 feeValue,
         address paymaster,
-        bytes assetMemo, // sent memo in case of transfer or calc from pub assets
-        bytes complianceMemo,
-        bytes[] noteMemos
+        bytes keysMemo,
+        bytes assetsMemo, // sent memo in case of transfer or calc from pub assets
+        bytes notesMemo,
+        bytes refundMemo
     );
 
     /////////////////////////////////////////
@@ -50,7 +52,8 @@ interface IPool {
     error RootAddressAlreadyRegistered(uint256 addr);
     error PublicAddressAlreadyRegistered(address addr);
     error BadArguments();
-    error InvalidProof();
+    error InvalidAddressProof();
+    error InvalidTransactionProof();
     error UnknownCommitmentTreeRoot();
     error UnknownAddressTreeRoot();
     error DoubleSpend(uint256 markedNullifier);
@@ -122,11 +125,9 @@ interface IPool {
 
     /// @notice Registers a new user using their address hash in the protocol.
     /// @notice Can only be called when the contract is not paused.
-    /// @param shieldedAddress The user's shielded address as created by the zkFi SDK. 96 bytes = 32 bytes rootAddress + 32 bytes sign public key + 32 bytes view public key
-    /// @param signature The signature of the user on the message.
+    /// @param addressRegData The user's shielded address data including shieled address and proof.
     function registerAddress(
-        bytes calldata shieldedAddress,
-        bytes calldata signature
+        ShieldedAddressRegistrationData calldata addressRegData
     ) external;
 
     /// @notice Validates and executes a ZTx.

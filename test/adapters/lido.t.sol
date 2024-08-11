@@ -30,7 +30,7 @@ contract LidoAdaptorTest is PoolTest, BaseScript {
 
     function setUp() external {
         require(shouldTestRun(), "LidoAdaptorTest: Chain not supported");
-        _initFixture();
+        _setUp();
 
         WETH = _config.wToken();
         if (WETH == address(0)) {
@@ -74,7 +74,7 @@ contract LidoAdaptorTest is PoolTest, BaseScript {
         vm.startPrank(user);
         iWETH.deposit{value: INITIAL_SUPPLY}(); // wrapping eth to weth
         iWETH.approve(address(pool), INITIAL_SUPPLY); // depositing weth to pool
-        ZTransaction memory ztxWethDeposit = _loadZTx(
+        ZTransaction memory ztxWethDeposit = _loadShieldedTransaction(
             "deposit_1_original_weth"
         );
         pool.transact(ztxWethDeposit);
@@ -92,7 +92,9 @@ contract LidoAdaptorTest is PoolTest, BaseScript {
             address(pool)
         );
 
-        ZTransaction memory ztxStake = _loadZTx("stake_1_orig_weth_on_lido");
+        ZTransaction memory ztxStake = _loadShieldedTransaction(
+            "stake_1_orig_weth_on_lido"
+        );
         pool.transact(ztxStake);
 
         // Asserts

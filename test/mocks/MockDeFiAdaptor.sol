@@ -8,7 +8,7 @@ import {MockDeFi} from "./MockDeFi.sol";
 
 import {console2} from "forge-std/console2.sol";
 
-contract MockDeFiProxy is ERC20, AdaptorBase {
+contract MockDeFiAdaptor is ERC20, AdaptorBase {
     address public immutable tokenAddress;
     address public immutable mockDefi;
 

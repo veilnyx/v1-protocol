@@ -8,16 +8,16 @@ import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/ut
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 import {EIP712Upgradeable} from "@openzeppelin/contracts-upgradeable/utils/cryptography/EIP712Upgradeable.sol";
-import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {IVerifier} from "../interfaces/IVerifier.sol";
 import {IPool} from "../interfaces/IPool.sol";
 import {IAdaptorHandler} from "../interfaces/IAdaptorHandler.sol";
 import {IScreener} from "../interfaces/IScreener.sol";
+import {EIP712_DOMAIN_NAME, EIP712_DOMAIN_VERSION, EIP712_TYPEHASH_REGISTER_ADDRESS, MESSAGE_REGISTER_ADDRESS} from "../base/Constants.sol";
 import {PoolStorage} from "../base/PoolStorage.sol";
 import {Asset, AssetType, AssetLogic} from "../libraries/Asset.sol";
-import {ZTransaction, ZTransactionLogic, RevokerData} from "../libraries/ZTransaction.sol";
 import {MerkleTree, MerkleTreeLogic} from "../libraries/MerkleTree.sol";
-import {EIP712_DOMAIN_NAME, EIP712_DOMAIN_VERSION, EIP712_TYPEHASH_REGISTER_ADDRESS, MESSAGE_REGISTER_ADDRESS} from "../base/Constants.sol";
+import {ShieldedAddressRegistrationData, ShieldedAddressLogic} from "../libraries/ShieldedAddress.sol";
+import {ZTransaction, ZTransactionLogic, RevokerData} from "../libraries/ZTransaction.sol";
 
 contract Pool is
     IPool,
@@ -30,6 +30,7 @@ contract Pool is
     PoolStorage
 {
     using MerkleTreeLogic for MerkleTree;
+    using ShieldedAddressLogic for ShieldedAddressRegistrationData;
     using ZTransactionLogic for ZTransaction;
 
     /// @notice Initializes the Pool contract with the given parameters.
@@ -159,39 +160,20 @@ contract Pool is
     ////////////////////////////////////////
 
     function registerAddress(
-        bytes calldata shieldedAddress,
-        bytes calldata signature
+        ShieldedAddressRegistrationData calldata addressRegData
     ) external whenNotPaused {
-        uint256 rootAddress = uint256(bytes32(shieldedAddress));
-
-        if (_rootAddresses[rootAddress]) {
-            revert RootAddressAlreadyRegistered(rootAddress);
-        }
-
-        // Since shielded address = rootAddress (32-byte) + sign public key (32-byte) +
-        // view public key (32-byte)
-        if (shieldedAddress.length != 96) {
-            revert BadArguments();
-        }
-
-        bytes32 hashStruct = _hashRegsiterAddressStruct(shieldedAddress);
-        bytes32 hashTypedData = _hashTypedDataV4(hashStruct);
-        address sender = ECDSA.recover(hashTypedData, signature);
-
-        if (_publicAddresses[sender] != 0) {
-            revert PublicAddressAlreadyRegistered(sender);
-        }
-
-        uint32 nextIndex = _addressTree.insert(rootAddress);
-        _rootAddresses[rootAddress] = true;
-        _publicAddresses[sender] = rootAddress;
-
-        emit RegisterAddress(
-            sender,
-            rootAddress,
-            nextIndex - 1,
-            shieldedAddress
+        bytes32 hashStruct = _hashRegsiterAddressStruct(
+            addressRegData.shieldedAddress
         );
+        bytes32 hashTypedData = _hashTypedDataV4(hashStruct);
+
+        addressRegData.register({
+            addressTree: _addressTree,
+            publicAddresses: _publicAddresses,
+            rootAddresses: _rootAddresses,
+            verifier: verifier,
+            hashTypedData: hashTypedData
+        });
     }
 
     function transact(

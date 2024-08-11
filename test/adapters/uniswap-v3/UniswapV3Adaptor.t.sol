@@ -26,7 +26,7 @@ contract UniswapV3AdaptorTest is PoolTest, BaseScript {
 
     function setUp() external {
         require(shouldTestRun(), "UniswapV3AdaptorTest: Chain not supported");
-        _initFixture();
+        _setUp();
 
         WETH = _config.initAssetAddresses()[0];
         if (WETH == address(0)) {
@@ -68,7 +68,7 @@ contract UniswapV3AdaptorTest is PoolTest, BaseScript {
         vm.startPrank(user);
         iWETH.deposit{value: INITIAL_SUPPLY}(); // wrapping eth to weth
         iWETH.approve(address(pool), INITIAL_SUPPLY); // depositing weth to pool
-        ZTransaction memory ztxWethDeposit = _loadZTx(
+        ZTransaction memory ztxWethDeposit = _loadShieldedTransaction(
             "deposit_1_original_weth"
         );
         pool.transact(ztxWethDeposit);
@@ -85,7 +85,7 @@ contract UniswapV3AdaptorTest is PoolTest, BaseScript {
             address(pool)
         );
 
-        ZTransaction memory ztxDeposit = _loadZTx(
+        ZTransaction memory ztxDeposit = _loadShieldedTransaction(
             "swap_1e16_orig_weth_to_usdc"
         );
         pool.transact(ztxDeposit);
@@ -103,7 +103,7 @@ contract UniswapV3AdaptorTest is PoolTest, BaseScript {
             address(pool)
         );
 
-        ZTransaction memory ztxDeposit = _loadZTx(
+        ZTransaction memory ztxDeposit = _loadShieldedTransaction(
             "swap_1e16_orig_weth_to_usdc_via_bundler"
         );
         pool.transact(ztxDeposit);
@@ -133,7 +133,7 @@ contract UniswapV3AdaptorTest is PoolTest, BaseScript {
     //         address(pool)
     //     );
 
-    //     ZTransaction memory ztxDeposit = _loadZTx("swap_5_usdc_to_weth");
+    //     ZTransaction memory ztxDeposit =  _loadShieldedTransaction("swap_5_usdc_to_weth");
     //     pool.transact(ztxDeposit);
 
     //     // Asserts
@@ -147,7 +147,7 @@ contract UniswapV3AdaptorTest is PoolTest, BaseScript {
     //     console.log("Initiating swap to USDC using Uniswap test");
     //     uint256 userUSDCBalBeforeConvert = IERC20(USDC).balanceOf(user);
 
-    //     ZTransaction memory ztxDeposit = _loadZTx(
+    //     ZTransaction memory ztxDeposit =  _loadShieldedTransaction(
     //         "swap_1e16_orig_weth_to_usdc"
     //     );
     //     pool.transact(ztxDeposit);
@@ -219,5 +219,5 @@ contract UniswapV3AdaptorTest is PoolTest, BaseScript {
 // function loadZTx(
 //     string memory name
 // ) external view returns (ZTransaction memory) {
-//     return _loadZTx(name);
+//     return  _loadShieldedTransaction(name);
 // }

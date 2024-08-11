@@ -11,7 +11,9 @@ interface IVerifier {
         bytes memory vInp
     ) external view returns (bool);
 
-    function getVerifierId(
+    function verifyAddressProof(bytes memory vInp) external view returns (bool);
+
+    function getTransactionVerifierId(
         uint256 nIns,
         uint256 nOuts
     ) external pure returns (uint16 id);
