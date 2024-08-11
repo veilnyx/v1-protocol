@@ -12,7 +12,7 @@ import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Own
 
 contract PoolInitTest is PoolTest {
     function setUp() public {
-        _initFixture();
+        _setUp();
     }
 
     function test_correctParameters() public view {

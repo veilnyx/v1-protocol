@@ -1,13 +1,15 @@
 import { genAddressRegistrations } from "./genTestAddressRegistration";
 import { genTestDeposits } from "./genTestDeposits";
 import { genTestWithdrawals } from "./genTestWithdrawals";
+import { genTestTransfers } from "./genTestTransfers";
 import { getSDKInstance } from "./sdk";
 
 const main = async () => {
   const sdk = getSDKInstance();
-  // await genAddressRegistrations(sdk);
-  // await genTestDeposits(sdk);
+  await genAddressRegistrations(sdk);
+  await genTestDeposits(sdk);
   await genTestWithdrawals(sdk);
+  // await genTestTransfers(sdk);
 };
 
 main()

@@ -1,92 +1,60 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {Test, console} from "forge-std/Test.sol";
 import {console2} from "forge-std/console2.sol";
 import {ZTransaction} from "src/libraries/ZTransaction.sol";
-import {PoolTransactTest} from "test/helpers/PoolTransact.t.sol";
-import {PoolTest} from "test/fixtures/PoolTest.sol";
 import {IPool} from "src/interfaces/IPool.sol";
-import {MockERC20} from "test/mocks/MockERC20.sol";
+import {ZERO_LEAF} from "src/base/Constants.sol";
+import {PoolTest} from "test/fixtures/PoolTest.sol";
 
 contract PoolDepositTest is PoolTest {
-    ZTransaction depositZTx;
-    PoolTransactTest poolTransactTestHelper;
-
     function setUp() public {
-        _initFixture();
-        _mintAsset(asset1, address(this), INITIAL_DEPOSIT);
-        _mintAsset(asset2, address(this), INITIAL_DEPOSIT);
-
-        depositZTx = _loadZTx("deposit_1000_weth_without_fee");
-        poolTransactTestHelper = new PoolTransactTest(
-            depositZTx,
-            INITIAL_DEPOSIT,
-            token1,
-            token2,
-            pool
-        );
+        _setUp();
+        _mintAsset(asset1, address(this), 10000 ether);
+        _mintAsset(asset2, address(this), 10000 ether);
+        _approveAsset(asset1, address(pool), 10000 ether);
+        _approveAsset(asset2, address(pool), 10000 ether);
     }
 
-    function test_depositAssetBalances() public {
+    function test_deposit() public {
+        console2.log("ZERO_LEAF:", ZERO_LEAF);
+
+        uint256 deposit1 = 1000 ether;
+        uint256 deposit2 = 1000e6;
         uint256 balance1 = token1.balanceOf(address(pool));
         uint256 balance2 = token2.balanceOf(address(pool));
 
-        _approveAsset(asset1, address(pool), INITIAL_DEPOSIT);
-        _approveAsset(asset2, address(pool), 1000e6);
-        pool.transact(depositZTx);
+        ZTransaction memory ztx = _loadShieldedTransaction(
+            "deposit_1000_weth_usdc_without_fee"
+        );
 
-        // assertEq(token1.balanceOf(address(pool)), balance1 + INITIAL_DEPOSIT);
-        // assertEq(token2.balanceOf(address(pool)), balance2 + 1000e6); // USDC is 6 decimals
+        _runExpectedTx(ztx);
+
+        assertEq(token1.balanceOf(address(pool)), balance1 + deposit1);
+        assertEq(token2.balanceOf(address(pool)), balance2 + deposit2);
     }
 
     // function test_revertOnDoubleSpendDeposit() external {
-    //     _approveAsset(asset1, address(pool), INITIAL_DEPOSIT);
-    //     _approveAsset(asset2, address(pool), 1000e6);
-    //     pool.transact(depositZTx);
+    //     uint256 deposit1 = 1000 ether;
+    //     uint256 deposit2 = 1000e6;
+    //     _approveAsset(asset1, address(pool), deposit1);
+    //     _approveAsset(asset2, address(pool), deposit2);
+    //     ZTransaction memory ztx = _loadShieldedTransaction(
+    //         "deposit_1000_weth_usdc_without_fee"
+    //     );
+    //     pool.transact(ztx);
 
     //     // re-depositing
-    //     _mintAsset(asset1, address(this), INITIAL_DEPOSIT);
-    //     _mintAsset(asset2, address(this), INITIAL_DEPOSIT);
-    //     _approveAsset(asset1, address(pool), INITIAL_DEPOSIT);
-    //     _approveAsset(asset2, address(pool), 1000e6);
+    //     _mintAsset(asset1, address(this), deposit1);
+    //     _mintAsset(asset2, address(this), deposit2);
+    //     _approveAsset(asset1, address(pool), deposit1);
+    //     _approveAsset(asset2, address(pool), deposit2);
     //     vm.expectRevert(
     //         abi.encodeWithSelector(
     //             IPool.DoubleSpend.selector,
-    //             depositZTx.nullifiers[0]
+    //             ztx.nullifiers[0]
     //         )
     //     );
-    //     pool.transact(depositZTx);
-    // }
-
-    // function test_nullifiersMarkedPostDeposit() public {
-    //     _transferAssetsToPoolTransactHelper();
-    //     poolTransactTestHelper.test_nullifiersMarked();
-    // }
-
-    // function test_leafAddedToCommitmentTreePostDeposit() external {
-    //     _transferAssetsToPoolTransactHelper();
-    //     poolTransactTestHelper.test_leafAddedToCommitmentTree();
-    // }
-
-    // function test_CommitmentEventsOnDeposit() external {
-    //     _transferAssetsToPoolTransactHelper();
-    //     poolTransactTestHelper.test_CommitmentEvents();
-    // }
-
-    // function test_ReceiptEventOnDeposit() external {
-    //     _transferAssetsToPoolTransactHelper();
-    //     poolTransactTestHelper.test_ReceiptEvent();
-    // }
-
-    // function _transferAssetsToPoolTransactHelper() internal {
-    //     MockERC20(token1).transfer(
-    //         address(poolTransactTestHelper),
-    //         INITIAL_DEPOSIT
-    //     );
-    //     MockERC20(token2).transfer(
-    //         address(poolTransactTestHelper),
-    //         INITIAL_DEPOSIT
-    //     );
+    //     pool.transact(ztx);
     // }
 }

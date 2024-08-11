@@ -1,122 +1,125 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.24;
 
+import {console2} from "forge-std/console2.sol";
+
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
-import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 import {Pool} from "src/core/Pool.sol";
+import {Verifier, TransactionVerifierInfo} from "src/core/Verifier.sol";
+import {AdaptorHandler} from "src/core/AdaptorHandler.sol";
 import {VerifierTransact21} from "src/verifiers/VerifierTransact21.sol";
 import {VerifierTransact22} from "src/verifiers/VerifierTransact22.sol";
 import {VerifierRegister} from "src/verifiers/VerifierRegister.sol";
-import {Verifier, TransactionVerifierInfo} from "src/core/Verifier.sol";
-import {AdaptorHandler} from "src/core/AdaptorHandler.sol";
 import {Asset, AssetType} from "src/libraries/Asset.sol";
 import {ZTransaction, RevokerData} from "src/libraries/ZTransaction.sol";
-import {MockERC20} from "test/mocks/MockERC20.sol";
-import {MockScreener} from "test/mocks/MockScreener.sol";
-import {BaseTest} from "./BaseTest.sol";
 import {ShieldedAddressRegistrationData, ShieldedAddressLogic} from "src/libraries/ShieldedAddress.sol";
-import {MESSAGE_REGISTER_ADDRESS, EIP712_DOMAIN_NAME, EIP712_DOMAIN_VERSION, EIP712_TYPEHASH_REGISTER_ADDRESS} from "src/base/Constants.sol";
-import {console2} from "forge-std/console2.sol";
+import {IPool} from "src/interfaces/IPool.sol";
+import {MockScreener} from "test/mocks/MockScreener.sol";
+import {MockERC20} from "test/mocks/MockERC20.sol";
+import {PoolBaseTest} from "./PoolBaseTest.sol";
 
-contract PoolTest is BaseTest {
-    Verifier public verifier;
-    AdaptorHandler public adaptorHandler;
-    Pool public pool;
-
-    uint256 public addressTreeDepth;
-    uint256 public commitmentTreeDepth;
-    address public entryPoint;
-
-    MockERC20 public token1;
-    MockERC20 public token2;
-
-    MockScreener public screener;
-
+contract PoolTest is PoolBaseTest {
     Asset public asset1;
     Asset public asset2;
 
     bytes revokerMetaData = abi.encode("Revoker 1", "Organization 1");
 
-    uint256 constant INITIAL_DEPOSIT = 1000 ether;
-    bytes32 private constant TYPE_HASH =
-        keccak256(
-            "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
+    modifier expectNullifiersMarked(ZTransaction memory ztx_) {
+        uint32 currentLeafIndex = pool.getCommitmentTreeNextLeafIndex();
+        uint32 nullifierMarkLeafIndex = currentLeafIndex + 1;
+
+        for (uint256 i = 0; i < ztx_.nullifiers.length; i++) {
+            vm.expectEmit(true, true, true, true);
+            emit IPool.NullifierMarked(
+                ztx_.nullifiers[i],
+                nullifierMarkLeafIndex
+            );
+        }
+
+        _;
+
+        for (uint256 i = 0; i < ztx_.nullifiers.length; i++) {
+            assertTrue(pool.isMarkedNullifier(ztx_.nullifiers[i]));
+        }
+    }
+
+    modifier expectCommitmentsInserted(ZTransaction memory ztx) {
+        uint256 nextIndex = pool.getCommitmentTreeNextLeafIndex();
+        uint256 rootBeforeDeposit = pool.getCommitmentTreeLastRoot();
+        uint256 currentRootIndexBeforeDeposit = pool
+            .getCommitmentTreeCurrentRootIndex();
+
+        for (uint256 i = 0; i < ztx.commitments.length; ++i) {
+            vm.expectEmit(false, true, true, true);
+            emit IPool.Commitment(nextIndex + i, ztx.commitments[i]);
+        }
+
+        _;
+
+        uint256 nextLeafIndexAfterDeposit = pool
+            .getCommitmentTreeNextLeafIndex();
+        uint256 rootAfterDeposit = pool.getCommitmentTreeLastRoot();
+        uint256 currentRootIndexAfterDeposit = pool
+            .getCommitmentTreeCurrentRootIndex();
+
+        // assertEq(nextIndex + ztx.commitments.length, nextLeafIndexAfterDeposit);
+        // assertNotEq(rootBeforeDeposit, rootAfterDeposit);
+        // assertLt(currentRootIndexBeforeDeposit, currentRootIndexAfterDeposit);
+    }
+
+    modifier expectReceipt(ZTransaction memory ztx) {
+        uint32 nextLeafIndex = pool.getCommitmentTreeNextLeafIndex();
+
+        vm.expectEmit(true, true, true, false);
+        emit IPool.Receipt(
+            ztx.txType,
+            ztx.revokerId,
+            (nextLeafIndex + uint32(ztx.commitments.length)),
+            address(0),
+            uint24(0),
+            uint96(0),
+            address(0),
+            ztx.keysMemo,
+            ztx.assetsMemo,
+            ztx.notesMemo,
+            bytes("")
         );
 
-    function _initFixture() internal virtual {
-        BaseTest._setUp();
+        _;
+    }
 
-        addressTreeDepth = fixture.addressTreeDepth;
-        commitmentTreeDepth = fixture.commitmentTreeDepth;
+    function _setUp() internal virtual override {
+        PoolBaseTest._setUp();
 
-        VerifierTransact21 vt21 = new VerifierTransact21();
-        VerifierTransact22 vt22 = new VerifierTransact22();
-        VerifierRegister vr = new VerifierRegister();
-        TransactionVerifierInfo[] memory vInfos = new TransactionVerifierInfo[](
-            2
-        );
-        vInfos[0] = TransactionVerifierInfo({
-            id: 21,
-            addr: address(vt21),
-            selector: vt21.verifyProof.selector
-        });
-        vInfos[1] = TransactionVerifierInfo({
-            id: 22,
-            addr: address(vt22),
-            selector: vt22.verifyProof.selector
-        });
-        verifier = new Verifier(vInfos, address(vr));
-        adaptorHandler = new AdaptorHandler();
-
-        pool = new Pool();
-
-        // Assets
-        token1 = new MockERC20(address(this));
-        token2 = new MockERC20(address(this));
-        asset1 = Asset({
-            id: 65537,
-            assetType: AssetType.ERC20,
-            assetAddress: address(token1),
-            isSupported: true
-        });
-        asset2 = Asset({
-            id: 65538,
-            assetType: AssetType.ERC20,
-            assetAddress: address(token2),
-            isSupported: true
-        });
-
+        // Add assets
+        // asset1 = Asset({
+        //     id: 65537,
+        //     assetType: AssetType.ERC20,
+        //     assetAddress: address(token1),
+        //     isSupported: true
+        // });
+        // asset2 = Asset({
+        //     id: 65538,
+        //     assetType: AssetType.ERC20,
+        //     assetAddress: address(token2),
+        //     isSupported: true
+        // });
         AssetType assetType = AssetType.ERC20;
         address[] memory assetAddresses = new address[](2);
         assetAddresses[0] = address(token1);
         assetAddresses[1] = address(token2);
-
-        screener = new MockScreener();
-        address hasher = _deployHasher();
-
-        bytes memory initData = abi.encodeCall(
-            Pool.initialize,
-            (
-                fixture.addressTreeDepth,
-                fixture.commitmentTreeDepth,
-                address(verifier),
-                address(adaptorHandler),
-                address(screener),
-                hasher,
-                fixture.withdrawFeeBps
-            )
-        );
-
-        ERC1967Proxy poolProxy = new ERC1967Proxy(address(pool), initData);
-        pool = Pool(address(poolProxy));
         pool.addAssets(assetType, assetAddresses);
+        asset1 = pool.getAsset(assetAddresses[0]);
+        asset2 = pool.getAsset(assetAddresses[1]);
 
+        // Register revoker
         pool.registerRevoker(
             fixture.revokerPublicKey,
             fixture.encryptionPublicKey,
             revokerMetaData
         );
 
+        // Register a user - "sender"
         (, uint256 senderPk) = makeAddrAndKey("sender");
         bytes memory signature = _getRegisterAddressSignature(
             senderPk,
@@ -128,13 +131,23 @@ contract PoolTest is BaseTest {
                 bytes32(fixture.sender.viewPublicKey[1])
             )
         );
-
         ShieldedAddressRegistrationData
             memory addressRegData = _loadShieldedAddressRegistrationData(
                 "register_sender"
             );
         addressRegData.signature = signature;
         pool.registerAddress(addressRegData);
+    }
+
+    function _runExpectedTx(
+        ZTransaction memory ztx
+    )
+        internal
+        expectNullifiersMarked(ztx)
+        expectCommitmentsInserted(ztx)
+        expectReceipt(ztx)
+    {
+        pool.transact(ztx);
     }
 
     function _mintAsset(
@@ -157,75 +170,19 @@ contract PoolTest is BaseTest {
         return pool.getAsset(asset.assetAddress).id;
     }
 
-    // Deposits 10000 ether
-    function _mockDeposit() internal {
-        string memory path = string.concat(
-            vm.projectRoot(),
-            "/test/mocks/deposit.txt"
-        );
-        string memory file = vm.readFile(path);
-        bytes memory data = vm.parseBytes(file);
-        ZTransaction memory ztx = abi.decode(data, (ZTransaction));
-
-        _mintAsset(asset1, address(this), 10000 ether);
-        _mintAsset(asset2, address(this), 10000 ether);
-        _approveAsset(asset1, address(pool), 10000 ether);
-        _approveAsset(asset2, address(pool), 10000 ether);
-        pool.transact(ztx);
-    }
-
-    function _makeInitialDeposit() internal {
-        _mintAsset(asset1, address(this), INITIAL_DEPOSIT);
-        _mintAsset(asset2, address(this), INITIAL_DEPOSIT);
-        _approveAsset(asset1, address(pool), INITIAL_DEPOSIT);
-        _approveAsset(asset2, address(pool), INITIAL_DEPOSIT);
-        ZTransaction memory ztx = _loadZTx(
+    function _makePreDeposit() internal {
+        uint256 deposit1 = 10000 ether;
+        uint256 deposit2 = 10000e6;
+        _mintAsset(asset1, address(this), deposit1);
+        _mintAsset(asset2, address(this), deposit2);
+        _approveAsset(asset1, address(pool), deposit1);
+        _approveAsset(asset2, address(pool), deposit2);
+        ZTransaction memory ztx = _loadShieldedTransaction(
             "deposit_1000_weth_usdc_without_fee"
         );
+        for (uint256 i = 0; i < ztx.commitments.length; i++) {
+            console2.log(i, ztx.commitments[i]);
+        }
         pool.transact(ztx);
-    }
-
-    //////////////////////////////////////////////////////
-    /// EIP 712 User Registration Functions       ////////
-    //////////////////////////////////////////////////////
-
-    function _getRegisterAddressSignature(
-        uint256 userPK,
-        bytes memory shieldedAddress
-    ) internal view returns (bytes memory) {
-        bytes32 hashTypedData = _getHashTypedRegisterAddressStruct(
-            shieldedAddress
-        );
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(userPK, hashTypedData);
-        return abi.encodePacked(r, s, v);
-    }
-
-    function _getHashTypedRegisterAddressStruct(
-        bytes memory shieldedAddress
-    ) internal view returns (bytes32) {
-        bytes32 hashTypedData = MessageHashUtils.toTypedDataHash(
-            _domainSeperator(),
-            keccak256(
-                abi.encode(
-                    EIP712_TYPEHASH_REGISTER_ADDRESS,
-                    keccak256(bytes(MESSAGE_REGISTER_ADDRESS)),
-                    keccak256(shieldedAddress)
-                )
-            )
-        );
-        return hashTypedData;
-    }
-
-    function _domainSeperator() internal view returns (bytes32) {
-        return
-            keccak256(
-                abi.encode(
-                    TYPE_HASH,
-                    keccak256(bytes(EIP712_DOMAIN_NAME)),
-                    keccak256(bytes(EIP712_DOMAIN_VERSION)),
-                    block.chainid,
-                    address(pool)
-                )
-            );
     }
 }

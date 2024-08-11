@@ -30,7 +30,7 @@ const {
   commitmentTreeDepth,
 } = fixture;
 
-const zeroElement = Fp.from(keccak256(stringToBytes("zkFi"))).toHex();
+const zeroElement = Fp.from(BigInt(keccak256(stringToBytes("zero")))).toHex();
 const hashFunction = (a: any, b: any) =>
   padHex(toHex(poseidonHash([toBigInt(a), toBigInt(b)])), { size: 32 });
 

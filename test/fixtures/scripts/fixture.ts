@@ -4,23 +4,20 @@ import {
   Hex,
   hexToBigInt,
   hexToBytes,
+  keccak256,
   size,
   sliceHex,
+  stringToBytes,
 } from "viem";
 import { ShieldedAccount } from "@zkfi-tech/account";
-import { Point, poseidonDecrypt } from "@zkfi-tech/babyjubjub";
+import { Fp, Point, poseidonDecrypt } from "@zkfi-tech/babyjubjub";
 import {
   TransactionOptions,
   TransactionRequest,
 } from "@zkfi-tech/shared-types";
 import { Core } from "@zkfi-tech/core";
 import { ZTransaction } from "@zkfi-tech/zk-prover";
-import {
-  LEN_ENCRYPTED_NOTE_DATA,
-  Note,
-  SIZE_KEY_MEMO,
-  SIZE_NOTE_MEMO,
-} from "@zkfi-tech/transaction";
+import { Note, SIZE_KEY_MEMO } from "@zkfi-tech/transaction";
 import config from "../config.json";
 
 const senderSeed = BigInt(config.sender.seed);
@@ -160,24 +157,30 @@ export async function mockNotes(depositName: string, sdk: Core) {
   // Decrypt notes
   const notes = [];
   for (let i = 0; i < encryptedNotes.length; i++) {
-    const n = Note.fromMemos(
-      encryptedNotesKeys[i],
-      encryptedNotes[i],
-      senderAccount,
-      revokerPublicKey
-    );
+    const n = Note.decrypt(encryptedNotesKeys[i], encryptedNotes[i], {
+      account: senderAccount,
+      revoker: revokerPublicKey,
+      leafIndex: 1,
+    });
 
     if (n) {
       notes.push(n);
     }
   }
 
-  const depositNotes = notes;
+  const z = Fp.from(BigInt(keccak256(stringToBytes("zero")))).val;
 
   //@ts-ignore
-  sdk.notesSource.mockNotes(depositNotes[0].assetId, [depositNotes[0]]);
+  sdk.notesSource.mockNotes(notes[0].assetId, [notes[0]]);
   //@ts-ignore
-  // sdk.notesSource.mockNotes(depositNotes[1].assetId, [depositNotes[1]]);
+  sdk.commitmentTreeSource.insert(z);
   //@ts-ignore
-  depositNotes.forEach((n) => sdk.commitmentTreeSource.insert(n.commitment));
+  sdk.commitmentTreeSource.insert(notes[0].commitment);
+
+  //@ts-ignore
+  // sdk.notesSource.mockNotes(notes[0].assetId, [notes[0]]);
+  // //@ts-ignore
+  // // sdk.notesSource.mockNotes(depositNotes[1].assetId, [depositNotes[1]]);
+  // //@ts-ignore
+  // notes.forEach((n) => sdk.commitmentTreeSource.insert(n.commitment));
 }

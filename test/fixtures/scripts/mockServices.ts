@@ -47,7 +47,7 @@ export class MockTreeSource implements ITreeSource {
   }
 
   get zeroLeaf() {
-    return Fp.from(keccak256(stringToBytes("zkFi"))).val;
+    return Fp.from(BigInt(keccak256(stringToBytes("zero")))).val;
   }
 
   update(): void {}

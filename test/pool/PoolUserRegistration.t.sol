@@ -8,23 +8,30 @@ import {EIP712Upgradeable} from "@openzeppelin/contracts-upgradeable/utils/crypt
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {ShieldedAddressRegistrationData, ShieldedAddressLogic} from "src/libraries/ShieldedAddress.sol";
 import {IPool} from "src/interfaces/IPool.sol";
-import {PoolTest} from "test/fixtures/PoolTest.sol";
+import {PoolBaseTest} from "test/fixtures/PoolBaseTest.sol";
 
-contract PoolUserRegistration is PoolTest {
-    // address userAddr;
-    // uint256 userPK;
-    // bytes shieldedAddress;
-    // bytes signature;
+contract PoolUserRegistration is PoolBaseTest {
+    ShieldedAddressRegistrationData addressRegistrationData;
 
     function setUp() public {
-        _initFixture();
-        // (userAddr, userPK) = makeAddrAndKey("userAddr");
-        // shieldedAddress = bytes.concat(
-        //     bytes32(keccak256("rootAddress")),
-        //     keccak256("sign"),
-        //     keccak256("view")
-        // );
-        // signature = _getRegisterAddressSignature(userPK, shieldedAddress);
+        _setUp();
+        (, uint256 senderPk) = makeAddrAndKey("sender");
+
+        addressRegistrationData = _loadShieldedAddressRegistrationData(
+            "register_sender"
+        );
+        bytes memory shieldedAddress = bytes.concat(
+            bytes32(fixture.sender.rootAddress),
+            bytes32(fixture.sender.signPublicKey[0]),
+            bytes32(fixture.sender.signPublicKey[1]),
+            bytes32(fixture.sender.viewPublicKey[0]),
+            bytes32(fixture.sender.viewPublicKey[1])
+        );
+
+        addressRegistrationData.signature = _getRegisterAddressSignature(
+            senderPk,
+            shieldedAddress
+        );
     }
 
     function test_compressShieldedAddress() public view {
@@ -59,45 +66,42 @@ contract PoolUserRegistration is PoolTest {
         // assertEq(compressed.length, 32);
     }
 
-    // function test_registerAddress() public {
-    //     bytes32 hashTypedData = _getHashTypedRegisterAddressStruct(
-    //         shieldedAddress
-    //     );
-    //     address recovered = ECDSA.recover(hashTypedData, signature);
-    //     assertEq(userAddr, recovered);
+    function test_registerAddress() public {
+        // vm.expectEmit(false, false, false, false);
+        // emit IPool.RegisterAddress(
+        //     senderAddr,
+        //     fixture.sender.rootAddress,
+        //     0,
+        //     shieldedAddress
+        // );
+        pool.registerAddress(addressRegistrationData);
+    }
 
-    //     uint256 rootAddr = uint256(bytes32(shieldedAddress));
-    //     uint32 nextLeafIndex = pool.getAddressTreeNextLeafIndex();
+    function test_userRegistrationWhenPaused() external {
+        pool.pause();
 
-    //     vm.expectEmit(true, true, true, true);
-    //     emit IPool.RegisterAddress(
-    //         userAddr,
-    //         rootAddr,
-    //         nextLeafIndex,
-    //         shieldedAddress
-    //     );
-    // pool.registerAddress(shieldedAddress, signature);
-    // }
+        ShieldedAddressRegistrationData
+            memory data = _loadShieldedAddressRegistrationData(
+                "register_sender"
+            );
+        vm.expectRevert(
+            abi.encodeWithSelector(PausableUpgradeable.EnforcedPause.selector)
+        );
+        pool.registerAddress(data);
+    }
 
-    // function test_userRegistrationWhenPaused() external {
-    //     pool.pause();
-    //     vm.expectRevert(
-    //         abi.encodeWithSelector(PausableUpgradeable.EnforcedPause.selector)
-    //     );
-    //     vm.prank(userAddr);
-    // pool.registerAddress(shieldedAddress, signature);
-    // }
+    function test_revertWhenAlreadyRegistered() external {
+        pool.registerAddress(addressRegistrationData);
+        uint256 rootAddress = uint256(
+            bytes32(addressRegistrationData.shieldedAddress)
+        );
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IPool.RootAddressAlreadyRegistered.selector,
+                rootAddress
+            )
+        );
 
-    // function test_revertWhenAlreadyRegistered() external {
-    //     uint256 rootAddr = uint256(bytes32(shieldedAddress));
-    // pool.registerAddress(shieldedAddress, signature);
-    // vm.expectRevert(
-    //     abi.encodeWithSelector(
-    //         IPool.RootAddressAlreadyRegistered.selector,
-    //         rootAddr
-    //     )
-    // );
-    // vm.prank(userAddr);
-    // pool.registerAddress(shieldedAddress, signature);
-    // }
+        pool.registerAddress(addressRegistrationData);
+    }
 }

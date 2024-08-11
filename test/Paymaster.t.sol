@@ -4,42 +4,26 @@ pragma solidity ^0.8.24;
 import {Test, console} from "forge-std/Test.sol";
 import {EntryPoint} from "@account-abstraction/contracts/core/EntryPoint.sol";
 import {PackedUserOperation} from "@account-abstraction/contracts/interfaces/PackedUserOperation.sol";
+import {Paymaster} from "src/core/Paymaster.sol";
+import {ZTransaction, ZTransactionType} from "src/libraries/ZTransaction.sol";
 import {Pool} from "src/core/Pool.sol";
 import {PoolTest} from "test/fixtures/PoolTest.sol";
 import {PoolTransactTest} from "test/helpers/PoolTransact.t.sol";
-import {Paymaster} from "src/core/Paymaster.sol";
-import {ZTransaction, ZTransactionType} from "src/libraries/ZTransaction.sol";
 
 contract PaymasterTest is PoolTest {
-    address public mockPool;
     Paymaster public paymaster;
 
-    uint24 defaultAssetId;
-    uint256 defaultFeeValue = 0.001 ether;
+    uint24 feeAssetId;
+    uint256 feeValue = 0.001 ether;
 
     PackedUserOperation userOp;
-
-    modifier depositTx() {
-        _mintAsset(asset1, address(this), INITIAL_DEPOSIT);
-        _mintAsset(asset2, address(this), INITIAL_DEPOSIT);
-        _approveAsset(asset1, address(pool), INITIAL_DEPOSIT);
-        _approveAsset(asset2, address(pool), 1000e6);
-
-        ZTransaction memory depositZTx = _loadZTx(
-            "deposit_1000_weth_without_fee"
-        );
-        pool.transact(depositZTx);
-        _;
-    }
 
     modifier createPackedUserOps() {
         ZTransaction memory ztx;
 
         ztx.pubAssets = new uint248[](1);
         ztx.pubAssets[0] = uint248(
-            bytes31(
-                bytes.concat(bytes3(defaultAssetId), bytes12(uint96(10 ether)))
-            )
+            bytes31(bytes.concat(bytes3(feeAssetId), bytes12(uint96(10 ether))))
         );
 
         ztx.feeData = uint256(
@@ -57,19 +41,18 @@ contract PaymasterTest is PoolTest {
     }
 
     function setUp() public {
-        _initFixture();
-        defaultAssetId = asset1.id;
-        mockPool = address(pool);
+        _setUp();
+        feeAssetId = asset1.id;
         entryPoint = address(new EntryPoint());
-        paymaster = new Paymaster(entryPoint, mockPool);
-        paymaster.setAssetFee(defaultAssetId, defaultFeeValue);
+        paymaster = new Paymaster(entryPoint, address(pool));
+        paymaster.setAssetFee(feeAssetId, feeValue);
     }
 
     function test_updateFeeAsset() public {
         uint24 assetId = 65538;
-        uint256 feeValue = 0.1 ether;
-        paymaster.setAssetFee(assetId, feeValue);
-        assertEq(paymaster.getAssetFee(assetId), feeValue);
+        uint256 newFeeValue = 0.1 ether;
+        paymaster.setAssetFee(assetId, newFeeValue);
+        assertEq(paymaster.getAssetFee(assetId), newFeeValue);
 
         bool isSupported = paymaster.isAssetFeeSupported(assetId);
         assertTrue(isSupported);
@@ -130,12 +113,10 @@ contract PaymasterTest is PoolTest {
 
         ztx.pubAssets = new uint248[](1);
         ztx.pubAssets[0] = uint248(
-            bytes31(
-                bytes.concat(bytes3(defaultAssetId), bytes12(uint96(10 ether)))
-            )
+            bytes31(bytes.concat(bytes3(feeAssetId), bytes12(uint96(10 ether))))
         );
 
-        uint256 lowFeeValue = defaultFeeValue / 2;
+        uint256 lowFeeValue = feeValue / 2;
 
         ztx.feeData = uint256(
             bytes32(
@@ -154,13 +135,13 @@ contract PaymasterTest is PoolTest {
             abi.encodeWithSelector(
                 Paymaster.InsufficientFee.selector,
                 lowFeeValue,
-                defaultFeeValue
+                feeValue
             )
         );
         paymaster.validatePaymasterUserOp(userOp, bytes32(0), 0);
     }
 
-      function test_validatePaymasterUserOp() public createPackedUserOps {
+    function test_validatePaymasterUserOp() public createPackedUserOps {
         vm.startPrank(entryPoint);
         (, uint256 flag) = paymaster.validatePaymasterUserOp(
             userOp,
@@ -172,38 +153,45 @@ contract PaymasterTest is PoolTest {
         assertEq(flag, 0);
     }
 
-    function test_paymasterFeeBalUpdateInPool() external depositTx {
+    function test_paymasterFeeBalUpdateInPool() external {
+        _makePreDeposit();
+
         uint256 value = 1000 ether;
         vm.deal(address(this), value);
-
         paymaster.depositToEntryPoint{value: value}();
 
-        ZTransaction memory withdrawZTx = _loadZTx("withdraw_1_weth_with_fee");
-        pool.transact(withdrawZTx);
+        ZTransaction memory ztx = _loadShieldedTransaction(
+            "withdraw_1_weth_with_fee"
+        );
+        pool.transact(ztx);
 
-        uint256 assetFeeByPaymaster = paymaster.getAssetFee(defaultAssetId);
+        uint256 assetFeeByPaymaster = paymaster.getAssetFee(feeAssetId);
         vm.prank(address(paymaster));
         assertEq(
-            pool.getCollectedPaymasterFee(defaultAssetId, address(paymaster)),
+            pool.getCollectedPaymasterFee(feeAssetId, address(paymaster)),
             assetFeeByPaymaster
         );
     }
 
-    function test_paymasterFeeClaim() external depositTx {
+    function test_paymasterFeeClaim() external {
+        _makePreDeposit();
+
         uint256 value = 1000 ether;
         vm.deal(address(this), value);
         paymaster.depositToEntryPoint{value: value}();
 
-        ZTransaction memory withdrawZTx = _loadZTx("withdraw_1_weth_with_fee");
-        pool.transact(withdrawZTx);
+        ZTransaction memory ztx = _loadShieldedTransaction(
+            "withdraw_1_weth_with_fee"
+        );
+        pool.transact(ztx);
 
         vm.startPrank(address(paymaster));
-        pool.withdrawPaymasterFee(defaultAssetId, address(paymaster));
+        pool.withdrawPaymasterFee(feeAssetId, address(paymaster));
 
         assertEq(
-            pool.getCollectedPaymasterFee(defaultAssetId, address(paymaster)),
+            pool.getCollectedPaymasterFee(feeAssetId, address(paymaster)),
             0
         );
-        assertEq(token1.balanceOf(address(paymaster)), defaultFeeValue);
+        assertEq(token1.balanceOf(address(paymaster)), feeValue);
     }
 }
