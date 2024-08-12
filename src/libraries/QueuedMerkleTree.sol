@@ -9,28 +9,28 @@ import {IPool} from "../interfaces/IPool.sol";
 struct QueuedMerkleTree {
     uint8 depth;
     uint8 currentRootIndex;
-    uint32 nextLeafIndex;
+    uint8 queueSize;
     uint40 capacity;
     address hasher;
-    uint8 queueSize;
     address verifier;
-    uint32 queuedLeavesLength;
+    uint32 nextLeafIndex;
+    uint32 nextQueueIndex;
     mapping(uint32 => uint256) queuedLeaves;
     mapping(uint8 => uint256) roots;
     mapping(uint8 => uint256) zeroes;
     mapping(uint8 => uint256) lastSubtrees;
 }
 
-struct SubtreeUpdateInputs {
+struct SubtreeUpdateData {
     uint256 newRoot;
     uint256[] newSubtrees;
-    bytes subtreeUpdateProof;
+    bytes proof;
 }
 
 library QueuedMerkleTreeLogic {
     error MerkleTreeFull();
 
-    uint8 public constant ROOT_HISTORY_SIZE = 100;
+    uint8 public constant ROOT_HISTORY_SIZE = 50;
 
     function init(
         QueuedMerkleTree storage self,
@@ -62,94 +62,105 @@ library QueuedMerkleTreeLogic {
         QueuedMerkleTree storage self,
         uint256[] calldata leaves
     ) public {
-        for (uint8 i = 0; i < leaves.length; ) {
-            self.queuedLeaves[self.queuedLeavesLength] = leaves[i];
-            self.queuedLeavesLength++;
+        uint32 nextIndex = self.nextQueueIndex;
+        uint32 nLeaves = uint32(leaves.length);
+
+        for (uint8 i = 0; i < nLeaves; ) {
+            self.queuedLeaves[nextIndex + i] = leaves[i];
             unchecked {
                 ++i;
             }
         }
+
+        self.nextQueueIndex = nextIndex + uint32(nLeaves);
     }
 
-    function updateSubtree(
+    function getState(
+        QueuedMerkleTree storage self
+    )
+        public
+        view
+        returns (uint256[] memory, uint256[] memory, uint256, uint32)
+    {
+        uint256[] memory leaves = _getQueuedLeaves(self);
+        uint256[] memory lastSubtrees = _getSubtree(self);
+        uint32 nextLeafIndex = self.nextLeafIndex;
+        uint256 lastRoot = self.roots[self.currentRootIndex];
+        return (leaves, lastSubtrees, lastRoot, nextLeafIndex);
+    }
+
+    function update(
         QueuedMerkleTree storage self,
-        SubtreeUpdateInputs memory subtreeUpdateInputs
+        SubtreeUpdateData calldata data
     ) public returns (uint256) {
-        bool subtreeUpdateProofVerification = _verifySubtreeUpdateProof(
-            self,
-            subtreeUpdateInputs
-        );
+        bool isValid = _verifyUpdateProof(self, data);
 
-        if (subtreeUpdateProofVerification) {
-            // updating roots
-            uint8 newRootIndex = (self.currentRootIndex + 1) %
-                ROOT_HISTORY_SIZE;
-            self.roots[newRootIndex] = subtreeUpdateInputs.newRoot;
+        if (!isValid) {
+            revert("Invalid proof");
+        }
 
-            // updating lastSubtrees
-            for (uint8 i = 0; i < self.depth; ) {
-                self.lastSubtrees[i] = subtreeUpdateInputs.newSubtrees[i];
-                unchecked {
-                    ++i;
-                }
+        uint8 newRootIndex = (self.currentRootIndex + 1) % ROOT_HISTORY_SIZE;
+        self.roots[newRootIndex] = data.newRoot;
+
+        for (uint8 i = 0; i < self.depth; ) {
+            self.lastSubtrees[i] = data.newSubtrees[i];
+            unchecked {
+                ++i;
             }
+        }
 
-            // updating nextLeafIndex
-            self.nextLeafIndex += self.queueSize;
+        self.nextLeafIndex += self.queueSize;
 
-            // Emitting commitments after commitment leaves have been inserted into the commitment tree
-            /// @todo move this to pool contract
-            /// @notice not moving this to Pool as we are removing the leaves that got inserted from the queue, below. Since leaves are not persistent, they won't be accessible in Pool.sol for being emitted.
-            for (uint8 i; i < self.queueSize; ) {
-                emit IPool.Commitment(
-                    self.nextLeafIndex - self.queueSize + i,
-                    self.queuedLeaves[i]
-                );
+        // Emitting commitments after commitment leaves have been inserted into the commitment tree
+        /// @todo move this to pool contract
+        /// @notice not moving this to Pool as we are removing the leaves that got inserted from the queue, below. Since leaves are not persistent, they won't be accessible in Pool.sol for being emitted.
+        for (uint8 i; i < self.queueSize; ) {
+            emit IPool.Commitment(
+                self.nextLeafIndex - self.queueSize + i,
+                self.queuedLeaves[i]
+            );
 
-                unchecked {
-                    ++i;
-                }
+            unchecked {
+                ++i;
             }
-
-            // remove the inserted leaves from the queue
-            for (uint8 i; i < self.queuedLeavesLength; ) {
-                uint8 repositionQueueIndex = self.queueSize + i;
-
-                if (repositionQueueIndex < self.queuedLeavesLength) {
-                    self.queuedLeaves[i] = self.queuedLeaves[
-                        repositionQueueIndex
-                    ];
-                }
-
-                unchecked {
-                    ++i;
-                }
-            }
-
-            self.queuedLeavesLength -= self.queueSize;
-        } else {
-            revert IPool.InvalidSubtreeUpdateProof();
         }
 
         return self.nextLeafIndex;
     }
 
-    function _verifySubtreeUpdateProof(
+    function _verifyUpdateProof(
         QueuedMerkleTree storage self,
-        SubtreeUpdateInputs memory subtreeUpdateInputs
+        SubtreeUpdateData calldata data
     ) internal view returns (bool) {
-        uint256[] memory leavesQueueForVerification = new uint256[](
-            self.queueSize
-        );
-        uint256[] memory lastSubtreesArrayForVerification = new uint256[](self.depth);
+        uint256[] memory leaves = _getQueuedLeaves(self);
+        uint256[] memory lastSubtrees = _getSubtree(self);
 
-        // converting `queueLeaves` mapping into array for verifier input
-        // if `queueLeaves` mapping has elements less than `self.queueSize`, we add rest of element as zero values.
-        for (uint8 i; i < self.queueSize; ) {
-            if (self.queuedLeaves[i] != 0) {
-                leavesQueueForVerification[i] = self.queuedLeaves[i];
+        bytes memory vInp = abi.encodePacked(
+            data.proof,
+            self.nextLeafIndex,
+            leaves,
+            self.roots[self.currentRootIndex],
+            lastSubtrees,
+            data.newRoot,
+            data.newSubtrees
+        );
+
+        return IVerifier(self.verifier).verifySubtreeUpdateProof(vInp);
+    }
+
+    function _getQueuedLeaves(
+        QueuedMerkleTree storage tree
+    ) internal view returns (uint256[] memory) {
+        uint256[] memory leaves = new uint256[](tree.queueSize);
+        uint32 startIdx = tree.nextLeafIndex;
+        uint32 endIdx = startIdx + tree.queueSize;
+
+        // Pad the queue with zeroes if queue is not full
+        for (uint32 i = startIdx; i < endIdx; ) {
+            if (i < tree.nextQueueIndex) {
+                leaves[i] = tree.queuedLeaves[i];
             } else {
-                leavesQueueForVerification[i] = 0;
+                leaves[i] = ZERO_LEAF;
             }
 
             unchecked {
@@ -157,28 +168,23 @@ library QueuedMerkleTreeLogic {
             }
         }
 
-        // converting mapping into array for verifier input
-        for(uint8 i; i < self.depth; ) {
-            lastSubtreesArrayForVerification[i] = self.lastSubtrees[i];
+        return leaves;
+    }
 
-            unchecked{
+    function _getSubtree(
+        QueuedMerkleTree storage tree
+    ) internal view returns (uint256[] memory) {
+        uint256[] memory subtree = new uint256[](tree.depth);
+
+        for (uint8 i; i < tree.depth; ) {
+            subtree[i] = tree.lastSubtrees[i];
+
+            unchecked {
                 ++i;
             }
         }
 
-        bytes memory vInp = abi.encodePacked(
-            subtreeUpdateInputs.subtreeUpdateProof,
-            self.nextLeafIndex,
-            leavesQueueForVerification,
-            self.roots[self.currentRootIndex],
-            lastSubtreesArrayForVerification,
-            subtreeUpdateInputs.newRoot,
-            subtreeUpdateInputs.newSubtrees
-        );
-        bool subtreeVerificationResult = IVerifier(self.verifier)
-            .verifySubtreeUpdateProof(vInp);
-
-        return subtreeVerificationResult;
+        return subtree;
     }
 
     function isKnownRoot(
