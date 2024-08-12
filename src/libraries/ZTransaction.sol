@@ -4,6 +4,7 @@ pragma solidity ^0.8.24;
 import {FIELD_SIZE} from "../base/Constants.sol";
 import {Asset, AssetLogic} from "./Asset.sol";
 import {MerkleTree, MerkleTreeLogic} from "./MerkleTree.sol";
+import {QueuedMerkleTree, QueuedMerkleTreeLogic} from "./QueuedMerkleTree.sol";
 import {IPool} from "../interfaces/IPool.sol";
 import {IVerifier} from "../interfaces/IVerifier.sol";
 import {IHasher} from "../interfaces/IHasher.sol";
@@ -102,6 +103,7 @@ struct MemoParams {
 /// @title ZTransactionLogic library for shielded transaction logic
 library ZTransactionLogic {
     using MerkleTreeLogic for MerkleTree;
+    using QueuedMerkleTreeLogic for QueuedMerkleTree;
 
     /// @notice Calculates the hash of a ZTransaction
     /// @dev All of the omitted fields of ZTransaction for hashing are public inputs
@@ -137,7 +139,7 @@ library ZTransactionLogic {
     function validate(
         ZTransaction calldata ztx,
         MerkleTree storage addressTree,
-        MerkleTree storage commitmentTree,
+        QueuedMerkleTree storage commitmentTree,
         mapping(uint256 => uint32) storage markedNullifiers,
         mapping(address => bool) storage supportedAdaptors,
         mapping(uint256 => RevokerData) storage revokerDataMap,
@@ -179,8 +181,7 @@ library ZTransactionLogic {
     /// @param paymasterFees Mapping of paymaster address to assetId to fee value
     function execute(
         ZTransaction calldata ztx,
-        MerkleTree storage commitmentTree,
-        uint256[] storage commitmentTreeQueue,
+        QueuedMerkleTree storage commitmentTree,
         mapping(uint24 => Asset) storage assets,
         mapping(address => mapping(uint24 => uint256)) storage paymasterFees,
         mapping(uint24 => uint256) storage withdrawFees,
@@ -228,7 +229,7 @@ library ZTransactionLogic {
             );
         }
 
-        _printNotes(commitmentTree, commitmentTreeQueue, params, memoParams);
+        _printNotes(commitmentTree, params, memoParams);
     }
 
     /**
@@ -410,7 +411,7 @@ library ZTransactionLogic {
     /// @dev This also prevents any duplicate nullifiers
     function _checkAndMarkNullifiers(
         ZTransaction calldata ztx,
-        MerkleTree storage commitmentTree,
+        QueuedMerkleTree storage commitmentTree,
         mapping(uint256 => uint32) storage markedNullifiers
     ) internal {
         uint256 numNullifiers = ztx.nullifiers.length;
@@ -432,18 +433,18 @@ library ZTransactionLogic {
     }
 
     function _printNotes(
-        MerkleTree storage tree,
-        uint256[] storage commitmentTreeQueue,
+        QueuedMerkleTree storage tree,
         Params memory params,
         MemoParams memory memoParams
     ) internal {
         uint256 numCommitments = memoParams.commitments.length;
 
         for (uint8 i = 0; i < numCommitments; ++i) {
-            commitmentTreeQueue.push(commitmentTreeQueue[i]);
+            tree.queuedLeaves[tree.queuedLeavesLength] = memoParams.commitments[i];
+            tree.queuedLeavesLength++;
         }
 
-        uint32 latestIndex = tree.nextLeafIndex - 1 + uint32(commitmentTreeQueue.length);
+        uint32 latestIndex = tree.nextLeafIndex - 1 + uint32(tree.queuedLeavesLength);
 
         emit IPool.Receipt(
             params.txType,

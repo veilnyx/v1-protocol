@@ -16,6 +16,7 @@ import {EIP712_DOMAIN_NAME, EIP712_DOMAIN_VERSION, EIP712_TYPEHASH_REGISTER_ADDR
 import {PoolStorage} from "../base/PoolStorage.sol";
 import {Asset, AssetType, AssetLogic} from "../libraries/Asset.sol";
 import {MerkleTree, MerkleTreeLogic} from "../libraries/MerkleTree.sol";
+import {QueuedMerkleTree, SubtreeUpdateInputs, QueuedMerkleTreeLogic} from "../libraries/QueuedMerkleTree.sol" ;
 import {ShieldedAddressRegistrationData, ShieldedAddressLogic} from "../libraries/ShieldedAddress.sol";
 import {ZTransaction, ZTransactionLogic, RevokerData} from "../libraries/ZTransaction.sol";
 
@@ -30,6 +31,7 @@ contract Pool is
     PoolStorage
 {
     using MerkleTreeLogic for MerkleTree;
+    using QueuedMerkleTreeLogic for QueuedMerkleTree;
     using ShieldedAddressLogic for ShieldedAddressRegistrationData;
     using ZTransactionLogic for ZTransaction;
 
@@ -64,7 +66,7 @@ contract Pool is
         withdrawFeeBps = withdrawFeeBps_;
 
         _addressTree.init(addressTreeDepth, hasher_);
-        _commitmentTree.init(commitmentTreeDepth, hasher_);
+        _commitmentTree.init(commitmentTreeDepth, hasher_, verifier_);
     }
 
     /////////////////////////////////////////
@@ -176,6 +178,14 @@ contract Pool is
         });
     }
 
+    function updateQueuedCommitmentTree(
+        SubtreeUpdateInputs memory updatedCommitmentTreeInputs
+    ) external whenNotPaused returns (uint256) {
+        uint256 nextLeafIndex = _commitmentTree.updateSubtree(updatedCommitmentTreeInputs);
+
+        return nextLeafIndex;
+    }
+
     function transact(
         ZTransaction calldata ztx
     ) external nonReentrant whenNotPaused {
@@ -190,7 +200,6 @@ contract Pool is
 
         ztx.execute({
             commitmentTree: _commitmentTree,
-            commitmentTreeQueue: commitmentTreeQueue,
             assets: _assets,
             withdrawFees: _withdrawFees,
             paymasterFees: _paymasterFees,
