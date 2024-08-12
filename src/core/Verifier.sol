@@ -3,6 +3,7 @@ pragma solidity ^0.8.24;
 
 import {IVerifier} from "../interfaces/IVerifier.sol";
 import {VerifierRegister} from "../verifiers/VerifierRegister.sol";
+import {VerifierSubtreeUpdate} from "../verifiers/VerifierSubtreeUpdate.sol";
 import {ZTransaction, ZTransactionType, ZTransactionLogic, RevokerData} from "../libraries/ZTransaction.sol";
 import {MerkleTree} from "../libraries/MerkleTree.sol";
 
@@ -16,14 +17,16 @@ contract Verifier is IVerifier {
     using ZTransactionLogic for ZTransaction;
 
     /**
-     * @notice Verifier id to Verifier info mapping
+     * @notice Verifier id to Verifier info mapping for transaction verifiers only
      */
-    address internal _addressVerifier;
     mapping(uint256 => TransactionVerifierInfo) internal _transactionVerifiers;
+    address internal _addressVerifier;
+    address internal _subtreeVerifier;
 
     constructor(
         TransactionVerifierInfo[] memory txvInfos,
-        address addressVerifier
+        address addressVerifier,
+        address subTreeVerifier
     ) {
         uint256 len = txvInfos.length;
 
@@ -35,6 +38,7 @@ contract Verifier is IVerifier {
         }
 
         _addressVerifier = addressVerifier;
+        _subtreeVerifier = subTreeVerifier;
     }
 
     function verifyAddressProof(
@@ -45,7 +49,21 @@ contract Verifier is IVerifier {
         );
 
         if (!success) {
-            revert("Verification call failed");
+            revert("Address proof verification call failed");
+        }
+
+        return uint8(result[31]) == 1;
+    }
+
+    function verifySubtreeUpdateProof(
+        bytes calldata vInputs
+    ) public view returns (bool) {
+        (bool success, bytes memory result) = _subtreeVerifier.staticcall(
+            bytes.concat(VerifierSubtreeUpdate.verifyProof.selector, vInputs)
+        );
+
+        if (!success) {
+            revert("Subtree proof verification call failed");
         }
 
         return uint8(result[31]) == 1;

@@ -8,6 +8,7 @@ import {MESSAGE_REGISTER_ADDRESS, EIP712_DOMAIN_NAME, EIP712_DOMAIN_VERSION, EIP
 import {VerifierTransact21} from "src/verifiers/VerifierTransact21.sol";
 import {VerifierTransact22} from "src/verifiers/VerifierTransact22.sol";
 import {VerifierRegister} from "src/verifiers/VerifierRegister.sol";
+import {VerifierSubtreeUpdate} from "src/verifiers/VerifierSubtreeUpdate.sol";
 import {Verifier, TransactionVerifierInfo} from "src/core/Verifier.sol";
 import {AdaptorHandler} from "src/core/AdaptorHandler.sol";
 import {MockScreener} from "test/mocks/MockScreener.sol";
@@ -39,6 +40,7 @@ contract PoolBaseTest is BaseTest {
         VerifierTransact21 vt21 = new VerifierTransact21();
         VerifierTransact22 vt22 = new VerifierTransact22();
         VerifierRegister vr = new VerifierRegister();
+        VerifierSubtreeUpdate vSubtreeUpdate = new VerifierSubtreeUpdate();
         TransactionVerifierInfo[] memory vInfos = new TransactionVerifierInfo[](
             2
         );
@@ -52,7 +54,7 @@ contract PoolBaseTest is BaseTest {
             addr: address(vt22),
             selector: vt22.verifyProof.selector
         });
-        verifier = new Verifier(vInfos, address(vr));
+        verifier = new Verifier(vInfos, address(vr), address(vSubtreeUpdate));
         adaptorHandler = new AdaptorHandler();
 
         pool = new Pool();

@@ -53,6 +53,7 @@ interface IPool {
     error PublicAddressAlreadyRegistered(address addr);
     error BadArguments();
     error InvalidAddressProof();
+    error InvalidSubtreeUpdateProof();
     error InvalidTransactionProof();
     error UnknownCommitmentTreeRoot();
     error UnknownAddressTreeRoot();

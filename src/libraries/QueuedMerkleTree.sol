@@ -3,6 +3,8 @@ pragma solidity ^0.8.18;
 
 import {IHasher} from "../interfaces/IHasher.sol";
 import {FIELD_SIZE, ZERO_LEAF} from "../base/Constants.sol";
+import {IVerifier} from "../interfaces/IVerifier.sol";
+import {IPool} from "../interfaces/IPool.sol";
 
 struct QueuedMerkleTree {
     uint8 depth;
@@ -16,6 +18,16 @@ struct QueuedMerkleTree {
     mapping(uint8 => uint256) roots;
     mapping(uint8 => uint256) zeroes;
     mapping(uint8 => uint256) lastSubtrees;
+}
+
+struct SubtreeUpdateInputs {
+    uint32 leafIndex;
+    uint256[10] leaves;
+    uint256 lastRoot;
+    uint256[25] lastSubtrees;
+    uint256 newRoot;
+    uint256[25] newSubtrees;
+    bytes subtreeUpdateProof;
 }
 
 library QueuedMerkleTreeLogic {
@@ -63,38 +75,53 @@ library QueuedMerkleTreeLogic {
     }
 
     function updateSubtree(
-        QueuedMerkleTree storage self,
-        uint256 newRoot,
-        uint256[] memory newSubtree
+        SubtreeUpdateInputs memory subtreeUpdateInputs,
+        address subtreeVerifier,
+        QueuedMerkleTree storage self
     ) internal returns (uint256) {
-        uint256[] memory leaves = new uint256[](self.queueSize);
-        for (uint8 i = 0; i < self.queueSize; ) {
-            leaves[i] = self.queuedLeaves[i];
-            unchecked {
-                ++i;
+        bool subtreeUpdateProofVerification = _verifySubtreeUpdateProof(
+            subtreeUpdateInputs,
+            subtreeVerifier
+        );
+
+        if (subtreeUpdateProofVerification) {
+            uint8 newRootIndex = (self.currentRootIndex + 1) %
+                ROOT_HISTORY_SIZE;
+            self.roots[newRootIndex] = subtreeUpdateInputs.newRoot;
+
+            for (uint8 i = 0; i < self.depth; ) {
+                self.lastSubtrees[i] = subtreeUpdateInputs.newSubtrees[i];
+                unchecked {
+                    ++i;
+                }
             }
-        }
 
-        if(_verifyUpdateProof()) {
-            uint8 newRootIndex = (self.currentRootIndex + 1) % ROOT_HISTORY_SIZE;
-            self.roots[newRootIndex] = newRoot;
-
-        for (uint8 i = 0; i < self.depth; ) {
-            self.lastSubtrees[i] = newSubtree[i];
-            unchecked {
-                ++i;
-            }
-        }
-
-        self.nextLeafIndex += self.queueSize;
+            self.nextLeafIndex += self.queueSize;
+        } else {
+            revert IPool.InvalidSubtreeUpdateProof();
         }
 
         return self.nextLeafIndex;
     }
 
-    function _verifyUpdateProof() internal pure returns (bool) {
-        //TODO: Verify proof
-        return true;
+    function _verifySubtreeUpdateProof(
+        SubtreeUpdateInputs memory subtreeUpdateInputs,
+        address subtreeVerifier
+    ) internal view returns (bool) {
+        
+        bytes memory vInp = abi.encodePacked(
+            subtreeUpdateInputs.subtreeUpdateProof,
+            subtreeUpdateInputs.leafIndex,
+            subtreeUpdateInputs.leaves,
+            subtreeUpdateInputs.lastRoot,
+            subtreeUpdateInputs.lastSubtrees,
+            subtreeUpdateInputs.newRoot,
+            subtreeUpdateInputs.newSubtrees
+        );
+        bool subtreeVerificationResult = IVerifier(subtreeVerifier)
+            .verifySubtreeUpdateProof(vInp);
+
+        return subtreeVerificationResult;
     }
 
     function isKnownRoot(
