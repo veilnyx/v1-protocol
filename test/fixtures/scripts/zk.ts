@@ -1,0 +1,35 @@
+import { readFileSync } from "fs";
+//@ts-ignore
+import * as snarkJs from "snarkjs";
+import { CircuitPath, ZTransaction } from "@zkfi-tech/zk-prover";
+
+export const getCircuitPath = (name: string) => {
+  return {
+    zKey: `../v1-circuits/artifacts/${name}/keys.zkey`,
+    wasm: `../v1-circuits/artifacts/${name}/circuit.wasm`,
+    vKey: `../v1-circuits/artifacts/${name}/vKey.json`,
+  };
+};
+
+export const circuits: Record<string, CircuitPath> = {
+  transact21: getCircuitPath("transact21"),
+  transact22: getCircuitPath("transact22"),
+  register: getCircuitPath("register"),
+};
+
+export const verifyZTx = async (ztx: ZTransaction) => {
+  const nIns = ztx.nullifiers.length;
+  const nOuts = ztx.commitments.length;
+  const id = nIns * 10 + nOuts;
+  const circuitPath = getCircuitPath(`transact${id}`);
+
+  const vInp = ztx.toSnarkJsVerifierInput();
+  const vKey = JSON.parse(readFileSync(circuitPath.vKey, "utf-8"));
+
+  const res = await snarkJs.groth16.verify(
+    vKey,
+    vInp.publicSignals,
+    vInp.proof
+  );
+  return res === true;
+};

@@ -2,7 +2,7 @@
 pragma solidity ^0.8.18;
 
 import {IHasher} from "../interfaces/IHasher.sol";
-import {FIELD_SIZE, ZERO_LEAF} from "../core/Constants.sol";
+import {FIELD_SIZE, ZERO_LEAF} from "../base/Constants.sol";
 
 struct QueuedMerkleTree {
     uint8 depth;
@@ -75,10 +75,9 @@ library QueuedMerkleTreeLogic {
             }
         }
 
-        _verifyUpdateProof();
-
-        uint8 newRootIndex = (self.currentRootIndex + 1) % ROOT_HISTORY_SIZE;
-        self.roots[newRootIndex] = newRoot;
+        if(_verifyUpdateProof()) {
+            uint8 newRootIndex = (self.currentRootIndex + 1) % ROOT_HISTORY_SIZE;
+            self.roots[newRootIndex] = newRoot;
 
         for (uint8 i = 0; i < self.depth; ) {
             self.lastSubtrees[i] = newSubtree[i];
@@ -88,6 +87,7 @@ library QueuedMerkleTreeLogic {
         }
 
         self.nextLeafIndex += self.queueSize;
+        }
 
         return self.nextLeafIndex;
     }

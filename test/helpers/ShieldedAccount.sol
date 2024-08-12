@@ -7,4 +7,7 @@ struct ShieldedAccount {
     uint256 seed;
     address pubAddress;
     uint256 rootAddress;
+    uint256[2] signPublicKey;
+    uint256[2] viewPublicKey;
+    bytes shieldedAddress;
 }

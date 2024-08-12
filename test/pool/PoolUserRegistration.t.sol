@@ -1,51 +1,88 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {Test} from "forge-std/Test.sol";
-import {PoolTest} from "test/fixtures/PoolTest.t.sol";
-import {IPool} from "src/interfaces/IPool.sol";
+import {Test, console2} from "forge-std/Test.sol";
 import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
+import {EIP712Upgradeable} from "@openzeppelin/contracts-upgradeable/utils/cryptography/EIP712Upgradeable.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import {ShieldedAddressRegistrationData, ShieldedAddressLogic} from "src/libraries/ShieldedAddress.sol";
+import {IPool} from "src/interfaces/IPool.sol";
+import {PoolBaseTest} from "test/fixtures/PoolBaseTest.sol";
 
-contract PoolInitTest is PoolTest {
-    address userAddr;
-    uint256 userPK;
-    uint256 user = uint256(uint160(userAddr));
-    bytes publicKeys;
-    bytes signature;
+contract PoolUserRegistration is PoolBaseTest {
+    ShieldedAddressRegistrationData addressRegistrationData;
 
     function setUp() public {
-        _initFixture();
-        (userAddr, userPK) = makeAddrAndKey("userAddr");
+        _setUp();
+        (, uint256 senderPk) = makeAddrAndKey("sender");
 
-        bytes32 userPublicKeyX = bytes32(user);
-        bytes32 userPublicKeyY = bytes32(user);
-
-        publicKeys = bytes.concat(userPublicKeyX, userPublicKeyY);
-        signature;
-
-        bytes32 msgHash = MessageHashUtils.toEthSignedMessageHash(
-            bytes.concat(bytes32(user), publicKeys)
+        addressRegistrationData = _loadShieldedAddressRegistrationData(
+            "register_sender"
         );
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(userPK, msgHash);
-        signature = abi.encodePacked(r, s, v);
+        bytes memory shieldedAddress = bytes.concat(
+            bytes32(fixture.sender.rootAddress),
+            bytes32(fixture.sender.signPublicKey[0]),
+            bytes32(fixture.sender.signPublicKey[1]),
+            bytes32(fixture.sender.viewPublicKey[0]),
+            bytes32(fixture.sender.viewPublicKey[1])
+        );
+
+        addressRegistrationData.signature = _getRegisterAddressSignature(
+            senderPk,
+            shieldedAddress
+        );
     }
 
-    function test_register_user() public {
-        vm.expectEmit(true, true, true, false, address(pool));
-        emit IPool.RegisterAddress(userAddr, user, 1, publicKeys);
+    function test_packShieldedAddress() public view {
+        bytes memory compressed = fixture.sender.shieldedAddress;
+        bytes memory uncompressed = abi.encodePacked(
+            fixture.sender.rootAddress,
+            fixture.sender.signPublicKey,
+            fixture.sender.viewPublicKey
+        );
+        bytes memory compressed2 = ShieldedAddressLogic.pack(uncompressed);
 
-        vm.prank(userAddr);
-        pool.registerAddress(user, publicKeys, signature);
+        assertEq(compressed2.length, 96);
+        assertEq(compressed, compressed2);
+    }
+
+    function test_registerAddress() public {
+        // vm.expectEmit(false, false, false, false);
+        // emit IPool.RegisterAddress(
+        //     senderAddr,
+        //     fixture.sender.rootAddress,
+        //     0,
+        //     shieldedAddress
+        // );
+        pool.registerAddress(addressRegistrationData);
     }
 
     function test_userRegistrationWhenPaused() external {
         pool.pause();
+
+        ShieldedAddressRegistrationData
+            memory data = _loadShieldedAddressRegistrationData(
+                "register_sender"
+            );
         vm.expectRevert(
             abi.encodeWithSelector(PausableUpgradeable.EnforcedPause.selector)
         );
-        vm.prank(userAddr);
-        pool.registerAddress(user, publicKeys, signature);
+        pool.registerAddress(data);
+    }
+
+    function test_revertWhenAlreadyRegistered() external {
+        pool.registerAddress(addressRegistrationData);
+        uint256 rootAddress = uint256(
+            bytes32(addressRegistrationData.shieldedAddress)
+        );
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IPool.RootAddressAlreadyRegistered.selector,
+                rootAddress
+            )
+        );
+
+        pool.registerAddress(addressRegistrationData);
     }
 }

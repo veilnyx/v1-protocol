@@ -6,7 +6,7 @@ import {console2} from "forge-std/console2.sol";
 import {IPool} from "src/interfaces/IPool.sol";
 import {Pool} from "src/core/Pool.sol";
 import {ZTransaction} from "src/libraries/ZTransaction.sol";
-import {PoolTest} from "test/fixtures/PoolTest.t.sol";
+import {PoolTest} from "test/fixtures/PoolTest.sol";
 import {MockERC20} from "test/mocks/MockERC20.sol";
 
 contract PoolTransactTest is Test {
@@ -15,6 +15,7 @@ contract PoolTransactTest is Test {
     MockERC20 public token1;
     MockERC20 public token2;
     Pool public pool;
+    uint256 defaultFeeValue = 0.001 ether;
 
     constructor(
         ZTransaction memory ztx_,
@@ -42,9 +43,15 @@ contract PoolTransactTest is Test {
     }
 
     function test_nullifiersMarked() public {
-        for (uint256 i = ztx.nullifiers.length; i > 0; i--) {
+        uint32 currentLeafIndex = pool.getCommitmentTreeNextLeafIndex();
+        uint32 nullifierMarkLeafIndex = currentLeafIndex + 1;
+
+        for (uint256 i = 0; i < ztx.nullifiers.length; i++) {
             vm.expectEmit(true, true, true, true);
-            emit IPool.NullifierMarked(ztx.nullifiers[i - 1]);
+            emit IPool.NullifierMarked(
+                ztx.nullifiers[i],
+                nullifierMarkLeafIndex
+            );
         }
 
         pool.transact(ztx);
@@ -74,31 +81,36 @@ contract PoolTransactTest is Test {
         assert(currentRootIndexBeforeDeposit < currentRootIndexAfterDeposit);
     }
 
-    function test_Annoucements() external {
+    function test_CommitmentEvents() external {
         uint256 nextIndex = pool.getCommitmentTreeNextLeafIndex();
         console.log("Leaf commitment for deposit:", ztx.commitments.length);
 
-        // for (uint256 a = 0; a < ztx.commitments.length; a++) {
-        //     vm.expectEmit(true, true, true, true);
-        //     emit IPool.Announcement(
-        //         nextIndex,
-        //         ztx.commitments[a],
-        //         ztx.noteMemos[a]
-        //     );
-        //     nextIndex++;
-        // }
+        for (uint256 a = 0; a < ztx.commitments.length; a++) {
+            vm.expectEmit(true, true, true, true);
+            emit IPool.Commitment(nextIndex, ztx.commitments[a]);
+            nextIndex++;
+        }
+
         pool.transact(ztx);
     }
 
-    // function test_InputNotesMemoEvent() external {
-    //     vm.expectEmit(true, true, false, true);
-    //     emit IPool.InputNoteMemos(ztx.inMemos);
-    //     pool.transact(ztx);
-    // }
+    function test_ReceiptEvent() external {
+        uint32 nextLeafIndex = pool.getCommitmentTreeNextLeafIndex();
 
-    // function test_ComplianceMemo() external {
-    //     vm.expectEmit(true, true, false, true);
-    //     emit IPool.ComplianceMemo(ztx.complianceMemo);
-    //     pool.transact(ztx);
-    // }
+        vm.expectEmit(true, true, true, false);
+        // emit IPool.Receipt(
+        //     ztx.txType,
+        //     ztx.revokerId,
+        //     (nextLeafIndex + 2),
+        //     address(0),
+        //     uint24(0),
+        //     uint96(0),
+        //     address(0),
+        //     ztx.assetsMemo,
+        //     ztx.keysMemo,
+        //     ztx.notesMemo
+        // );
+
+        pool.transact(ztx);
+    }
 }

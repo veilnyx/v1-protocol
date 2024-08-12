@@ -13,7 +13,6 @@ contract UniswapV3Adapter is AdaptorBase {
     error UnsupportedAsset(uint24 assetId);
     error MultiAssetSwap();
     error ZeroValues();
-    error ZeroAddress();
 
     ISwapRouter02 public immutable swapRouter02;
     uint24 public constant feeTier = 3000;
@@ -49,10 +48,6 @@ contract UniswapV3Adapter is AdaptorBase {
         Asset memory inAsset = getAsset(inAssetIds[0]);
         if (!inAsset.isSupported) {
             revert UnsupportedAsset(inAssetIds[0]);
-        }
-
-        if (inAsset.assetAddress == address(0)) {
-            revert ZeroAddress();
         }
 
         // decoding payload
@@ -91,8 +86,6 @@ contract UniswapV3Adapter is AdaptorBase {
             outAssetIds = new uint24[](0);
             outValues = new uint256[](0);
         }
-
-        return (outAssetIds, outValues);
     }
 
     /// @param tokenIn The address of the token to be swapped
@@ -107,7 +100,7 @@ contract UniswapV3Adapter is AdaptorBase {
         uint256 minOut,
         address beneficiary
     ) public returns (uint256 amountOut) {
-        // ZkFi convertor to approve the Uniswap adaptor the inTokens received.
+        // Uniswap adaptor to approve Uniswap's Swap Router contract the inTokens received.
         SafeERC20.forceApprove(
             IERC20(tokenIn),
             address(swapRouter02),

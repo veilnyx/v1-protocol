@@ -1,20 +1,20 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.24;
 
+import {FIELD_SIZE} from "../base/Constants.sol";
+import {Asset, AssetLogic} from "./Asset.sol";
+import {MerkleTree, MerkleTreeLogic} from "./MerkleTree.sol";
 import {IPool} from "../interfaces/IPool.sol";
 import {IVerifier} from "../interfaces/IVerifier.sol";
 import {IHasher} from "../interfaces/IHasher.sol";
-import {FIELD_SIZE} from "../core/Constants.sol";
 import {IAdaptorHandler} from "../interfaces/IAdaptorHandler.sol";
-import {Asset, AssetLogic} from "./Asset.sol";
-import {MerkleTree, MerkleTreeLogic} from "./MerkleTree.sol";
 
 /// @title ZTransactionType enum representing types of shielded transactions
 enum ZTransactionType {
     DEPOSIT,
     TRANSFER,
     WITHDRAW,
-    CONVERT
+    CALL_ADAPTOR
 }
 
 /// @title MemoType enum representing memo types for output notes
@@ -43,33 +43,32 @@ struct RevokerData {
 /// @param addressTreeRoot      Recent merkle root of address tree
 /// @param commitmentTreeRoot   Recent merkle root of commitment tree
 /// @param feeData              Packed fee data (20-byte paymaster address + 12-byte fee value)
+/// @param refundAddress        Blinded address to publicly refund assets to such as in adaptor transactions
 /// @param pubAssets            Encoded (assetId + value) for publicly spent assets. If applicable, fee asset is
 ///                             the first element in this array
 /// @param nullifiers           Revealed nullifiers of input/spent notes
 /// @param commitments          New commitments of output notes to be inserted in tree
 /// @param proof                Abi encoded ZK proof
-/// @param noteMemos            Memos for output notes. This is list of encrypted notes' fields.
-/// @param assetMemo            This is empty for non-TRANSFER transactions. For TRANSFER transactions,
+/// @param assetsMemo           This is empty for non-TRANSFER transactions. For TRANSFER transactions,
 ///                             this is encrypted assets using sender's key that were transferred to receiver.
-/// @param complianceMemo       Encrypted compliance data that was created using compliance encryption key
+/// @param keysMemo             Encrypted keys with wich notesMemo is encrypted
+/// @param notesMemo            Memos for output notes. This is list of encrypted notes' fields and sender data.
 /// @param targetData           Target address (first 20-bytes) for withdraw/adapter concatenated with payload
-/// @param refundData           Refund address (first 32-byte) for public deposit to shielded account
-///                             concatenated with refund memo
 struct ZTransaction {
     ZTransactionType txType;
     uint16 revokerId;
     uint256 addressTreeRoot;
     uint256 commitmentTreeRoot;
     uint256 feeData;
+    uint256 refundAddress;
     uint248[] pubAssets;
     uint256[] nullifiers;
     uint256[] commitments;
     bytes proof;
-    bytes[] noteMemos;
-    bytes assetMemo;
-    bytes complianceMemo;
+    bytes assetsMemo;
+    bytes keysMemo;
+    bytes notesMemo;
     bytes targetData;
-    bytes refundData;
 }
 
 /// @title PubAsset struct representing public asset details
@@ -94,10 +93,10 @@ struct Params {
 
 struct MemoParams {
     uint256[] commitments;
-    bytes[] noteMemos;
-    bytes complianceMemo;
-    bytes assetMemo;
-    bytes refundAddressMemo;
+    bytes keysMemo;
+    bytes assetsMemo;
+    bytes notesMemo;
+    bytes refundMemo;
 }
 
 /// @title ZTransactionLogic library for shielded transaction logic
@@ -117,11 +116,11 @@ library ZTransactionLogic {
                 abi.encode(
                     self.txType,
                     self.feeData,
+                    self.refundAddress,
                     self.nullifiers,
-                    self.noteMemos,
-                    self.assetMemo,
-                    self.targetData,
-                    self.refundData
+                    self.assetsMemo,
+                    self.keysMemo,
+                    self.targetData
                 )
             )
         ) % FIELD_SIZE;
@@ -129,7 +128,7 @@ library ZTransactionLogic {
         return txHash;
     }
 
-    ///@notice Validates a shielded transaction
+    /// @notice Validates a shielded transaction
     /// @param ztx ZTransaction to be executed
     /// @param addressTree Address `MerkleTree` state in this contract
     /// @param commitmentTree Commitment `MerkleTree` state in this contract
@@ -159,7 +158,7 @@ library ZTransactionLogic {
         }
 
         if (
-            ztx.txType == ZTransactionType.CONVERT &&
+            ztx.txType == ZTransactionType.CALL_ADAPTOR &&
             !supportedAdaptors[address(bytes20(ztx.targetData))]
         ) {
             revert IPool.UnsupportedAdaptor();
@@ -168,7 +167,7 @@ library ZTransactionLogic {
         _checkAndMarkNullifiers(ztx, commitmentTree, markedNullifiers);
 
         if (!_verifyProof(ztx, revokerData, verifier)) {
-            revert IPool.InvalidProof();
+            revert IPool.InvalidTransactionProof();
         }
     }
 
@@ -191,8 +190,8 @@ library ZTransactionLogic {
         Params memory params = _copyParamsToMemory(ztx);
         MemoParams memory memoParams = _copyMemoParamsToMemory(ztx);
 
-        // Transfer paymaster fees
-        _transferPaymasterFee(paymasterFees, params);
+        // Credit paymaster fees
+        _creditPaymasterFee(paymasterFees, params);
 
         // Receive any deposits
         if (ztx.txType == ZTransactionType.DEPOSIT) {
@@ -211,7 +210,7 @@ library ZTransactionLogic {
         }
 
         // Perform any conversions
-        if (ztx.txType == ZTransactionType.CONVERT) {
+        if (ztx.txType == ZTransactionType.CALL_ADAPTOR) {
             _transferPubAssets(
                 assets,
                 withdrawFees,
@@ -219,7 +218,13 @@ library ZTransactionLogic {
                 adaptorHandler,
                 0
             );
-            _handleAdaptor(assets, hasher, adaptorHandler, params, memoParams);
+            _handleAdaptorCall(
+                assets,
+                hasher,
+                adaptorHandler,
+                params,
+                memoParams
+            );
         }
 
         _printNotes(commitmentTree, params, memoParams);
@@ -270,10 +275,10 @@ library ZTransactionLogic {
                 revokerData.revokerPublicKey[0],
                 revokerData.revokerPublicKey[1],
                 abi.encodePacked(self.commitments),
-                bytes32(self.refundData),
+                self.refundAddress,
                 revokerData.encryptionPublicKey[0],
                 revokerData.encryptionPublicKey[1],
-                self.complianceMemo
+                self.notesMemo
             );
         }
 
@@ -286,7 +291,7 @@ library ZTransactionLogic {
         return verifierParams;
     }
 
-    function _handleAdaptor(
+    function _handleAdaptorCall(
         mapping(uint24 => Asset) storage assets,
         address hasher,
         address adaptorHandler,
@@ -302,10 +307,11 @@ library ZTransactionLogic {
 
         _receivePubAssets(assets, outPubAssets, adaptorHandler);
 
+        /// @dev Creating commitments and output noteMemos for received tokens. This is done on the protocol side for CONVERT txns because the exact value of converted tokens can only be determined after executing the CONVERT tx.
+        /// @dev `refundAddress` is used as the recipient's blinded address.
+        /// @dev `refundAddressMemo` contains the encrypted blinding factor which can only be decrypted by the owner of `refundAddress`. This blinding needs to be submitted as a proof to prove ownership over the refund notes.
         uint256 outLen = outPubAssets.length;
-
         uint256[] memory pubCms = new uint256[](outLen);
-        bytes[] memory pubMemos = new bytes[](outLen);
 
         for (uint8 i = 0; i < outLen; ++i) {
             pubCms[i] = IHasher(hasher).hash(
@@ -315,20 +321,17 @@ library ZTransactionLogic {
                     outPubAssets[i].value
                 ]
             );
-            pubMemos[i] = abi.encodePacked(
-                MemoType.SEMI,
+            memoParams.refundMemo = abi.encodePacked(
+                memoParams.refundMemo,
                 outPubAssets[i].id,
-                params.refundAddress,
-                outPubAssets[i].value,
-                memoParams.refundAddressMemo
+                outPubAssets[i].value
             );
         }
 
         memoParams.commitments = _concat(memoParams.commitments, pubCms);
-        memoParams.noteMemos = _concat(memoParams.noteMemos, pubMemos);
     }
 
-    function _transferPaymasterFee(
+    function _creditPaymasterFee(
         mapping(address => mapping(uint24 => uint256)) storage paymasterFees,
         Params memory params
     ) internal {
@@ -395,7 +398,7 @@ library ZTransactionLogic {
         RevokerData memory revokerData,
         address verifier
     ) internal view returns (bool) {
-        uint16 vId = IVerifier(verifier).getVerifierId(
+        uint16 vId = IVerifier(verifier).getTransactionVerifierId(
             ztx.nullifiers.length,
             ztx.commitments.length
         );
@@ -419,6 +422,7 @@ library ZTransactionLogic {
             }
 
             markedNullifiers[nullifier] = nextIdx + 1;
+            emit IPool.NullifierMarked(nullifier, markedNullifiers[nullifier]);
 
             unchecked {
                 ++i;
@@ -452,9 +456,10 @@ library ZTransactionLogic {
             params.feeAssetId,
             params.feeValue,
             params.paymaster,
-            memoParams.assetMemo,
-            memoParams.complianceMemo,
-            memoParams.noteMemos
+            memoParams.keysMemo,
+            memoParams.assetsMemo,
+            memoParams.notesMemo,
+            memoParams.refundMemo
         );
     }
 
@@ -488,8 +493,8 @@ library ZTransactionLogic {
             params.targetPayload = bytes(ztx.targetData[20:]);
         }
 
-        if (ztx.txType == ZTransactionType.CONVERT) {
-            params.refundAddress = uint256(bytes32(ztx.refundData));
+        if (ztx.txType == ZTransactionType.CALL_ADAPTOR) {
+            params.refundAddress = ztx.refundAddress;
         }
 
         return params;
@@ -501,17 +506,17 @@ library ZTransactionLogic {
         MemoParams memory memoParams;
 
         memoParams.commitments = ztx.commitments;
-        memoParams.noteMemos = ztx.noteMemos;
-        memoParams.complianceMemo = ztx.complianceMemo;
+        memoParams.keysMemo = ztx.keysMemo;
+        memoParams.notesMemo = ztx.notesMemo;
 
         if (ztx.txType == ZTransactionType.TRANSFER) {
-            memoParams.assetMemo = ztx.assetMemo;
+            memoParams.assetsMemo = ztx.assetsMemo;
         } else {
-            memoParams.assetMemo = abi.encodePacked(ztx.pubAssets);
+            memoParams.assetsMemo = abi.encodePacked(ztx.pubAssets);
         }
 
-        if (ztx.txType == ZTransactionType.CONVERT) {
-            memoParams.refundAddressMemo = ztx.refundData[32:];
+        if (ztx.txType == ZTransactionType.CALL_ADAPTOR) {
+            memoParams.refundMemo = abi.encodePacked(ztx.refundAddress);
         }
 
         return memoParams;
@@ -522,26 +527,6 @@ library ZTransactionLogic {
         uint256[] memory b
     ) internal pure returns (uint256[] memory) {
         uint256[] memory result = new uint256[](a.length + b.length);
-        for (uint8 i = 0; i < a.length; ) {
-            result[i] = a[i];
-            unchecked {
-                ++i;
-            }
-        }
-        for (uint8 i = 0; i < b.length; ) {
-            result[a.length + i] = b[i];
-            unchecked {
-                ++i;
-            }
-        }
-        return result;
-    }
-
-    function _concat(
-        bytes[] memory a,
-        bytes[] memory b
-    ) internal pure returns (bytes[] memory) {
-        bytes[] memory result = new bytes[](a.length + b.length);
         for (uint8 i = 0; i < a.length; ) {
             result[i] = a[i];
             unchecked {

@@ -67,6 +67,12 @@ contract AdaptorHandler is IAdaptorHandler {
 
             outPubAssets[i] = PubAsset(outAssetIds[i], uint224(outValues[i]));
 
+            // uint248(
+            //     bytes31(
+            //         bytes.concat(bytes3(outAssetIds[i]), bytes28(outValues[i]))
+            //     )
+            // );
+
             unchecked {
                 ++i;
             }
@@ -74,4 +80,7 @@ contract AdaptorHandler is IAdaptorHandler {
 
         return outPubAssets;
     }
+
+    // Allow Lido adaptor to receive unwrapped Ether
+    receive() external payable {}
 }

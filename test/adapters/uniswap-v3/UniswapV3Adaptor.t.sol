@@ -3,7 +3,7 @@ pragma solidity 0.8.24;
 pragma abicoder v2;
 
 import {BaseScript} from "script/BaseScript.sol";
-import {PoolTest} from "test/fixtures/PoolTest.t.sol";
+import {PoolTest} from "test/fixtures/PoolTest.sol";
 import {Pool} from "src/core/Pool.sol";
 import {ZTransaction} from "src/libraries/ZTransaction.sol";
 import {UniswapV3Adapter} from "src/adaptors/uniswap-v3/UniswapV3Adapter.sol";
@@ -26,7 +26,7 @@ contract UniswapV3AdaptorTest is PoolTest, BaseScript {
 
     function setUp() external {
         require(shouldTestRun(), "UniswapV3AdaptorTest: Chain not supported");
-        _initFixture();
+        _setUp();
 
         WETH = _config.initAssetAddresses()[0];
         if (WETH == address(0)) {
@@ -49,6 +49,7 @@ contract UniswapV3AdaptorTest is PoolTest, BaseScript {
             uniswapSwapRouter02,
             address(pool)
         );
+        /// @dev update convert req fixture with this adaptor addr as `to`
         console.log("Uniswap adaptor:", address(uniswapV3Adapter));
 
         // TODO: Use a cheat code for Uni adp. address for consistency
@@ -65,9 +66,9 @@ contract UniswapV3AdaptorTest is PoolTest, BaseScript {
 
         vm.deal(user, INITIAL_SUPPLY * 2);
         vm.startPrank(user);
-        iWETH.deposit{value: INITIAL_SUPPLY}();
-        iWETH.approve(address(pool), INITIAL_SUPPLY);
-        ZTransaction memory ztxWethDeposit = _loadZTx(
+        iWETH.deposit{value: INITIAL_SUPPLY}(); // wrapping eth to weth
+        iWETH.approve(address(pool), INITIAL_SUPPLY); // depositing weth to pool
+        ZTransaction memory ztxWethDeposit = _loadShieldedTransaction(
             "deposit_1_original_weth"
         );
         pool.transact(ztxWethDeposit);
@@ -84,7 +85,7 @@ contract UniswapV3AdaptorTest is PoolTest, BaseScript {
             address(pool)
         );
 
-        ZTransaction memory ztxDeposit = _loadZTx(
+        ZTransaction memory ztxDeposit = _loadShieldedTransaction(
             "swap_1e16_orig_weth_to_usdc"
         );
         pool.transact(ztxDeposit);
@@ -96,14 +97,13 @@ contract UniswapV3AdaptorTest is PoolTest, BaseScript {
         assert(poolUSDCBalPostConvert > poolUSDCBalBeforeConvert);
     }
 
-
-    function testWethToUSDCSwapToPoolViaBundler() public {
+    function testSwapViaBundler() public {
         console.log("Initiating WETH<>USDC swap");
         uint256 poolUSDCBalBeforeConvert = IERC20(USDC).balanceOf(
             address(pool)
         );
 
-        ZTransaction memory ztxDeposit = _loadZTx(
+        ZTransaction memory ztxDeposit = _loadShieldedTransaction(
             "swap_1e16_orig_weth_to_usdc_via_bundler"
         );
         pool.transact(ztxDeposit);
@@ -133,7 +133,7 @@ contract UniswapV3AdaptorTest is PoolTest, BaseScript {
     //         address(pool)
     //     );
 
-    //     ZTransaction memory ztxDeposit = _loadZTx("swap_5_usdc_to_weth");
+    //     ZTransaction memory ztxDeposit =  _loadShieldedTransaction("swap_5_usdc_to_weth");
     //     pool.transact(ztxDeposit);
 
     //     // Asserts
@@ -147,7 +147,7 @@ contract UniswapV3AdaptorTest is PoolTest, BaseScript {
     //     console.log("Initiating swap to USDC using Uniswap test");
     //     uint256 userUSDCBalBeforeConvert = IERC20(USDC).balanceOf(user);
 
-    //     ZTransaction memory ztxDeposit = _loadZTx(
+    //     ZTransaction memory ztxDeposit =  _loadShieldedTransaction(
     //         "swap_1e16_orig_weth_to_usdc"
     //     );
     //     pool.transact(ztxDeposit);
@@ -219,5 +219,5 @@ contract UniswapV3AdaptorTest is PoolTest, BaseScript {
 // function loadZTx(
 //     string memory name
 // ) external view returns (ZTransaction memory) {
-//     return _loadZTx(name);
+//     return  _loadShieldedTransaction(name);
 // }

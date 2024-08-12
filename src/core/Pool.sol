@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifie–: MIT
 pragma solidity ^0.8.24;
 
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
@@ -7,15 +7,17 @@ import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/U
 import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
-import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import {EIP712Upgradeable} from "@openzeppelin/contracts-upgradeable/utils/cryptography/EIP712Upgradeable.sol";
 import {IVerifier} from "../interfaces/IVerifier.sol";
 import {IPool} from "../interfaces/IPool.sol";
 import {IAdaptorHandler} from "../interfaces/IAdaptorHandler.sol";
 import {IScreener} from "../interfaces/IScreener.sol";
+import {EIP712_DOMAIN_NAME, EIP712_DOMAIN_VERSION, EIP712_TYPEHASH_REGISTER_ADDRESS, MESSAGE_REGISTER_ADDRESS} from "../base/Constants.sol";
 import {PoolStorage} from "../base/PoolStorage.sol";
 import {Asset, AssetType, AssetLogic} from "../libraries/Asset.sol";
-import {ZTransaction, ZTransactionLogic, RevokerData} from "../libraries/ZTransaction.sol";
 import {MerkleTree, MerkleTreeLogic} from "../libraries/MerkleTree.sol";
+import {ShieldedAddressRegistrationData, ShieldedAddressLogic} from "../libraries/ShieldedAddress.sol";
+import {ZTransaction, ZTransactionLogic, RevokerData} from "../libraries/ZTransaction.sol";
 
 contract Pool is
     IPool,
@@ -24,11 +26,22 @@ contract Pool is
     OwnableUpgradeable,
     ReentrancyGuardUpgradeable,
     PausableUpgradeable,
+    EIP712Upgradeable,
     PoolStorage
 {
     using MerkleTreeLogic for MerkleTree;
+    using ShieldedAddressLogic for ShieldedAddressRegistrationData;
     using ZTransactionLogic for ZTransaction;
 
+    /// @notice Initializes the Pool contract with the given parameters.
+    /// @dev Pool is an UUPSUpgradeable contract, so it needs to be initialized.
+    /// @param addressTreeDepth The depth of the address tree.
+    /// @param commitmentTreeDepth The depth of the commitment tree.
+    /// @param verifier_ The address of the verifier contract. Verifier contract verifies the ZTx's zk proof.
+    /// @param adaptorHandler_ The address of the adaptor handler contract, responsible for delegate calling adaptors of external DeFi protocols.
+    /// @param screener_ The address of the screener contract, responsible for screening sanctioned addresseses.
+    /// @param hasher_ The address of the hasher contract. It provides a single interface to Poseidon hashing functions
+    /// @param withdrawFeeBps_ The fee in basis points (1/10000) that is charged for withdrawing assets from the pool.
     function initialize(
         uint8 addressTreeDepth,
         uint8 commitmentTreeDepth,
@@ -42,12 +55,13 @@ contract Pool is
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
         __Pausable_init();
+        __EIP712_init(EIP712_DOMAIN_NAME, EIP712_DOMAIN_VERSION);
 
         verifier = verifier_;
         adaptorHandler = adaptorHandler_;
         hasher = hasher_;
         screener = screener_;
-        _withdrawFeeBps = withdrawFeeBps_;
+        withdrawFeeBps = withdrawFeeBps_;
 
         _addressTree.init(addressTreeDepth, hasher_);
         _commitmentTree.init(commitmentTreeDepth, hasher_);
@@ -110,6 +124,24 @@ contract Pool is
         _revokerCount += 1;
     }
 
+    function withdrawProtocolFee(
+        uint24 assetId,
+        address to
+    ) external nonReentrant onlyOwner {
+        uint256 withdrawFeeCollected = _withdrawFees[assetId];
+        if (withdrawFeeCollected == 0) {
+            revert NoFeeToClaim(msg.sender, assetId);
+        }
+
+        _withdrawFees[assetId] = 0;
+        AssetLogic.transferAsset({
+            assets: _assets,
+            to: to,
+            assetId: assetId,
+            value: withdrawFeeCollected
+        });
+    }
+
     function setRevokerStatus(uint256 id, bool isActive) external onlyOwner {
         _revokers[id].isActive = isActive;
         emit IPool.RevokerStatusUpdated(id, isActive);
@@ -120,7 +152,7 @@ contract Pool is
     }
 
     function setWithdrawFeeBips(uint256 feeBps) external onlyOwner {
-        _withdrawFeeBps = feeBps;
+        withdrawFeeBps = feeBps;
     }
 
     /////////////////////////////////////////
@@ -128,29 +160,20 @@ contract Pool is
     ////////////////////////////////////////
 
     function registerAddress(
-        uint256 addr,
-        bytes calldata publicKeys,
-        bytes calldata signature
+        ShieldedAddressRegistrationData calldata addressRegData
     ) external whenNotPaused {
-        if (_addressRegistered[addr]) {
-            revert AddressAlreadyRegistered(addr);
-        }
-
-        // Each public key is 32 bytes long
-        if (publicKeys.length != 64) {
-            revert BadArguments();
-        }
-
-        bytes32 msgHash = MessageHashUtils.toEthSignedMessageHash(
-            bytes.concat(bytes32(addr), publicKeys)
+        bytes32 hashStruct = _hashRegsiterAddressStruct(
+            addressRegData.shieldedAddress
         );
+        bytes32 hashTypedData = _hashTypedDataV4(hashStruct);
 
-        address sender = ECDSA.recover(msgHash, signature);
-
-        uint256 nextIndex = _addressTree.insert(addr);
-        _addressRegistered[addr] = true;
-
-        emit RegisterAddress(sender, addr, nextIndex - 1, publicKeys);
+        addressRegData.register({
+            addressTree: _addressTree,
+            publicAddresses: _publicAddresses,
+            rootAddresses: _rootAddresses,
+            verifier: verifier,
+            hashTypedData: hashTypedData
+        });
     }
 
     function transact(
@@ -172,7 +195,7 @@ contract Pool is
             paymasterFees: _paymasterFees,
             adaptorHandler: adaptorHandler,
             hasher: hasher,
-            withdrawFeeBps: _withdrawFeeBps
+            withdrawFeeBps: withdrawFeeBps
         });
     }
 
@@ -201,14 +224,13 @@ contract Pool is
 
     function verifyTransactionProof(
         ZTransaction calldata ztx
-    ) external view returns (bool) {
+    ) external view returns (bool result) {
         RevokerData memory revokerData = _revokers[ztx.revokerId];
-        uint16 vId = IVerifier(verifier).getVerifierId(
-            ztx.nullifiers.length,
-            ztx.commitments.length
-        );
-        bytes memory vParams = ztx.toVerifierInput(revokerData);
-        return IVerifier(verifier).verifyTransactionProof(vId, vParams);
+
+        result = ztx._verifyProof({
+            revokerData: revokerData,
+            verifier: verifier
+        });
     }
 
     function getRevokerData(
@@ -232,15 +254,13 @@ contract Pool is
         return _assets[assetId];
     }
 
+    /// @notice Returns the data of an asset.
+    /// @param assetAddress The address of the asset.
     function getAsset(
         address assetAddress
     ) external view returns (Asset memory) {
         uint24 id = _assetIds[assetAddress];
         return _assets[id];
-    }
-
-    function getWithdrawFeeBps() external view returns (uint256) {
-        return _withdrawFeeBps;
     }
 
     function getCollectedWithdrawFee(
@@ -287,19 +307,19 @@ contract Pool is
         return _commitmentTree.zeroes[level];
     }
 
-    function getCommitmentTreeDepth() external view returns (uint256) {
+    function getCommitmentTreeDepth() external view returns (uint8) {
         return _commitmentTree.depth;
     }
 
-    function getAddressTreeDepth() external view returns (uint256) {
+    function getAddressTreeDepth() external view returns (uint8) {
         return _addressTree.depth;
     }
 
-    function getCommitmentTreeNextLeafIndex() external view returns (uint256) {
+    function getCommitmentTreeNextLeafIndex() external view returns (uint32) {
         return _commitmentTree.nextLeafIndex;
     }
 
-    function getAddressTreeNextLeafIndex() external view returns (uint256) {
+    function getAddressTreeNextLeafIndex() external view returns (uint32) {
         return _addressTree.nextLeafIndex;
     }
 
@@ -331,6 +351,19 @@ contract Pool is
 
     function isKnownAddressTreeRoot(uint256 root) external view returns (bool) {
         return _addressTree.isKnownRoot(root);
+    }
+
+    function _hashRegsiterAddressStruct(
+        bytes calldata shieldedAddress
+    ) internal pure returns (bytes32) {
+        return
+            keccak256(
+                abi.encode(
+                    EIP712_TYPEHASH_REGISTER_ADDRESS,
+                    keccak256(bytes(MESSAGE_REGISTER_ADDRESS)),
+                    keccak256(shieldedAddress)
+                )
+            );
     }
 
     function _authorizeUpgrade(

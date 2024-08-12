@@ -24,6 +24,8 @@ struct Asset {
 library AssetLogic {
     using SafeERC20 for IERC20;
 
+    error ZeroAddress();
+    
     function getAssetOrRevert(
         mapping(uint24 => Asset) storage assets,
         uint24 assetId
@@ -43,6 +45,10 @@ library AssetLogic {
     ) public returns (uint16) {
         if (_isAssetSupported(assetIds, assets, assetAddress)) {
             revert IPool.DuplicateAsset(assetAddress);
+        }
+
+        if(assetAddress == address(0)) {
+            revert ZeroAddress();
         }
 
         // Uid of added asset

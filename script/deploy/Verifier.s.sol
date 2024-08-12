@@ -3,49 +3,32 @@ pragma solidity ^0.8.24;
 
 import {console2} from "forge-std/console2.sol";
 import {Verifier} from "src/core/Verifier.sol";
-import {Verifier22} from "src/verifiers/Verifier22.sol";
-import {Verifier42} from "src/verifiers/Verifier42.sol";
-import {Verifier44} from "src/verifiers/Verifier44.sol";
-import {Verifier82} from "src/verifiers/Verifier82.sol";
-import {Verifier84} from "src/verifiers/Verifier84.sol";
-import {VerifierInfo} from "src/core/Verifier.sol";
+import {VerifierTransact21} from "src/verifiers/VerifierTransact21.sol";
+import {VerifierTransact22} from "src/verifiers/VerifierTransact22.sol";
+import {VerifierRegister} from "src/verifiers/VerifierRegister.sol";
+import {TransactionVerifierInfo} from "src/core/Verifier.sol";
 import {BaseScript} from "../BaseScript.sol";
 
 contract VerifierDeploy is BaseScript {
     function run() external broadcast {
-        Verifier22 v22 = new Verifier22();
-        Verifier42 v42 = new Verifier42();
-        Verifier44 v44 = new Verifier44();
-        Verifier82 v82 = new Verifier82();
-        Verifier84 v84 = new Verifier84();
+        VerifierTransact21 vt21 = new VerifierTransact21();
+        VerifierTransact22 vt22 = new VerifierTransact22();
+        VerifierRegister vr = new VerifierRegister();
 
-        VerifierInfo[] memory vInfos = new VerifierInfo[](5);
-        vInfos[0] = VerifierInfo({
+        TransactionVerifierInfo[] memory vInfos = new TransactionVerifierInfo[](
+            2
+        );
+        vInfos[0] = TransactionVerifierInfo({
+            id: 21,
+            addr: address(vt21),
+            selector: vt21.verifyProof.selector
+        });
+        vInfos[1] = TransactionVerifierInfo({
             id: 22,
-            addr: address(v22),
-            selector: v22.verifyProof.selector
-        });
-        vInfos[1] = VerifierInfo({
-            id: 42,
-            addr: address(v42),
-            selector: v42.verifyProof.selector
-        });
-        vInfos[2] = VerifierInfo({
-            id: 44,
-            addr: address(v44),
-            selector: v44.verifyProof.selector
-        });
-        vInfos[3] = VerifierInfo({
-            id: 82,
-            addr: address(v82),
-            selector: v82.verifyProof.selector
-        });
-        vInfos[4] = VerifierInfo({
-            id: 84,
-            addr: address(v84),
-            selector: v84.verifyProof.selector
+            addr: address(vt22),
+            selector: vt22.verifyProof.selector
         });
 
-        new Verifier(vInfos);
+        new Verifier(vInfos, address(vr));
     }
 }

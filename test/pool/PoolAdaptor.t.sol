@@ -7,24 +7,23 @@ import {IPool} from "src/interfaces/IPool.sol";
 import {Pool} from "src/core/Pool.sol";
 import {ZTransaction} from "src/libraries/ZTransaction.sol";
 import {AssetType} from "src/libraries/Asset.sol";
-import {PoolTest} from "test/fixtures/PoolTest.t.sol";
-import {TransactionRequest} from "test/helpers/TransactionRequest.sol";
+import {PoolTest} from "test/fixtures/PoolTest.sol";
 import {MockDeFi} from "test/mocks/MockDeFi.sol";
-import {MockDeFiProxy} from "test/mocks/MockDeFiProxy.sol";
+import {MockDeFiAdaptor} from "test/mocks/MockDeFiAdaptor.sol";
 
 contract PoolAdaptorTest is PoolTest {
     MockDeFi public mockDefi;
-    MockDeFiProxy public mockDefiProxy;
+    MockDeFiAdaptor public mockDefiAdaptor;
 
     function setUp() public {
-        _initFixture();
+        _setUp();
         mockDefi = new MockDeFi(asset1.assetAddress);
-        mockDefiProxy = new MockDeFiProxy(
+        mockDefiAdaptor = new MockDeFiAdaptor(
             address(pool),
             asset1.assetAddress,
             address(mockDefi)
         );
-        pool.addAdaptorSupport(address(mockDefiProxy), true);
+        pool.addAdaptorSupport(address(mockDefiAdaptor), true);
         AssetType assetType = AssetType.ERC20;
         address[] memory addresses = new address[](1);
         addresses[0] = address(mockDefi);
@@ -32,7 +31,13 @@ contract PoolAdaptorTest is PoolTest {
     }
 
     function test_supportAdaptor() public view {
-        bool isSupported = pool.isAdaptorSupported(address(mockDefiProxy));
+        bool isSupported = pool.isAdaptorSupported(address(mockDefiAdaptor));
         assertTrue(isSupported);
     }
+
+    // function test_callAdaptor() public {
+    //     ZTransaction memory ztx = _loadShieldedTransaction(
+    //         "transfer_500_weth_without_fee"
+    //     );
+    // }
 }
