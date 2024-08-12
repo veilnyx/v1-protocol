@@ -21,6 +21,7 @@ abstract contract PoolStorage {
     mapping(uint24 assetId => Asset asset) _assets;
 
     MerkleTree internal _commitmentTree;
+    uint256[] public commitmentTreeQueue;
     mapping(uint256 nullifier => uint32 markLeafIndex)
         internal _markedNullifiers;
 

@@ -180,6 +180,7 @@ library ZTransactionLogic {
     function execute(
         ZTransaction calldata ztx,
         MerkleTree storage commitmentTree,
+        uint256[] storage commitmentTreeQueue,
         mapping(uint24 => Asset) storage assets,
         mapping(address => mapping(uint24 => uint256)) storage paymasterFees,
         mapping(uint24 => uint256) storage withdrawFees,
@@ -227,7 +228,7 @@ library ZTransactionLogic {
             );
         }
 
-        _printNotes(commitmentTree, params, memoParams);
+        _printNotes(commitmentTree, commitmentTreeQueue, params, memoParams);
     }
 
     /**
@@ -432,26 +433,22 @@ library ZTransactionLogic {
 
     function _printNotes(
         MerkleTree storage tree,
+        uint256[] storage commitmentTreeQueue,
         Params memory params,
         MemoParams memory memoParams
     ) internal {
         uint256 numCommitments = memoParams.commitments.length;
-        uint256 nextIndex = MerkleTreeLogic.insert(
-            tree,
-            memoParams.commitments
-        );
 
         for (uint8 i = 0; i < numCommitments; ++i) {
-            emit IPool.Commitment(
-                nextIndex - numCommitments + i,
-                memoParams.commitments[i]
-            );
+            commitmentTreeQueue.push(commitmentTreeQueue[i]);
         }
+
+        uint32 latestIndex = tree.nextLeafIndex - 1 + uint32(commitmentTreeQueue.length);
 
         emit IPool.Receipt(
             params.txType,
             params.revokerId,
-            uint32(nextIndex - 1),
+            latestIndex,
             params.target,
             params.feeAssetId,
             params.feeValue,
@@ -460,7 +457,7 @@ library ZTransactionLogic {
             memoParams.assetsMemo,
             memoParams.notesMemo,
             memoParams.refundMemo
-        );
+        );   
     }
 
     function _copyParamsToMemory(

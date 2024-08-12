@@ -2,7 +2,7 @@
 pragma solidity ^0.8.18;
 
 import {IHasher} from "../interfaces/IHasher.sol";
-import {FIELD_SIZE, ZERO_LEAF} from "../base/Constants.sol";
+import {FIELD_SIZE, ZERO_LEAF, COMMITMENT_TREE_QUEUE_SIZE, COMMITMENT_TREE_DEPTH} from "../base/Constants.sol";
 import {IVerifier} from "../interfaces/IVerifier.sol";
 import {IPool} from "../interfaces/IPool.sol";
 
@@ -22,11 +22,11 @@ struct QueuedMerkleTree {
 
 struct SubtreeUpdateInputs {
     uint32 leafIndex;
-    uint256[10] leaves;
+    uint256[COMMITMENT_TREE_QUEUE_SIZE] leaves;
     uint256 lastRoot;
-    uint256[25] lastSubtrees;
+    uint256[COMMITMENT_TREE_DEPTH] lastSubtrees;
     uint256 newRoot;
-    uint256[25] newSubtrees;
+    uint256[COMMITMENT_TREE_DEPTH] newSubtrees;
     bytes subtreeUpdateProof;
 }
 
@@ -45,6 +45,7 @@ library QueuedMerkleTreeLogic {
         self.hasher = hasher;
         self.verifier = verifier;
         self.capacity = uint32(2 ** depth);
+        self.queueSize = COMMITMENT_TREE_QUEUE_SIZE;
 
         uint256 zero = ZERO_LEAF;
         for (uint8 i = 0; i < depth; ) {
@@ -85,10 +86,11 @@ library QueuedMerkleTreeLogic {
         );
 
         if (subtreeUpdateProofVerification) {
-            uint8 newRootIndex = (self.currentRootIndex + 1) %
-                ROOT_HISTORY_SIZE;
+            // updating roots
+            uint8 newRootIndex = (self.currentRootIndex + 1) % ROOT_HISTORY_SIZE;
             self.roots[newRootIndex] = subtreeUpdateInputs.newRoot;
 
+            // updating lastSubtrees
             for (uint8 i = 0; i < self.depth; ) {
                 self.lastSubtrees[i] = subtreeUpdateInputs.newSubtrees[i];
                 unchecked {
@@ -96,7 +98,20 @@ library QueuedMerkleTreeLogic {
                 }
             }
 
+            // updating nextLeafIndex
             self.nextLeafIndex += self.queueSize;
+
+            // Emitting commitments after commitment leaves have been inserted into the commitment tree
+            for(uint8 i; i < COMMITMENT_TREE_QUEUE_SIZE; ){
+                emit IPool.Commitment(
+                self.nextLeafIndex - COMMITMENT_TREE_QUEUE_SIZE + i,
+                subtreeUpdateInputs.leaves[i]
+            );   
+
+            unchecked {
+                    ++i;
+                }
+            }
         } else {
             revert IPool.InvalidSubtreeUpdateProof();
         }

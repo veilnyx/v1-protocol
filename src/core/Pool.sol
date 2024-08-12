@@ -37,7 +37,7 @@ contract Pool is
     /// @dev Pool is an UUPSUpgradeable contract, so it needs to be initialized.
     /// @param addressTreeDepth The depth of the address tree.
     /// @param commitmentTreeDepth The depth of the commitment tree.
-    /// @param verifier_ The address of the verifier contract. Verifier contract verifies the ZTx's zk proof.
+    /// @param verifier_ The address of the verifier contract. Verifier contract verifies the ZTx's zk proof, address proof and merkle tree queue proof.
     /// @param adaptorHandler_ The address of the adaptor handler contract, responsible for delegate calling adaptors of external DeFi protocols.
     /// @param screener_ The address of the screener contract, responsible for screening sanctioned addresseses.
     /// @param hasher_ The address of the hasher contract. It provides a single interface to Poseidon hashing functions
@@ -190,6 +190,7 @@ contract Pool is
 
         ztx.execute({
             commitmentTree: _commitmentTree,
+            commitmentTreeQueue: commitmentTreeQueue,
             assets: _assets,
             withdrawFees: _withdrawFees,
             paymasterFees: _paymasterFees,
