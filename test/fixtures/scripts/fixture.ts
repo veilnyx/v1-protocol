@@ -10,16 +10,22 @@ import {
   stringToBytes,
 } from "viem";
 import { ShieldedAccount } from "@zkfi-tech/account";
-import { Fp, Point, poseidonDecrypt } from "@zkfi-tech/babyjubjub";
+import {
+  Fp,
+  Point,
+  poseidonDecrypt,
+  poseidonHash,
+} from "@zkfi-tech/babyjubjub";
 import {
   TransactionOptions,
   TransactionRequest,
 } from "@zkfi-tech/shared-types";
 import { Core } from "@zkfi-tech/core";
-import { ZTransaction } from "@zkfi-tech/zk-prover";
+import { MerkleTreeState, ZTransaction } from "@zkfi-tech/zk-prover";
 import { Note, SIZE_KEY_MEMO } from "@zkfi-tech/transaction";
 import config from "../config.json";
-const path = require('path');
+import { getInitialTreeState } from "./genTreeUpdateData";
+const path = require("path");
 
 const senderSeed = BigInt(config.sender.seed);
 const receiverSeed = BigInt(config.receiver.seed);
@@ -51,7 +57,7 @@ export const fixture = {
   revokerPublicKey: Point.fromArray(revokerPubKey),
   encryptionPublicKey: Point.fromArray(encryptionPubKey),
   assets,
-  leavesQueue: config.leavesQueue.map((leaf: string) => BigInt(leaf))
+  leavesQueue: config.leavesQueue.map((leaf: string) => BigInt(leaf)),
 };
 
 const dirFixtureData = path.resolve(__dirname, "../data");
@@ -101,6 +107,16 @@ export const generateTestAddressRegistration = async (
   const zaddrReg = await sdk.proveAddress("0x");
   const encoded = zaddrReg.encode();
   writeFileSync(`${dirFixtureData}/${name}.txt`, encoded);
+};
+
+export const generateTestTreeUpdates = async (sdk: Core) => {
+  let initialTreeState = getInitialTreeState();
+  const subtreeUpdateData = await sdk.prover.proveSubtreeUpdate({
+    lastTree: initialTreeState,
+    leaves: fixture.leavesQueue,
+  });
+  const encoded = subtreeUpdateData.encode();
+  writeFileSync(`${dirFixtureData}/subtree_update_data.txt`, encoded);
 };
 
 export const splitToChunks = (data: Hex, chunkSize: number) => {

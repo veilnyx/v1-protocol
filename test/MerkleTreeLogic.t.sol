@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
+import {console2} from "forge-std/console2.sol";
 import {BinaryIMT as BinaryIMTLogic, BinaryIMTData} from "@zk-kit/imt/BinaryIMT.sol";
 import {IHasher} from "src/interfaces/IHasher.sol";
 import {MerkleTree, MerkleTreeLogic} from "src/libraries/MerkleTree.sol";
@@ -48,6 +49,25 @@ contract MerkleTreeLogicTest is BaseTest {
     ////////////////////////////////////////
     //// MerkleTreeInitialization Tests ////
     ////////////////////////////////////////
+
+    function test_ww() public {
+        console2.log("zeros");
+        for (uint8 i = 0; i < _commitmentTree.depth; i++) {
+            console2.log(_commitmentTree.zeroes[i]);
+        }
+        MerkleTreeLogic.insert(_commitmentTree, 1, 2);
+
+        console2.log("lastSubtrees");
+        for (uint8 i = 0; i < _commitmentTree.depth; i++) {
+            console2.log(_commitmentTree.lastSubtrees[i]);
+        }
+
+        MerkleTreeLogic.insert(_commitmentTree, 3, 4);
+        console2.log("newSubtrees");
+        for (uint8 i = 0; i < _commitmentTree.depth; i++) {
+            console2.log(_commitmentTree.lastSubtrees[i]);
+        }
+    }
 
     function test_commitmentTree_initialization() public view {
         assertEq(_commitmentTree.depth, commitmentTreeDepth);
