@@ -3,7 +3,7 @@ pragma solidity ^0.8.24;
 
 import {ZTransaction, ZTransactionType, RevokerData} from "../libraries/ZTransaction.sol";
 import {ShieldedAddressRegistrationData} from "../libraries/ShieldedAddress.sol";
-import {SubtreeUpdateData} from "../libraries/QueuedMerkleTree.sol";
+import {TreeUpdateData} from "../libraries/QueuedMerkleTree.sol";
 import {AssetType, Asset} from "../libraries/Asset.sol";
 import {PoolStorage} from "../base/PoolStorage.sol";
 
@@ -135,7 +135,7 @@ interface IPool {
     /// @notice Updates the commitment tree with a queue of leaves. It uses zk proof under the hood to prove the `newRoot` and `newSubtrees` are valid.
     /// @param updatedCommitmentTreeInputs The inputs needed by the zk verifier to verify the authenticity of the queued merkle tree update.
     function updateQueuedCommitmentTree(
-        SubtreeUpdateData memory updatedCommitmentTreeInputs
+        TreeUpdateData memory updatedCommitmentTreeInputs
     ) external returns (uint256);
 
     /// @notice Validates and executes a ZTx.

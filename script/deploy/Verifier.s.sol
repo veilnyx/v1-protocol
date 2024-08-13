@@ -6,7 +6,7 @@ import {Verifier} from "src/core/Verifier.sol";
 import {VerifierTransact21} from "src/verifiers/VerifierTransact21.sol";
 import {VerifierTransact22} from "src/verifiers/VerifierTransact22.sol";
 import {VerifierRegister} from "src/verifiers/VerifierRegister.sol";
-import {VerifierSubtreeUpdate} from "src/verifiers/VerifierSubtreeUpdate.sol";
+import {VerifierTreeUpdate} from "src/verifiers/VerifierTreeUpdate.sol";
 import {TransactionVerifierInfo} from "src/core/Verifier.sol";
 import {BaseScript} from "../BaseScript.sol";
 
@@ -15,7 +15,7 @@ contract VerifierDeploy is BaseScript {
         VerifierTransact21 vt21 = new VerifierTransact21();
         VerifierTransact22 vt22 = new VerifierTransact22();
         VerifierRegister vr = new VerifierRegister();
-        VerifierSubtreeUpdate vSubtree = new VerifierSubtreeUpdate();
+        VerifierTreeUpdate vTree = new VerifierTreeUpdate();
 
         TransactionVerifierInfo[] memory vInfos = new TransactionVerifierInfo[](
             2
@@ -31,6 +31,6 @@ contract VerifierDeploy is BaseScript {
             selector: vt22.verifyProof.selector
         });
 
-        new Verifier(vInfos, address(vr), address(vSubtree));
+        new Verifier(vInfos, address(vr), address(vTree));
     }
 }

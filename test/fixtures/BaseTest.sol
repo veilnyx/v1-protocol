@@ -4,6 +4,7 @@ pragma solidity ^0.8.20;
 import {Test} from "forge-std/Test.sol";
 import {ZTransactionType, ZTransaction} from "src/libraries/ZTransaction.sol";
 import {ShieldedAddressRegistrationData} from "src/libraries/ShieldedAddress.sol";
+import {TreeUpdateData} from "src/libraries/QueuedMerkleTree.sol";
 import {Hasher} from "src/core/Hasher.sol";
 import {Fixture, FixtureLib} from "test/fixtures/Fixture.sol";
 import {MockERC20} from "test/mocks/MockERC20.sol";
@@ -30,6 +31,12 @@ abstract contract BaseTest is Test {
         string memory name
     ) internal view returns (ShieldedAddressRegistrationData memory) {
         return FixtureLib.loadShieldedAddressRegistrationData(name, vm);
+    }
+
+    function _loadTreeUpdateData(
+        string memory name
+    ) internal view returns (TreeUpdateData memory) {
+        return FixtureLib.loadTreeUpdateData(name, vm);
     }
 
     function _loadData(

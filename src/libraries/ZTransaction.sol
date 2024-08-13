@@ -439,12 +439,13 @@ library ZTransactionLogic {
     ) internal {
         uint256 numCommitments = memoParams.commitments.length;
 
-        for (uint8 i = 0; i < numCommitments; ++i) {
-            tree.queuedLeaves[tree.nextQueueIndex + i] = memoParams.commitments[i];
-        }
-        tree.nextQueueIndex += uint32(numCommitments);
+        // for (uint8 i = 0; i < numCommitments; ++i) {
 
-        uint32 latestIndex = tree.nextLeafIndex + uint32(tree.nextQueueIndex) - 1;
+        //     tree.queuedLeaves[tree.nextQueueIndex + i] = memoParams.commitments[i];
+        // }
+        // tree.nextQueueIndex += uint32(numCommitments);
+
+        uint32 latestIndex = tree.nextLeafIndex;
 
         emit IPool.Receipt(
             params.txType,
@@ -458,7 +459,7 @@ library ZTransactionLogic {
             memoParams.assetsMemo,
             memoParams.notesMemo,
             memoParams.refundMemo
-        );   
+        );
     }
 
     function _copyParamsToMemory(

@@ -3,9 +3,11 @@ pragma solidity ^0.8.24;
 
 import {IVerifier} from "../interfaces/IVerifier.sol";
 import {VerifierRegister} from "../verifiers/VerifierRegister.sol";
-import {VerifierSubtreeUpdate} from "../verifiers/VerifierSubtreeUpdate.sol";
+import {VerifierTreeUpdate} from "../verifiers/VerifierTreeUpdate.sol";
 import {ZTransaction, ZTransactionType, ZTransactionLogic, RevokerData} from "../libraries/ZTransaction.sol";
 import {MerkleTree} from "../libraries/MerkleTree.sol";
+
+import {console2} from "forge-std/console2.sol";
 
 struct TransactionVerifierInfo {
     uint16 id;
@@ -21,12 +23,12 @@ contract Verifier is IVerifier {
      */
     mapping(uint256 => TransactionVerifierInfo) internal _transactionVerifiers;
     address internal _addressVerifier;
-    address internal _subtreeVerifier;
+    address internal _treeUpdateVerifier;
 
     constructor(
         TransactionVerifierInfo[] memory txvInfos,
         address addressVerifier,
-        address subTreeVerifier
+        address treeUpdateVerifier
     ) {
         uint256 len = txvInfos.length;
 
@@ -38,7 +40,7 @@ contract Verifier is IVerifier {
         }
 
         _addressVerifier = addressVerifier;
-        _subtreeVerifier = subTreeVerifier;
+        _treeUpdateVerifier = treeUpdateVerifier;
     }
 
     function verifyAddressProof(
@@ -49,22 +51,30 @@ contract Verifier is IVerifier {
         );
 
         if (!success) {
-            revert("Address proof verification call failed");
+            revert("Verification call failed");
         }
 
         return uint8(result[31]) == 1;
     }
 
-    function verifySubtreeUpdateProof(
-        bytes calldata vInputs
+    function verifyTreeUpdateProof(
+        bytes calldata vParams
     ) public view returns (bool) {
-        (bool success, bytes memory result) = _subtreeVerifier.staticcall(
-            bytes.concat(VerifierSubtreeUpdate.verifyProof.selector, vInputs)
+        console2.log("verifyTreeUpdateProof()");
+        (bool success, bytes memory result) = _treeUpdateVerifier.staticcall(
+            bytes.concat(VerifierTreeUpdate.verifyProof.selector, vParams)
         );
+        console2.log("ckpt2");
 
         if (!success) {
-            revert("Subtree proof verification call failed");
+            revert("Verification call failed");
         }
+
+        // bool isValid = uint256(bytes32(result));
+        console2.log("ckpt3");
+
+        console2.log("result", result.length);
+        console2.logBytes(result);
 
         return uint8(result[31]) == 1;
     }

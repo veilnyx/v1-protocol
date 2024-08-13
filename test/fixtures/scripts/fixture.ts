@@ -35,6 +35,7 @@ const senderPubAddress = config.sender.pubAddress;
 const receiverPubAddress = config.receiver.pubAddress;
 const addressTreeDepth = Number(config.addressTreeDepth);
 const commitmentTreeDepth = Number(config.commitmentTreeDepth);
+const commitmentTreeQueueSize = Number(config.commitmentTreeQueueSize);
 const assets = {
   weth: config.assets.weth,
   usdc: config.assets.usdc,
@@ -54,10 +55,12 @@ export const fixture = {
   receiver: { account: receiverAccount, pubAddress: receiverPubAddress },
   addressTreeDepth,
   commitmentTreeDepth,
+  commitmentTreeQueueSize,
   revokerPublicKey: Point.fromArray(revokerPubKey),
   encryptionPublicKey: Point.fromArray(encryptionPubKey),
   assets,
-  leavesQueue: config.leavesQueue.map((leaf: string) => BigInt(leaf)),
+  leavesQueue1: config.leavesQueue1.map((leaf: string) => BigInt(leaf)),
+  leavesQueue2: config.leavesQueue2.map((leaf: string) => BigInt(leaf)),
 };
 
 const dirFixtureData = path.resolve(__dirname, "../data");
@@ -109,15 +112,15 @@ export const generateTestAddressRegistration = async (
   writeFileSync(`${dirFixtureData}/${name}.txt`, encoded);
 };
 
-export const generateTestTreeUpdates = async (sdk: Core) => {
-  let initialTreeState = getInitialTreeState();
-  const subtreeUpdateData = await sdk.prover.proveSubtreeUpdate({
-    lastTree: initialTreeState,
-    leaves: fixture.leavesQueue,
-  });
-  const encoded = subtreeUpdateData.encode();
-  writeFileSync(`${dirFixtureData}/subtree_update_data.txt`, encoded);
-};
+// export const generateTestTreeUpdates = async (sdk: Core) => {
+//   let initialTreeState = getInitialTreeState();
+//   const subtreeUpdateData = await sdk.prover.proveSubtreeUpdate({
+//     lastTree: initialTreeState,
+//     leaves: fixture.leavesQueue1,
+//   });
+//   const encoded = subtreeUpdateData.encode();
+//   writeFileSync(`${dirFixtureData}/tree_update_data.txt`, encoded);
+// };
 
 export const splitToChunks = (data: Hex, chunkSize: number) => {
   const bytesSize = size(data);

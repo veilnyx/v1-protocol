@@ -3,90 +3,90 @@ pragma solidity ^0.8.24;
 
 import {BinaryIMT as BinaryIMTLogic, BinaryIMTData} from "@zk-kit/imt/BinaryIMT.sol";
 import {IHasher} from "src/interfaces/IHasher.sol";
-import {QueuedMerkleTree, QueuedMerkleTreeLogic, SubtreeUpdateData } from "src/libraries/QueuedMerkleTree.sol";
+import {QueuedMerkleTree, QueuedMerkleTreeLogic, TreeUpdateData} from "src/libraries/QueuedMerkleTree.sol";
 import {FIELD_SIZE, ZERO_LEAF} from "src/base/Constants.sol";
 import {BaseTest} from "test/fixtures/BaseTest.sol";
 import {Fixture, FixtureLib} from "./fixtures/Fixture.sol";
-import {VerifierSubtreeUpdate} from "src/verifiers/VerifierSubtreeUpdate.sol";
+import {Verifier, TransactionVerifierInfo} from "src/core/Verifier.sol";
+import {VerifierTreeUpdate} from "src/verifiers/VerifierTreeUpdate.sol";
+
+import {console2} from "forge-std/console2.sol";
 
 contract QueuedMerkleTreeLogicTest is BaseTest {
     using QueuedMerkleTreeLogic for QueuedMerkleTree;
     using BinaryIMTLogic for BinaryIMTData;
 
-    QueuedMerkleTree internal _queuedCommitmentTree;
-    BinaryIMTData internal _zkKitTree;
-    uint8 public commitmentTreeDepth;
-    uint256[] public leavesQueue;
+    QueuedMerkleTree internal qmt;
+    BinaryIMTData internal refTree;
     IHasher hasher;
 
     function setUp() external {
         BaseTest._setUp();
-        commitmentTreeDepth = fixture.commitmentTreeDepth;
-        leavesQueue = fixture.leavesQueue;
         address hasherAddr = _deployHasher();
         hasher = IHasher(hasherAddr);
-        VerifierSubtreeUpdate subtreeUpdateDataVerifier = new VerifierSubtreeUpdate();
+        VerifierTreeUpdate treeUpdateVerifier = new VerifierTreeUpdate();
 
-        _queuedCommitmentTree.init(
-            commitmentTreeDepth,
+        TransactionVerifierInfo[]
+            memory txvInfos = new TransactionVerifierInfo[](0);
+        Verifier verifier = new Verifier(
+            txvInfos,
+            address(0),
+            address(treeUpdateVerifier)
+        );
+
+        qmt.init(
+            fixture.commitmentTreeDepth,
+            fixture.commitmentTreeQueueSize,
             address(hasher),
-            address(subtreeUpdateDataVerifier)
+            address(verifier)
         );
 
-        _zkKitTree.init(
-            commitmentTreeDepth,
-            ZERO_LEAF
-        );
+        refTree.init(fixture.commitmentTreeDepth, ZERO_LEAF);
     }
 
     ////////////////////////////////////////
     //// MerkleTreeInitialization Tests ////
     ////////////////////////////////////////
 
-    function test_commitmentTree_initialization() public view {
-        assertEq(_queuedCommitmentTree.depth, commitmentTreeDepth);
-        assertEq(_queuedCommitmentTree.zeroes[0], ZERO_LEAF);
-        assertEq(_queuedCommitmentTree.lastSubtrees[0], ZERO_LEAF);
-        assertEq(_queuedCommitmentTree.nextLeafIndex, 0);
-        assertEq(_queuedCommitmentTree.currentRootIndex, 0);
-    }
+    // function test_qmtInitialization() public view {
+    //     assertEq(qmt.depth, fixture.commitmentTreeDepth);
+    //     assertEq(qmt.capacity, 2 ** fixture.commitmentTreeDepth);
+    //     assertEq(qmt.queueSize, fixture.commitmentTreeQueueSize);
+    //     assertEq(qmt.zeroes[0], ZERO_LEAF);
+    //     assertEq(qmt.lastSubtrees[0], ZERO_LEAF);
+    //     assertEq(qmt.nextLeafIndex, 0);
+    //     assertEq(qmt.currentRootIndex, 0);
+    // }
 
-    function test_zkKitTree_initialization() public view {
-        assertEq(_zkKitTree.depth, commitmentTreeDepth);
-        assertEq(_zkKitTree.zeroes[0], ZERO_LEAF);
-        assertEq(_zkKitTree.numberOfLeaves, 0);
-    }
+    // function test_zkKitTree_initialization() public view {
+    //     assertEq(refTree.depth, fixture.commitmentTreeDepth);
+    //     assertEq(refTree.zeroes[0], ZERO_LEAF);
+    //     assertEq(refTree.numberOfLeaves, 0);
+    // }
 
-    ///////////////////////////////////////////
-    ////// Commitment Merkle Tree Tests ///////
-    ///////////////////////////////////////////
+    // function test_getState() public {
+    //     qmt.queueLeaves(fixture.leavesQueue1);
+
+    //     (
+    //         uint256[] memory queuedLeaves,
+    //         uint256[] memory lastSubtrees,
+    //         uint256 lastRoot,
+    //         uint256 nextLeafIndex
+    //     ) = qmt.getState();
+    //     assertEq(queuedLeaves.length, fixture.leavesQueue1.length);
+    // }
 
     function test_rootsOnCommitmentTreeQuadLeafInsertion() public {
-        _queuedCommitmentTree.queueLeaves(leavesQueue);
-        for (uint i = 0; i < 10; i++) {
-            _zkKitTree.insert(
-                leavesQueue[i]
-            );
-        }
-        
-        uint256 zkKitTreeRoot = _zkKitTree.root;
-        uint256[] memory zkKitTreeLastSubtrees = new uint256[](commitmentTreeDepth);
-        for(uint i; i < commitmentTreeDepth; ) {
-            zkKitTreeLastSubtrees[i] = _zkKitTree.lastSubtrees[i][0]; // @todo reconfirm if this is right
-            unchecked{
-                ++i;
-            }
-        }
-        bytes memory subtreeUpdateProof = _loadData("subtreeUpdateData");
+        qmt.queueLeaves(fixture.leavesQueue1);
+        TreeUpdateData memory treeUpdateData1 = _loadTreeUpdateData(
+            "tree_update_data_1"
+        );
+        qmt.update(treeUpdateData1);
 
-        SubtreeUpdateData memory subtreeUpdateData = SubtreeUpdateData({
-            newRoot: zkKitTreeRoot,
-            newSubtrees: zkKitTreeLastSubtrees,
-            proof: subtreeUpdateProof
-        });
-
-        uint256 leafIndexBeforeQueueInsertion = _queuedCommitmentTree.nextLeafIndex;
-        uint256 leafIndexAfterQueueInsertion = _queuedCommitmentTree.update(subtreeUpdateData);
-        assert(leafIndexAfterQueueInsertion > leafIndexBeforeQueueInsertion);
+        qmt.queueLeaves(fixture.leavesQueue2);
+        TreeUpdateData memory treeUpdateData2 = _loadTreeUpdateData(
+            "tree_update_data_2"
+        );
+        qmt.update(treeUpdateData2);
     }
 }

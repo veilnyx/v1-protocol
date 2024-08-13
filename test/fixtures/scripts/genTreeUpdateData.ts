@@ -2,24 +2,37 @@ const path = require("path");
 import { writeFileSync } from "fs";
 import { keccak256, stringToBytes } from "viem";
 import { Fp, poseidonHash } from "@zkfi-tech/babyjubjub";
-import { fixture } from "./fixture";
 import { MerkleTreeState } from "@zkfi-tech/zk-prover";
-import { getSDKInstance } from "./sdk";
 import { Core } from "@zkfi-tech/core";
+import { fixture } from "./fixture";
 
 const dirFixtureData = path.resolve(__dirname, "../data");
 
 export const genTreeUpdateData = async (sdk: Core) => {
   let initialTreeState: MerkleTreeState = getInitialTreeState();
-  const subtreeUpdateData = await sdk.prover.proveSubtreeUpdate({
+  const treeUpdateData1 = await sdk.prover.proveTreeUpdate({
     lastTree: initialTreeState,
-    leaves: fixture.leavesQueue,
+    leaves: fixture.leavesQueue1,
   });
-  const subtreeUpdateDataEncoded = subtreeUpdateData.encode();
-  writeFileSync(
-    `${dirFixtureData}/subtreeUpdateData.txt`,
-    subtreeUpdateDataEncoded
-  );
+
+  const treeUpdateData2 = await sdk.prover.proveTreeUpdate({
+    lastTree: treeUpdateData1.newTree,
+    leaves: fixture.leavesQueue2,
+  });
+  // // console.log("leafIndex", treeUpdateData.lastTree.nextLeafIndex);
+  // // console.log("leaves", treeUpdateData.leaves);
+  // // console.log("lastRoot", treeUpdateData.lastTree.root);
+  // // console.log("lastSubtree", treeUpdateData.lastTree.subtrees);
+  // // console.log("newRoot", treeUpdateData.newTree.root);
+  // // console.log("newSubtree", treeUpdateData.newTree.subtrees);
+  // const isValid = await verifyTreeUpdateData(treeUpdateData);
+  // console.log("proof", treeUpdateData.proof);
+  // console.log("TreeUpdateData is valid:", isValid);
+
+  const encoded1 = treeUpdateData1.encode();
+  const encoded2 = treeUpdateData2.encode();
+  writeFileSync(`${dirFixtureData}/tree_update_data_1.txt`, encoded1);
+  writeFileSync(`${dirFixtureData}/tree_update_data_2.txt`, encoded2);
 };
 
 export const getInitialTreeState = (): MerkleTreeState => {
@@ -39,7 +52,7 @@ export const getInitialTreeState = (): MerkleTreeState => {
     depth: treeDepth,
     root,
     nextLeafIndex: 0,
-    subtree: lastSubtree,
+    subtrees: lastSubtree,
     zeros,
   };
 };
