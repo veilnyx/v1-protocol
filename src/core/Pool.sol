@@ -16,7 +16,7 @@ import {EIP712_DOMAIN_NAME, EIP712_DOMAIN_VERSION, EIP712_TYPEHASH_REGISTER_ADDR
 import {PoolStorage} from "../base/PoolStorage.sol";
 import {Asset, AssetType, AssetLogic} from "../libraries/Asset.sol";
 import {MerkleTree, MerkleTreeLogic} from "../libraries/MerkleTree.sol";
-import {QueuedMerkleTree, SubtreeUpdateInputs, QueuedMerkleTreeLogic} from "../libraries/QueuedMerkleTree.sol" ;
+import {QueuedMerkleTree, SubtreeUpdateData, QueuedMerkleTreeLogic} from "../libraries/QueuedMerkleTree.sol";
 import {ShieldedAddressRegistrationData, ShieldedAddressLogic} from "../libraries/ShieldedAddress.sol";
 import {ZTransaction, ZTransactionLogic, RevokerData} from "../libraries/ZTransaction.sol";
 
@@ -179,9 +179,11 @@ contract Pool is
     }
 
     function updateQueuedCommitmentTree(
-        SubtreeUpdateInputs memory updatedCommitmentTreeInputs
+        SubtreeUpdateData memory updatedCommitmentTreeInputs
     ) external whenNotPaused returns (uint256) {
-        uint256 nextLeafIndex = _commitmentTree.updateSubtree(updatedCommitmentTreeInputs);
+        uint256 nextLeafIndex = _commitmentTree.update(
+            updatedCommitmentTreeInputs
+        );
 
         return nextLeafIndex;
     }
@@ -347,6 +349,12 @@ contract Pool is
         returns (uint256)
     {
         return _commitmentTree.currentRootIndex;
+    }
+
+    function getCommitmentTreeState() external view returns (uint256[] memory queuedLeaves, uint256[] memory lastSubtrees, uint256 nextLeafIndex, uint32 lastRoot) {
+        (queuedLeaves, lastSubtrees, nextLeafIndex, lastRoot) = _commitmentTree.getState();
+
+        return (queuedLeaves, lastSubtrees, nextLeafIndex, lastRoot);
     }
 
     function getAddressTreeCurrentRootIndex() external view returns (uint256) {

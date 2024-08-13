@@ -15,6 +15,7 @@ export const circuits: Record<string, CircuitPath> = {
   transact21: getCircuitPath("transact21"),
   transact22: getCircuitPath("transact22"),
   register: getCircuitPath("register"),
+  subtreeUpdate: getCircuitPath("subtreeUpdate")
 };
 
 export const verifyZTx = async (ztx: ZTransaction) => {

@@ -25,6 +25,27 @@ devDependencies:
   '@zk-kit/imt.sol':
     specifier: 2.0.0-beta.12
     version: 2.0.0-beta.12
+  '@zkfi-tech/account':
+    specifier: link:../v1-sdk/packages/account
+    version: link:../v1-sdk/packages/account
+  '@zkfi-tech/babyjubjub':
+    specifier: link:../v1-sdk/packages/babyjubjub
+    version: link:../v1-sdk/packages/babyjubjub
+  '@zkfi-tech/core':
+    specifier: link:../v1-sdk/packages/core
+    version: link:../v1-sdk/packages/core
+  '@zkfi-tech/shared-types':
+    specifier: link:../v1-sdk/packages/shared-types
+    version: link:../v1-sdk/packages/shared-types
+  '@zkfi-tech/transaction':
+    specifier: link:../v1-sdk/packages/transaction
+    version: link:../v1-sdk/packages/transaction
+  '@zkfi-tech/utils':
+    specifier: link:../v1-sdk/packages/utils
+    version: link:../v1-sdk/packages/utils
+  '@zkfi-tech/zk-prover':
+    specifier: link:../v1-sdk/packages/zk-prover
+    version: link:../v1-sdk/packages/zk-prover
   fixed-merkle-tree:
     specifier: ^0.7.3
     version: 0.7.3

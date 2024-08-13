@@ -19,6 +19,7 @@ import { Core } from "@zkfi-tech/core";
 import { ZTransaction } from "@zkfi-tech/zk-prover";
 import { Note, SIZE_KEY_MEMO } from "@zkfi-tech/transaction";
 import config from "../config.json";
+const path = require('path');
 
 const senderSeed = BigInt(config.sender.seed);
 const receiverSeed = BigInt(config.receiver.seed);
@@ -50,9 +51,10 @@ export const fixture = {
   revokerPublicKey: Point.fromArray(revokerPubKey),
   encryptionPublicKey: Point.fromArray(encryptionPubKey),
   assets,
+  leavesQueue: config.leavesQueue.map((leaf: string) => BigInt(leaf))
 };
 
-const dirFixtureData = "test/fixtures/data";
+const dirFixtureData = path.resolve(__dirname, "../data");
 
 export const generateTestTransactions = async (
   reqs: Record<string, TransactionRequest & TransactionOptions>,
@@ -95,6 +97,7 @@ export const generateTestAddressRegistration = async (
   name: string,
   sdk: Core
 ) => {
+  console.log("Inside generateTestAddressRegistration()");
   const zaddrReg = await sdk.proveAddress("0x");
   const encoded = zaddrReg.encode();
   writeFileSync(`${dirFixtureData}/${name}.txt`, encoded);

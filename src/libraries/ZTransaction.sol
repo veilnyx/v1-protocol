@@ -440,11 +440,11 @@ library ZTransactionLogic {
         uint256 numCommitments = memoParams.commitments.length;
 
         for (uint8 i = 0; i < numCommitments; ++i) {
-            tree.queuedLeaves[tree.queuedLeavesLength] = memoParams.commitments[i];
-            tree.queuedLeavesLength++;
+            tree.queuedLeaves[tree.nextQueueIndex + i] = memoParams.commitments[i];
         }
+        tree.nextQueueIndex += uint32(numCommitments);
 
-        uint32 latestIndex = tree.nextLeafIndex - 1 + uint32(tree.queuedLeavesLength);
+        uint32 latestIndex = tree.nextLeafIndex + uint32(tree.nextQueueIndex) - 1;
 
         emit IPool.Receipt(
             params.txType,
