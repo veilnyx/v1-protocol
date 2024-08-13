@@ -75,20 +75,6 @@ library QueuedMerkleTreeLogic {
         self.nextQueueIndex = nextIndex + uint32(nLeaves);
     }
 
-    function getState(
-        QueuedMerkleTree storage self
-    )
-        public
-        view
-        returns (uint256[] memory, uint256[] memory, uint256, uint32)
-    {
-        uint256[] memory leaves = _getQueuedLeaves(self);
-        uint256[] memory lastSubtrees = _getSubtree(self);
-        uint32 nextLeafIndex = self.nextLeafIndex;
-        uint256 lastRoot = self.roots[self.currentRootIndex];
-        return (leaves, lastSubtrees, lastRoot, nextLeafIndex);
-    }
-
     function update(
         QueuedMerkleTree storage self,
         SubtreeUpdateData calldata data
@@ -214,5 +200,19 @@ library QueuedMerkleTreeLogic {
         uint8 rootIndex
     ) external view returns (uint256) {
         return self.roots[rootIndex];
+    }
+
+    function getState(
+        QueuedMerkleTree storage self
+    )
+        public
+        view
+        returns (uint256[] memory, uint256[] memory, uint256, uint32)
+    {
+        uint256[] memory leaves = _getQueuedLeaves(self);
+        uint256[] memory lastSubtrees = _getSubtree(self);
+        uint32 nextLeafIndex = self.nextLeafIndex;
+        uint256 lastRoot = self.roots[self.currentRootIndex];
+        return (leaves, lastSubtrees, lastRoot, nextLeafIndex);
     }
 }

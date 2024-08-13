@@ -32,6 +32,12 @@ abstract contract BaseTest is Test {
         return FixtureLib.loadShieldedAddressRegistrationData(name, vm);
     }
 
+    function _loadData(
+        string memory name
+    ) internal view returns (bytes memory) {
+        return FixtureLib.loadData(name, vm);
+    }
+
     function _deployHasher() internal returns (address) {
         string memory t3Path = string.concat(
             vm.projectRoot(),

@@ -16,6 +16,7 @@ struct Fixture {
     uint256[2] encryptionPublicKey;
     ShieldedAccount sender;
     ShieldedAccount receiver;
+    uint256[] leavesQueue;
 }
 
 library FixtureLib {
@@ -35,6 +36,7 @@ library FixtureLib {
         fixture.commitmentTreeDepth = uint8(
             vm.parseJsonUint(configJsonStr, ".commitmentTreeDepth")
         );
+        fixture.leavesQueue = vm.parseJsonUintArray(configJsonStr, ".leavesQueue");
 
         // Fee
         fixture.withdrawFeeBps = vm.parseJsonUint(
@@ -146,7 +148,7 @@ library FixtureLib {
         string memory name,
         Vm vm
     ) external view returns (ZTransaction memory) {
-        bytes memory data = _loadData(name, vm);
+        bytes memory data = loadData(name, vm);
         ZTransaction memory ztx = abi.decode(data, (ZTransaction));
         return ztx;
     }
@@ -155,7 +157,7 @@ library FixtureLib {
         string memory name,
         Vm vm
     ) external view returns (ShieldedAddressRegistrationData memory) {
-        bytes memory data = _loadData(name, vm);
+        bytes memory data = loadData(name, vm);
         ShieldedAddressRegistrationData memory addressRegData = abi.decode(
             data,
             (ShieldedAddressRegistrationData)
@@ -163,10 +165,10 @@ library FixtureLib {
         return addressRegData;
     }
 
-    function _loadData(
+    function loadData(
         string memory name,
         Vm vm
-    ) internal view returns (bytes memory) {
+    ) public view returns (bytes memory) {
         string memory path = string.concat(
             vm.projectRoot(),
             string.concat("/test/fixtures/data/", name, ".txt")
