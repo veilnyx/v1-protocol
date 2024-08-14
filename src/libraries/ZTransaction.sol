@@ -438,14 +438,8 @@ library ZTransactionLogic {
         MemoParams memory memoParams
     ) internal {
         uint256 numCommitments = memoParams.commitments.length;
-
-        // for (uint8 i = 0; i < numCommitments; ++i) {
-
-        //     tree.queuedLeaves[tree.nextQueueIndex + i] = memoParams.commitments[i];
-        // }
-        // tree.nextQueueIndex += uint32(numCommitments);
-
-        uint32 latestIndex = tree.nextLeafIndex;
+        tree.queueLeaves(memoParams.commitments);
+        uint32 latestIndex = tree.nextLeafIndex + (tree.queueEndIndex - tree.queueStartIndex) - 1;
 
         emit IPool.Receipt(
             params.txType,

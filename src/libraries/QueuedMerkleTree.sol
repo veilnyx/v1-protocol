@@ -76,7 +76,6 @@ library QueuedMerkleTreeLogic {
             }
         }
 
-        self.queueStartIndex = self.queueEndIndex;
         self.queueEndIndex = nextIndex + nLeaves;
     }
 
@@ -114,6 +113,7 @@ library QueuedMerkleTreeLogic {
             revert("Invalid proof");
         }
 
+        // Updating tree states
         uint8 newRootIndex = (self.currentRootIndex + 1) % ROOT_HISTORY_SIZE;
         self.currentRootIndex = newRootIndex;
         self.roots[newRootIndex] = data.newRoot;
@@ -126,6 +126,7 @@ library QueuedMerkleTreeLogic {
         }
 
         self.nextLeafIndex += self.queueSize;
+        self.queueStartIndex += self.queueSize;
 
         // Emitting commitments after commitment leaves have been inserted into the commitment tree
         /// @todo move this to pool contract
