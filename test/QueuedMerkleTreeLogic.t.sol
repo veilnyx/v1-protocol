@@ -89,4 +89,18 @@ contract QueuedMerkleTreeLogicTest is BaseTest {
         );
         qmt.update(treeUpdateData2);
     }
+
+    function test_QCommitmentTreeLeafInsertionWhenQueueShort() public {
+        qmt.queueLeaves(fixture.leavesQueueShort);
+        TreeUpdateData memory treeUpdateData1 = _loadTreeUpdateData(
+            "tree_update_data_for_short_queue"
+        );
+        qmt.update(treeUpdateData1);
+
+        // qmt.queueLeaves(fixture.leavesQueue2);
+        // TreeUpdateData memory treeUpdateData2 = _loadTreeUpdateData(
+        //     "tree_update_data_2"
+        // );
+        // qmt.update(treeUpdateData2);
+    }
 }

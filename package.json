@@ -8,7 +8,7 @@
     "test": "forge test",
     "coverage": "forge coverage --ir-minimum",
     "test:prepare": "ts-node test/fixtures/scripts/index.ts",
-    "genAdaptorPayload": "forge script script/setup/GenerateAdaptorPayload.s.sol"
+    "genAdaptorPayload": "forge script script/setup/GenerateAdaptorPayload.s.sol:GenerateAdaptorPayload"
   },
   "keywords": [],
   "author": "zkFi Team",

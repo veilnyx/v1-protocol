@@ -89,13 +89,25 @@ library QueuedMerkleTreeLogic {
         uint32 queueLen = endIdx - startIdx;
         uint32 nLeaves = queueLen > n ? n : queueLen;
 
-        uint256[] memory leaves = new uint256[](nLeaves);
+        uint256[] memory leaves = new uint256[](n);
 
         for (uint32 i = 0; i < nLeaves; ) {
             leaves[i] = self.queuedLeaves[startIdx + i];
 
             unchecked {
                 ++i;
+            }
+        }
+
+        if(nLeaves < n) {
+            console2.log("Queue short. Adding ZERO_LEAF");
+            
+            for(uint32 i = nLeaves; i < n; ) {
+                leaves[i] = ZERO_LEAF;
+
+                unchecked {
+                    ++i;
+                }
             }
         }
 
@@ -158,7 +170,7 @@ library QueuedMerkleTreeLogic {
 
         uint256 lastRoot = self.roots[self.currentRootIndex];
 
-        /**
+        
         uint256[] memory pubSigs = new uint256[](63);
 
         console2.log("--------PUBLIC SIGS LOGS STARTING---------");
@@ -196,16 +208,16 @@ library QueuedMerkleTreeLogic {
         // }
 
         console2.log("--------PUBLIC SIGS LOGS ENDED---------");
-    */
+    
         bytes memory vParams = abi.encodePacked(
             data.proof,
-            // pubSigs
-            uint256(self.nextLeafIndex),
-            leaves,
-            lastRoot,
-            lastSubtrees,
-            data.newRoot,
-            data.newSubtrees
+            pubSigs
+            // uint256(self.nextLeafIndex),
+            // leaves,
+            // lastRoot,
+            // lastSubtrees,
+            // data.newRoot,
+            // data.newSubtrees
         );
 
         return IVerifier(self.verifier).verifyTreeUpdateProof(vParams);

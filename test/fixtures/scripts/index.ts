@@ -5,7 +5,7 @@ import { genTestTransfers } from "./genTestTransfers";
 import { getSDKInstance } from "./sdk";
 import { Point, poseidonHash } from "@zkfi-tech/babyjubjub";
 import { randomBigInt } from "@zkfi-tech/utils";
-import { genTreeUpdateData } from "./genTreeUpdateData";
+import { genTreeUpdateData, genTreeUpdateDataWhenQueueShort } from "./genTreeUpdateData";
 
 const main = async () => {
   const sdk = getSDKInstance();
@@ -13,8 +13,8 @@ const main = async () => {
   // await genTestDeposits(sdk);
   // await genTestWithdrawals(sdk);
   // await genTestTransfers(sdk);
-  await genTreeUpdateData(sdk);
-
+  // await genTreeUpdateData(sdk);
+  await genTreeUpdateDataWhenQueueShort(sdk);
   // const n = 10;
   // const leaves1 = Array.from({ length: n }, (_, i) =>
   //   poseidonHash([BigInt(i)])
