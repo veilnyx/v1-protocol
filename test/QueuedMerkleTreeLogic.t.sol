@@ -3,6 +3,7 @@ pragma solidity ^0.8.24;
 
 import {BinaryIMT as BinaryIMTLogic, BinaryIMTData} from "@zk-kit/imt/BinaryIMT.sol";
 import {IHasher} from "src/interfaces/IHasher.sol";
+import {IPool} from "src/interfaces/IPool.sol";
 import {QueuedMerkleTree, QueuedMerkleTreeLogic, TreeUpdateData} from "src/libraries/QueuedMerkleTree.sol";
 import {FIELD_SIZE, ZERO_LEAF} from "src/base/Constants.sol";
 import {BaseTest} from "test/fixtures/BaseTest.sol";
@@ -96,11 +97,39 @@ contract QueuedMerkleTreeLogicTest is BaseTest {
             "tree_update_data_for_short_queue"
         );
         qmt.update(treeUpdateData1);
+    }
 
-        // qmt.queueLeaves(fixture.leavesQueue2);
-        // TreeUpdateData memory treeUpdateData2 = _loadTreeUpdateData(
-        //     "tree_update_data_2"
-        // );
-        // qmt.update(treeUpdateData2);
+    function test_CommitmentEventEmitsOnlyForNonZeroLeaves() public {
+        qmt.queueLeaves(fixture.leavesQueueShort);
+        TreeUpdateData memory treeUpdateData1 = _loadTreeUpdateData(
+            "tree_update_data_for_short_queue"
+        );
+
+        // Expected emits only for non zero leaves
+        for (uint8 i; i < fixture.leavesQueueShort.length; ) {
+            vm.expectEmit(true, true, true, true);
+            emit IPool.Commitment(i, fixture.leavesQueueShort[i]);
+            unchecked {
+                ++i;
+            }
+        }
+        qmt.update(treeUpdateData1); // this will pad ZERO_LEAF but will not emit them
+    }
+
+    function test_CommitmentEventEmitsAllLeaves() public {
+        qmt.queueLeaves(fixture.leavesQueue1);
+        TreeUpdateData memory treeUpdateData1 = _loadTreeUpdateData(
+            "tree_update_data_1"
+        );
+        
+        // Expected emits only for non zero leaves
+        for (uint8 i; i < fixture.leavesQueue1.length; ) {
+            vm.expectEmit(true, true, true, true);
+            emit IPool.Commitment(i, fixture.leavesQueue1[i]);
+            unchecked {
+                ++i;
+            }
+        }
+        qmt.update(treeUpdateData1); // this will pad ZERO_LEAF but will not emit them
     }
 }

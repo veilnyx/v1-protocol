@@ -137,22 +137,22 @@ library QueuedMerkleTreeLogic {
             }
         }
 
+        // Emitting commitments after commitment leaves have been inserted into the commitment tree
+        uint8 nonZeroLeaves = uint8(self.queueEndIndex - self.queueStartIndex);
+        for (uint8 i = 0; i < nonZeroLeaves; ) {
+            uint32 leafIndex = self.nextLeafIndex + i;
+            emit IPool.Commitment(
+                leafIndex,
+                self.queuedLeaves[leafIndex]
+            );
+
+            unchecked {
+                ++i;
+            }
+        }
+
         self.nextLeafIndex += self.queueSize;
         self.queueStartIndex += self.queueSize;
-
-        // Emitting commitments after commitment leaves have been inserted into the commitment tree
-        /// @todo move this to pool contract
-        /// @notice not moving this to Pool as we are removing the leaves that got inserted from the queue, below. Since leaves are not persistent, they won't be accessible in Pool.sol for being emitted.
-        // for (uint8 i; i < self.queueSize; ) {
-        //     emit IPool.Commitment(
-        //         self.nextLeafIndex - self.queueSize + i,
-        //         self.queuedLeaves[i]
-        //     );
-
-        //     unchecked {
-        //         ++i;
-        //     }
-        // }
 
         return self.nextLeafIndex;
     }
