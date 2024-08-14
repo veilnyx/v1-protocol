@@ -77,7 +77,7 @@ contract QueuedMerkleTreeLogicTest is BaseTest {
     //     assertEq(queuedLeaves.length, fixture.leavesQueue1.length);
     // }
 
-    function test_QCommitmentTreeLeafInsertion() public {
+    function test_updateTree() public {
         qmt.queueLeaves(fixture.leavesQueue1);
         TreeUpdateData memory treeUpdateData1 = _loadTreeUpdateData(
             "tree_update_data_1"
@@ -91,24 +91,24 @@ contract QueuedMerkleTreeLogicTest is BaseTest {
         qmt.update(treeUpdateData2);
     }
 
-    function test_QCommitmentTreeLeafInsertionWhenQueueShort() public {
-        qmt.queueLeaves(fixture.leavesQueueShort);
+    function test_updateTreeWithPartialQueue() public {
+        qmt.queueLeaves(fixture.leavesQueuePartial);
         TreeUpdateData memory treeUpdateData1 = _loadTreeUpdateData(
-            "tree_update_data_for_short_queue"
+            "tree_update_data_partial_queue"
         );
         qmt.update(treeUpdateData1);
     }
 
     function test_CommitmentEventEmitsOnlyForNonZeroLeaves() public {
-        qmt.queueLeaves(fixture.leavesQueueShort);
+        qmt.queueLeaves(fixture.leavesQueuePartial);
         TreeUpdateData memory treeUpdateData1 = _loadTreeUpdateData(
-            "tree_update_data_for_short_queue"
+            "tree_update_data_partial_queue"
         );
 
         // Expected emits only for non zero leaves
-        for (uint8 i; i < fixture.leavesQueueShort.length; ) {
+        for (uint8 i; i < fixture.leavesQueuePartial.length; ) {
             vm.expectEmit(true, true, true, true);
-            emit IPool.Commitment(i, fixture.leavesQueueShort[i]);
+            emit IPool.Commitment(i, fixture.leavesQueuePartial[i]);
             unchecked {
                 ++i;
             }
@@ -121,7 +121,7 @@ contract QueuedMerkleTreeLogicTest is BaseTest {
         TreeUpdateData memory treeUpdateData1 = _loadTreeUpdateData(
             "tree_update_data_1"
         );
-        
+
         // Expected emits only for non zero leaves
         for (uint8 i; i < fixture.leavesQueue1.length; ) {
             vm.expectEmit(true, true, true, true);
