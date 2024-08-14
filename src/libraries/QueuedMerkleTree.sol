@@ -76,6 +76,7 @@ library QueuedMerkleTreeLogic {
             }
         }
 
+        self.queueStartIndex = self.queueEndIndex;
         self.queueEndIndex = nextIndex + nLeaves;
     }
 
@@ -99,8 +100,6 @@ library QueuedMerkleTreeLogic {
             }
         }
 
-        // self.queueStartIndex += nLeaves;
-
         return leaves;
     }
 
@@ -116,6 +115,7 @@ library QueuedMerkleTreeLogic {
         }
 
         uint8 newRootIndex = (self.currentRootIndex + 1) % ROOT_HISTORY_SIZE;
+        self.currentRootIndex = newRootIndex;
         self.roots[newRootIndex] = data.newRoot;
 
         for (uint8 i = 0; i < self.depth; ) {
@@ -148,40 +148,51 @@ library QueuedMerkleTreeLogic {
         QueuedMerkleTree storage self,
         TreeUpdateData calldata data
     ) internal returns (bool) {
+
         console2.log("_verifyUpdateProof()");
         uint256[] memory leaves = _getQueuedLeaves(self);
-        console2.log("leaves22");
+        // console2.log("leaves22");
         uint256[] memory lastSubtrees = _getSubtree(self);
-        console2.log("lastSubtrees22");
+        // console2.log("lastSubtrees22");
 
         uint256 lastRoot = self.roots[self.currentRootIndex];
         uint256[] memory pubSigs = new uint256[](63);
 
+        console2.log("--------PUBLIC SIGS LOGS STARTING---------");
         pubSigs[0] = self.nextLeafIndex;
+        console2.log("leafIndex:", pubSigs[0]);
 
-        console2.log("leaves", leaves.length);
+        // console2.log("leaves", leaves.length);
+
         for (uint i = 0; i < leaves.length; i++) {
             pubSigs[i + 1] = leaves[i];
+            console2.log("leaves:", pubSigs[i+1]);
         }
 
         pubSigs[1 + leaves.length] = lastRoot;
+        console2.log("lastRoot:", pubSigs[1 + leaves.length]);
 
-        console2.log("lastSubtress", lastSubtrees.length);
+        // console2.log("lastSubtress", lastSubtrees.length);
         for (uint i = 0; i < lastSubtrees.length; i++) {
             pubSigs[2 + leaves.length + i] = lastSubtrees[i];
+            console2.log("lastSubtrees:", pubSigs[2 + leaves.length + i]);
         }
 
         pubSigs[2 + leaves.length + lastSubtrees.length] = data.newRoot;
+        console2.log("newRoot:", pubSigs[2 + leaves.length + lastSubtrees.length]);
 
-        console2.log("newSubtrees", data.newSubtrees.length);
+        // console2.log("newSubtrees", data.newSubtrees.length);
         for (uint i = 0; i < data.newSubtrees.length; i++) {
             pubSigs[3 + leaves.length + lastSubtrees.length + i] = data
                 .newSubtrees[i];
+            console2.log("newSubtrees:", pubSigs[3 + leaves.length + lastSubtrees.length + i]);
         }
 
-        for (uint i = 0; i < pubSigs.length; i++) {
-            console2.log("p", i, pubSigs[i]);
-        }
+        // for (uint i = 0; i < pubSigs.length; i++) {
+        //     console2.log("p", i, pubSigs[i]);
+        // }
+
+        console2.log("--------PUBLIC SIGS LOGS ENDED---------");
 
         bytes memory vParams = abi.encodePacked(
             data.proof,

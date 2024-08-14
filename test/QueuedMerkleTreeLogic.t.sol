@@ -76,7 +76,7 @@ contract QueuedMerkleTreeLogicTest is BaseTest {
     //     assertEq(queuedLeaves.length, fixture.leavesQueue1.length);
     // }
 
-    function test_rootsOnCommitmentTreeQuadLeafInsertion() public {
+    function test_QCommitmentTreeLeafInsertion() public {
         qmt.queueLeaves(fixture.leavesQueue1);
         TreeUpdateData memory treeUpdateData1 = _loadTreeUpdateData(
             "tree_update_data_1"
