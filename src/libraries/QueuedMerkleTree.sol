@@ -156,6 +156,8 @@ library QueuedMerkleTreeLogic {
         // console2.log("lastSubtrees22");
 
         uint256 lastRoot = self.roots[self.currentRootIndex];
+
+        /**
         uint256[] memory pubSigs = new uint256[](63);
 
         console2.log("--------PUBLIC SIGS LOGS STARTING---------");
@@ -193,16 +195,16 @@ library QueuedMerkleTreeLogic {
         // }
 
         console2.log("--------PUBLIC SIGS LOGS ENDED---------");
-
+    */
         bytes memory vParams = abi.encodePacked(
             data.proof,
-            pubSigs
-            // uint256(self.nextLeafIndex),
-            // leaves,
-            // lastRoot,
-            // lastSubtrees,
-            // data.newRoot,
-            // data.newSubtrees
+            // pubSigs
+            uint256(self.nextLeafIndex),
+            leaves,
+            lastRoot,
+            lastSubtrees,
+            data.newRoot,
+            data.newSubtrees
         );
 
         return IVerifier(self.verifier).verifyTreeUpdateProof(vParams);
