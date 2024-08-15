@@ -1,4 +1,5 @@
 import { readFileSync } from "fs";
+import path from "path";
 //@ts-ignore
 import * as snarkJs from "snarkjs";
 import {
@@ -7,11 +8,16 @@ import {
   ZTransaction,
 } from "@zkfi-tech/zk-prover";
 
+const circuitPathBase = path.resolve(
+  __dirname,
+  "../../../../v1-circuits/artifacts/"
+);
+
 export const getCircuitPath = (name: string) => {
   return {
-    zKey: `/Users/shiven/Documents/code/v1-circuits/artifacts/${name}/keys.zkey`,
-    wasm: `/Users/shiven/Documents/code/v1-circuits/artifacts/${name}/circuit.wasm`,
-    vKey: `/Users/shiven/Documents/code/v1-circuits/artifacts/${name}/vKey.json`,
+    zKey: `${circuitPathBase}/${name}/keys.zkey`,
+    wasm: `${circuitPathBase}/${name}/circuit.wasm`,
+    vKey: `${circuitPathBase}/${name}/vKey.json`,
   };
 };
 

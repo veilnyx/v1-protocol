@@ -11,6 +11,8 @@ import {VerifierRegister} from "src/verifiers/VerifierRegister.sol";
 import {VerifierTreeUpdate} from "src/verifiers/VerifierTreeUpdate.sol";
 import {Verifier, TransactionVerifierInfo} from "src/core/Verifier.sol";
 import {AdaptorHandler} from "src/core/AdaptorHandler.sol";
+import {Hasher} from "src/core/Hasher.sol";
+import {MockPool} from "test/mocks/MockPool.sol";
 import {MockScreener} from "test/mocks/MockScreener.sol";
 import {MockERC20} from "test/mocks/MockERC20.sol";
 import {BaseTest} from "./BaseTest.sol";
@@ -23,6 +25,7 @@ contract PoolBaseTest is BaseTest {
 
     Verifier public verifier;
     AdaptorHandler public adaptorHandler;
+    Hasher public hasher;
     Pool public pool;
 
     uint256 public addressTreeDepth;
@@ -57,10 +60,10 @@ contract PoolBaseTest is BaseTest {
         verifier = new Verifier(vInfos, address(vr), address(vTreeUpdate));
         adaptorHandler = new AdaptorHandler();
 
-        pool = new Pool();
+        pool = new MockPool();
 
         screener = new MockScreener();
-        address hasher = _deployHasher();
+        hasher = _deployHasher();
 
         bytes memory initData = abi.encodeCall(
             Pool.initialize,
@@ -71,13 +74,13 @@ contract PoolBaseTest is BaseTest {
                 address(verifier),
                 address(adaptorHandler),
                 address(screener),
-                hasher,
+                address(hasher),
                 fixture.withdrawFeeBps
             )
         );
 
         ERC1967Proxy poolProxy = new ERC1967Proxy(address(pool), initData);
-        pool = Pool(address(poolProxy));
+        pool = MockPool(address(poolProxy));
     }
 
     //////////////////////////////////////////////////////

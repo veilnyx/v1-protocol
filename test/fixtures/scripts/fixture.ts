@@ -1,4 +1,5 @@
 import { readFileSync, writeFileSync } from "fs";
+import path from "path";
 import {
   bytesToBigInt,
   Hex,
@@ -10,22 +11,15 @@ import {
   stringToBytes,
 } from "viem";
 import { ShieldedAccount } from "@zkfi-tech/account";
-import {
-  Fp,
-  Point,
-  poseidonDecrypt,
-  poseidonHash,
-} from "@zkfi-tech/babyjubjub";
+import { Fp, Point, poseidonDecrypt } from "@zkfi-tech/babyjubjub";
 import {
   TransactionOptions,
   TransactionRequest,
 } from "@zkfi-tech/shared-types";
 import { Core } from "@zkfi-tech/core";
-import { MerkleTreeState, ZTransaction } from "@zkfi-tech/zk-prover";
+import { ZTransaction } from "@zkfi-tech/zk-prover";
 import { Note, SIZE_KEY_MEMO } from "@zkfi-tech/transaction";
 import config from "../config.json";
-import { getInitialTreeState } from "./genTreeUpdateData";
-const path = require("path");
 
 const senderSeed = BigInt(config.sender.seed);
 const receiverSeed = BigInt(config.receiver.seed);
@@ -110,7 +104,6 @@ export const generateTestAddressRegistration = async (
   name: string,
   sdk: Core
 ) => {
-  console.log("Inside generateTestAddressRegistration()");
   const zaddrReg = await sdk.proveAddress("0x");
   const encoded = zaddrReg.encode();
   writeFileSync(`${dirFixtureData}/${name}.txt`, encoded);
@@ -200,18 +193,6 @@ export async function mockNotes(depositName: string, sdk: Core) {
     //@ts-ignore
     sdk.notesSource.mockNotes(notes[i].assetId, [notes[i]]);
     //@ts-ignore
-    // sdk.commitmentTreeSource.insert(z); 
-
-    console.log("leaf inserted", notes[i].commitment);
-    //@ts-ignore
     sdk.commitmentTreeSource.insert(notes[i].commitment);
   }
-  console.log("mt root off-chain", sdk.commitmentTreeSource.root);
-
-  //@ts-ignore
-  // sdk.notesSource.mockNotes(notes[0].assetId, [notes[0]]);
-  // //@ts-ignore
-  // // sdk.notesSource.mockNotes(depositNotes[1].assetId, [depositNotes[1]]);
-  // //@ts-ignore
-  // notes.forEach((n) => sdk.commitmentTreeSource.insert(n.commitment));
 }

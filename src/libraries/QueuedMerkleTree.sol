@@ -1,11 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.24;
 
-import {IHasher} from "../interfaces/IHasher.sol";
 import {FIELD_SIZE, ZERO_LEAF} from "../base/Constants.sol";
+import {IHasher} from "../interfaces/IHasher.sol";
 import {IVerifier} from "../interfaces/IVerifier.sol";
 import {IPool} from "../interfaces/IPool.sol";
-import {console2} from "forge-std/console2.sol";
 
 struct QueuedMerkleTree {
     uint8 depth;
@@ -31,6 +30,7 @@ struct TreeUpdateData {
 
 library QueuedMerkleTreeLogic {
     error MerkleTreeFull();
+    error InvalidProof();
 
     uint8 public constant ROOT_HISTORY_SIZE = 50;
 
@@ -71,7 +71,6 @@ library QueuedMerkleTreeLogic {
         uint32 nLeaves = uint32(leaves.length);
 
         for (uint8 i = 0; i < nLeaves; ) {
-            console2.log("Pushing leaf to qmt queue:", leaves[i]);
             self.queuedLeaves[nextIndex + i] = leaves[i];
             unchecked {
                 ++i;
@@ -90,10 +89,9 @@ library QueuedMerkleTreeLogic {
 
         uint32 queueLen = endIdx - startIdx; //
         uint32 nLeaves = queueLen > n ? n : queueLen;
-        console2.log("Queue len:", nLeaves);
+        // console2.log("Queue len:", nLeaves);
 
         uint256[] memory leaves = new uint256[](n);
-        // uint256[] memory leaves = new uint256[](nLeaves);
 
         for (uint32 i = 0; i < nLeaves; ) {
             leaves[i] = self.queuedLeaves[startIdx + i];
@@ -120,12 +118,11 @@ library QueuedMerkleTreeLogic {
         QueuedMerkleTree storage self,
         TreeUpdateData calldata data
     ) public returns (uint256) {
-        // @todo: Uncomment this and create a mock pool
-        // bool isValid = _verifyUpdateProof(self, data);
+        bool isValid = _verifyUpdateProof(self, data);
 
-        // if (!isValid) {
-        //     revert("Invalid proof");
-        // }
+        if (!isValid) {
+            revert InvalidProof();
+        }
 
         // Updating tree states
         uint8 newRootIndex = (self.currentRootIndex + 1) % ROOT_HISTORY_SIZE;
@@ -142,12 +139,12 @@ library QueuedMerkleTreeLogic {
         self.nextLeafIndex += self.queueSize;
         uint32 batchSize = self.queueEndIndex - self.queueStartIndex;
 
-        if(batchSize < self.queueSize) {
+        if (batchSize < self.queueSize) {
             self.queueStartIndex = self.queueEndIndex;
         } else {
             self.queueStartIndex += self.queueSize;
-        }        
-        
+        }
+
         return self.nextLeafIndex;
     }
 
@@ -158,50 +155,6 @@ library QueuedMerkleTreeLogic {
         uint256[] memory leaves = _getQueuedLeaves(self);
         uint256[] memory lastSubtrees = _getSubtree(self);
         uint256 lastRoot = self.roots[self.currentRootIndex];
-
-        // uint256[] memory pubSigs = new uint256[](63);
-
-        // console2.log("--------PUBLIC SIGS LOGS STARTING---------");
-        // pubSigs[0] = self.nextLeafIndex;
-        // console2.log("leafIndex:", pubSigs[0]);
-
-        // console2.log("leaves", leaves.length);
-
-        // for (uint i = 0; i < leaves.length; i++) {
-        //     pubSigs[i + 1] = leaves[i];
-        //     console2.log("leaves:", pubSigs[i + 1]);
-        // }
-
-        // pubSigs[1 + leaves.length] = lastRoot;
-        // console2.log("lastRoot:", pubSigs[1 + leaves.length]);
-
-        // console2.log("lastSubtress", lastSubtrees.length);
-        // for (uint i = 0; i < lastSubtrees.length; i++) {
-        //     pubSigs[2 + leaves.length + i] = lastSubtrees[i];
-        //     console2.log("lastSubtrees:", pubSigs[2 + leaves.length + i]);
-        // }
-
-        // pubSigs[2 + leaves.length + lastSubtrees.length] = data.newRoot;
-        // console2.log(
-        //     "newRoot:",
-        //     pubSigs[2 + leaves.length + lastSubtrees.length]
-        // );
-
-        // console2.log("newSubtrees", data.newSubtrees.length);
-        // for (uint i = 0; i < data.newSubtrees.length; i++) {
-        //     pubSigs[3 + leaves.length + lastSubtrees.length + i] = data
-        //         .newSubtrees[i];
-        //     console2.log(
-        //         "newSubtrees:",
-        //         pubSigs[3 + leaves.length + lastSubtrees.length + i]
-        //     );
-        // }
-
-        // for (uint i = 0; i < pubSigs.length; i++) {
-        //     console2.log("p", i, pubSigs[i]);
-        // }
-
-        // console2.log("--------PUBLIC SIGS LOGS ENDED---------");
 
         bytes memory vParams = abi.encodePacked(
             data.proof,
@@ -224,7 +177,9 @@ library QueuedMerkleTreeLogic {
         return leaves;
     }
 
-    function getQueuedLeaves(QueuedMerkleTree storage tree) external view returns (uint256[] memory) {
+    function getQueuedLeaves(
+        QueuedMerkleTree storage tree
+    ) external view returns (uint256[] memory) {
         return _getQueuedLeaves(tree);
     }
 

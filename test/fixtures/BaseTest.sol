@@ -45,7 +45,7 @@ abstract contract BaseTest is Test {
         return FixtureLib.loadData(name, vm);
     }
 
-    function _deployHasher() internal returns (address) {
+    function _deployHasher() internal returns (Hasher) {
         string memory t3Path = string.concat(
             vm.projectRoot(),
             "/src/poseidon/t3.txt"
@@ -67,7 +67,7 @@ abstract contract BaseTest is Test {
             poseidonT4 := create(0, add(t4Bytecode, 0x20), mload(t4Bytecode))
         }
 
-        address hasher = address(new Hasher(poseidonT3, poseidonT4));
+        Hasher hasher = new Hasher(poseidonT3, poseidonT4);
         return hasher;
     }
 }

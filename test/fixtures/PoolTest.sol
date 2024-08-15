@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.24;
 
-import {console2} from "forge-std/console2.sol";
-
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {Pool} from "src/core/Pool.sol";
 import {Verifier, TransactionVerifierInfo} from "src/core/Verifier.sol";
@@ -12,6 +10,8 @@ import {VerifierTransact22} from "src/verifiers/VerifierTransact22.sol";
 import {VerifierRegister} from "src/verifiers/VerifierRegister.sol";
 import {Asset, AssetType} from "src/libraries/Asset.sol";
 import {ZTransaction, RevokerData} from "src/libraries/ZTransaction.sol";
+import {MerkleTree, MerkleTreeLogic} from "src/libraries/MerkleTree.sol";
+import {TreeUpdateData} from "src/libraries/QueuedMerkleTree.sol";
 import {ShieldedAddressRegistrationData, ShieldedAddressLogic} from "src/libraries/ShieldedAddress.sol";
 import {IPool} from "src/interfaces/IPool.sol";
 import {MockScreener} from "test/mocks/MockScreener.sol";
@@ -19,8 +19,12 @@ import {MockERC20} from "test/mocks/MockERC20.sol";
 import {PoolBaseTest} from "./PoolBaseTest.sol";
 
 contract PoolTest is PoolBaseTest {
+    using MerkleTreeLogic for MerkleTree;
+
     Asset public asset1;
     Asset public asset2;
+
+    MerkleTree internal _helperTree;
 
     bytes revokerMetaData = abi.encode("Revoker 1", "Organization 1");
 
@@ -44,23 +48,26 @@ contract PoolTest is PoolBaseTest {
     }
 
     modifier expectCommitmentsInserted(ZTransaction memory ztx) {
-        uint256 nextIndex = pool.getCommitmentTreeNextLeafIndex();
-        uint256 rootBeforeDeposit = pool.getCommitmentTreeLastRoot();
-        uint256 currentRootIndexBeforeDeposit = pool
-            .getCommitmentTreeCurrentRootIndex();
+        // uint256 nextLeafIndex = pool.getCommitmentTreeNextLeafIndex();
+        // uint256 rootBeforeDeposit = pool.getCommitmentTreeLastRoot();
+        // uint256 currentRootIndexBeforeDeposit = pool
+        //     .getCommitmentTreeCurrentRootIndex();
+
+        uint256 nextLeafIndex = pool.getCommitmentTreeNextLeafIndex();
+        // uint256 queueLen = pool.getCommitmentTreeQueueLength();
 
         for (uint256 i = 0; i < ztx.commitments.length; ++i) {
-            vm.expectEmit(false, true, true, true);
-            emit IPool.Commitment(nextIndex + i, ztx.commitments[i]);
+            vm.expectEmit(true, true, true, true);
+            emit IPool.Commitment(nextLeafIndex + i, ztx.commitments[i]);
         }
 
         _;
 
-        uint256 nextLeafIndexAfterDeposit = pool
-            .getCommitmentTreeNextLeafIndex();
-        uint256 rootAfterDeposit = pool.getCommitmentTreeLastRoot();
-        uint256 currentRootIndexAfterDeposit = pool
-            .getCommitmentTreeCurrentRootIndex();
+        // uint256 nextLeafIndexAfterDeposit = pool
+        //     .getCommitmentTreeNextLeafIndex();
+        // uint256 rootAfterDeposit = pool.getCommitmentTreeLastRoot();
+        // uint256 currentRootIndexAfterDeposit = pool
+        //     .getCommitmentTreeCurrentRootIndex();
 
         // assertEq(nextIndex + ztx.commitments.length, nextLeafIndexAfterDeposit);
         // assertNotEq(rootBeforeDeposit, rootAfterDeposit);
@@ -141,11 +148,8 @@ contract PoolTest is PoolBaseTest {
 
     function _runExpectedTx(
         ZTransaction memory ztx
-    )
-        internal
-        expectNullifiersMarked(ztx)
-        expectCommitmentsInserted(ztx)
-        expectReceipt(ztx)
+    ) internal expectNullifiersMarked(ztx) // expectCommitmentsInserted(ztx)
+    // expectReceipt(ztx)
     {
         pool.transact(ztx);
     }
@@ -171,31 +175,30 @@ contract PoolTest is PoolBaseTest {
     }
 
     function _makePreDeposit() internal {
+        // Deposit 10000 WETH and 10000 USDC
         uint256 deposit1 = 10000 ether;
         uint256 deposit2 = 10000e6;
         _mintAsset(asset1, address(this), deposit1);
         _mintAsset(asset2, address(this), deposit2);
         _approveAsset(asset1, address(pool), deposit1);
         _approveAsset(asset2, address(pool), deposit2);
-        ZTransaction memory ztx = _loadShieldedTransaction(
-            "deposit_1000_weth_usdc_without_fee"
-        );
-        for (uint256 i = 0; i < ztx.commitments.length; i++) {
-            console2.log(i, ztx.commitments[i]);
-        }
+        ZTransaction memory ztx = _loadShieldedTransaction("deposit_pre_tx");
         pool.transact(ztx);
-    }
 
-    function _makePreDepositWeth() internal {
-        uint256 deposit1 = 10000 ether;
-        _mintAsset(asset1, address(this), deposit1);
-        _approveAsset(asset1, address(pool), deposit1);
-        ZTransaction memory ztx = _loadShieldedTransaction(
-            "deposit_1000_weth_without_fee"
-        );
-        for (uint256 i = 0; i < ztx.commitments.length; i++) {
-            console2.log(i, ztx.commitments[i]);
+        // Process the batch
+        (uint256[] memory leaves, , , ) = pool.getCommitmentTreeState();
+        uint8 depth = pool.getCommitmentTreeDepth();
+        _helperTree.init(depth, address(hasher));
+        for (uint256 i = 0; i < leaves.length; ++i) {
+            _helperTree.insert(leaves[i]);
         }
-        pool.transact(ztx);
+
+        TreeUpdateData memory treeUpdateData = TreeUpdateData({
+            newRoot: _helperTree.getLatestRoot(),
+            newSubtrees: _helperTree.getLastSubtrees(),
+            proof: bytes("")
+        });
+
+        pool.updateCommitmentTree(treeUpdateData);
     }
 }

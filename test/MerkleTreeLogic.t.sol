@@ -22,8 +22,7 @@ contract MerkleTreeLogicTest is BaseTest {
     IHasher hasher;
 
     constructor() {
-        address hasherAddr = _deployHasher();
-        hasher = IHasher(hasherAddr);
+        hasher = _deployHasher();
     }
 
     function setUp() external {
