@@ -439,12 +439,18 @@ library ZTransactionLogic {
     ) internal {
         // uint256 numCommitments = memoParams.commitments.length;
         tree.queueLeaves(memoParams.commitments);
-        uint32 latestIndex = tree.queueEndIndex - 1;
+
+        for(uint8 i = 0; i < memoParams.commitments.length; ++i) {
+            uint32 leafIndex = tree.nextLeafIndex + i;
+            emit IPool.Commitment(leafIndex, memoParams.commitments[i]);
+        }
+
+        uint32 lastLeafIndex = tree.nextLeafIndex + (tree.queueEndIndex - tree.queueStartIndex) - 1;
 
         emit IPool.Receipt(
             params.txType,
             params.revokerId,
-            latestIndex,
+            lastLeafIndex,
             params.target,
             params.feeAssetId,
             params.feeValue,

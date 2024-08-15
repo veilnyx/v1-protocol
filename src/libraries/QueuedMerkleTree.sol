@@ -88,7 +88,7 @@ library QueuedMerkleTreeLogic {
         uint32 startIdx = self.queueStartIndex;
         uint32 endIdx = self.queueEndIndex;
 
-        uint32 queueLen = endIdx - startIdx;
+        uint32 queueLen = endIdx - startIdx; //
         uint32 nLeaves = queueLen > n ? n : queueLen;
         console2.log("Queue len:", nLeaves);
 
@@ -120,6 +120,7 @@ library QueuedMerkleTreeLogic {
         QueuedMerkleTree storage self,
         TreeUpdateData calldata data
     ) public returns (uint256) {
+        // @todo: Uncomment this and create a mock pool
         // bool isValid = _verifyUpdateProof(self, data);
 
         // if (!isValid) {
@@ -138,21 +139,15 @@ library QueuedMerkleTreeLogic {
             }
         }
 
-        // Emitting commitments after commitment leaves have been inserted into the commitment tree
-        uint8 nonZeroLeaves = uint8(self.queueEndIndex - self.queueStartIndex);
-        for (uint8 i = 0; i < nonZeroLeaves; ) {
-            uint32 leafIndex = self.nextLeafIndex + i;
-            emit IPool.Commitment(leafIndex, self.queuedLeaves[leafIndex]);
-
-            unchecked {
-                ++i;
-            }
-        }
-
         self.nextLeafIndex += self.queueSize;
-        self.queueStartIndex += self.queueSize;
-        self.queueEndIndex = self.queueStartIndex;
+        uint32 batchSize = self.queueEndIndex - self.queueStartIndex;
 
+        if(batchSize < self.queueSize) {
+            self.queueStartIndex = self.queueEndIndex;
+        } else {
+            self.queueStartIndex += self.queueSize;
+        }        
+        
         return self.nextLeafIndex;
     }
 

@@ -25,6 +25,7 @@ contract QueuedMerkleTreeLogicTest is PoolTest {
     // BinaryIMTData internal refTree;
     MerkleTree internal refTree;
     IHasher hasher;
+    ZTransaction depositTx;
 
     function setUp() external {
         PoolTest._setUp();
@@ -48,38 +49,11 @@ contract QueuedMerkleTreeLogicTest is PoolTest {
         );
 
         refTree.init(fixture.commitmentTreeDepth, address(hasher));
-
-
-        /**
-        // For events testing modifiers
-        depositTx = _loadShieldedTransaction("deposit_1000_weth_without_fee");
-        uint256 deposit1 = 10000 ether;
-        _mintAsset(asset1, address(this), deposit1);
-        _approveAsset(asset1, address(pool), deposit1);
-        ZTransaction memory ztx = _loadShieldedTransaction(
+        depositTx = _loadShieldedTransaction(
             "deposit_1000_weth_without_fee"
         );
-        for (uint256 i = 0; i < ztx.commitments.length; i++) {
-            console2.log(i, ztx.commitments[i]);
-        }
-        // _depositWethAndPrepareUpdateMTService(); // will add commitments to the queue only
-         */
+        // _makePreDepositWeth();
     }
-
-    /**
-    function _depositWethAndPrepareUpdateMTService() internal {
-        uint256 deposit1 = 10000 ether;
-        _mintAsset(asset1, address(this), deposit1);
-        _approveAsset(asset1, address(pool), deposit1);
-        ZTransaction memory ztx = _loadShieldedTransaction(
-            "deposit_1000_weth_without_fee"
-        );
-        for (uint256 i = 0; i < ztx.commitments.length; i++) {
-            console2.log(i, ztx.commitments[i]);
-        }
-        pool.transact(ztx);
-    }
-     */
 
     ////////////////////////////////////////
     //// MerkleTreeInitialization Tests ////
@@ -172,10 +146,6 @@ contract QueuedMerkleTreeLogicTest is PoolTest {
     function test_txTest() public {
         _makePreDepositWeth();
 
-        ZTransaction memory depositTx = _loadShieldedTransaction(
-            "deposit_1000_weth_without_fee"
-        );
-        pool.transact(depositTx); // will add commitments to the queue
         uint256 poolBalAfterDeposit = IERC20(address(token1)).balanceOf(
             address(pool)
         );
@@ -184,8 +154,8 @@ contract QueuedMerkleTreeLogicTest is PoolTest {
 
         pool.updateCommitmentTree(treeUpdateData); // inserting deposit tx commitments into the qmt
 
-        ( , , , uint32 latestRoot ) = pool.getCommitmentTreeState();
-        console2.log('onchain root after deposit:', latestRoot);
+        // ( , , , uint32 latestRoot ) = pool.getCommitmentTreeState();
+        // console2.log('onchain root after deposit:', latestRoot);
 
         // executing withdraw tx now
         ZTransaction memory withdrawTx = _loadShieldedTransaction(
@@ -204,28 +174,12 @@ contract QueuedMerkleTreeLogicTest is PoolTest {
         // assert(poolBalAfterDeposit > poolBalAfterWithdraw);
     }
 
-    function test_CommitmentEventsOfDepositTx() public {
-        ZTransaction memory depositTx = _loadShieldedTransaction(
-            "deposit_1000_weth_without_fee"
-        );
-
-        _makePreDepositWeth();
-        pool.transact(depositTx); // will add commitments to the queue
-        TreeUpdateData memory treeUpdateData = _prepareMTService();
-
-        _expectCommitmentsInserted(depositTx);
-        pool.updateCommitmentTree(treeUpdateData); // inserting deposit tx commitments into the qmt and emitting Commitment events
-    }
-
-    function test_ReceiptEventOfDepositTx() public {
-         ZTransaction memory depositTx = _loadShieldedTransaction(
-            "deposit_1000_weth_without_fee"
-        );
-
-        _makePreDepositWeth(); // inserting deposit tx commitments into the qmt queue and emitting Receipt event
-        _expectReceipt(depositTx);
-
-        pool.transact(depositTx); 
+    function test_Events() public {
+        /// @notice using _makePreDepositWeth() will cause double spend error, hence minting and approving explicitly
+        uint256 deposit = 10000 ether;
+        _mintAsset(asset1, address(this), deposit);
+        _approveAsset(asset1, address(pool), deposit);
+        _runExpectedTx(depositTx);
     }
 
     function _prepareMTService() internal returns (TreeUpdateData memory) {
