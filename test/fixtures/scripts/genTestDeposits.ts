@@ -9,6 +9,7 @@ const {
 } = fixture;
 
 export const reqs = {
+  /**
   deposit_1000_weth_without_fee: {
     type: TransactionType.DEPOSIT,
     assetIds: [weth],
@@ -19,6 +20,7 @@ export const reqs = {
     paymaster: zeroAddress,
     revokerId: 0,
   },
+   */
   deposit_1000_weth_usdc_without_fee: {
     type: TransactionType.DEPOSIT,
     assetIds: [weth, usdc],

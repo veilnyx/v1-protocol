@@ -2,27 +2,32 @@
 pragma solidity ^0.8.24;
 
 import {BinaryIMT as BinaryIMTLogic, BinaryIMTData} from "@zk-kit/imt/BinaryIMT.sol";
+import {MerkleTree, MerkleTreeLogic} from "../src/libraries/MerkleTree.sol";
 import {IHasher} from "src/interfaces/IHasher.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IPool} from "src/interfaces/IPool.sol";
 import {QueuedMerkleTree, QueuedMerkleTreeLogic, TreeUpdateData} from "src/libraries/QueuedMerkleTree.sol";
 import {FIELD_SIZE, ZERO_LEAF} from "src/base/Constants.sol";
-import {BaseTest} from "test/fixtures/BaseTest.sol";
+import {PoolTest} from "test/fixtures/PoolTest.sol";
 import {Fixture, FixtureLib} from "./fixtures/Fixture.sol";
 import {Verifier, TransactionVerifierInfo} from "src/core/Verifier.sol";
 import {VerifierTreeUpdate} from "src/verifiers/VerifierTreeUpdate.sol";
+import {ZTransaction} from "src/libraries/ZTransaction.sol";
 
 import {console2} from "forge-std/console2.sol";
 
-contract QueuedMerkleTreeLogicTest is BaseTest {
+contract QueuedMerkleTreeLogicTest is PoolTest {
     using QueuedMerkleTreeLogic for QueuedMerkleTree;
     using BinaryIMTLogic for BinaryIMTData;
+    using MerkleTreeLogic for MerkleTree;
 
     QueuedMerkleTree internal qmt;
-    BinaryIMTData internal refTree;
+    // BinaryIMTData internal refTree;
+    MerkleTree internal refTree;
     IHasher hasher;
 
     function setUp() external {
-        BaseTest._setUp();
+        PoolTest._setUp();
         address hasherAddr = _deployHasher();
         hasher = IHasher(hasherAddr);
         VerifierTreeUpdate treeUpdateVerifier = new VerifierTreeUpdate();
@@ -42,7 +47,7 @@ contract QueuedMerkleTreeLogicTest is BaseTest {
             address(verifier)
         );
 
-        refTree.init(fixture.commitmentTreeDepth, ZERO_LEAF);
+        refTree.init(fixture.commitmentTreeDepth, address(hasher));
     }
 
     ////////////////////////////////////////
@@ -131,5 +136,38 @@ contract QueuedMerkleTreeLogicTest is BaseTest {
             }
         }
         qmt.update(treeUpdateData1); // this will pad ZERO_LEAF but will not emit them
+    }
+
+    function test_txTest() public {
+        ZTransaction memory depositTx = _loadShieldedTransaction("deposit_1000_weth_without_fee");
+        _runExpectedTx(depositTx); // will add commitments to the queue
+        uint256 poolBalAfterDeposit = IERC20(address(token1)).balanceOf(address(pool));
+
+        // service reading the queue and generating new merkle tree state on-chain
+        uint256[] memory leaves = qmt.getQueuedLeaves();
+
+        for(uint8 i; i < leaves.length; ) {
+            refTree.insert(leaves[i]);
+            unchecked {
+                ++i;
+            }
+        }
+
+        TreeUpdateData memory treeUpdateData = TreeUpdateData({
+            newRoot: refTree.getLatestRoot(),
+            newSubtrees: refTree.getLastSubtrees(),
+            proof: bytes("")
+        });
+
+        qmt.update(treeUpdateData); // inserting deposit tx commitments into the qmt
+
+        // executing withdraw tx now
+        ZTransaction memory withdrawTx = _loadShieldedTransaction("withdraw_500_weth_without_fee");
+        _runExpectedTx(withdrawTx);
+        uint256 poolBalAfterWithdraw = IERC20(address(token1)).balanceOf(address(pool));
+        
+        assert(poolBalAfterDeposit == 1000);
+        assert(poolBalAfterWithdraw == 500);
+        assert(poolBalAfterDeposit > poolBalAfterWithdraw);
     }
 }

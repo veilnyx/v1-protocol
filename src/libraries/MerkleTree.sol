@@ -234,4 +234,21 @@ library MerkleTreeLogic {
     ) external view returns (uint256) {
         return self.roots[rootIndex];
     }
+
+    function getLatestRoot(MerkleTree storage self) external view returns (uint256) {
+        return self.roots[self.currentRootIndex];
+    }
+
+    function getLastSubtrees(MerkleTree storage self) external view returns (uint256[] memory) {
+        uint256[] memory subtrees = new uint256[](self.depth);
+        
+        for(uint8 i; i < uint8(self.depth); ) {
+            subtrees[i] = self.lastSubtrees[i];
+
+            unchecked {
+                ++i;
+            }
+        }
+        return subtrees;
+    }
 }

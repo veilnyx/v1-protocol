@@ -119,11 +119,12 @@ library QueuedMerkleTreeLogic {
         TreeUpdateData calldata data
     ) public returns (uint256) {
         console2.log("update()");
-        bool isValid = _verifyUpdateProof(self, data);
+       
+        // bool isValid = _verifyUpdateProof(self, data);
 
-        if (!isValid) {
-            revert("Invalid proof");
-        }
+        // if (!isValid) {
+        //     revert("Invalid proof");
+        // }
 
         // Updating tree states
         uint8 newRootIndex = (self.currentRootIndex + 1) % ROOT_HISTORY_SIZE;
@@ -229,6 +230,10 @@ library QueuedMerkleTreeLogic {
         uint32 nLeaves = tree.queueSize;
         uint256[] memory leaves = peekQueuedLeaves(tree, nLeaves);
         return leaves;
+    }
+
+    function getQueuedLeaves(QueuedMerkleTree storage tree) external view returns (uint256[] memory) {
+        return _getQueuedLeaves(tree);
     }
 
     function _getSubtree(

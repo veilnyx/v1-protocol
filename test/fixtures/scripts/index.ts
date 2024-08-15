@@ -9,12 +9,12 @@ import { genTreeUpdateData, genTreeUpdateDataWhenQueueShort } from "./genTreeUpd
 
 const main = async () => {
   const sdk = getSDKInstance();
-  // await genAddressRegistrations(sdk);
-  // await genTestDeposits(sdk);
+  await genAddressRegistrations(sdk);
+  await genTestDeposits(sdk);
   // await genTestWithdrawals(sdk);
   // await genTestTransfers(sdk);
   // await genTreeUpdateData(sdk);
-  await genTreeUpdateDataWhenQueueShort(sdk);
+  // await genTreeUpdateDataWhenQueueShort(sdk);
   // const n = 10;
   // const leaves1 = Array.from({ length: n }, (_, i) =>
   //   poseidonHash([BigInt(i)])
