@@ -62,7 +62,9 @@ export const fixture = {
   zeroLeaf: config.zeroLeaf,
   leavesQueue1: config.leavesQueue1.map((leaf: string) => BigInt(leaf)),
   leavesQueue2: config.leavesQueue2.map((leaf: string) => BigInt(leaf)),
-  leavesQueueShort: config.leavesQueueShort.map((leaf: string) => BigInt(leaf))
+  leavesQueuePartial: config.leavesQueuePartial.map((leaf: string) =>
+    BigInt(leaf)
+  ),
 };
 
 const dirFixtureData = path.resolve(__dirname, "../data");

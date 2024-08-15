@@ -9,9 +9,9 @@ import {
 
 export const getCircuitPath = (name: string) => {
   return {
-    zKey: `../v1-circuits/artifacts/${name}/keys.zkey`,
-    wasm: `../v1-circuits/artifacts/${name}/circuit.wasm`,
-    vKey: `../v1-circuits/artifacts/${name}/vKey.json`,
+    zKey: `/Users/shiven/Documents/code/v1-circuits/artifacts/${name}/keys.zkey`,
+    wasm: `/Users/shiven/Documents/code/v1-circuits/artifacts/${name}/circuit.wasm`,
+    vKey: `/Users/shiven/Documents/code/v1-circuits/artifacts/${name}/vKey.json`,
   };
 };
 

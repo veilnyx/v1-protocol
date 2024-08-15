@@ -6,8 +6,6 @@ import {FIELD_SIZE, ZERO_LEAF} from "../base/Constants.sol";
 import {IVerifier} from "../interfaces/IVerifier.sol";
 import {IPool} from "../interfaces/IPool.sol";
 
-import {console2} from "forge-std/console2.sol";
-
 struct QueuedMerkleTree {
     uint8 depth;
     uint8 currentRootIndex;
@@ -99,10 +97,8 @@ library QueuedMerkleTreeLogic {
             }
         }
 
-        if(nLeaves < n) {
-            console2.log("Queue short. Adding ZERO_LEAF");
-            
-            for(uint32 i = nLeaves; i < n; ) {
+        if (nLeaves < n) {
+            for (uint32 i = nLeaves; i < n; ) {
                 leaves[i] = ZERO_LEAF;
 
                 unchecked {
@@ -118,8 +114,6 @@ library QueuedMerkleTreeLogic {
         QueuedMerkleTree storage self,
         TreeUpdateData calldata data
     ) public returns (uint256) {
-        console2.log("update()");
-       
         // bool isValid = _verifyUpdateProof(self, data);
 
         // if (!isValid) {
@@ -142,10 +136,7 @@ library QueuedMerkleTreeLogic {
         uint8 nonZeroLeaves = uint8(self.queueEndIndex - self.queueStartIndex);
         for (uint8 i = 0; i < nonZeroLeaves; ) {
             uint32 leafIndex = self.nextLeafIndex + i;
-            emit IPool.Commitment(
-                leafIndex,
-                self.queuedLeaves[leafIndex]
-            );
+            emit IPool.Commitment(leafIndex, self.queuedLeaves[leafIndex]);
 
             unchecked {
                 ++i;
@@ -161,64 +152,63 @@ library QueuedMerkleTreeLogic {
     function _verifyUpdateProof(
         QueuedMerkleTree storage self,
         TreeUpdateData calldata data
-    ) internal returns (bool) {
-
-        console2.log("_verifyUpdateProof()");
+    ) internal view returns (bool) {
         uint256[] memory leaves = _getQueuedLeaves(self);
-        // console2.log("leaves22");
         uint256[] memory lastSubtrees = _getSubtree(self);
-        // console2.log("lastSubtrees22");
-
         uint256 lastRoot = self.roots[self.currentRootIndex];
 
-        
-        uint256[] memory pubSigs = new uint256[](63);
+        // uint256[] memory pubSigs = new uint256[](63);
 
-        console2.log("--------PUBLIC SIGS LOGS STARTING---------");
-        pubSigs[0] = self.nextLeafIndex;
-        console2.log("leafIndex:", pubSigs[0]);
+        // console2.log("--------PUBLIC SIGS LOGS STARTING---------");
+        // pubSigs[0] = self.nextLeafIndex;
+        // console2.log("leafIndex:", pubSigs[0]);
 
         // console2.log("leaves", leaves.length);
 
-        for (uint i = 0; i < leaves.length; i++) {
-            pubSigs[i + 1] = leaves[i];
-            console2.log("leaves:", pubSigs[i+1]);
-        }
+        // for (uint i = 0; i < leaves.length; i++) {
+        //     pubSigs[i + 1] = leaves[i];
+        //     console2.log("leaves:", pubSigs[i + 1]);
+        // }
 
-        pubSigs[1 + leaves.length] = lastRoot;
-        console2.log("lastRoot:", pubSigs[1 + leaves.length]);
+        // pubSigs[1 + leaves.length] = lastRoot;
+        // console2.log("lastRoot:", pubSigs[1 + leaves.length]);
 
         // console2.log("lastSubtress", lastSubtrees.length);
-        for (uint i = 0; i < lastSubtrees.length; i++) {
-            pubSigs[2 + leaves.length + i] = lastSubtrees[i];
-            console2.log("lastSubtrees:", pubSigs[2 + leaves.length + i]);
-        }
+        // for (uint i = 0; i < lastSubtrees.length; i++) {
+        //     pubSigs[2 + leaves.length + i] = lastSubtrees[i];
+        //     console2.log("lastSubtrees:", pubSigs[2 + leaves.length + i]);
+        // }
 
-        pubSigs[2 + leaves.length + lastSubtrees.length] = data.newRoot;
-        console2.log("newRoot:", pubSigs[2 + leaves.length + lastSubtrees.length]);
+        // pubSigs[2 + leaves.length + lastSubtrees.length] = data.newRoot;
+        // console2.log(
+        //     "newRoot:",
+        //     pubSigs[2 + leaves.length + lastSubtrees.length]
+        // );
 
         // console2.log("newSubtrees", data.newSubtrees.length);
-        for (uint i = 0; i < data.newSubtrees.length; i++) {
-            pubSigs[3 + leaves.length + lastSubtrees.length + i] = data
-                .newSubtrees[i];
-            console2.log("newSubtrees:", pubSigs[3 + leaves.length + lastSubtrees.length + i]);
-        }
+        // for (uint i = 0; i < data.newSubtrees.length; i++) {
+        //     pubSigs[3 + leaves.length + lastSubtrees.length + i] = data
+        //         .newSubtrees[i];
+        //     console2.log(
+        //         "newSubtrees:",
+        //         pubSigs[3 + leaves.length + lastSubtrees.length + i]
+        //     );
+        // }
 
         // for (uint i = 0; i < pubSigs.length; i++) {
         //     console2.log("p", i, pubSigs[i]);
         // }
 
-        console2.log("--------PUBLIC SIGS LOGS ENDED---------");
-    
+        // console2.log("--------PUBLIC SIGS LOGS ENDED---------");
+
         bytes memory vParams = abi.encodePacked(
             data.proof,
-            pubSigs
-            // uint256(self.nextLeafIndex),
-            // leaves,
-            // lastRoot,
-            // lastSubtrees,
-            // data.newRoot,
-            // data.newSubtrees
+            uint256(self.nextLeafIndex),
+            leaves,
+            lastRoot,
+            lastSubtrees,
+            data.newRoot,
+            data.newSubtrees
         );
 
         return IVerifier(self.verifier).verifyTreeUpdateProof(vParams);

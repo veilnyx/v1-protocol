@@ -20,7 +20,7 @@ struct Fixture {
     ShieldedAccount receiver;
     uint256[] leavesQueue1;
     uint256[] leavesQueue2;
-    uint256[] leavesQueueShort;
+    uint256[] leavesQueuePartial;
 }
 
 library FixtureLib {
@@ -53,9 +53,9 @@ library FixtureLib {
             configJsonStr,
             ".leavesQueue2"
         );
-        fixture.leavesQueueShort = vm.parseJsonUintArray(
+        fixture.leavesQueuePartial = vm.parseJsonUintArray(
             configJsonStr,
-            ".leavesQueueShort"
+            ".leavesQueuePartial"
         );
 
         // Fee

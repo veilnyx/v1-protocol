@@ -19,16 +19,6 @@ export const genTreeUpdateData = async (sdk: Core) => {
     lastTree: treeUpdateData1.newTree,
     leaves: fixture.leavesQueue2,
   });
-  
-  // // console.log("leafIndex", treeUpdateData.lastTree.nextLeafIndex);
-  // // console.log("leaves", treeUpdateData.leaves);
-  // // console.log("lastRoot", treeUpdateData.lastTree.root);
-  // // console.log("lastSubtree", treeUpdateData.lastTree.subtrees);
-  // // console.log("newRoot", treeUpdateData.newTree.root);
-  // // console.log("newSubtree", treeUpdateData.newTree.subtrees);
-  // const isValid = await verifyTreeUpdateData(treeUpdateData);
-  // console.log("proof", treeUpdateData.proof);
-  // console.log("TreeUpdateData is valid:", isValid);
 
   const encoded1 = treeUpdateData1.encode();
   const encoded2 = treeUpdateData2.encode();
@@ -36,11 +26,11 @@ export const genTreeUpdateData = async (sdk: Core) => {
   writeFileSync(`${dirFixtureData}/tree_update_data_2.txt`, encoded2);
 };
 
-export const genTreeUpdateDataWhenQueueShort = async (sdk: Core) => {
+export const genTreeUpdateDataWithPartialQueue = async (sdk: Core) => {
   let initialTreeState: MerkleTreeState = getInitialTreeState();
 
   // adding ZERO_LEAF to make it 10 leaves
-  let leavesQueue: bigint[] = fixture.leavesQueueShort;
+  let leavesQueue: bigint[] = fixture.leavesQueuePartial;
   leavesQueue[8] = BigInt(fixture.zeroLeaf);
   leavesQueue[9] = BigInt(fixture.zeroLeaf);
 
@@ -50,7 +40,10 @@ export const genTreeUpdateDataWhenQueueShort = async (sdk: Core) => {
   });
 
   const encoded = treeUpdateData.encode();
-  writeFileSync(`${dirFixtureData}/tree_update_data_for_short_queue.txt`, encoded);
+  writeFileSync(
+    `${dirFixtureData}/tree_update_data_partial_queue.txt`,
+    encoded
+  );
 };
 
 export const getInitialTreeState = (): MerkleTreeState => {

@@ -7,8 +7,6 @@ import {VerifierTreeUpdate} from "../verifiers/VerifierTreeUpdate.sol";
 import {ZTransaction, ZTransactionType, ZTransactionLogic, RevokerData} from "../libraries/ZTransaction.sol";
 import {MerkleTree} from "../libraries/MerkleTree.sol";
 
-import {console2} from "forge-std/console2.sol";
-
 struct TransactionVerifierInfo {
     uint16 id;
     bytes4 selector;
@@ -60,21 +58,13 @@ contract Verifier is IVerifier {
     function verifyTreeUpdateProof(
         bytes calldata vParams
     ) public view returns (bool) {
-        console2.log("verifyTreeUpdateProof()");
         (bool success, bytes memory result) = _treeUpdateVerifier.staticcall(
             bytes.concat(VerifierTreeUpdate.verifyProof.selector, vParams)
         );
-        console2.log("ckpt2");
 
         if (!success) {
             revert("Verification call failed");
         }
-
-        // bool isValid = uint256(bytes32(result));
-        console2.log("ckpt3");
-
-        console2.log("result", result.length);
-        console2.logBytes(result);
 
         return uint8(result[31]) == 1;
     }
