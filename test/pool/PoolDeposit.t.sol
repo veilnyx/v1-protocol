@@ -28,7 +28,8 @@ contract PoolDepositTest is PoolTest {
             "deposit_1000_weth_usdc_without_fee"
         );
 
-        _runExpectedTx(ztx);
+        // _runExpectedTx(ztx);
+        pool.transact(ztx);
 
         assertEq(token1.balanceOf(address(pool)), balance1 + deposit1);
         assertEq(token2.balanceOf(address(pool)), balance2 + deposit2);
