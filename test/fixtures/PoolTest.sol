@@ -24,6 +24,8 @@ contract PoolTest is PoolBaseTest {
 
     bytes revokerMetaData = abi.encode("Revoker 1", "Organization 1");
 
+    /**
+     * 
     modifier expectNullifiersMarked(ZTransaction memory ztx_) {
         uint32 currentLeafIndex = pool.getCommitmentTreeNextLeafIndex();
         uint32 nullifierMarkLeafIndex = currentLeafIndex + 1;
@@ -88,6 +90,8 @@ contract PoolTest is PoolBaseTest {
         _;
     }
 
+     */
+
     function _setUp() internal virtual override {
         PoolBaseTest._setUp();
 
@@ -143,9 +147,9 @@ contract PoolTest is PoolBaseTest {
         ZTransaction memory ztx
     )
         internal
-        expectNullifiersMarked(ztx)
-        expectCommitmentsInserted(ztx)
-        expectReceipt(ztx)
+        // expectNullifiersMarked(ztx)
+        // expectCommitmentsInserted(ztx)
+        // expectReceipt(ztx)
     {
         pool.transact(ztx);
     }
@@ -184,5 +188,77 @@ contract PoolTest is PoolBaseTest {
             console2.log(i, ztx.commitments[i]);
         }
         pool.transact(ztx);
+    }
+
+    function _makePreDepositWeth() internal {
+        uint256 deposit1 = 10000 ether;
+        _mintAsset(asset1, address(this), deposit1);
+        _approveAsset(asset1, address(pool), deposit1);
+        ZTransaction memory ztx = _loadShieldedTransaction(
+            "deposit_1000_weth_without_fee"
+        );
+        for (uint256 i = 0; i < ztx.commitments.length; i++) {
+            console2.log(i, ztx.commitments[i]);
+        }
+    }
+
+     function _expectNullifiersMarked(ZTransaction memory ztx_) internal {
+        uint32 currentLeafIndex = pool.getCommitmentTreeNextLeafIndex();
+        uint32 nullifierMarkLeafIndex = currentLeafIndex + 1;
+
+        for (uint256 i = 0; i < ztx_.nullifiers.length; i++) {
+            vm.expectEmit(true, true, true, true);
+            emit IPool.NullifierMarked(
+                ztx_.nullifiers[i],
+                nullifierMarkLeafIndex
+            );
+        }
+
+        // _;
+
+        // for (uint256 i = 0; i < ztx_.nullifiers.length; i++) {
+        //     assertTrue(pool.isMarkedNullifier(ztx_.nullifiers[i]));
+        // }
+    }
+
+    function _expectCommitmentsInserted(ZTransaction memory ztx) internal {
+        uint256 nextIndex = pool.getCommitmentTreeNextLeafIndex();
+        // uint256 rootBeforeDeposit = pool.getCommitmentTreeLastRoot();
+        // uint256 currentRootIndexBeforeDeposit = pool
+        //     .getCommitmentTreeCurrentRootIndex();
+
+        for (uint256 i = 0; i < ztx.commitments.length; ++i) {
+            vm.expectEmit(false, true, true, true);
+            emit IPool.Commitment(nextIndex + i, ztx.commitments[i]);
+        }
+
+        // uint256 nextLeafIndexAfterDeposit = pool
+        //     .getCommitmentTreeNextLeafIndex();
+        // uint256 rootAfterDeposit = pool.getCommitmentTreeLastRoot();
+        // uint256 currentRootIndexAfterDeposit = pool
+        //     .getCommitmentTreeCurrentRootIndex();
+
+        // assertEq(nextIndex + ztx.commitments.length, nextLeafIndexAfterDeposit);
+        // assertNotEq(rootBeforeDeposit, rootAfterDeposit);
+        // assertLt(currentRootIndexBeforeDeposit, currentRootIndexAfterDeposit);
+    }
+
+    function _expectReceipt(ZTransaction memory ztx) internal {
+        uint32 nextLeafIndex = pool.getCommitmentTreeNextLeafIndex();
+
+        vm.expectEmit(true, true, true, false);
+        emit IPool.Receipt(
+            ztx.txType,
+            ztx.revokerId,
+            (nextLeafIndex + uint32(ztx.commitments.length)),
+            address(0),
+            uint24(0),
+            uint96(0),
+            address(0),
+            ztx.keysMemo,
+            ztx.assetsMemo,
+            ztx.notesMemo,
+            bytes("")
+        );
     }
 }

@@ -1,28 +1,27 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.24;
+pragma solidity ^ 0.8.24;
 
-import {BinaryIMT as BinaryIMTLogic, BinaryIMTData} from "@zk-kit/imt/BinaryIMT.sol";
-import {MerkleTree, MerkleTreeLogic} from "../src/libraries/MerkleTree.sol";
-import {IHasher} from "src/interfaces/IHasher.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {IPool} from "src/interfaces/IPool.sol";
-import {QueuedMerkleTree, QueuedMerkleTreeLogic, TreeUpdateData} from "src/libraries/QueuedMerkleTree.sol";
-import {FIELD_SIZE, ZERO_LEAF} from "src/base/Constants.sol";
-import {PoolTest} from "test/fixtures/PoolTest.sol";
-import {Fixture, FixtureLib} from "./fixtures/Fixture.sol";
-import {Verifier, TransactionVerifierInfo} from "src/core/Verifier.sol";
-import {VerifierTreeUpdate} from "src/verifiers/VerifierTreeUpdate.sol";
-import {ZTransaction} from "src/libraries/ZTransaction.sol";
+import { BinaryIMT as BinaryIMTLogic, BinaryIMTData } from "@zk-kit/imt/BinaryIMT.sol";
+import { MerkleTree, MerkleTreeLogic } from "../src/libraries/MerkleTree.sol";
+import { IHasher } from "src/interfaces/IHasher.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { IPool } from "src/interfaces/IPool.sol";
+import { QueuedMerkleTree, QueuedMerkleTreeLogic, TreeUpdateData } from "src/libraries/QueuedMerkleTree.sol";
+import { FIELD_SIZE, ZERO_LEAF } from "src/base/Constants.sol";
+import { PoolTest } from "test/fixtures/PoolTest.sol";
+import { Fixture, FixtureLib } from "./fixtures/Fixture.sol";
+import { Verifier, TransactionVerifierInfo } from "src/core/Verifier.sol";
+import { VerifierTreeUpdate } from "src/verifiers/VerifierTreeUpdate.sol";
+import { ZTransaction } from "src/libraries/ZTransaction.sol";
 
-import {console2} from "forge-std/console2.sol";
+import { console2 } from "forge-std/console2.sol";
 
 contract QueuedMerkleTreeLogicTest is PoolTest {
     using QueuedMerkleTreeLogic for QueuedMerkleTree;
-    using BinaryIMTLogic for BinaryIMTData;
-    using MerkleTreeLogic for MerkleTree;
+        using BinaryIMTLogic for BinaryIMTData;
+            using MerkleTreeLogic for MerkleTree;
 
-    QueuedMerkleTree internal qmt;
-    ZTransaction internal depositTx;
+                QueuedMerkleTree internal qmt;
     // BinaryIMTData internal refTree;
     MerkleTree internal refTree;
     IHasher hasher;
@@ -49,7 +48,38 @@ contract QueuedMerkleTreeLogicTest is PoolTest {
         );
 
         refTree.init(fixture.commitmentTreeDepth, address(hasher));
+
+
+        /**
+        // For events testing modifiers
+        depositTx = _loadShieldedTransaction("deposit_1000_weth_without_fee");
+        uint256 deposit1 = 10000 ether;
+        _mintAsset(asset1, address(this), deposit1);
+        _approveAsset(asset1, address(pool), deposit1);
+        ZTransaction memory ztx = _loadShieldedTransaction(
+            "deposit_1000_weth_without_fee"
+        );
+        for (uint256 i = 0; i < ztx.commitments.length; i++) {
+            console2.log(i, ztx.commitments[i]);
         }
+        // _depositWethAndPrepareUpdateMTService(); // will add commitments to the queue only
+         */
+    }
+
+    /**
+    function _depositWethAndPrepareUpdateMTService() internal {
+        uint256 deposit1 = 10000 ether;
+        _mintAsset(asset1, address(this), deposit1);
+        _approveAsset(asset1, address(pool), deposit1);
+        ZTransaction memory ztx = _loadShieldedTransaction(
+            "deposit_1000_weth_without_fee"
+        );
+        for (uint256 i = 0; i < ztx.commitments.length; i++) {
+            console2.log(i, ztx.commitments[i]);
+        }
+        pool.transact(ztx);
+    }
+     */
 
     ////////////////////////////////////////
     //// MerkleTreeInitialization Tests ////
@@ -140,8 +170,7 @@ contract QueuedMerkleTreeLogicTest is PoolTest {
     }
 
     function test_txTest() public {
-        _mintAsset(asset1, address(this), 10000 ether);
-        _approveAsset(asset1, address(pool), 10000 ether);
+        _makePreDepositWeth();
 
         ZTransaction memory depositTx = _loadShieldedTransaction(
             "deposit_1000_weth_without_fee"
@@ -151,22 +180,7 @@ contract QueuedMerkleTreeLogicTest is PoolTest {
             address(pool)
         );
 
-        // UPDATE QUEUE MT SERVICE 
-        // service reading the queue and generating new merkle tree state on-chain
-        (uint256[] memory leaves, , , ) = pool.getCommitmentTreeState();
-        for (uint8 i; i < leaves.length; ) {
-            console2.log('leaf inserted onchain:', leaves[i]);
-            refTree.insert(leaves[i]);
-            unchecked {
-                ++i;
-            }
-        }
-
-        TreeUpdateData memory treeUpdateData = TreeUpdateData({
-            newRoot: refTree.getLatestRoot(),
-            newSubtrees: refTree.getLastSubtrees(),
-            proof: bytes("")
-        });
+        TreeUpdateData memory treeUpdateData = _prepareMTService();
 
         pool.updateCommitmentTree(treeUpdateData); // inserting deposit tx commitments into the qmt
 
@@ -188,5 +202,50 @@ contract QueuedMerkleTreeLogicTest is PoolTest {
         // assert(poolBalAfterDeposit == 1000 ether);
         // assert(poolBalAfterWithdraw == 500 ether);
         // assert(poolBalAfterDeposit > poolBalAfterWithdraw);
+    }
+
+    function test_CommitmentEventsOfDepositTx() public {
+        ZTransaction memory depositTx = _loadShieldedTransaction(
+            "deposit_1000_weth_without_fee"
+        );
+
+        _makePreDepositWeth();
+        pool.transact(depositTx); // will add commitments to the queue
+        TreeUpdateData memory treeUpdateData = _prepareMTService();
+
+        _expectCommitmentsInserted(depositTx);
+        pool.updateCommitmentTree(treeUpdateData); // inserting deposit tx commitments into the qmt and emitting Commitment events
+    }
+
+    function test_ReceiptEventOfDepositTx() public {
+         ZTransaction memory depositTx = _loadShieldedTransaction(
+            "deposit_1000_weth_without_fee"
+        );
+
+        _makePreDepositWeth(); // inserting deposit tx commitments into the qmt queue and emitting Receipt event
+        _expectReceipt(depositTx);
+
+        pool.transact(depositTx); 
+    }
+
+    function _prepareMTService() internal returns (TreeUpdateData memory) {
+        // UPDATE QUEUE MT SERVICE 
+        // service reading the queue and generating new merkle tree state on-chain
+        (uint256[] memory leaves, , , ) = pool.getCommitmentTreeState();
+        for (uint8 i; i < leaves.length; ) {
+            console2.log('leaf inserted onchain:', leaves[i]);
+            refTree.insert(leaves[i]);
+            unchecked {
+                ++i;
+            }
+        }
+
+        TreeUpdateData memory treeUpdateDataForEventChecks = TreeUpdateData({
+            newRoot: refTree.getLatestRoot(),
+            newSubtrees: refTree.getLastSubtrees(),
+            proof: bytes("")
+        });
+
+        return treeUpdateDataForEventChecks;
     }
 }
