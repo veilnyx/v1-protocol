@@ -367,10 +367,13 @@ contract Pool is
             uint32 lastRoot
         )
     {
-        (queuedLeaves, lastSubtrees, nextLeafIndex, lastRoot) = _commitmentTree
-            .getState();
+        (queuedLeaves, lastSubtrees, nextLeafIndex, lastRoot) = _commitmentTree.getState();
 
         return (queuedLeaves, lastSubtrees, nextLeafIndex, lastRoot);
+    }
+
+    function updateCommitmentTree(TreeUpdateData calldata treeUpdateData) external {
+        _commitmentTree.update(treeUpdateData);
     }
 
     function getAddressTreeCurrentRootIndex() external view returns (uint256) {

@@ -5,6 +5,7 @@ import {IHasher} from "../interfaces/IHasher.sol";
 import {FIELD_SIZE, ZERO_LEAF} from "../base/Constants.sol";
 import {IVerifier} from "../interfaces/IVerifier.sol";
 import {IPool} from "../interfaces/IPool.sol";
+import {console2} from "forge-std/console2.sol";
 
 struct QueuedMerkleTree {
     uint8 depth;
@@ -45,6 +46,8 @@ library QueuedMerkleTreeLogic {
         self.verifier = verifier;
         self.capacity = uint32(2 ** depth);
         self.queueSize = queueSize;
+        self.queueStartIndex = 0;
+        self.queueEndIndex = 0;
 
         uint256 zero = ZERO_LEAF;
         for (uint8 i = 0; i < depth; ) {
@@ -68,13 +71,14 @@ library QueuedMerkleTreeLogic {
         uint32 nLeaves = uint32(leaves.length);
 
         for (uint8 i = 0; i < nLeaves; ) {
+            console2.log("Pushing leaf to qmt queue:", leaves[i]);
             self.queuedLeaves[nextIndex + i] = leaves[i];
             unchecked {
                 ++i;
             }
         }
 
-        self.queueEndIndex = nextIndex + nLeaves;
+        self.queueEndIndex += nLeaves;
     }
 
     function peekQueuedLeaves(
@@ -86,8 +90,10 @@ library QueuedMerkleTreeLogic {
 
         uint32 queueLen = endIdx - startIdx;
         uint32 nLeaves = queueLen > n ? n : queueLen;
+        console2.log("Queue len:", nLeaves);
 
         uint256[] memory leaves = new uint256[](n);
+        // uint256[] memory leaves = new uint256[](nLeaves);
 
         for (uint32 i = 0; i < nLeaves; ) {
             leaves[i] = self.queuedLeaves[startIdx + i];
@@ -145,6 +151,7 @@ library QueuedMerkleTreeLogic {
 
         self.nextLeafIndex += self.queueSize;
         self.queueStartIndex += self.queueSize;
+        self.queueEndIndex = self.queueStartIndex;
 
         return self.nextLeafIndex;
     }

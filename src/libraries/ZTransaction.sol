@@ -437,7 +437,7 @@ library ZTransactionLogic {
         Params memory params,
         MemoParams memory memoParams
     ) internal {
-        uint256 numCommitments = memoParams.commitments.length;
+        // uint256 numCommitments = memoParams.commitments.length;
         tree.queueLeaves(memoParams.commitments);
         uint32 latestIndex = tree.queueEndIndex - 1;
 

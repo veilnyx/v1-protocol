@@ -186,7 +186,7 @@ export async function mockNotes(depositName: string, sdk: Core) {
     const n = Note.decrypt(encryptedNotesKeys[i], encryptedNotes[i], {
       account: senderAccount,
       revoker: revokerPublicKey,
-      leafIndex: 1,
+      leafIndex: i,
     });
 
     if (n) {
@@ -196,12 +196,17 @@ export async function mockNotes(depositName: string, sdk: Core) {
 
   const z = Fp.from(BigInt(keccak256(stringToBytes("zero")))).val;
 
-  //@ts-ignore
-  sdk.notesSource.mockNotes(notes[0].assetId, [notes[0]]);
-  //@ts-ignore
-  sdk.commitmentTreeSource.insert(z);
-  //@ts-ignore
-  sdk.commitmentTreeSource.insert(notes[0].commitment);
+  for (let i = 0; i < notes.length; i++) {
+    //@ts-ignore
+    sdk.notesSource.mockNotes(notes[i].assetId, [notes[i]]);
+    //@ts-ignore
+    // sdk.commitmentTreeSource.insert(z); 
+
+    console.log("leaf inserted", notes[i].commitment);
+    //@ts-ignore
+    sdk.commitmentTreeSource.insert(notes[i].commitment);
+  }
+  console.log("mt root off-chain", sdk.commitmentTreeSource.root);
 
   //@ts-ignore
   // sdk.notesSource.mockNotes(notes[0].assetId, [notes[0]]);
