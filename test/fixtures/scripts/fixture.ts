@@ -6,6 +6,7 @@ import {
   hexToBigInt,
   hexToBytes,
   keccak256,
+  parseEther,
   size,
   sliceHex,
   stringToBytes,
@@ -36,14 +37,30 @@ const assets = {
   reentrantToken: config.assets.reentrantToken,
 };
 
-const revokerPubKey = [
+const revokerPublicKey = Point.fromArray([
   BigInt(config.revokerPublicKey[0]),
   BigInt(config.revokerPublicKey[1]),
-];
-const encryptionPubKey = [
+]);
+const encryptionPublicKey = Point.fromArray([
   BigInt(config.encryptionPublicKey[0]),
   BigInt(config.encryptionPublicKey[1]),
-];
+]);
+
+export const dirFixtureData = path.resolve(__dirname, "../data");
+
+// Makes fixed pre-deposit notes of value 100000 ether each
+export const preDepositedNotes = Array.from({
+  length: commitmentTreeQueueSize,
+}).map((_, i) => {
+  return new Note({
+    assetId: 0x010001 + i,
+    value: parseEther("100000"),
+    rootAddress: senderAccount.rootAddress,
+    revoker: revokerPublicKey,
+    blinding: BigInt(0),
+    leafIndex: i,
+  });
+});
 
 export const fixture = {
   sender: { account: senderAccount, pubAddress: senderPubAddress },
@@ -51,8 +68,8 @@ export const fixture = {
   addressTreeDepth,
   commitmentTreeDepth,
   commitmentTreeQueueSize,
-  revokerPublicKey: Point.fromArray(revokerPubKey),
-  encryptionPublicKey: Point.fromArray(encryptionPubKey),
+  revokerPublicKey,
+  encryptionPublicKey,
   assets,
   zeroLeaf: config.zeroLeaf,
   leavesQueue1: config.leavesQueue1.map((leaf: string) => BigInt(leaf)),
@@ -60,9 +77,10 @@ export const fixture = {
   leavesQueuePartial: config.leavesQueuePartial.map((leaf: string) =>
     BigInt(leaf)
   ),
+  preDepositedNotesCommitments: config.preDepositedNotesCommitments.map(
+    (commitment: string) => BigInt(commitment)
+  ),
 };
-
-const dirFixtureData = path.resolve(__dirname, "../data");
 
 export const generateTestTransactions = async (
   reqs: Record<string, TransactionRequest & TransactionOptions>,
@@ -110,16 +128,6 @@ export const generateTestAddressRegistration = async (
   writeFileSync(`${dirFixtureData}/${name}.txt`, encoded);
 };
 
-// export const generateTestTreeUpdates = async (sdk: Core) => {
-//   let initialTreeState = getInitialTreeState();
-//   const subtreeUpdateData = await sdk.prover.proveSubtreeUpdate({
-//     lastTree: initialTreeState,
-//     leaves: fixture.leavesQueue1,
-//   });
-//   const encoded = subtreeUpdateData.encode();
-//   writeFileSync(`${dirFixtureData}/tree_update_data.txt`, encoded);
-// };
-
 export const splitToChunks = (data: Hex, chunkSize: number) => {
   const bytesSize = size(data);
   if (bytesSize % chunkSize !== 0) {
@@ -135,6 +143,27 @@ export const splitToChunks = (data: Hex, chunkSize: number) => {
 };
 
 export async function mockNotes(depositName: string, sdk: Core) {
+  // const notes = preDepositedNotes;
+  // const commitments = fixture.preDepositedNotesCommitments;
+
+  // // Check for data integrity
+  // if (notes.length !== commitments.length) {
+  //   throw new Error(
+  //     "Pre-deposited notes and commitments have different lengths"
+  //   );
+  // }
+  // for (let i = 0; i < notes.length; i++) {
+  //   if (notes[i].commitment !== commitments[i]) {
+  //     throw new Error("Pre-deposited notes do not match commitments");
+  //   }
+  // }
+  // for (let i = 0; i < notes.length; i++) {
+  //   //@ts-ignore
+  //   sdk.notesSource.mockNotes(notes[i].assetId, [notes[i]]);
+  //   //@ts-ignore
+  //   sdk.commitmentTreeSource.insert(commitments[i]);
+  // }
+
   const encoded = readFileSync(
     `${dirFixtureData}/${depositName}.txt`,
     "utf-8"
@@ -142,13 +171,11 @@ export async function mockNotes(depositName: string, sdk: Core) {
   const ztx = ZTransaction.decode(encoded) as any;
   const revokerData = await sdk.getRevokerData(0);
   const revokerPublicKey = revokerData.revokerPublicKey;
-
   // Parse encrypted data
   const [encryptedRefundDataKey, ...encryptedNotesKeys] = splitToChunks(
     ztx.keysMemo,
     SIZE_KEY_MEMO
   );
-
   const encryptedNoteMemoChunks = splitToChunks(ztx.notesMemo, 32).map((v) =>
     hexToBigInt(v)
   );
@@ -162,7 +189,6 @@ export async function mockNotes(depositName: string, sdk: Core) {
     encryptedNotesData.push(encryptedNotesDataArr.slice(start, end));
   }
   const [encryptedRefundData, ...encryptedNotes] = encryptedNotesData;
-
   // Decrypt refund data
   const refundDataDecryptionKey = Point.generate(
     bytesToBigInt(senderAccount.decrypt(hexToBytes(encryptedRefundDataKey)))
@@ -173,7 +199,6 @@ export async function mockNotes(depositName: string, sdk: Core) {
     BigInt(0),
     2
   );
-
   // Decrypt notes
   const notes = [];
   for (let i = 0; i < encryptedNotes.length; i++) {
@@ -182,14 +207,11 @@ export async function mockNotes(depositName: string, sdk: Core) {
       revoker: revokerPublicKey,
       leafIndex: i,
     });
-
     if (n) {
       notes.push(n);
     }
   }
-
   const z = Fp.from(BigInt(keccak256(stringToBytes("zero")))).val;
-
   for (let i = 0; i < notes.length; i++) {
     //@ts-ignore
     sdk.notesSource.mockNotes(notes[i].assetId, [notes[i]]);

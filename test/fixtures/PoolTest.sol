@@ -15,11 +15,15 @@ import {TreeUpdateData} from "src/libraries/QueuedMerkleTree.sol";
 import {ShieldedAddressRegistrationData, ShieldedAddressLogic} from "src/libraries/ShieldedAddress.sol";
 import {IPool} from "src/interfaces/IPool.sol";
 import {MockScreener} from "test/mocks/MockScreener.sol";
+import {MockVerifier} from "test/mocks/MockVerifier.sol";
 import {MockERC20} from "test/mocks/MockERC20.sol";
+import {MockVerifier} from "test/mocks/MockVerifier.sol";
 import {PoolBaseTest} from "./PoolBaseTest.sol";
 
 contract PoolTest is PoolBaseTest {
     using MerkleTreeLogic for MerkleTree;
+
+    MockVerifier internal _mockVerifier = new MockVerifier();
 
     Asset public asset1;
     Asset public asset2;
@@ -148,7 +152,9 @@ contract PoolTest is PoolBaseTest {
 
     function _runExpectedTx(
         ZTransaction memory ztx
-    ) internal expectNullifiersMarked(ztx) // expectCommitmentsInserted(ztx)
+    )
+        internal
+        expectNullifiersMarked(ztx) // expectCommitmentsInserted(ztx)
     // expectReceipt(ztx)
     {
         pool.transact(ztx);
@@ -199,6 +205,56 @@ contract PoolTest is PoolBaseTest {
             proof: bytes("")
         });
 
+        _mockVerifierResult(true);
         pool.updateCommitmentTree(treeUpdateData);
+        _mockVerifierReset();
     }
+
+    function _mockVerifierResult(bool result) internal {
+        pool.mock_verifier(address(_mockVerifier));
+        _mockVerifier.setResult(result);
+    }
+
+    function _mockVerifierReset() internal {
+        pool.mock_verifier(address(verifier));
+    }
+
+    // function _makePreDeposits() internal {
+    //     console2.log("Making pre-deposits");
+    //     // Deposits 100,000 ethers of each asset for each asset id
+    //     pool.mock_queueCommitments(fixture.preDepositedNotesCommitments);
+    //     console2.log("ckpt11");
+
+    //     // Process the batch
+    //     (uint256[] memory leaves, , , ) = pool.getCommitmentTreeState();
+    //     console2.log("ckpt22");
+    //     uint8 depth = pool.getCommitmentTreeDepth();
+    //     console2.log("ckpt33");
+    //     _helperTree.init(depth, address(hasher));
+    //     for (uint256 i = 0; i < leaves.length; ++i) {
+    //         // console2.log("ckpt44", i);
+    //         _helperTree.insert(leaves[i]);
+    //     }
+
+    //     // console2.log("ckpt55");
+    //     // console2.log("latestRoot", _helperTree.getLatestRoot());
+    //     // console2.log("lastSubtrees", _helperTree.getLastSubtrees()[0]);
+    //     TreeUpdateData memory treeUpdateData;
+    //     treeUpdateData.newRoot = _helperTree.getLatestRoot();
+    //     treeUpdateData.newSubtrees = new uint256[](depth);
+    //     for (uint8 i = 0; i < depth; ++i) {
+    //         // console2.log("i", i);
+    //         treeUpdateData.newSubtrees[i] = _helperTree.lastSubtrees[i];
+    //     }
+
+    //     _mockVerifierResult(true);
+    //     address vAddr = pool.verifier();
+    //     console2.log("verifier", vAddr);
+    //     console2.log("mockVer", address(_mockVerifier));
+    //     console2.log("ckpt1");
+    //     pool.updateCommitmentTree(treeUpdateData);
+    //     console2.log("ckpt2");
+    //     // _mockVerifierReset();
+    //     console2.log("ckpt3");
+    // }
 }

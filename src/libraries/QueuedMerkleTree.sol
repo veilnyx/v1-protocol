@@ -89,7 +89,6 @@ library QueuedMerkleTreeLogic {
 
         uint32 queueLen = endIdx - startIdx; //
         uint32 nLeaves = queueLen > n ? n : queueLen;
-        // console2.log("Queue len:", nLeaves);
 
         uint256[] memory leaves = new uint256[](n);
 

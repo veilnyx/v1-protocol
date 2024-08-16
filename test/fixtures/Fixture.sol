@@ -21,6 +21,7 @@ struct Fixture {
     uint256[] leavesQueue1;
     uint256[] leavesQueue2;
     uint256[] leavesQueuePartial;
+    uint256[] preDepositedNotesCommitments;
 }
 
 library FixtureLib {
@@ -56,6 +57,12 @@ library FixtureLib {
         fixture.leavesQueuePartial = vm.parseJsonUintArray(
             configJsonStr,
             ".leavesQueuePartial"
+        );
+
+        // Pre-deposited notes commitments
+        fixture.preDepositedNotesCommitments = vm.parseJsonUintArray(
+            configJsonStr,
+            ".preDepositedNotesCommitments"
         );
 
         // Fee
