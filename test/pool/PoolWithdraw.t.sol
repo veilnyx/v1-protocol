@@ -28,8 +28,7 @@ contract PoolWithdrawTest is PoolTest {
             (withdrawAmt * feeBps) /
             10000;
 
-        // _runExpectedTx(withdrawTx);
-        pool.transact(ztx);
+        _runExpectedTx(ztx);
 
         assertEq(token1.balanceOf(address(pool)), balanceAfter);
     }

@@ -9,7 +9,6 @@ const {
 } = fixture;
 
 export const reqs = {
-  /**
   withdraw_500_weth_without_fee: {
     type: TransactionType.WITHDRAW,
     assetIds: [weth],
@@ -23,7 +22,7 @@ export const reqs = {
   withdraw_10_weth_with_weth_fee: {
     type: TransactionType.WITHDRAW,
     assetIds: [weth],
-    values: [parseEther("1")],
+    values: [parseEther("10")],
     feeAssetId: weth,
     to: senderPubAddress,
     viaBundler: true,
@@ -31,7 +30,7 @@ export const reqs = {
       `0x${"03E98aE18908eBc2Fe82e646E4DFB628963383c1"}` as `0x${string}`,
     revokerId: 0,
   },
-   */
+  /**
   withdraw_500_reentrantToken_to_attacker_contract: {
     type: TransactionType.WITHDRAW,
     assetIds: [reentrantToken],
@@ -42,9 +41,10 @@ export const reqs = {
     paymaster: zeroAddress,
     revokerId: 0,
   },
+  */
 };
 
 export const genTestWithdrawals = async (sdk: Core) => {
-  await mockNotes("deposit_1000_reentrantToken_without_fee", sdk);
+  await mockNotes("deposit_pre_tx", sdk);
   await generateTestTransactions(reqs, sdk);
 };

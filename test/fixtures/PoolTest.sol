@@ -154,8 +154,9 @@ contract PoolTest is PoolBaseTest {
         ZTransaction memory ztx
     )
         internal
-        expectNullifiersMarked(ztx) // expectCommitmentsInserted(ztx)
-    // expectReceipt(ztx)
+        expectNullifiersMarked(ztx)
+        expectCommitmentsInserted(ztx)
+        expectReceipt(ztx)
     {
         pool.transact(ztx);
     }

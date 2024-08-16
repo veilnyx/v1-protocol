@@ -23,7 +23,6 @@ contract PoolDepositTest is PoolTest {
         uint256 balance2 = token2.balanceOf(address(pool));
         ZTransaction memory ztx = _loadShieldedTransaction("deposit_pre_tx");
         _runExpectedTx(ztx);
-        // pool.transact(ztx);
 
         assertEq(token1.balanceOf(address(pool)), balance1 + deposit1);
         assertEq(token2.balanceOf(address(pool)), balance2 + deposit2);
