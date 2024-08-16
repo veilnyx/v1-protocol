@@ -9,7 +9,6 @@ const {
 } = fixture;
 
 export const reqs = {
-  /**
   deposit_pre_tx: {
     type: TransactionType.DEPOSIT,
     assetIds: [weth, usdc],
@@ -20,6 +19,7 @@ export const reqs = {
     paymaster: zeroAddress,
     revokerId: 0,
   },
+  /**
   deposit_1000_weth_without_fee: {
     type: TransactionType.DEPOSIT,
     assetIds: [weth],
@@ -40,7 +40,6 @@ export const reqs = {
     paymaster: zeroAddress,
     revokerId: 0,
   },
-   */
   deposit_1000_reentrantToken_without_fee: {
     type: TransactionType.DEPOSIT,
     assetIds: [reentrantToken],
@@ -51,6 +50,7 @@ export const reqs = {
     paymaster: zeroAddress,
     revokerId: 0,
   },
+   */
 };
 
 export const genTestDeposits = async (sdk: Core) => {

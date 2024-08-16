@@ -192,7 +192,7 @@ contract PoolTest is PoolBaseTest {
         pool.transact(ztx);
 
         // Process the batch
-        (uint256[] memory leaves, , , ) = pool.getCommitmentTreeState();
+        uint256[] memory leaves = pool.getQueuedLeaves();
         uint8 depth = pool.getCommitmentTreeDepth();
         _helperTree.init(depth, address(hasher));
         for (uint256 i = 0; i < leaves.length; ++i) {

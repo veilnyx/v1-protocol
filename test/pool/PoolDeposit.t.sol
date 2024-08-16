@@ -22,7 +22,6 @@ contract PoolDepositTest is PoolTest {
         uint256 balance1 = token1.balanceOf(address(pool));
         uint256 balance2 = token2.balanceOf(address(pool));
         ZTransaction memory ztx = _loadShieldedTransaction("deposit_pre_tx");
-
         _runExpectedTx(ztx);
         // pool.transact(ztx);
 
@@ -33,19 +32,16 @@ contract PoolDepositTest is PoolTest {
     function test_revertOnDoubleSpendDeposit() external {
         uint256 deposit1 = 1000 ether;
         uint256 deposit2 = 1000e6;
-        _approveAsset(asset1, address(pool), deposit1);
-        _approveAsset(asset2, address(pool), deposit2);
 
-        ZTransaction memory ztx = _loadShieldedTransaction(
-            "deposit_1000_weth_usdc_without_fee"
-        );
-        pool.transact(ztx);
+       _makePreDeposit();
 
         // Re-using the same transaction should revert
         _mintAsset(asset1, address(this), deposit1);
         _mintAsset(asset2, address(this), deposit2);
         _approveAsset(asset1, address(pool), deposit1);
         _approveAsset(asset2, address(pool), deposit2);
+        ZTransaction memory ztx = _loadShieldedTransaction("deposit_pre_tx");
+        
         vm.expectRevert(
             abi.encodeWithSelector(
                 IPool.DoubleSpend.selector,
