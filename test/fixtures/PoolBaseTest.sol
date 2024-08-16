@@ -24,9 +24,10 @@ contract PoolBaseTest is BaseTest {
         );
 
     Verifier public verifier;
+
     AdaptorHandler public adaptorHandler;
     Hasher public hasher;
-    Pool public pool;
+    MockPool public pool;
 
     uint256 public addressTreeDepth;
     uint256 public commitmentTreeDepth;

@@ -2,9 +2,24 @@
 pragma solidity ^0.8.24;
 
 import {Pool} from "src/core/Pool.sol";
+import {IVerifier} from "src/interfaces/IVerifier.sol";
+import {MerkleTree, MerkleTreeLogic} from "src/libraries/MerkleTree.sol";
+import {QueuedMerkleTree, QueuedMerkleTreeLogic, TreeUpdateData} from "src/libraries/QueuedMerkleTree.sol";
+import {MockVerifier} from "test/mocks/MockVerifier.sol";
+
+import {console2} from "forge-std/console2.sol";
 
 contract MockPool is Pool {
-    function mockVerifier(address verifier_) public {
+    using QueuedMerkleTreeLogic for QueuedMerkleTree;
+
+    // using MerkleTreeLogic for MerkleTree;
+
+    function mock_verifier(address verifier_) public {
         verifier = verifier_;
+        _commitmentTree.verifier = verifier_;
+    }
+
+    function mock_queueCommitments(uint256[] memory commitments) public {
+        _commitmentTree.queueLeaves(commitments);
     }
 }
