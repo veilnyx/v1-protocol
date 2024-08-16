@@ -14,8 +14,8 @@ const main = async () => {
   const sdk = getSDKInstance();
   await genAddressRegistrations(sdk);
   await genTestDeposits(sdk);
-  await genTestWithdrawals(sdk);
-  // await genTestTransfers(sdk);
+  // await genTestWithdrawals(sdk);
+  await genTestTransfers(sdk);
   // await genTreeUpdateData(sdk);
   // await genTreeUpdateDataWithPartialQueue(sdk);
 };

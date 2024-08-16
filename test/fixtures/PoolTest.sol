@@ -9,7 +9,7 @@ import {VerifierTransact21} from "src/verifiers/VerifierTransact21.sol";
 import {VerifierTransact22} from "src/verifiers/VerifierTransact22.sol";
 import {VerifierRegister} from "src/verifiers/VerifierRegister.sol";
 import {Asset, AssetType} from "src/libraries/Asset.sol";
-import {ZTransaction, RevokerData} from "src/libraries/ZTransaction.sol";
+import {ZTransaction, ZTransactionType, RevokerData} from "src/libraries/ZTransaction.sol";
 import {MerkleTree, MerkleTreeLogic} from "src/libraries/MerkleTree.sol";
 import {TreeUpdateData} from "src/libraries/QueuedMerkleTree.sol";
 import {ShieldedAddressRegistrationData, ShieldedAddressLogic} from "src/libraries/ShieldedAddress.sol";
@@ -19,6 +19,7 @@ import {MockVerifier} from "test/mocks/MockVerifier.sol";
 import {MockERC20} from "test/mocks/MockERC20.sol";
 import {MockVerifier} from "test/mocks/MockVerifier.sol";
 import {PoolBaseTest} from "./PoolBaseTest.sol";
+import {console2} from "forge-std/console2.sol";
 
 contract PoolTest is PoolBaseTest {
     using MerkleTreeLogic for MerkleTree;
@@ -52,13 +53,11 @@ contract PoolTest is PoolBaseTest {
     }
 
     modifier expectCommitmentsInserted(ZTransaction memory ztx) {
-        // uint256 nextLeafIndex = pool.getCommitmentTreeNextLeafIndex();
         // uint256 rootBeforeDeposit = pool.getCommitmentTreeLastRoot();
         // uint256 currentRootIndexBeforeDeposit = pool
         //     .getCommitmentTreeCurrentRootIndex();
 
         uint256 nextLeafIndex = pool.getCommitmentTreeNextLeafIndex();
-        // uint256 queueLen = pool.getCommitmentTreeQueueLength();
 
         for (uint256 i = 0; i < ztx.commitments.length; ++i) {
             vm.expectEmit(true, true, true, true);
@@ -80,16 +79,32 @@ contract PoolTest is PoolBaseTest {
 
     modifier expectReceipt(ZTransaction memory ztx) {
         uint32 nextLeafIndex = pool.getCommitmentTreeNextLeafIndex();
+        address target = address(bytes20(ztx.targetData));
 
-        vm.expectEmit(true, true, true, false);
+        uint24 feeAssetId = 0;
+        uint96 feeValue = 0;
+        address paymaster = address(0);
+
+        // non transfer tx & transfer tx with fee
+        if (ztx.pubAssets.length != 0) {
+            feeAssetId = uint24(bytes3(bytes31(ztx.pubAssets[0])));
+            feeValue = uint96(ztx.feeData);
+            paymaster = address(bytes20(bytes32(ztx.feeData)));
+        }
+
+        if (ztx.txType != ZTransactionType.TRANSFER) {
+            ztx.assetsMemo = abi.encodePacked(ztx.pubAssets);
+        }
+
+        vm.expectEmit(true, true, true, true);
         emit IPool.Receipt(
             ztx.txType,
             ztx.revokerId,
-            (nextLeafIndex + uint32(ztx.commitments.length)),
-            address(0),
-            uint24(0),
-            uint96(0),
-            address(0),
+            (nextLeafIndex + uint32(ztx.commitments.length) - 1),
+            target,
+            feeAssetId,
+            feeValue,
+            paymaster,
             ztx.keysMemo,
             ztx.assetsMemo,
             ztx.notesMemo,

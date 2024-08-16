@@ -423,6 +423,7 @@ library ZTransactionLogic {
                 revert IPool.DoubleSpend(nullifier);
             }
 
+            /// @dev adding 1 to nextIdx to avoid marking the first nullifier as 0, as 0 means nullifier is not marked
             markedNullifiers[nullifier] = nextIdx + 1;
             emit IPool.NullifierMarked(nullifier, markedNullifiers[nullifier]);
 
@@ -440,12 +441,14 @@ library ZTransactionLogic {
         // uint256 numCommitments = memoParams.commitments.length;
         tree.queueLeaves(memoParams.commitments);
 
-        for(uint8 i = 0; i < memoParams.commitments.length; ++i) {
+        for (uint8 i = 0; i < memoParams.commitments.length; ++i) {
             uint32 leafIndex = tree.nextLeafIndex + i;
             emit IPool.Commitment(leafIndex, memoParams.commitments[i]);
         }
 
-        uint32 lastLeafIndex = tree.nextLeafIndex + (tree.queueEndIndex - tree.queueStartIndex) - 1;
+        uint32 lastLeafIndex = tree.nextLeafIndex +
+            (tree.queueEndIndex - tree.queueStartIndex) -
+            1;
 
         emit IPool.Receipt(
             params.txType,
@@ -476,6 +479,7 @@ library ZTransactionLogic {
             params.pubAssets[i].value = uint224(ztx.pubAssets[i]);
         }
 
+        // non transfer tx & transfer tx with fee
         if (pubLen != 0) {
             params.feeAssetId = params.pubAssets[0].id;
             params.feeValue = uint96(ztx.feeData);
