@@ -19,7 +19,6 @@ import {MockVerifier} from "test/mocks/MockVerifier.sol";
 import {MockERC20} from "test/mocks/MockERC20.sol";
 import {MockVerifier} from "test/mocks/MockVerifier.sol";
 import {PoolBaseTest} from "./PoolBaseTest.sol";
-import {console2} from "forge-std/console2.sol";
 
 contract PoolTest is PoolBaseTest {
     using MerkleTreeLogic for MerkleTree;
@@ -80,10 +79,10 @@ contract PoolTest is PoolBaseTest {
     modifier expectReceipt(ZTransaction memory ztx) {
         uint32 nextLeafIndex = pool.getCommitmentTreeNextLeafIndex();
         address target = address(bytes20(ztx.targetData));
-
         uint24 feeAssetId = 0;
         uint96 feeValue = 0;
         address paymaster = address(0);
+        bytes memory assetsMemo;
 
         // non transfer tx & transfer tx with fee
         if (ztx.pubAssets.length != 0) {
@@ -93,7 +92,9 @@ contract PoolTest is PoolBaseTest {
         }
 
         if (ztx.txType != ZTransactionType.TRANSFER) {
-            ztx.assetsMemo = abi.encodePacked(ztx.pubAssets);
+            assetsMemo = abi.encodePacked(ztx.pubAssets);
+        } else {
+            assetsMemo = ztx.assetsMemo;
         }
 
         vm.expectEmit(true, true, true, true);
@@ -106,7 +107,7 @@ contract PoolTest is PoolBaseTest {
             feeValue,
             paymaster,
             ztx.keysMemo,
-            ztx.assetsMemo,
+            assetsMemo,
             ztx.notesMemo,
             bytes("")
         );
