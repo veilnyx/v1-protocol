@@ -1,0 +1,26 @@
+// SPDX-License-Identifier: MIT
+
+pragma solidity ^0.8.24;
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+contract MockERC20ForReentrancyTest is ERC20, Ownable {
+    constructor(
+        address initialOwner
+    ) ERC20("Token", "TKN") Ownable(initialOwner) {}
+    function mint(address to, uint256 amount) public onlyOwner {
+        _mint(to, amount);
+    }
+
+    function transfer(
+        address to,
+        uint256 amount
+    ) public override returns (bool) {
+        super.transfer(to, amount);
+
+        /// @dev This is added to enable reentrancy attack for ERC20 tokens for testing purposes
+        (bool success, ) = to.call(
+            abi.encodeWithSignature("onTokenTransfer()")
+        );
+        return success;
+    }
+}

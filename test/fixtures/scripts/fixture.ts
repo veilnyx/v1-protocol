@@ -33,6 +33,7 @@ const commitmentTreeQueueSize = Number(config.commitmentTreeQueueSize);
 const assets = {
   weth: config.assets.weth,
   usdc: config.assets.usdc,
+  reentrantToken: config.assets.reentrantToken,
 };
 
 const revokerPubKey = [

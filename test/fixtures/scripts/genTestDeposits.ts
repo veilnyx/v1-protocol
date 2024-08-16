@@ -4,11 +4,12 @@ import { TransactionType } from "@zkfi-tech/shared-types";
 import { fixture, generateTestTransactions } from "./fixture";
 
 const {
-  assets: { weth, usdc },
+  assets: { weth, usdc, reentrantToken },
   sender: { account: senderAccount },
 } = fixture;
 
 export const reqs = {
+  /**
   deposit_pre_tx: {
     type: TransactionType.DEPOSIT,
     assetIds: [weth, usdc],
@@ -29,7 +30,6 @@ export const reqs = {
     paymaster: zeroAddress,
     revokerId: 0,
   },
-  /**
   deposit_1000_weth_usdc_without_fee: {
     type: TransactionType.DEPOSIT,
     assetIds: [weth, usdc],
@@ -41,6 +41,16 @@ export const reqs = {
     revokerId: 0,
   },
    */
+  deposit_1000_reentrantToken_without_fee: {
+    type: TransactionType.DEPOSIT,
+    assetIds: [reentrantToken],
+    values: [parseEther("1000")],
+    feeAssetId: 0,
+    to: senderAccount.shieldedAddress.pack(),
+    viaBundler: false,
+    paymaster: zeroAddress,
+    revokerId: 0,
+  },
 };
 
 export const genTestDeposits = async (sdk: Core) => {

@@ -4,11 +4,12 @@ import { TransactionType } from "@zkfi-tech/shared-types";
 import { fixture, generateTestTransactions, mockNotes } from "./fixture";
 
 const {
-  assets: { weth, usdc },
+  assets: { weth, usdc, reentrantToken },
   sender: { account: senderAccount, pubAddress: senderPubAddress },
 } = fixture;
 
 export const reqs = {
+  /**
   withdraw_500_weth_without_fee: {
     type: TransactionType.WITHDRAW,
     assetIds: [weth],
@@ -30,9 +31,20 @@ export const reqs = {
       `0x${"03E98aE18908eBc2Fe82e646E4DFB628963383c1"}` as `0x${string}`,
     revokerId: 0,
   },
+   */
+  withdraw_500_reentrantToken_to_attacker_contract: {
+    type: TransactionType.WITHDRAW,
+    assetIds: [reentrantToken],
+    values: [parseEther("500")],
+    feeAssetId: 0,
+    to: "0x8F2FbdFDa8BE4Da8B9454aE9F0301150932AE4b5",
+    viaBundler: false,
+    paymaster: zeroAddress,
+    revokerId: 0,
+  },
 };
 
 export const genTestWithdrawals = async (sdk: Core) => {
-  await mockNotes("deposit_pre_tx", sdk);
+  await mockNotes("deposit_1000_reentrantToken_without_fee", sdk);
   await generateTestTransactions(reqs, sdk);
 };
