@@ -134,9 +134,9 @@ interface IPool {
 
     /// @notice Updates the commitment tree with a queue of leaves. It uses zk proof under the hood to prove the `newRoot` and `newSubtrees` are valid.
     /// @param updatedCommitmentTreeInputs The inputs needed by the zk verifier to verify the authenticity of the queued merkle tree update.
-    function updateQueuedCommitmentTree(
+    function updateCommitmentTree(
         TreeUpdateData memory updatedCommitmentTreeInputs
-    ) external returns (uint256);
+    ) external;
 
     /// @notice Validates and executes a ZTx.
     /// @notice Can only be called when the contract is not paused.

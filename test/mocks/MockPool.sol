@@ -7,12 +7,8 @@ import {MerkleTree, MerkleTreeLogic} from "src/libraries/MerkleTree.sol";
 import {QueuedMerkleTree, QueuedMerkleTreeLogic, TreeUpdateData} from "src/libraries/QueuedMerkleTree.sol";
 import {MockVerifier} from "test/mocks/MockVerifier.sol";
 
-import {console2} from "forge-std/console2.sol";
-
 contract MockPool is Pool {
     using QueuedMerkleTreeLogic for QueuedMerkleTree;
-
-    // using MerkleTreeLogic for MerkleTree;
 
     function mock_verifier(address verifier_) public {
         verifier = verifier_;

@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-// import {console2} from "forge-std/console2.sol";
 import {ZTransaction} from "src/libraries/ZTransaction.sol";
 import {IPool} from "src/interfaces/IPool.sol";
 import {ZERO_LEAF} from "src/base/Constants.sol";
@@ -32,7 +31,7 @@ contract PoolDepositTest is PoolTest {
         uint256 deposit1 = 1000 ether;
         uint256 deposit2 = 1000e6;
 
-       _makePreDeposit();
+        _makePreDeposit();
 
         // Re-using the same transaction should revert
         _mintAsset(asset1, address(this), deposit1);
@@ -40,7 +39,7 @@ contract PoolDepositTest is PoolTest {
         _approveAsset(asset1, address(pool), deposit1);
         _approveAsset(asset2, address(pool), deposit2);
         ZTransaction memory ztx = _loadShieldedTransaction("deposit_pre_tx");
-        
+
         vm.expectRevert(
             abi.encodeWithSelector(
                 IPool.DoubleSpend.selector,

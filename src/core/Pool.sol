@@ -184,14 +184,10 @@ contract Pool is
         });
     }
 
-    function updateQueuedCommitmentTree(
-        TreeUpdateData memory updatedCommitmentTreeInputs
-    ) external whenNotPaused returns (uint256) {
-        uint256 nextLeafIndex = _commitmentTree.update(
-            updatedCommitmentTreeInputs
-        );
-
-        return nextLeafIndex;
+    function updateCommitmentTree(
+        TreeUpdateData calldata treeUpdateData
+    ) external {
+        _commitmentTree.update(treeUpdateData);
     }
 
     function transact(
@@ -301,23 +297,23 @@ contract Pool is
     }
 
     function isMarkedNullifier(uint256 nullifier) external view returns (bool) {
-        if (_markedNullifiers[nullifier] > 0) {
-            return true;
-        } else {
-            return false;
-        }
+        return _markedNullifiers[nullifier] != 0;
     }
 
     function areMarkedNullifiers(
         uint256[] calldata nullifiers
     ) external view returns (bool[] memory) {
         bool[] memory markedArr = new bool[](nullifiers.length);
-        for (uint256 i = 0; i < nullifiers.length; ) {
-            markedArr[i] = _markedNullifiers[nullifiers[i]] > 0 ? true : false;
+        uint256 nullifiersLen = nullifiers.length;
+
+        for (uint256 i = 0; i < nullifiersLen; ) {
+            markedArr[i] = _markedNullifiers[nullifiers[i]] != 0;
+
             unchecked {
                 ++i;
             }
         }
+
         return markedArr;
     }
 
@@ -375,12 +371,6 @@ contract Pool is
             .getState();
 
         return (queuedLeaves, lastSubtrees, nextLeafIndex, lastRoot);
-    }
-
-    function updateCommitmentTree(
-        TreeUpdateData calldata treeUpdateData
-    ) external {
-        _commitmentTree.update(treeUpdateData);
     }
 
     function getAddressTreeCurrentRootIndex() external view returns (uint256) {

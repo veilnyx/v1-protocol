@@ -116,7 +116,7 @@ library QueuedMerkleTreeLogic {
     function update(
         QueuedMerkleTree storage self,
         TreeUpdateData calldata data
-    ) public returns (uint256) {
+    ) public {
         bool isValid = _verifyUpdateProof(self, data);
 
         if (!isValid) {
@@ -143,8 +143,6 @@ library QueuedMerkleTreeLogic {
         } else {
             self.queueStartIndex += self.queueSize;
         }
-
-        return self.nextLeafIndex;
     }
 
     function _verifyUpdateProof(
