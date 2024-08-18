@@ -77,8 +77,6 @@ contract PoolTest is PoolBaseTest {
     }
 
     modifier expectReceipt(ZTransaction memory ztx) {
-        uint32 nextLeafIndex = pool.getCommitmentTreeNextLeafIndex();
-        address target = address(bytes20(ztx.targetData));
         uint24 feeAssetId = 0;
         uint96 feeValue = 0;
         address paymaster = address(0);
@@ -101,8 +99,8 @@ contract PoolTest is PoolBaseTest {
         emit IPool.Receipt(
             ztx.txType,
             ztx.revokerId,
-            (nextLeafIndex + uint32(ztx.commitments.length) - 1),
-            target,
+            (pool.getCommitmentTreeNextLeafIndex() + uint32(ztx.commitments.length) - 1),
+            address(bytes20(ztx.targetData)),
             feeAssetId,
             feeValue,
             paymaster,
