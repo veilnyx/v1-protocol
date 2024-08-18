@@ -7,12 +7,12 @@ import {IPool} from "src/interfaces/IPool.sol";
 import {Pool} from "src/core/Pool.sol";
 import {ZTransaction} from "src/libraries/ZTransaction.sol";
 import {PoolTest} from "test/fixtures/PoolTest.sol";
-import {PoolTransactTest} from "test/helpers/PoolTransact.t.sol";
 import {MockERC20} from "test/mocks/MockERC20.sol";
 
 contract PoolTransferTest is PoolTest {
     function setUp() public {
         _setUp();
+        _makePreDeposit();
     }
 
     function test_transferWithoutFee() external {

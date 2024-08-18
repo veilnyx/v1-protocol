@@ -4,6 +4,7 @@ pragma solidity ^0.8.20;
 import {Test} from "forge-std/Test.sol";
 import {ZTransactionType, ZTransaction} from "src/libraries/ZTransaction.sol";
 import {ShieldedAddressRegistrationData} from "src/libraries/ShieldedAddress.sol";
+import {TreeUpdateData} from "src/libraries/QueuedMerkleTree.sol";
 import {Hasher} from "src/core/Hasher.sol";
 import {Fixture, FixtureLib} from "test/fixtures/Fixture.sol";
 import {MockERC20} from "test/mocks/MockERC20.sol";
@@ -32,7 +33,19 @@ abstract contract BaseTest is Test {
         return FixtureLib.loadShieldedAddressRegistrationData(name, vm);
     }
 
-    function _deployHasher() internal returns (address) {
+    function _loadTreeUpdateData(
+        string memory name
+    ) internal view returns (TreeUpdateData memory) {
+        return FixtureLib.loadTreeUpdateData(name, vm);
+    }
+
+    function _loadData(
+        string memory name
+    ) internal view returns (bytes memory) {
+        return FixtureLib.loadData(name, vm);
+    }
+
+    function _deployHasher() internal returns (Hasher) {
         string memory t3Path = string.concat(
             vm.projectRoot(),
             "/src/poseidon/t3.txt"
@@ -54,7 +67,7 @@ abstract contract BaseTest is Test {
             poseidonT4 := create(0, add(t4Bytecode, 0x20), mload(t4Bytecode))
         }
 
-        address hasher = address(new Hasher(poseidonT3, poseidonT4));
+        Hasher hasher = new Hasher(poseidonT3, poseidonT4);
         return hasher;
     }
 }

@@ -13,6 +13,10 @@ interface IVerifier {
 
     function verifyAddressProof(bytes memory vInp) external view returns (bool);
 
+    function verifyTreeUpdateProof(
+        bytes calldata vInputs
+    ) external view returns (bool);
+
     function getTransactionVerifierId(
         uint256 nIns,
         uint256 nOuts

@@ -1,34 +1,39 @@
 // SPDX-License-Identifier: MTI
-
 pragma solidity ^0.8.24;
 
 import {ZTransaction} from "../../src/libraries/ZTransaction.sol";
 import {Pool} from "../../src/core/Pool.sol";
 import {console} from "forge-std/console.sol";
-import {MockERC20} from "./MockERC20.sol";
+import {MockERC20ForReentrancyTest} from "./MockERC20ForReentrancyTest.sol";
 import {Test} from "forge-std/Test.sol";
 import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 
 contract MockAttacker is Test {
     Pool pool;
     ZTransaction withdrawZTx;
-    MockERC20 token1;
+    MockERC20ForReentrancyTest tokenReent;
 
-    constructor(Pool pool_, ZTransaction memory withdrawZTx_, MockERC20 token1_) {
+    constructor(
+        Pool pool_,
+        ZTransaction memory withdrawZTx_,
+        MockERC20ForReentrancyTest tokenReent_
+    ) {
         pool = pool_;
         withdrawZTx = withdrawZTx_;
-        token1 = token1_;
+        tokenReent = tokenReent_;
     }
 
     function onTokenTransfer() external payable {
-        console.logString('Initiating reentrancy attack');
-        if(MockERC20(token1).balanceOf(address(pool)) >= 500 ether){
+        console.logString("Initiating reentrancy attack");
+        if (MockERC20ForReentrancyTest(tokenReent).balanceOf(address(pool)) >= 500 ether) {
             vm.expectRevert(
-            abi.encodeWithSelector(
-                ReentrancyGuardUpgradeable.ReentrancyGuardReentrantCall.selector
-            )
-        );
-            pool.transact(withdrawZTx);   
+                abi.encodeWithSelector(
+                    ReentrancyGuardUpgradeable
+                        .ReentrancyGuardReentrantCall
+                        .selector
+                )
+            );
+            pool.transact(withdrawZTx);
         }
     }
 }

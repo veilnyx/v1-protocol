@@ -3,6 +3,7 @@ pragma solidity ^0.8.24;
 
 import {IVerifier} from "../interfaces/IVerifier.sol";
 import {VerifierRegister} from "../verifiers/VerifierRegister.sol";
+import {VerifierTreeUpdate} from "../verifiers/VerifierTreeUpdate.sol";
 import {ZTransaction, ZTransactionType, ZTransactionLogic, RevokerData} from "../libraries/ZTransaction.sol";
 import {MerkleTree} from "../libraries/MerkleTree.sol";
 
@@ -16,14 +17,16 @@ contract Verifier is IVerifier {
     using ZTransactionLogic for ZTransaction;
 
     /**
-     * @notice Verifier id to Verifier info mapping
+     * @notice Verifier id to Verifier info mapping for transaction verifiers only
      */
-    address internal _addressVerifier;
     mapping(uint256 => TransactionVerifierInfo) internal _transactionVerifiers;
+    address internal _addressVerifier;
+    address internal _treeUpdateVerifier;
 
     constructor(
         TransactionVerifierInfo[] memory txvInfos,
-        address addressVerifier
+        address addressVerifier,
+        address treeUpdateVerifier
     ) {
         uint256 len = txvInfos.length;
 
@@ -35,6 +38,7 @@ contract Verifier is IVerifier {
         }
 
         _addressVerifier = addressVerifier;
+        _treeUpdateVerifier = treeUpdateVerifier;
     }
 
     function verifyAddressProof(
@@ -42,6 +46,20 @@ contract Verifier is IVerifier {
     ) public view returns (bool) {
         (bool success, bytes memory result) = _addressVerifier.staticcall(
             bytes.concat(VerifierRegister.verifyProof.selector, vParams)
+        );
+
+        if (!success) {
+            revert("Verification call failed");
+        }
+
+        return uint8(result[31]) == 1;
+    }
+
+    function verifyTreeUpdateProof(
+        bytes calldata vParams
+    ) public view returns (bool) {
+        (bool success, bytes memory result) = _treeUpdateVerifier.staticcall(
+            bytes.concat(VerifierTreeUpdate.verifyProof.selector, vParams)
         );
 
         if (!success) {

@@ -3,19 +3,24 @@ pragma solidity ^0.8.24;
 
 import {Test} from "forge-std/Test.sol";
 import {Vm} from "forge-std/Vm.sol";
-import {console2} from "forge-std/console2.sol";
 import {ZTransaction, ZTransactionType} from "src/libraries/ZTransaction.sol";
 import {ShieldedAddressRegistrationData} from "src/libraries/ShieldedAddress.sol";
 import {ShieldedAccount} from "test/helpers/ShieldedAccount.sol";
+import {TreeUpdateData} from "src/libraries/QueuedMerkleTree.sol";
 
 struct Fixture {
     uint8 addressTreeDepth;
     uint8 commitmentTreeDepth;
+    uint8 commitmentTreeQueueSize;
     uint256 withdrawFeeBps;
     uint256[2] revokerPublicKey;
     uint256[2] encryptionPublicKey;
     ShieldedAccount sender;
     ShieldedAccount receiver;
+    uint256[] leavesQueue1;
+    uint256[] leavesQueue2;
+    uint256[] leavesQueuePartial;
+    uint256[] preDepositedNotesCommitments;
 }
 
 library FixtureLib {
@@ -34,6 +39,29 @@ library FixtureLib {
         );
         fixture.commitmentTreeDepth = uint8(
             vm.parseJsonUint(configJsonStr, ".commitmentTreeDepth")
+        );
+        fixture.commitmentTreeQueueSize = uint8(
+            vm.parseJsonUint(configJsonStr, ".commitmentTreeQueueSize")
+        );
+
+        // Queue of leaves for queued merkle tree
+        fixture.leavesQueue1 = vm.parseJsonUintArray(
+            configJsonStr,
+            ".leavesQueue1"
+        );
+        fixture.leavesQueue2 = vm.parseJsonUintArray(
+            configJsonStr,
+            ".leavesQueue2"
+        );
+        fixture.leavesQueuePartial = vm.parseJsonUintArray(
+            configJsonStr,
+            ".leavesQueuePartial"
+        );
+
+        // Pre-deposited notes commitments
+        fixture.preDepositedNotesCommitments = vm.parseJsonUintArray(
+            configJsonStr,
+            ".preDepositedNotesCommitments"
         );
 
         // Fee
@@ -70,21 +98,7 @@ library FixtureLib {
             configJsonStr,
             ".sender.rootAddress"
         );
-        // fixture.sender.signPublicKey[0] = abi.decode(
-        //     vm.parseJson(configJsonStr, ".sender.signPublicKey[0]"),
-        //     (uint256)
-        // );
-        // uint256[] memory arr = vm.parseJsonUintArray(
-        //     configJsonStr,
-        //     ".sender.signPublicKey"
-        // );
-        // console2.logUint(arr.length);
-        // console2.logUint(arr[0]);
-        // console2.logUint(arr[1]);
-        // fixture.sender.signPublicKey = abi.decode(
-        //     vm.parseJson(configJsonStr, ".sender.signPublicKey"),
-        //     (uint256[2])
-        // );
+
         fixture.sender.signPublicKey[0] = vm.parseJsonUint(
             configJsonStr,
             ".sender.signPublicKey[0]"
@@ -146,7 +160,7 @@ library FixtureLib {
         string memory name,
         Vm vm
     ) external view returns (ZTransaction memory) {
-        bytes memory data = _loadData(name, vm);
+        bytes memory data = loadData(name, vm);
         ZTransaction memory ztx = abi.decode(data, (ZTransaction));
         return ztx;
     }
@@ -155,7 +169,7 @@ library FixtureLib {
         string memory name,
         Vm vm
     ) external view returns (ShieldedAddressRegistrationData memory) {
-        bytes memory data = _loadData(name, vm);
+        bytes memory data = loadData(name, vm);
         ShieldedAddressRegistrationData memory addressRegData = abi.decode(
             data,
             (ShieldedAddressRegistrationData)
@@ -163,10 +177,22 @@ library FixtureLib {
         return addressRegData;
     }
 
-    function _loadData(
+    function loadTreeUpdateData(
         string memory name,
         Vm vm
-    ) internal view returns (bytes memory) {
+    ) external view returns (TreeUpdateData memory) {
+        bytes memory data = loadData(name, vm);
+        TreeUpdateData memory treeUpdateData = abi.decode(
+            data,
+            (TreeUpdateData)
+        );
+        return treeUpdateData;
+    }
+
+    function loadData(
+        string memory name,
+        Vm vm
+    ) public view returns (bytes memory) {
         string memory path = string.concat(
             vm.projectRoot(),
             string.concat("/test/fixtures/data/", name, ".txt")

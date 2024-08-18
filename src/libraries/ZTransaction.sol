@@ -4,6 +4,7 @@ pragma solidity ^0.8.24;
 import {FIELD_SIZE} from "../base/Constants.sol";
 import {Asset, AssetLogic} from "./Asset.sol";
 import {MerkleTree, MerkleTreeLogic} from "./MerkleTree.sol";
+import {QueuedMerkleTree, QueuedMerkleTreeLogic} from "./QueuedMerkleTree.sol";
 import {IPool} from "../interfaces/IPool.sol";
 import {IVerifier} from "../interfaces/IVerifier.sol";
 import {IHasher} from "../interfaces/IHasher.sol";
@@ -102,6 +103,7 @@ struct MemoParams {
 /// @title ZTransactionLogic library for shielded transaction logic
 library ZTransactionLogic {
     using MerkleTreeLogic for MerkleTree;
+    using QueuedMerkleTreeLogic for QueuedMerkleTree;
 
     /// @notice Calculates the hash of a ZTransaction
     /// @dev All of the omitted fields of ZTransaction for hashing are public inputs
@@ -137,7 +139,7 @@ library ZTransactionLogic {
     function validate(
         ZTransaction calldata ztx,
         MerkleTree storage addressTree,
-        MerkleTree storage commitmentTree,
+        QueuedMerkleTree storage commitmentTree,
         mapping(uint256 => uint32) storage markedNullifiers,
         mapping(address => bool) storage supportedAdaptors,
         mapping(uint256 => RevokerData) storage revokerDataMap,
@@ -179,7 +181,7 @@ library ZTransactionLogic {
     /// @param paymasterFees Mapping of paymaster address to assetId to fee value
     function execute(
         ZTransaction calldata ztx,
-        MerkleTree storage commitmentTree,
+        QueuedMerkleTree storage commitmentTree,
         mapping(uint24 => Asset) storage assets,
         mapping(address => mapping(uint24 => uint256)) storage paymasterFees,
         mapping(uint24 => uint256) storage withdrawFees,
@@ -409,7 +411,7 @@ library ZTransactionLogic {
     /// @dev This also prevents any duplicate nullifiers
     function _checkAndMarkNullifiers(
         ZTransaction calldata ztx,
-        MerkleTree storage commitmentTree,
+        QueuedMerkleTree storage commitmentTree,
         mapping(uint256 => uint32) storage markedNullifiers
     ) internal {
         uint256 numNullifiers = ztx.nullifiers.length;
@@ -421,6 +423,7 @@ library ZTransactionLogic {
                 revert IPool.DoubleSpend(nullifier);
             }
 
+            /// @dev adding 1 to nextIdx to avoid marking the first nullifier as 0, as 0 means nullifier is not marked
             markedNullifiers[nullifier] = nextIdx + 1;
             emit IPool.NullifierMarked(nullifier, markedNullifiers[nullifier]);
 
@@ -431,27 +434,26 @@ library ZTransactionLogic {
     }
 
     function _printNotes(
-        MerkleTree storage tree,
+        QueuedMerkleTree storage tree,
         Params memory params,
         MemoParams memory memoParams
     ) internal {
-        uint256 numCommitments = memoParams.commitments.length;
-        uint256 nextIndex = MerkleTreeLogic.insert(
-            tree,
-            memoParams.commitments
-        );
+        // uint256 numCommitments = memoParams.commitments.length;
+        tree.queueLeaves(memoParams.commitments);
 
-        for (uint8 i = 0; i < numCommitments; ++i) {
-            emit IPool.Commitment(
-                nextIndex - numCommitments + i,
-                memoParams.commitments[i]
-            );
+        for (uint8 i = 0; i < memoParams.commitments.length; ++i) {
+            uint32 leafIndex = tree.nextLeafIndex + i;
+            emit IPool.Commitment(leafIndex, memoParams.commitments[i]);
         }
+
+        uint32 lastLeafIndex = tree.nextLeafIndex +
+            (tree.queueEndIndex - tree.queueStartIndex) -
+            1;
 
         emit IPool.Receipt(
             params.txType,
             params.revokerId,
-            uint32(nextIndex - 1),
+            lastLeafIndex,
             params.target,
             params.feeAssetId,
             params.feeValue,
@@ -477,6 +479,7 @@ library ZTransactionLogic {
             params.pubAssets[i].value = uint224(ztx.pubAssets[i]);
         }
 
+        // non transfer tx & transfer tx with fee
         if (pubLen != 0) {
             params.feeAssetId = params.pubAssets[0].id;
             params.feeValue = uint96(ztx.feeData);

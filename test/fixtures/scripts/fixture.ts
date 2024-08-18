@@ -1,10 +1,12 @@
 import { readFileSync, writeFileSync } from "fs";
+import path from "path";
 import {
   bytesToBigInt,
   Hex,
   hexToBigInt,
   hexToBytes,
   keccak256,
+  parseEther,
   size,
   sliceHex,
   stringToBytes,
@@ -28,31 +30,57 @@ const senderPubAddress = config.sender.pubAddress;
 const receiverPubAddress = config.receiver.pubAddress;
 const addressTreeDepth = Number(config.addressTreeDepth);
 const commitmentTreeDepth = Number(config.commitmentTreeDepth);
+const commitmentTreeQueueSize = Number(config.commitmentTreeQueueSize);
 const assets = {
   weth: config.assets.weth,
   usdc: config.assets.usdc,
+  reentrantToken: config.assets.reentrantToken,
 };
 
-const revokerPubKey = [
+const revokerPublicKey = Point.fromArray([
   BigInt(config.revokerPublicKey[0]),
   BigInt(config.revokerPublicKey[1]),
-];
-const encryptionPubKey = [
+]);
+const encryptionPublicKey = Point.fromArray([
   BigInt(config.encryptionPublicKey[0]),
   BigInt(config.encryptionPublicKey[1]),
-];
+]);
+
+export const dirFixtureData = path.resolve(__dirname, "../data");
+
+// Makes fixed pre-deposit notes of value 100000 ether each
+export const preDepositedNotes = Array.from({
+  length: commitmentTreeQueueSize,
+}).map((_, i) => {
+  return new Note({
+    assetId: 0x010001 + i,
+    value: parseEther("100000"),
+    rootAddress: senderAccount.rootAddress,
+    revoker: revokerPublicKey,
+    blinding: BigInt(0),
+    leafIndex: i,
+  });
+});
 
 export const fixture = {
   sender: { account: senderAccount, pubAddress: senderPubAddress },
   receiver: { account: receiverAccount, pubAddress: receiverPubAddress },
   addressTreeDepth,
   commitmentTreeDepth,
-  revokerPublicKey: Point.fromArray(revokerPubKey),
-  encryptionPublicKey: Point.fromArray(encryptionPubKey),
+  commitmentTreeQueueSize,
+  revokerPublicKey,
+  encryptionPublicKey,
   assets,
+  zeroLeaf: config.zeroLeaf,
+  leavesQueue1: config.leavesQueue1.map((leaf: string) => BigInt(leaf)),
+  leavesQueue2: config.leavesQueue2.map((leaf: string) => BigInt(leaf)),
+  leavesQueuePartial: config.leavesQueuePartial.map((leaf: string) =>
+    BigInt(leaf)
+  ),
+  preDepositedNotesCommitments: config.preDepositedNotesCommitments.map(
+    (commitment: string) => BigInt(commitment)
+  ),
 };
-
-const dirFixtureData = "test/fixtures/data";
 
 export const generateTestTransactions = async (
   reqs: Record<string, TransactionRequest & TransactionOptions>,
@@ -115,6 +143,27 @@ export const splitToChunks = (data: Hex, chunkSize: number) => {
 };
 
 export async function mockNotes(depositName: string, sdk: Core) {
+  // const notes = preDepositedNotes;
+  // const commitments = fixture.preDepositedNotesCommitments;
+
+  // // Check for data integrity
+  // if (notes.length !== commitments.length) {
+  //   throw new Error(
+  //     "Pre-deposited notes and commitments have different lengths"
+  //   );
+  // }
+  // for (let i = 0; i < notes.length; i++) {
+  //   if (notes[i].commitment !== commitments[i]) {
+  //     throw new Error("Pre-deposited notes do not match commitments");
+  //   }
+  // }
+  // for (let i = 0; i < notes.length; i++) {
+  //   //@ts-ignore
+  //   sdk.notesSource.mockNotes(notes[i].assetId, [notes[i]]);
+  //   //@ts-ignore
+  //   sdk.commitmentTreeSource.insert(commitments[i]);
+  // }
+
   const encoded = readFileSync(
     `${dirFixtureData}/${depositName}.txt`,
     "utf-8"
@@ -122,13 +171,11 @@ export async function mockNotes(depositName: string, sdk: Core) {
   const ztx = ZTransaction.decode(encoded) as any;
   const revokerData = await sdk.getRevokerData(0);
   const revokerPublicKey = revokerData.revokerPublicKey;
-
   // Parse encrypted data
   const [encryptedRefundDataKey, ...encryptedNotesKeys] = splitToChunks(
     ztx.keysMemo,
     SIZE_KEY_MEMO
   );
-
   const encryptedNoteMemoChunks = splitToChunks(ztx.notesMemo, 32).map((v) =>
     hexToBigInt(v)
   );
@@ -142,7 +189,6 @@ export async function mockNotes(depositName: string, sdk: Core) {
     encryptedNotesData.push(encryptedNotesDataArr.slice(start, end));
   }
   const [encryptedRefundData, ...encryptedNotes] = encryptedNotesData;
-
   // Decrypt refund data
   const refundDataDecryptionKey = Point.generate(
     bytesToBigInt(senderAccount.decrypt(hexToBytes(encryptedRefundDataKey)))
@@ -153,34 +199,23 @@ export async function mockNotes(depositName: string, sdk: Core) {
     BigInt(0),
     2
   );
-
   // Decrypt notes
   const notes = [];
   for (let i = 0; i < encryptedNotes.length; i++) {
     const n = Note.decrypt(encryptedNotesKeys[i], encryptedNotes[i], {
       account: senderAccount,
       revoker: revokerPublicKey,
-      leafIndex: 1,
+      leafIndex: i,
     });
-
     if (n) {
       notes.push(n);
     }
   }
-
   const z = Fp.from(BigInt(keccak256(stringToBytes("zero")))).val;
-
-  //@ts-ignore
-  sdk.notesSource.mockNotes(notes[0].assetId, [notes[0]]);
-  //@ts-ignore
-  sdk.commitmentTreeSource.insert(z);
-  //@ts-ignore
-  sdk.commitmentTreeSource.insert(notes[0].commitment);
-
-  //@ts-ignore
-  // sdk.notesSource.mockNotes(notes[0].assetId, [notes[0]]);
-  // //@ts-ignore
-  // // sdk.notesSource.mockNotes(depositNotes[1].assetId, [depositNotes[1]]);
-  // //@ts-ignore
-  // notes.forEach((n) => sdk.commitmentTreeSource.insert(n.commitment));
+  for (let i = 0; i < notes.length; i++) {
+    //@ts-ignore
+    sdk.notesSource.mockNotes(notes[i].assetId, [notes[i]]);
+    //@ts-ignore
+    sdk.commitmentTreeSource.insert(notes[i].commitment);
+  }
 }

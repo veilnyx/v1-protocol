@@ -34,8 +34,6 @@ export const reqs = {
 };
 
 export const genTestTransfers = async (sdk: Core) => {
-  console.log("sdk.root", sdk.commitmentTreeSource.root);
-  await mockNotes("deposit_1000_weth_usdc_without_fee", sdk);
-  console.log("sdk.root", sdk.commitmentTreeSource.root);
+  await mockNotes("deposit_pre_tx", sdk);
   await generateTestTransactions(reqs, sdk);
 };

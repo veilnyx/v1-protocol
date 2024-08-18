@@ -2,47 +2,81 @@
 pragma solidity ^0.8.24;
 
 import {Test, console} from "forge-std/Test.sol";
-import {ZTransaction} from "src/libraries/ZTransaction.sol";
-import {PoolTransactTest} from "test/helpers/PoolTransact.t.sol";
-import {PoolTest} from "test/fixtures/PoolTest.sol";
-import {MockERC20} from "test/mocks/MockERC20.sol";
-import {MockAttacker} from "test/mocks/MockAttacker.t.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {ZTransaction} from "src/libraries/ZTransaction.sol";
+import {PoolTest} from "test/fixtures/PoolTest.sol";
+import {MockERC20ForReentrancyTest} from "test/mocks/MockERC20ForReentrancyTest.sol";
+import {MockAttacker} from "test/mocks/MockAttacker.t.sol";
+import {Asset, AssetType} from "src/libraries/Asset.sol";
+import {TreeUpdateData} from "src/libraries/QueuedMerkleTree.sol";
+import {MerkleTree, MerkleTreeLogic} from "src/libraries/MerkleTree.sol";
 
 contract PoolReentrancyTest is PoolTest {
+    using MerkleTreeLogic for MerkleTree;
+
     ZTransaction attackerWithdrawZtx;
-    PoolTransactTest poolTransactTestHelper;
+    MerkleTree internal refTree;
+    MockERC20ForReentrancyTest tokenReent;
     MockAttacker attacker;
-    uint256 attackerDeposit = 10 ether;
+    Asset assetReent;
+    uint256 constant INITIAL_DEPOSIT = 1000 ether;
 
     function setUp() public {
         _setUp();
-        // _mintAsset(asset1, address(this), INITIAL_DEPOSIT);
-        // _approveAsset(asset1, address(pool), INITIAL_DEPOSIT);
+        refTree.init(fixture.commitmentTreeDepth, address(hasher));
 
-        ZTransaction memory bulkDepositZtx = _loadShieldedTransaction(
-            "deposit_1000_weth_usdc_without_fee"
+        // Deploying the ERC20 token for testing reentrancy attack
+        tokenReent = new MockERC20ForReentrancyTest(address(this));
+
+        AssetType assetType = AssetType.ERC20;
+        address[] memory assetAddresses = new address[](1);
+        assetAddresses[0] = address(tokenReent);
+        pool.addAssets(assetType, assetAddresses);
+        assetReent = pool.getAsset(address(tokenReent));
+
+        _mintAsset(assetReent, address(this), INITIAL_DEPOSIT);
+        _approveAsset(assetReent, address(pool), INITIAL_DEPOSIT);
+
+        ZTransaction memory reentTokenDepositZtx = _loadShieldedTransaction(
+            "deposit_1000_reentrantToken_without_fee"
         );
-        pool.transact(bulkDepositZtx);
+        pool.transact(reentTokenDepositZtx);
 
+        // `to` address will be that of the attacker contract which
+        // will perform the reentrancy attack
         attackerWithdrawZtx = _loadShieldedTransaction(
-            "withdraw_500_weth_without_fee_to_mock_attacker"
-        ); // `to` address will be that of the attacker contract which will perform the reentrancy attack
+            "withdraw_500_reentrantToken_to_attacker_contract"
+        );
 
-        attacker = new MockAttacker(pool, attackerWithdrawZtx, token1); // will perform the reentrancy attack and test the revert
+        // will perform the reentrancy attack and test the revert
+        attacker = new MockAttacker(pool, attackerWithdrawZtx, tokenReent);
         console.log("Attacker address:", address(attacker));
     }
 
     function test_reentrancyAttack() public {
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                SafeERC20.SafeERC20FailedOperation.selector,
-                address(token1)
-            )
-        );
-        pool.transact(attackerWithdrawZtx); // initiating the withdraw to attacker that will perform reentrancy attack
+        _updateOnChainMT();
 
-        assertEq(token1.balanceOf(address(attacker)), 0);
-        // assertEq(token1.balanceOf(address(pool)), INITIAL_DEPOSIT);
+        // initiating the withdraw to attacker that will perform reentrancy attack and check the revert
+        pool.transact(attackerWithdrawZtx);
+    }
+
+    function _updateOnChainMT() internal {
+        // UPDATE QUEUE MT SERVICE
+        // service reading the queue and generating new merkle tree state on-chain
+        uint256[] memory leaves = pool.getQueuedLeaves();
+        for (uint8 i; i < leaves.length; ) {
+            refTree.insert(leaves[i]);
+            unchecked {
+                ++i;
+            }
+        }
+
+        TreeUpdateData memory treeUpdateData = TreeUpdateData({
+            newRoot: refTree.getLatestRoot(),
+            newSubtrees: refTree.getLastSubtrees(),
+            proof: bytes("")
+        });
+
+        pool.updateCommitmentTree(treeUpdateData);
     }
 }

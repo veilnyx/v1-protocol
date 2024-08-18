@@ -2,6 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {MerkleTree} from "../libraries/MerkleTree.sol";
+import {QueuedMerkleTree} from "../libraries/QueuedMerkleTree.sol";
 import {Asset, AssetType} from "../libraries/Asset.sol";
 import {RevokerData} from "../libraries/ZTransaction.sol";
 
@@ -20,7 +21,7 @@ abstract contract PoolStorage {
     mapping(address assetAddress => uint24 assetId) _assetIds;
     mapping(uint24 assetId => Asset asset) _assets;
 
-    MerkleTree internal _commitmentTree;
+    QueuedMerkleTree internal _commitmentTree;
     mapping(uint256 nullifier => uint32 markLeafIndex)
         internal _markedNullifiers;
 

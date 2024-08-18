@@ -8,8 +8,11 @@ import {MESSAGE_REGISTER_ADDRESS, EIP712_DOMAIN_NAME, EIP712_DOMAIN_VERSION, EIP
 import {VerifierTransact21} from "src/verifiers/VerifierTransact21.sol";
 import {VerifierTransact22} from "src/verifiers/VerifierTransact22.sol";
 import {VerifierRegister} from "src/verifiers/VerifierRegister.sol";
+import {VerifierTreeUpdate} from "src/verifiers/VerifierTreeUpdate.sol";
 import {Verifier, TransactionVerifierInfo} from "src/core/Verifier.sol";
 import {AdaptorHandler} from "src/core/AdaptorHandler.sol";
+import {Hasher} from "src/core/Hasher.sol";
+import {MockPool} from "test/mocks/MockPool.sol";
 import {MockScreener} from "test/mocks/MockScreener.sol";
 import {MockERC20} from "test/mocks/MockERC20.sol";
 import {BaseTest} from "./BaseTest.sol";
@@ -21,8 +24,10 @@ contract PoolBaseTest is BaseTest {
         );
 
     Verifier public verifier;
+
     AdaptorHandler public adaptorHandler;
-    Pool public pool;
+    Hasher public hasher;
+    MockPool public pool;
 
     uint256 public addressTreeDepth;
     uint256 public commitmentTreeDepth;
@@ -39,6 +44,7 @@ contract PoolBaseTest is BaseTest {
         VerifierTransact21 vt21 = new VerifierTransact21();
         VerifierTransact22 vt22 = new VerifierTransact22();
         VerifierRegister vr = new VerifierRegister();
+        VerifierTreeUpdate vTreeUpdate = new VerifierTreeUpdate();
         TransactionVerifierInfo[] memory vInfos = new TransactionVerifierInfo[](
             2
         );
@@ -52,29 +58,30 @@ contract PoolBaseTest is BaseTest {
             addr: address(vt22),
             selector: vt22.verifyProof.selector
         });
-        verifier = new Verifier(vInfos, address(vr));
+        verifier = new Verifier(vInfos, address(vr), address(vTreeUpdate));
         adaptorHandler = new AdaptorHandler();
 
-        pool = new Pool();
+        pool = new MockPool();
 
         screener = new MockScreener();
-        address hasher = _deployHasher();
+        hasher = _deployHasher();
 
         bytes memory initData = abi.encodeCall(
             Pool.initialize,
             (
                 fixture.addressTreeDepth,
                 fixture.commitmentTreeDepth,
+                fixture.commitmentTreeQueueSize,
                 address(verifier),
                 address(adaptorHandler),
                 address(screener),
-                hasher,
+                address(hasher),
                 fixture.withdrawFeeBps
             )
         );
 
         ERC1967Proxy poolProxy = new ERC1967Proxy(address(pool), initData);
-        pool = Pool(address(poolProxy));
+        pool = MockPool(address(poolProxy));
     }
 
     //////////////////////////////////////////////////////

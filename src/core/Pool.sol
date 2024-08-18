@@ -16,6 +16,7 @@ import {EIP712_DOMAIN_NAME, EIP712_DOMAIN_VERSION, EIP712_TYPEHASH_REGISTER_ADDR
 import {PoolStorage} from "../base/PoolStorage.sol";
 import {Asset, AssetType, AssetLogic} from "../libraries/Asset.sol";
 import {MerkleTree, MerkleTreeLogic} from "../libraries/MerkleTree.sol";
+import {QueuedMerkleTree, QueuedMerkleTreeLogic, TreeUpdateData} from "../libraries/QueuedMerkleTree.sol";
 import {ShieldedAddressRegistrationData, ShieldedAddressLogic} from "../libraries/ShieldedAddress.sol";
 import {ZTransaction, ZTransactionLogic, RevokerData} from "../libraries/ZTransaction.sol";
 
@@ -30,6 +31,7 @@ contract Pool is
     PoolStorage
 {
     using MerkleTreeLogic for MerkleTree;
+    using QueuedMerkleTreeLogic for QueuedMerkleTree;
     using ShieldedAddressLogic for ShieldedAddressRegistrationData;
     using ZTransactionLogic for ZTransaction;
 
@@ -37,7 +39,7 @@ contract Pool is
     /// @dev Pool is an UUPSUpgradeable contract, so it needs to be initialized.
     /// @param addressTreeDepth The depth of the address tree.
     /// @param commitmentTreeDepth The depth of the commitment tree.
-    /// @param verifier_ The address of the verifier contract. Verifier contract verifies the ZTx's zk proof.
+    /// @param verifier_ The address of the verifier contract. Verifier contract verifies the ZTx's zk proof, address proof and merkle tree queue proof.
     /// @param adaptorHandler_ The address of the adaptor handler contract, responsible for delegate calling adaptors of external DeFi protocols.
     /// @param screener_ The address of the screener contract, responsible for screening sanctioned addresseses.
     /// @param hasher_ The address of the hasher contract. It provides a single interface to Poseidon hashing functions
@@ -45,6 +47,7 @@ contract Pool is
     function initialize(
         uint8 addressTreeDepth,
         uint8 commitmentTreeDepth,
+        uint8 commitmentTreeQueueSize,
         address verifier_,
         address adaptorHandler_,
         address screener_,
@@ -64,7 +67,12 @@ contract Pool is
         withdrawFeeBps = withdrawFeeBps_;
 
         _addressTree.init(addressTreeDepth, hasher_);
-        _commitmentTree.init(commitmentTreeDepth, hasher_);
+        _commitmentTree.init(
+            commitmentTreeDepth,
+            commitmentTreeQueueSize,
+            hasher_,
+            verifier_
+        );
     }
 
     /////////////////////////////////////////
@@ -176,6 +184,12 @@ contract Pool is
         });
     }
 
+    function updateCommitmentTree(
+        TreeUpdateData calldata treeUpdateData
+    ) external {
+        _commitmentTree.update(treeUpdateData);
+    }
+
     function transact(
         ZTransaction calldata ztx
     ) external nonReentrant whenNotPaused {
@@ -283,23 +297,23 @@ contract Pool is
     }
 
     function isMarkedNullifier(uint256 nullifier) external view returns (bool) {
-        if (_markedNullifiers[nullifier] > 0) {
-            return true;
-        } else {
-            return false;
-        }
+        return _markedNullifiers[nullifier] != 0;
     }
 
     function areMarkedNullifiers(
         uint256[] calldata nullifiers
     ) external view returns (bool[] memory) {
         bool[] memory markedArr = new bool[](nullifiers.length);
-        for (uint256 i = 0; i < nullifiers.length; ) {
-            markedArr[i] = _markedNullifiers[nullifiers[i]] > 0 ? true : false;
+        uint256 nullifiersLen = nullifiers.length;
+
+        for (uint256 i = 0; i < nullifiersLen; ) {
+            markedArr[i] = _markedNullifiers[nullifiers[i]] != 0;
+
             unchecked {
                 ++i;
             }
         }
+
         return markedArr;
     }
 
@@ -337,6 +351,26 @@ contract Pool is
         returns (uint256)
     {
         return _commitmentTree.currentRootIndex;
+    }
+
+    function getQueuedLeaves() external view returns (uint256[] memory) {
+        return _commitmentTree.getQueuedLeaves();
+    }
+
+    function getCommitmentTreeState()
+        external
+        view
+        returns (
+            uint256[] memory queuedLeaves,
+            uint256[] memory lastSubtrees,
+            uint256 nextLeafIndex,
+            uint32 lastRoot
+        )
+    {
+        (queuedLeaves, lastSubtrees, nextLeafIndex, lastRoot) = _commitmentTree
+            .getState();
+
+        return (queuedLeaves, lastSubtrees, nextLeafIndex, lastRoot);
     }
 
     function getAddressTreeCurrentRootIndex() external view returns (uint256) {

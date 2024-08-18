@@ -16,6 +16,7 @@ contract Config is Script {
     uint256[2] internal _encryptionPublicKey;
     uint8 public immutable addressTreeDepth;
     uint8 public immutable commitmentTreeDepth;
+    uint8 public immutable commitmentTreeQueueSize;
     uint256 public immutable withdrawFeeBps;
     address public immutable entryPoint;
     address public immutable gateway;
@@ -55,6 +56,10 @@ contract Config is Script {
             vm.parseJsonUint(configJson, ".common.commitmentTreeDepth")
         );
 
+        commitmentTreeQueueSize = uint8(
+            vm.parseJsonUint(configJson, ".common.commitmentTreeQueueSize")
+        );
+
         withdrawFeeBps = vm.parseJsonUint(configJson, ".common.withdrawFeeBps");
 
         // chain specific config
@@ -80,22 +85,28 @@ contract Config is Script {
             string.concat(chainPrefix, ".wToken")
         );
 
-        if(chainId == 11155111 || chainId == 1) {
+        if (chainId == 11155111 || chainId == 1) {
             uniswapSwapRouter02 = vm.parseJsonAddress(
-            configJson,
-            string.concat(chainPrefix, ".uniswapSwapRouter02")
-        );
+                configJson,
+                string.concat(chainPrefix, ".uniswapSwapRouter02")
+            );
         } else {
             uniswapSwapRouter02 = address(0);
         }
 
-        if(chainId == 17000) {
-            lido = vm.parseJsonAddress(configJson, string.concat(chainPrefix, ".lido"));
-            withdrawalQueueERC721 = vm.parseJsonAddress(configJson, string.concat(chainPrefix, ".withdrawalQueueERC721"));
+        if (chainId == 17000) {
+            lido = vm.parseJsonAddress(
+                configJson,
+                string.concat(chainPrefix, ".lido")
+            );
+            withdrawalQueueERC721 = vm.parseJsonAddress(
+                configJson,
+                string.concat(chainPrefix, ".withdrawalQueueERC721")
+            );
         } else {
             lido = address(0);
         }
-        
+
         sanctionList = vm.parseJsonAddress(
             configJson,
             string.concat(chainPrefix, ".sanctionList")
