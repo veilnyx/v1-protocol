@@ -50,8 +50,8 @@ contract AdaptorHandler is IAdaptorHandler {
         for (uint8 i = 0; i < outAssetIds.length; ) {
             asset = IPool(msg.sender).getAsset(outAssetIds[i]);
 
-            if (!asset.isSupported) {
-                revert("Unsupported asset");
+            if (!asset.isActive) {
+                revert IPool.InactiveAsset(asset.id);
             }
 
             assetBalance = IERC20(asset.assetAddress).balanceOf(address(this));

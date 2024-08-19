@@ -12,7 +12,8 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {console} from "forge-std/Test.sol";
 
 contract LidoAdaptor is AdaptorBase {
-    error UnsupportedAsset(uint24 assetId);
+    error InactiveAsset(uint24 assetId);
+    error UnstakingNotSupportedForAsset(uint24 assetId);
     error ZeroValues();
     error ZeroAddress();
 
@@ -51,8 +52,8 @@ contract LidoAdaptor is AdaptorBase {
         Asset memory inAsset = getAsset(inAssetIds[0]);
         uint256 stakeValue = inValues[0];
 
-        if (!inAsset.isSupported) {
-            revert UnsupportedAsset(inAssetIds[0]);
+        if (!inAsset.isActive) {
+            revert InactiveAsset(inAssetIds[0]);
         }
 
         if (stakeValue == 0) {
@@ -72,8 +73,8 @@ contract LidoAdaptor is AdaptorBase {
 
             // initializing the out token arrays
             Asset memory outAsset = getAsset(wstEth);
-            if (!outAsset.isSupported) {
-                revert UnsupportedAsset(outAsset.id);
+            if (!outAsset.isActive) {
+                revert InactiveAsset(outAsset.id);
             }
 
             outValues = new uint256[](1);
@@ -84,7 +85,7 @@ contract LidoAdaptor is AdaptorBase {
         } else {
             // Unstaking request
             if (inAsset.assetAddress != wstEth) {
-                revert UnsupportedAsset(inAsset.id); // If not wEth, only wstEth is supported for claiming `unstEth` NFTs from Lido
+                revert UnstakingNotSupportedForAsset(inAsset.id); // If not wEth, only wstEth is supported for claiming `unstEth` NFTs from Lido
             }
 
             address withdrawalAddress = abi.decode(payload, (address));

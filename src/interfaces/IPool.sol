@@ -61,7 +61,7 @@ interface IPool {
     error DoubleSpend(uint256 markedNullifier);
     error UnsupportedAdaptor();
     error DuplicateAsset(address assetAddress);
-    error UnsupportedAsset(uint24 assetId);
+    error InactiveAsset(uint24 assetId);
     error InvalidRevoker(uint256 id);
     error NoFeeToClaim(address paymaster, uint24 assetId);
 
@@ -163,11 +163,9 @@ interface IPool {
     /// @param assetType The type of the asset. Ref. enum Asset::AssetType
     function assetCount(AssetType assetType) external view returns (uint24);
 
-    /// @notice Returns if an asset is supported.
+    /// @notice Returns if an asset is registered and active.
     /// @param assetAddress The address of the asset to check.
-    function isAssetSupported(
-        address assetAddress
-    ) external view returns (bool);
+    function isAssetActive(address assetAddress) external view returns (bool);
 
     /// @notice Returns the data of an asset.
     /// @param assetId The id of the asset.

@@ -32,10 +32,10 @@ contract PoolInitTest is PoolTest {
 
         pool.addAssets(assetType, assetAddresses);
 
-        bool isAssetSupported = pool.isAssetSupported(assetAddress);
+        bool isAssetActive = pool.isAssetActive(assetAddress);
         Asset memory newAsset = pool.getAsset(assetAddress);
 
-        assert(isAssetSupported);
+        assert(isAssetActive);
         assertNotEq(newAsset.id, 0);
         assert(newAsset.assetType == assetType);
         assertEq(newAsset.assetAddress, assetAddress);

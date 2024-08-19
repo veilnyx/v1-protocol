@@ -257,11 +257,9 @@ contract Pool is
         return _assetCounts[assetType];
     }
 
-    function isAssetSupported(
-        address assetAddress
-    ) external view returns (bool) {
+    function isAssetActive(address assetAddress) external view returns (bool) {
         uint24 id = _assetIds[assetAddress];
-        return _assets[id].isSupported;
+        return _assets[id].isActive;
     }
 
     function getAsset(uint24 assetId) external view returns (Asset memory) {

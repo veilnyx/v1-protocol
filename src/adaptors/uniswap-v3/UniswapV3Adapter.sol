@@ -10,7 +10,7 @@ import {console} from "forge-std/Test.sol";
 
 contract UniswapV3Adapter is AdaptorBase {
     // Errors //
-    error UnsupportedAsset(uint24 assetId);
+    error InactiveAsset(uint24 assetId);
     error MultiAssetSwap();
     error ZeroValues();
 
@@ -46,8 +46,8 @@ contract UniswapV3Adapter is AdaptorBase {
         }
 
         Asset memory inAsset = getAsset(inAssetIds[0]);
-        if (!inAsset.isSupported) {
-            revert UnsupportedAsset(inAssetIds[0]);
+        if (!inAsset.isActive) {
+            revert InactiveAsset(inAssetIds[0]);
         }
 
         // decoding payload
@@ -57,8 +57,8 @@ contract UniswapV3Adapter is AdaptorBase {
         );
 
         Asset memory outAsset = getAsset(outAssetId);
-        if (!outAsset.isSupported) {
-            revert UnsupportedAsset(outAssetId);
+        if (!outAsset.isActive) {
+            revert InactiveAsset(outAssetId);
         }
 
         if (beneficiary == address(0)) {
