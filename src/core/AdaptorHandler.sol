@@ -7,7 +7,7 @@ import {IAdaptorHandler} from "../interfaces/IAdaptorHandler.sol";
 import {IAdaptor} from "../interfaces/IAdaptor.sol";
 import {IPool} from "../interfaces/IPool.sol";
 import {Asset, AssetType} from "../libraries/Asset.sol";
-import {PubAsset} from "../libraries/ZTransaction.sol";
+import {PubAsset} from "../libraries/ShieldedTransaction.sol";
 
 contract AdaptorHandler is IAdaptorHandler {
     using SafeERC20 for IERC20;

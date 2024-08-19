@@ -9,7 +9,7 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {IPaymaster} from "@account-abstraction/contracts/interfaces/IPaymaster.sol";
 import {IEntryPoint} from "@account-abstraction/contracts/interfaces/IEntryPoint.sol";
 import {PackedUserOperation} from "@account-abstraction/contracts/interfaces/PackedUserOperation.sol";
-import {ZTransaction} from "../libraries/ZTransaction.sol";
+import {ShieldedTransaction} from "../libraries/ShieldedTransaction.sol";
 import {IPool} from "../interfaces/IPool.sol";
 
 contract Paymaster is IPaymaster, Ownable {
@@ -160,14 +160,14 @@ contract Paymaster is IPaymaster, Ownable {
     function _parseFeeParams(
         PackedUserOperation calldata userOp
     ) internal pure returns (address, uint24, uint256) {
-        ZTransaction memory ztx = abi.decode(
+        ShieldedTransaction memory stx = abi.decode(
             userOp.callData[4:],
-            (ZTransaction)
+            (ShieldedTransaction)
         );
 
-        uint24 feeAssetId = uint24(bytes3(bytes31(ztx.pubAssets[0])));
-        uint256 feeValue = uint256(uint96(ztx.feeData));
-        address paymaster = address(bytes20(bytes32(ztx.feeData)));
+        uint24 feeAssetId = uint24(bytes3(bytes31(stx.pubAssets[0])));
+        uint256 feeValue = uint256(uint96(stx.feeData));
+        address paymaster = address(bytes20(bytes32(stx.feeData)));
 
         return (paymaster, feeAssetId, feeValue);
     }

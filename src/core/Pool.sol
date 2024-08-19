@@ -18,7 +18,7 @@ import {Asset, AssetType, AssetLogic} from "../libraries/Asset.sol";
 import {MerkleTree, MerkleTreeLogic} from "../libraries/MerkleTree.sol";
 import {QueuedMerkleTree, QueuedMerkleTreeLogic, TreeUpdateData} from "../libraries/QueuedMerkleTree.sol";
 import {ShieldedAddressRegistrationData, ShieldedAddressLogic} from "../libraries/ShieldedAddress.sol";
-import {ZTransaction, ZTransactionLogic, RevokerData} from "../libraries/ZTransaction.sol";
+import {ShieldedTransaction, ShieldedTransactionLogic, RevokerData} from "../libraries/ShieldedTransaction.sol";
 
 contract Pool is
     IPool,
@@ -33,13 +33,13 @@ contract Pool is
     using MerkleTreeLogic for MerkleTree;
     using QueuedMerkleTreeLogic for QueuedMerkleTree;
     using ShieldedAddressLogic for ShieldedAddressRegistrationData;
-    using ZTransactionLogic for ZTransaction;
+    using ShieldedTransactionLogic for ShieldedTransaction;
 
     /// @notice Initializes the Pool contract with the given parameters.
     /// @dev Pool is an UUPSUpgradeable contract, so it needs to be initialized.
     /// @param addressTreeDepth The depth of the address tree.
     /// @param commitmentTreeDepth The depth of the commitment tree.
-    /// @param verifier_ The address of the verifier contract. Verifier contract verifies the ZTx's zk proof, address proof and merkle tree queue proof.
+    /// @param verifier_ The address of the verifier contract. Verifier contract verifies the stx's zk proof, address proof and merkle tree queue proof.
     /// @param adaptorHandler_ The address of the adaptor handler contract, responsible for delegate calling adaptors of external DeFi protocols.
     /// @param screener_ The address of the screener contract, responsible for screening sanctioned addresseses.
     /// @param hasher_ The address of the hasher contract. It provides a single interface to Poseidon hashing functions
@@ -191,9 +191,9 @@ contract Pool is
     }
 
     function transact(
-        ZTransaction calldata ztx
+        ShieldedTransaction calldata stx
     ) external nonReentrant whenNotPaused {
-        ztx.validate({
+        stx.validate({
             addressTree: _addressTree,
             commitmentTree: _commitmentTree,
             markedNullifiers: _markedNullifiers,
@@ -202,7 +202,7 @@ contract Pool is
             verifier: verifier
         });
 
-        ztx.execute({
+        stx.execute({
             commitmentTree: _commitmentTree,
             assets: _assets,
             withdrawFees: _withdrawFees,
@@ -237,11 +237,11 @@ contract Pool is
     ////////////////////////////////////////
 
     function verifyTransactionProof(
-        ZTransaction calldata ztx
+        ShieldedTransaction calldata stx
     ) external view returns (bool result) {
-        RevokerData memory revokerData = _revokers[ztx.revokerId];
+        RevokerData memory revokerData = _revokers[stx.revokerId];
 
-        result = ztx._verifyProof({
+        result = stx._verifyProof({
             revokerData: revokerData,
             verifier: verifier
         });

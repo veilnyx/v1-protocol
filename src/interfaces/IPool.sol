@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {ZTransaction, ZTransactionType, RevokerData} from "../libraries/ZTransaction.sol";
+import {ShieldedTransaction, ShieldedTransactionType, RevokerData} from "../libraries/ShieldedTransaction.sol";
 import {ShieldedAddressRegistrationData} from "../libraries/ShieldedAddress.sol";
 import {TreeUpdateData} from "../libraries/QueuedMerkleTree.sol";
 import {AssetType, Asset} from "../libraries/Asset.sol";
@@ -33,7 +33,7 @@ interface IPool {
     event Commitment(uint256 indexed leafIndex, uint256 indexed commitment);
 
     event Receipt(
-        ZTransactionType indexed txType,
+        ShieldedTransactionType indexed txType,
         uint16 indexed revokerId,
         uint32 lastLeafIndex,
         address target,
@@ -138,10 +138,10 @@ interface IPool {
         TreeUpdateData memory updatedCommitmentTreeInputs
     ) external;
 
-    /// @notice Validates and executes a ZTx.
+    /// @notice Validates and executes a stx.
     /// @notice Can only be called when the contract is not paused.
-    /// @param ztx The ZTx to be executed.
-    function transact(ZTransaction calldata ztx) external;
+    /// @param stx The stx to be executed.
+    function transact(ShieldedTransaction calldata stx) external;
 
     /// @notice A function to call by a paymaster contract to claim the asset wise fees collected for the ERC-4337 transactions they catered to.
     /// @notice Can only be called when the contract is not paused.
@@ -153,10 +153,10 @@ interface IPool {
     //         READ METHODS                //
     ////////////////////////////////////////
 
-    /// @notice Verifies the proof of a ZTx.
-    /// @param ztx The ZTx to be verified.
+    /// @notice Verifies the proof of a stx.
+    /// @param stx The stx to be verified.
     function verifyTransactionProof(
-        ZTransaction calldata ztx
+        ShieldedTransaction calldata stx
     ) external view returns (bool);
 
     /// @notice Returns the no. of assets supported by asset type.

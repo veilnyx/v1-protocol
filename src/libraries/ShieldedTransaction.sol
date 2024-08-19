@@ -10,8 +10,8 @@ import {IVerifier} from "../interfaces/IVerifier.sol";
 import {IHasher} from "../interfaces/IHasher.sol";
 import {IAdaptorHandler} from "../interfaces/IAdaptorHandler.sol";
 
-/// @title ZTransactionType enum representing types of shielded transactions
-enum ZTransactionType {
+/// @title ShieldedTransactionType enum representing types of shielded transactions
+enum ShieldedTransactionType {
     DEPOSIT,
     TRANSFER,
     WITHDRAW,
@@ -37,7 +37,7 @@ struct RevokerData {
     uint256[2] encryptionPublicKey;
 }
 
-/// @title ZTransaction struct representing shielded transaction
+/// @title ShieldedTransaction struct representing shielded transaction
 ///
 /// @param txType               Type of transaction
 /// @param revokerId            Id of revoker used for this transaction
@@ -55,8 +55,8 @@ struct RevokerData {
 /// @param keysMemo             Encrypted keys with wich notesMemo is encrypted
 /// @param notesMemo            Memos for output notes. This is list of encrypted notes' fields and sender data.
 /// @param targetData           Target address (first 20-bytes) for withdraw/adapter concatenated with payload
-struct ZTransaction {
-    ZTransactionType txType;
+struct ShieldedTransaction {
+    ShieldedTransactionType txType;
     uint16 revokerId;
     uint256 addressTreeRoot;
     uint256 commitmentTreeRoot;
@@ -81,7 +81,7 @@ struct PubAsset {
 }
 
 struct Params {
-    ZTransactionType txType;
+    ShieldedTransactionType txType;
     uint16 revokerId;
     uint24 feeAssetId;
     uint96 feeValue;
@@ -100,19 +100,21 @@ struct MemoParams {
     bytes refundMemo;
 }
 
-/// @title ZTransactionLogic library for shielded transaction logic
-library ZTransactionLogic {
+/// @title ShieldedTransactionLogic library for shielded transaction logic
+library ShieldedTransactionLogic {
     using MerkleTreeLogic for MerkleTree;
     using QueuedMerkleTreeLogic for QueuedMerkleTree;
 
-    /// @notice Calculates the hash of a ZTransaction
-    /// @dev All of the omitted fields of ZTransaction for hashing are public inputs
+    /// @notice Calculates the hash of a ShieldedTransaction
+    /// @dev All of the omitted fields of ShieldedTransaction for hashing are public inputs
     ///      to the verifier, and tampering with any of those fields will result in invalid
     ///      proof anyway. `nullifiers` is exception for sake of including some element of
     ///      spent notes in the hash.
-    /// @param self ZTransaction
+    /// @param self ShieldedTransaction
     /// @return Hash of the transaction
-    function hash(ZTransaction memory self) public pure returns (uint256) {
+    function hash(
+        ShieldedTransaction memory self
+    ) public pure returns (uint256) {
         uint256 txHash = uint256(
             keccak256(
                 abi.encode(
@@ -131,13 +133,13 @@ library ZTransactionLogic {
     }
 
     /// @notice Validates a shielded transaction
-    /// @param ztx ZTransaction to be executed
+    /// @param stx ShieldedTransaction to be executed
     /// @param addressTree Address `MerkleTree` state in this contract
     /// @param commitmentTree Commitment `MerkleTree` state in this contract
     /// @param markedNullifiers Mapping of nullifiers that are already marked
     /// @param supportedAdaptors Mapping of supported external adaptor addresses
     function validate(
-        ZTransaction calldata ztx,
+        ShieldedTransaction calldata stx,
         MerkleTree storage addressTree,
         QueuedMerkleTree storage commitmentTree,
         mapping(uint256 => uint32) storage markedNullifiers,
@@ -145,42 +147,42 @@ library ZTransactionLogic {
         mapping(uint256 => RevokerData) storage revokerDataMap,
         address verifier
     ) external {
-        RevokerData memory revokerData = revokerDataMap[ztx.revokerId];
+        RevokerData memory revokerData = revokerDataMap[stx.revokerId];
 
         if (!revokerData.isActive) {
-            revert IPool.InvalidRevoker(ztx.revokerId);
+            revert IPool.InvalidRevoker(stx.revokerId);
         }
 
-        if (!addressTree.isKnownRoot(ztx.addressTreeRoot)) {
+        if (!addressTree.isKnownRoot(stx.addressTreeRoot)) {
             revert IPool.UnknownAddressTreeRoot();
         }
 
-        if (!commitmentTree.isKnownRoot(ztx.commitmentTreeRoot)) {
+        if (!commitmentTree.isKnownRoot(stx.commitmentTreeRoot)) {
             revert IPool.UnknownCommitmentTreeRoot();
         }
 
         if (
-            ztx.txType == ZTransactionType.CALL_ADAPTOR &&
-            !supportedAdaptors[address(bytes20(ztx.targetData))]
+            stx.txType == ShieldedTransactionType.CALL_ADAPTOR &&
+            !supportedAdaptors[address(bytes20(stx.targetData))]
         ) {
             revert IPool.UnsupportedAdaptor();
         }
 
-        _checkAndMarkNullifiers(ztx, commitmentTree, markedNullifiers);
+        _checkAndMarkNullifiers(stx, commitmentTree, markedNullifiers);
 
-        if (!_verifyProof(ztx, revokerData, verifier)) {
+        if (!_verifyProof(stx, revokerData, verifier)) {
             revert IPool.InvalidTransactionProof();
         }
     }
 
     /// @notice Executes a shielded transaction
-    /// @param ztx ZTransaction to be executed
+    /// @param stx ShieldedTransaction to be executed
     /// @param commitmentTree Commitment `MerkleTree` state in this contract
     /// @param assets Mapping of assetId to Asset
     /// @param adaptorHandler Address of the adaptor handler contract responsible for handling DeFi adaptor ops
     /// @param paymasterFees Mapping of paymaster address to assetId to fee value
     function execute(
-        ZTransaction calldata ztx,
+        ShieldedTransaction calldata stx,
         QueuedMerkleTree storage commitmentTree,
         mapping(uint24 => Asset) storage assets,
         mapping(address => mapping(uint24 => uint256)) storage paymasterFees,
@@ -189,19 +191,19 @@ library ZTransactionLogic {
         address adaptorHandler,
         uint256 withdrawFeeBps
     ) external {
-        Params memory params = _copyParamsToMemory(ztx);
-        MemoParams memory memoParams = _copyMemoParamsToMemory(ztx);
+        Params memory params = _copyParamsToMemory(stx);
+        MemoParams memory memoParams = _copyMemoParamsToMemory(stx);
 
         // Credit paymaster fees
         _creditPaymasterFee(paymasterFees, params);
 
         // Receive any deposits
-        if (ztx.txType == ZTransactionType.DEPOSIT) {
+        if (stx.txType == ShieldedTransactionType.DEPOSIT) {
             _receivePubAssets(assets, params.pubAssets, msg.sender);
         }
 
         // Transfer any withdrawals
-        if (ztx.txType == ZTransactionType.WITHDRAW) {
+        if (stx.txType == ShieldedTransactionType.WITHDRAW) {
             _transferPubAssets(
                 assets,
                 withdrawFees,
@@ -212,7 +214,7 @@ library ZTransactionLogic {
         }
 
         // Perform any conversions
-        if (ztx.txType == ZTransactionType.CALL_ADAPTOR) {
+        if (stx.txType == ShieldedTransactionType.CALL_ADAPTOR) {
             _transferPubAssets(
                 assets,
                 withdrawFees,
@@ -234,13 +236,13 @@ library ZTransactionLogic {
 
     /**
      *
-     * @param self ZTransaction to convert to a proper verifier input
+     * @param self ShieldedTransaction to convert to a proper verifier input
      * @param revokerData The RevokerData used for this transaction
      * @return Calldata bytes for appropriate verifier contract
      * @dev We divide the public inputs into 2 chunks to avoid stack too deep error
      */
     function toVerifierInput(
-        ZTransaction calldata self,
+        ShieldedTransaction calldata self,
         RevokerData memory revokerData
     ) public pure returns (bytes memory) {
         bytes memory pubDataChunk1;
@@ -260,7 +262,7 @@ library ZTransactionLogic {
                 self.addressTreeRoot,
                 self.commitmentTreeRoot,
                 hash(self),
-                self.txType == ZTransactionType.DEPOSIT
+                self.txType == ShieldedTransactionType.DEPOSIT
                     ? uint256(0)
                     : uint256(1),
                 pubAssetIds,
@@ -396,29 +398,29 @@ library ZTransactionLogic {
     }
 
     function _verifyProof(
-        ZTransaction calldata ztx,
+        ShieldedTransaction calldata stx,
         RevokerData memory revokerData,
         address verifier
     ) internal view returns (bool) {
         uint16 vId = IVerifier(verifier).getTransactionVerifierId(
-            ztx.nullifiers.length,
-            ztx.commitments.length
+            stx.nullifiers.length,
+            stx.commitments.length
         );
-        bytes memory vInp = toVerifierInput(ztx, revokerData);
+        bytes memory vInp = toVerifierInput(stx, revokerData);
         return IVerifier(verifier).verifyTransactionProof(vId, vInp);
     }
 
     /// @dev This also prevents any duplicate nullifiers
     function _checkAndMarkNullifiers(
-        ZTransaction calldata ztx,
+        ShieldedTransaction calldata stx,
         QueuedMerkleTree storage commitmentTree,
         mapping(uint256 => uint32) storage markedNullifiers
     ) internal {
-        uint256 numNullifiers = ztx.nullifiers.length;
+        uint256 numNullifiers = stx.nullifiers.length;
         uint32 nextIdx = commitmentTree.nextLeafIndex;
 
         for (uint8 i = 0; i < numNullifiers; ) {
-            uint256 nullifier = ztx.nullifiers[i];
+            uint256 nullifier = stx.nullifiers[i];
             if (markedNullifiers[nullifier] != 0) {
                 revert IPool.DoubleSpend(nullifier);
             }
@@ -466,60 +468,60 @@ library ZTransactionLogic {
     }
 
     function _copyParamsToMemory(
-        ZTransaction calldata ztx
+        ShieldedTransaction calldata stx
     ) internal pure returns (Params memory) {
         Params memory params;
-        uint256 pubLen = ztx.pubAssets.length;
+        uint256 pubLen = stx.pubAssets.length;
 
         params.pubAssets = new PubAsset[](pubLen);
         for (uint8 i = 0; i < pubLen; ++i) {
             // Extract first 3 bytes assetId
-            params.pubAssets[i].id = uint24(bytes3(bytes31(ztx.pubAssets[i])));
+            params.pubAssets[i].id = uint24(bytes3(bytes31(stx.pubAssets[i])));
             // Extract last 28 bytes value
-            params.pubAssets[i].value = uint224(ztx.pubAssets[i]);
+            params.pubAssets[i].value = uint224(stx.pubAssets[i]);
         }
 
         // non transfer tx & transfer tx with fee
         if (pubLen != 0) {
             params.feeAssetId = params.pubAssets[0].id;
-            params.feeValue = uint96(ztx.feeData);
-            params.paymaster = address(bytes20(bytes32(ztx.feeData)));
+            params.feeValue = uint96(stx.feeData);
+            params.paymaster = address(bytes20(bytes32(stx.feeData)));
             params.pubAssets[0].value =
                 params.pubAssets[0].value -
                 params.feeValue;
         }
 
-        params.txType = ztx.txType;
-        params.revokerId = ztx.revokerId;
-        params.target = address(bytes20(ztx.targetData));
+        params.txType = stx.txType;
+        params.revokerId = stx.revokerId;
+        params.target = address(bytes20(stx.targetData));
         if (params.target != address(0)) {
-            params.targetPayload = bytes(ztx.targetData[20:]);
+            params.targetPayload = bytes(stx.targetData[20:]);
         }
 
-        if (ztx.txType == ZTransactionType.CALL_ADAPTOR) {
-            params.refundAddress = ztx.refundAddress;
+        if (stx.txType == ShieldedTransactionType.CALL_ADAPTOR) {
+            params.refundAddress = stx.refundAddress;
         }
 
         return params;
     }
 
     function _copyMemoParamsToMemory(
-        ZTransaction calldata ztx
+        ShieldedTransaction calldata stx
     ) internal pure returns (MemoParams memory) {
         MemoParams memory memoParams;
 
-        memoParams.commitments = ztx.commitments;
-        memoParams.keysMemo = ztx.keysMemo;
-        memoParams.notesMemo = ztx.notesMemo;
+        memoParams.commitments = stx.commitments;
+        memoParams.keysMemo = stx.keysMemo;
+        memoParams.notesMemo = stx.notesMemo;
 
-        if (ztx.txType == ZTransactionType.TRANSFER) {
-            memoParams.assetsMemo = ztx.assetsMemo;
+        if (stx.txType == ShieldedTransactionType.TRANSFER) {
+            memoParams.assetsMemo = stx.assetsMemo;
         } else {
-            memoParams.assetsMemo = abi.encodePacked(ztx.pubAssets);
+            memoParams.assetsMemo = abi.encodePacked(stx.pubAssets);
         }
 
-        if (ztx.txType == ZTransactionType.CALL_ADAPTOR) {
-            memoParams.refundMemo = abi.encodePacked(ztx.refundAddress);
+        if (stx.txType == ShieldedTransactionType.CALL_ADAPTOR) {
+            memoParams.refundMemo = abi.encodePacked(stx.refundAddress);
         }
 
         return memoParams;

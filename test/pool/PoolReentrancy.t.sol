@@ -3,7 +3,7 @@ pragma solidity ^0.8.24;
 
 import {Test, console} from "forge-std/Test.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {ZTransaction} from "src/libraries/ZTransaction.sol";
+import {ShieldedTransaction} from "src/libraries/ShieldedTransaction.sol";
 import {PoolTest} from "test/fixtures/PoolTest.sol";
 import {MockERC20ForReentrancyTest} from "test/mocks/MockERC20ForReentrancyTest.sol";
 import {MockAttacker} from "test/mocks/MockAttacker.t.sol";
@@ -14,7 +14,7 @@ import {MerkleTree, MerkleTreeLogic} from "src/libraries/MerkleTree.sol";
 contract PoolReentrancyTest is PoolTest {
     using MerkleTreeLogic for MerkleTree;
 
-    ZTransaction attackerWithdrawZtx;
+    ShieldedTransaction attackerWithdrawStx;
     MerkleTree internal refTree;
     MockERC20ForReentrancyTest tokenReent;
     MockAttacker attacker;
@@ -37,19 +37,20 @@ contract PoolReentrancyTest is PoolTest {
         _mintAsset(assetReent, address(this), INITIAL_DEPOSIT);
         _approveAsset(assetReent, address(pool), INITIAL_DEPOSIT);
 
-        ZTransaction memory reentTokenDepositZtx = _loadShieldedTransaction(
-            "deposit_1000_reentrantToken_without_fee"
-        );
-        pool.transact(reentTokenDepositZtx);
+        ShieldedTransaction
+            memory reentTokenDepositStx = _loadShieldedTransaction(
+                "deposit_1000_reentrantToken_without_fee"
+            );
+        pool.transact(reentTokenDepositStx);
 
         // `to` address will be that of the attacker contract which
         // will perform the reentrancy attack
-        attackerWithdrawZtx = _loadShieldedTransaction(
+        attackerWithdrawStx = _loadShieldedTransaction(
             "withdraw_500_reentrantToken_to_attacker_contract"
         );
 
         // will perform the reentrancy attack and test the revert
-        attacker = new MockAttacker(pool, attackerWithdrawZtx, tokenReent);
+        attacker = new MockAttacker(pool, attackerWithdrawStx, tokenReent);
         console.log("Attacker address:", address(attacker));
     }
 
@@ -57,7 +58,7 @@ contract PoolReentrancyTest is PoolTest {
         _updateOnChainMT();
 
         // initiating the withdraw to attacker that will perform reentrancy attack and check the revert
-        pool.transact(attackerWithdrawZtx);
+        pool.transact(attackerWithdrawStx);
     }
 
     function _updateOnChainMT() internal {

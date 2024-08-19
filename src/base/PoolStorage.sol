@@ -4,7 +4,7 @@ pragma solidity ^0.8.24;
 import {MerkleTree} from "../libraries/MerkleTree.sol";
 import {QueuedMerkleTree} from "../libraries/QueuedMerkleTree.sol";
 import {Asset, AssetType} from "../libraries/Asset.sol";
-import {RevokerData} from "../libraries/ZTransaction.sol";
+import {RevokerData} from "../libraries/ShieldedTransaction.sol";
 
 abstract contract PoolStorage {
     address public verifier;

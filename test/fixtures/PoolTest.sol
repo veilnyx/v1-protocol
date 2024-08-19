@@ -9,7 +9,7 @@ import {VerifierTransact21} from "src/verifiers/VerifierTransact21.sol";
 import {VerifierTransact22} from "src/verifiers/VerifierTransact22.sol";
 import {VerifierRegister} from "src/verifiers/VerifierRegister.sol";
 import {Asset, AssetType} from "src/libraries/Asset.sol";
-import {ZTransaction, ZTransactionType, RevokerData} from "src/libraries/ZTransaction.sol";
+import {ShieldedTransaction, ShieldedTransactionType, RevokerData} from "src/libraries/ShieldedTransaction.sol";
 import {MerkleTree, MerkleTreeLogic} from "src/libraries/MerkleTree.sol";
 import {TreeUpdateData} from "src/libraries/QueuedMerkleTree.sol";
 import {ShieldedAddressRegistrationData, ShieldedAddressLogic} from "src/libraries/ShieldedAddress.sol";
@@ -32,35 +32,35 @@ contract PoolTest is PoolBaseTest {
 
     bytes revokerMetaData = abi.encode("Revoker 1", "Organization 1");
 
-    modifier expectNullifiersMarked(ZTransaction memory ztx_) {
+    modifier expectNullifiersMarked(ShieldedTransaction memory stx_) {
         uint32 currentLeafIndex = pool.getCommitmentTreeNextLeafIndex();
         uint32 nullifierMarkLeafIndex = currentLeafIndex + 1;
 
-        for (uint256 i = 0; i < ztx_.nullifiers.length; i++) {
+        for (uint256 i = 0; i < stx_.nullifiers.length; i++) {
             vm.expectEmit(true, true, true, true);
             emit IPool.NullifierMarked(
-                ztx_.nullifiers[i],
+                stx_.nullifiers[i],
                 nullifierMarkLeafIndex
             );
         }
 
         _;
 
-        for (uint256 i = 0; i < ztx_.nullifiers.length; i++) {
-            assertTrue(pool.isMarkedNullifier(ztx_.nullifiers[i]));
+        for (uint256 i = 0; i < stx_.nullifiers.length; i++) {
+            assertTrue(pool.isMarkedNullifier(stx_.nullifiers[i]));
         }
     }
 
-    modifier expectCommitmentsInserted(ZTransaction memory ztx) {
+    modifier expectCommitmentsInserted(ShieldedTransaction memory stx) {
         // uint256 rootBeforeDeposit = pool.getCommitmentTreeLastRoot();
         // uint256 currentRootIndexBeforeDeposit = pool
         //     .getCommitmentTreeCurrentRootIndex();
 
         uint256 nextLeafIndex = pool.getCommitmentTreeNextLeafIndex();
 
-        for (uint256 i = 0; i < ztx.commitments.length; ++i) {
+        for (uint256 i = 0; i < stx.commitments.length; ++i) {
             vm.expectEmit(true, true, true, true);
-            emit IPool.Commitment(nextLeafIndex + i, ztx.commitments[i]);
+            emit IPool.Commitment(nextLeafIndex + i, stx.commitments[i]);
         }
 
         _;
@@ -71,42 +71,44 @@ contract PoolTest is PoolBaseTest {
         // uint256 currentRootIndexAfterDeposit = pool
         //     .getCommitmentTreeCurrentRootIndex();
 
-        // assertEq(nextIndex + ztx.commitments.length, nextLeafIndexAfterDeposit);
+        // assertEq(nextIndex + stx.commitments.length, nextLeafIndexAfterDeposit);
         // assertNotEq(rootBeforeDeposit, rootAfterDeposit);
         // assertLt(currentRootIndexBeforeDeposit, currentRootIndexAfterDeposit);
     }
 
-    modifier expectReceipt(ZTransaction memory ztx) {
+    modifier expectReceipt(ShieldedTransaction memory stx) {
         uint24 feeAssetId = 0;
         uint96 feeValue = 0;
         address paymaster = address(0);
         bytes memory assetsMemo;
 
         // non transfer tx & transfer tx with fee
-        if (ztx.pubAssets.length != 0) {
-            feeAssetId = uint24(bytes3(bytes31(ztx.pubAssets[0])));
-            feeValue = uint96(ztx.feeData);
-            paymaster = address(bytes20(bytes32(ztx.feeData)));
+        if (stx.pubAssets.length != 0) {
+            feeAssetId = uint24(bytes3(bytes31(stx.pubAssets[0])));
+            feeValue = uint96(stx.feeData);
+            paymaster = address(bytes20(bytes32(stx.feeData)));
         }
 
-        if (ztx.txType != ZTransactionType.TRANSFER) {
-            assetsMemo = abi.encodePacked(ztx.pubAssets);
+        if (stx.txType != ShieldedTransactionType.TRANSFER) {
+            assetsMemo = abi.encodePacked(stx.pubAssets);
         } else {
-            assetsMemo = ztx.assetsMemo;
+            assetsMemo = stx.assetsMemo;
         }
 
         vm.expectEmit(true, true, true, true);
         emit IPool.Receipt(
-            ztx.txType,
-            ztx.revokerId,
-            (pool.getCommitmentTreeNextLeafIndex() + uint32(ztx.commitments.length) - 1),
-            address(bytes20(ztx.targetData)),
+            stx.txType,
+            stx.revokerId,
+            (pool.getCommitmentTreeNextLeafIndex() +
+                uint32(stx.commitments.length) -
+                1),
+            address(bytes20(stx.targetData)),
             feeAssetId,
             feeValue,
             paymaster,
-            ztx.keysMemo,
+            stx.keysMemo,
             assetsMemo,
-            ztx.notesMemo,
+            stx.notesMemo,
             bytes("")
         );
 
@@ -116,19 +118,6 @@ contract PoolTest is PoolBaseTest {
     function _setUp() internal virtual override {
         PoolBaseTest._setUp();
 
-        // Add assets
-        // asset1 = Asset({
-        //     id: 65537,
-        //     assetType: AssetType.ERC20,
-        //     assetAddress: address(token1),
-        //     isSupported: true
-        // });
-        // asset2 = Asset({
-        //     id: 65538,
-        //     assetType: AssetType.ERC20,
-        //     assetAddress: address(token2),
-        //     isSupported: true
-        // });
         AssetType assetType = AssetType.ERC20;
         address[] memory assetAddresses = new address[](2);
         assetAddresses[0] = address(token1);
@@ -165,14 +154,14 @@ contract PoolTest is PoolBaseTest {
     }
 
     function _runExpectedTx(
-        ZTransaction memory ztx
+        ShieldedTransaction memory stx
     )
         internal
-        expectNullifiersMarked(ztx)
-        expectCommitmentsInserted(ztx)
-        expectReceipt(ztx)
+        expectNullifiersMarked(stx)
+        expectCommitmentsInserted(stx)
+        expectReceipt(stx)
     {
-        pool.transact(ztx);
+        pool.transact(stx);
     }
 
     function _mintAsset(
@@ -203,8 +192,10 @@ contract PoolTest is PoolBaseTest {
         _mintAsset(asset2, address(this), deposit2);
         _approveAsset(asset1, address(pool), deposit1);
         _approveAsset(asset2, address(pool), deposit2);
-        ZTransaction memory ztx = _loadShieldedTransaction("deposit_pre_tx");
-        pool.transact(ztx);
+        ShieldedTransaction memory stx = _loadShieldedTransaction(
+            "deposit_pre_tx"
+        );
+        pool.transact(stx);
 
         // Process the batch
         uint256[] memory leaves = pool.getQueuedLeaves();

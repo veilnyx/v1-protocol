@@ -6,7 +6,7 @@ import {console2} from "forge-std/console2.sol";
 import {Verifier, TransactionVerifierInfo} from "src/core/Verifier.sol";
 import {VerifierTransact21} from "src/verifiers/VerifierTransact21.sol";
 import {VerifierTransact22} from "src/verifiers/VerifierTransact22.sol";
-import {ZTransaction, ZTransactionType} from "src/libraries/ZTransaction.sol";
+import {ShieldedTransaction, ShieldedTransactionType} from "src/libraries/ShieldedTransaction.sol";
 import {BaseTest} from "test/fixtures/BaseTest.sol";
 
 contract VerifierTest is BaseTest {

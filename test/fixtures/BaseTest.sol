@@ -2,7 +2,7 @@
 pragma solidity ^0.8.20;
 
 import {Test} from "forge-std/Test.sol";
-import {ZTransactionType, ZTransaction} from "src/libraries/ZTransaction.sol";
+import {ShieldedTransactionType, ShieldedTransaction} from "src/libraries/ShieldedTransaction.sol";
 import {ShieldedAddressRegistrationData} from "src/libraries/ShieldedAddress.sol";
 import {TreeUpdateData} from "src/libraries/QueuedMerkleTree.sol";
 import {Hasher} from "src/core/Hasher.sol";
@@ -23,7 +23,7 @@ abstract contract BaseTest is Test {
 
     function _loadShieldedTransaction(
         string memory name
-    ) internal view returns (ZTransaction memory) {
+    ) internal view returns (ShieldedTransaction memory) {
         return FixtureLib.loadShieldedTransaction(name, vm);
     }
 

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.18;
 
-import {PubAsset} from "../libraries/ZTransaction.sol";
+import {PubAsset} from "../libraries/ShieldedTransaction.sol";
 
 interface IAdaptorHandler {
     error InvalidOutputValue();

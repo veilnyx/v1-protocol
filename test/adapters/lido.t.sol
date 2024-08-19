@@ -5,7 +5,7 @@ pragma abicoder v2;
 import {BaseScript} from "script/BaseScript.sol";
 import {PoolTest} from "test/fixtures/PoolTest.sol";
 import {Pool} from "src/core/Pool.sol";
-import {ZTransaction} from "src/libraries/ZTransaction.sol";
+import {ShieldedTransaction} from "src/libraries/ShieldedTransaction.sol";
 import {LidoAdaptor} from "src/adaptors/lido/lidoAdaptor.sol";
 import {IAdaptor} from "src/interfaces/IAdaptor.sol";
 import {IWToken} from "src/interfaces/IWToken.sol";
@@ -74,10 +74,10 @@ contract LidoAdaptorTest is PoolTest, BaseScript {
         vm.startPrank(user);
         iWETH.deposit{value: INITIAL_SUPPLY}(); // wrapping eth to weth
         iWETH.approve(address(pool), INITIAL_SUPPLY); // depositing weth to pool
-        ZTransaction memory ztxWethDeposit = _loadShieldedTransaction(
+        ShieldedTransaction memory stxWethDeposit = _loadShieldedTransaction(
             "deposit_1_original_weth"
         );
-        pool.transact(ztxWethDeposit);
+        pool.transact(stxWethDeposit);
         vm.stopPrank();
     }
 
@@ -92,10 +92,10 @@ contract LidoAdaptorTest is PoolTest, BaseScript {
             address(pool)
         );
 
-        ZTransaction memory ztxStake = _loadShieldedTransaction(
+        ShieldedTransaction memory stxStake = _loadShieldedTransaction(
             "stake_1_orig_weth_on_lido"
         );
-        pool.transact(ztxStake);
+        pool.transact(stxStake);
 
         // Asserts
         uint256 poolwstETHBalPostStake = IERC20(wstETH).balanceOf(

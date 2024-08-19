@@ -5,7 +5,7 @@ import {Test, console} from "forge-std/Test.sol";
 import {EntryPoint} from "@account-abstraction/contracts/core/EntryPoint.sol";
 import {PackedUserOperation} from "@account-abstraction/contracts/interfaces/PackedUserOperation.sol";
 import {Paymaster} from "src/core/Paymaster.sol";
-import {ZTransaction, ZTransactionType} from "src/libraries/ZTransaction.sol";
+import {ShieldedTransaction, ShieldedTransactionType} from "src/libraries/ShieldedTransaction.sol";
 import {Pool} from "src/core/Pool.sol";
 import {PoolTest} from "test/fixtures/PoolTest.sol";
 
@@ -20,14 +20,14 @@ contract PaymasterTest is PoolTest {
     PackedUserOperation userOp;
 
     modifier createPackedUserOps() {
-        ZTransaction memory ztx;
+        ShieldedTransaction memory stx;
 
-        ztx.pubAssets = new uint248[](1);
-        ztx.pubAssets[0] = uint248(
+        stx.pubAssets = new uint248[](1);
+        stx.pubAssets[0] = uint248(
             bytes31(bytes.concat(bytes3(feeAssetId), bytes12(uint96(10 ether))))
         );
 
-        ztx.feeData = uint256(
+        stx.feeData = uint256(
             bytes32(
                 bytes.concat(
                     bytes20(address(paymaster)),
@@ -37,7 +37,7 @@ contract PaymasterTest is PoolTest {
         );
 
         userOp.sender = address(pool);
-        userOp.callData = abi.encodeCall(Pool.transact, (ztx));
+        userOp.callData = abi.encodeCall(Pool.transact, (stx));
         _;
     }
 
@@ -110,16 +110,16 @@ contract PaymasterTest is PoolTest {
     }
 
     function test_revertWhenPaymasterFeesIsNotEnough() public {
-        ZTransaction memory ztx;
+        ShieldedTransaction memory stx;
 
-        ztx.pubAssets = new uint248[](1);
-        ztx.pubAssets[0] = uint248(
+        stx.pubAssets = new uint248[](1);
+        stx.pubAssets[0] = uint248(
             bytes31(bytes.concat(bytes3(feeAssetId), bytes12(uint96(10 ether))))
         );
 
         uint256 lowFeeValue = feeValue / 2;
 
-        ztx.feeData = uint256(
+        stx.feeData = uint256(
             bytes32(
                 bytes.concat(
                     bytes20(address(paymaster)),
@@ -129,7 +129,7 @@ contract PaymasterTest is PoolTest {
         );
 
         userOp.sender = address(pool);
-        userOp.callData = abi.encodeCall(Pool.transact, (ztx));
+        userOp.callData = abi.encodeCall(Pool.transact, (stx));
 
         vm.prank(entryPoint);
         vm.expectRevert(
@@ -161,10 +161,10 @@ contract PaymasterTest is PoolTest {
         vm.deal(address(this), value);
         paymaster.depositToEntryPoint{value: value}();
 
-        ZTransaction memory ztx = _loadShieldedTransaction(
+        ShieldedTransaction memory stx = _loadShieldedTransaction(
             "withdraw_1_weth_with_fee"
         );
-        pool.transact(ztx);
+        pool.transact(stx);
 
         uint256 assetFeeByPaymaster = paymaster.getAssetFee(feeAssetId);
         vm.prank(address(paymaster));
@@ -181,10 +181,10 @@ contract PaymasterTest is PoolTest {
         vm.deal(address(this), value);
         paymaster.depositToEntryPoint{value: value}();
 
-        ZTransaction memory ztx = _loadShieldedTransaction(
+        ShieldedTransaction memory stx = _loadShieldedTransaction(
             "withdraw_1_weth_with_fee"
         );
-        pool.transact(ztx);
+        pool.transact(stx);
 
         vm.startPrank(address(paymaster));
         pool.withdrawPaymasterFee(feeAssetId, address(paymaster));

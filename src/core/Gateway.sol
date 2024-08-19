@@ -5,7 +5,7 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {IAccount} from "@account-abstraction/contracts/interfaces/IAccount.sol";
 import {IEntryPoint} from "@account-abstraction/contracts/interfaces/IEntryPoint.sol";
 import {PackedUserOperation} from "@account-abstraction/contracts/interfaces/PackedUserOperation.sol";
-import {ZTransaction} from "../libraries/ZTransaction.sol";
+import {ShieldedTransaction} from "../libraries/ShieldedTransaction.sol";
 import {IWToken} from "../interfaces/IWToken.sol";
 import {IPool} from "../interfaces/IPool.sol";
 import {IGateway} from "../interfaces/IGateway.sol";
@@ -47,14 +47,18 @@ contract Gateway is IGateway, Ownable {
         return VALIDATION_SUCCEEDED;
     }
 
-    function handleUserOp(ZTransaction calldata ztx) external onlyEntryPoint {
-        IPool(_pool).transact(ztx);
+    function handleUserOp(
+        ShieldedTransaction calldata stx
+    ) external onlyEntryPoint {
+        IPool(_pool).transact(stx);
     }
 
-    function handleWrapAndDeposit(ZTransaction calldata ztx) external payable {
+    function handleWrapAndDeposit(
+        ShieldedTransaction calldata stx
+    ) external payable {
         IWToken(_wToken).deposit{value: msg.value}();
         IWToken(_wToken).approve(_pool, msg.value);
-        IPool(_pool).transact(ztx);
+        IPool(_pool).transact(stx);
     }
 
     // This may not be needed as paymaster is always supposed to pay for gas

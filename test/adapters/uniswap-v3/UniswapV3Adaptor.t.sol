@@ -5,7 +5,7 @@ pragma abicoder v2;
 import {BaseScript} from "script/BaseScript.sol";
 import {PoolTest} from "test/fixtures/PoolTest.sol";
 import {Pool} from "src/core/Pool.sol";
-import {ZTransaction} from "src/libraries/ZTransaction.sol";
+import {ShieldedTransaction} from "src/libraries/ShieldedTransaction.sol";
 import {UniswapV3Adapter} from "src/adaptors/uniswap-v3/UniswapV3Adapter.sol";
 import {IWToken} from "src/interfaces/IWToken.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -68,10 +68,10 @@ contract UniswapV3AdaptorTest is PoolTest, BaseScript {
         vm.startPrank(user);
         iWETH.deposit{value: INITIAL_SUPPLY}(); // wrapping eth to weth
         iWETH.approve(address(pool), INITIAL_SUPPLY); // depositing weth to pool
-        ZTransaction memory ztxWethDeposit = _loadShieldedTransaction(
+        ShieldedTransaction memory stxWethDeposit = _loadShieldedTransaction(
             "deposit_1_original_weth"
         );
-        pool.transact(ztxWethDeposit);
+        pool.transact(stxWethDeposit);
         vm.stopPrank();
     }
 
@@ -85,10 +85,10 @@ contract UniswapV3AdaptorTest is PoolTest, BaseScript {
             address(pool)
         );
 
-        ZTransaction memory ztxDeposit = _loadShieldedTransaction(
+        ShieldedTransaction memory stxDeposit = _loadShieldedTransaction(
             "swap_1e16_orig_weth_to_usdc"
         );
-        pool.transact(ztxDeposit);
+        pool.transact(stxDeposit);
 
         // Asserts
         uint256 poolUSDCBalPostConvert = IERC20(USDC).balanceOf(address(pool));
@@ -103,10 +103,10 @@ contract UniswapV3AdaptorTest is PoolTest, BaseScript {
             address(pool)
         );
 
-        ZTransaction memory ztxDeposit = _loadShieldedTransaction(
+        ShieldedTransaction memory stxDeposit = _loadShieldedTransaction(
             "swap_1e16_orig_weth_to_usdc_via_bundler"
         );
-        pool.transact(ztxDeposit);
+        pool.transact(stxDeposit);
 
         // Asserts
         uint256 poolUSDCBalPostConvert = IERC20(USDC).balanceOf(address(pool));
@@ -133,8 +133,8 @@ contract UniswapV3AdaptorTest is PoolTest, BaseScript {
     //         address(pool)
     //     );
 
-    //     ZTransaction memory ztxDeposit =  _loadShieldedTransaction("swap_5_usdc_to_weth");
-    //     pool.transact(ztxDeposit);
+    //     ShieldedTransaction memory stxDeposit =  _loadShieldedTransaction("swap_5_usdc_to_weth");
+    //     pool.transact(stxDeposit);
 
     //     // Asserts
     //     uint256 poolWETHBalPostConvert = IERC20(WETH).balanceOf(address(pool));
@@ -147,10 +147,10 @@ contract UniswapV3AdaptorTest is PoolTest, BaseScript {
     //     console.log("Initiating swap to USDC using Uniswap test");
     //     uint256 userUSDCBalBeforeConvert = IERC20(USDC).balanceOf(user);
 
-    //     ZTransaction memory ztxDeposit =  _loadShieldedTransaction(
+    //     ShieldedTransaction memory stxDeposit =  _loadShieldedTransaction(
     //         "swap_1e16_orig_weth_to_usdc"
     //     );
-    //     pool.transact(ztxDeposit);
+    //     pool.transact(stxDeposit);
 
     //     // Asserts
     //     uint256 userUSDCBalPostConvert = IERC20(USDC).balanceOf(user);
@@ -216,8 +216,8 @@ contract UniswapV3AdaptorTest is PoolTest, BaseScript {
 //     pool.addAdaptorSupport(adaptor, true);
 // }
 
-// function loadZTx(
+// function loadStx(
 //     string memory name
-// ) external view returns (ZTransaction memory) {
+// ) external view returns (ShieldedTransaction memory) {
 //     return  _loadShieldedTransaction(name);
 // }

@@ -5,7 +5,7 @@ import {Test} from "forge-std/Test.sol";
 import {console2} from "forge-std/console2.sol";
 import {IPool} from "src/interfaces/IPool.sol";
 import {Pool} from "src/core/Pool.sol";
-import {ZTransaction} from "src/libraries/ZTransaction.sol";
+import {ShieldedTransaction} from "src/libraries/ShieldedTransaction.sol";
 import {AssetType} from "src/libraries/Asset.sol";
 import {PoolTest} from "test/fixtures/PoolTest.sol";
 import {MockDeFi} from "test/mocks/MockDeFi.sol";
@@ -36,7 +36,7 @@ contract PoolAdaptorTest is PoolTest {
     }
 
     // function test_callAdaptor() public {
-    //     ZTransaction memory ztx = _loadShieldedTransaction(
+    //     ShieldedTransaction memory stx = _loadShieldedTransaction(
     //         "transfer_500_weth_without_fee"
     //     );
     // }

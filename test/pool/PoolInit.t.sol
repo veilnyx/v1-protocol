@@ -6,7 +6,7 @@ import {PoolTest} from "test/fixtures/PoolTest.sol";
 import {IPool} from "src/interfaces/IPool.sol";
 import {AssetType, Asset} from "src/libraries/Asset.sol";
 import {MerkleTree} from "src/libraries/MerkleTree.sol";
-import {RevokerData} from "src/libraries/ZTransaction.sol";
+import {RevokerData} from "src/libraries/ShieldedTransaction.sol";
 import {PoolStorage} from "src/base/PoolStorage.sol";
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 

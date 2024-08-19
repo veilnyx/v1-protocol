@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {ZTransaction, RevokerData} from "../libraries/ZTransaction.sol";
+import {ShieldedTransaction, RevokerData} from "../libraries/ShieldedTransaction.sol";
 
 interface IVerifier {
     error BadArguments();

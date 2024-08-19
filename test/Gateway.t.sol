@@ -8,11 +8,11 @@ import {PackedUserOperation} from "@account-abstraction/contracts/interfaces/Pac
 import {Gateway} from "src/core/Gateway.sol";
 import {Paymaster} from "src/core/Paymaster.sol";
 import {IWToken} from "src/interfaces/IWToken.sol";
-import {ZTransaction, ZTransactionType} from "src/libraries/ZTransaction.sol";
+import {ShieldedTransaction, ShieldedTransactionType} from "src/libraries/ShieldedTransaction.sol";
 import {MockWToken} from "test/mocks/MockWToken.sol";
 
 contract MockPool {
-    function transact(ZTransaction calldata) external {
+    function transact(ShieldedTransaction calldata) external {
         // Simulate gas usage
         for (uint256 i = 0; i < 10; i++) {
             new MockWToken();
@@ -50,17 +50,17 @@ contract GatewayTest is Test {
 
     function test_handleWrapAndDeposit() public {
         vm.deal(address(this), 100 ether);
-        ZTransaction memory ztx;
-        ztx.txType = ZTransactionType.DEPOSIT;
-        gateway.handleWrapAndDeposit{value: 100 ether}(ztx);
+        ShieldedTransaction memory stx;
+        stx.txType = ShieldedTransactionType.DEPOSIT;
+        gateway.handleWrapAndDeposit{value: 100 ether}(stx);
     }
 
     function test_handleUserOp() public {
-        ZTransaction memory ztx;
+        ShieldedTransaction memory stx;
         uint24[] memory pubAssetIds = new uint24[](1);
         pubAssetIds[0] = 0x010001;
-        // ztx.pubAssetIds = pubAssetIds;
-        ztx.feeData = uint256(
+        // stx.pubAssetIds = pubAssetIds;
+        stx.feeData = uint256(
             bytes32(
                 bytes.concat(
                     bytes20(address(paymaster)),
@@ -79,7 +79,7 @@ contract GatewayTest is Test {
 
         PackedUserOperation memory userOp;
         userOp.sender = address(gateway);
-        userOp.callData = abi.encodeCall(Gateway.handleUserOp, ztx);
+        userOp.callData = abi.encodeCall(Gateway.handleUserOp, stx);
         userOp.accountGasLimits = bytes32(
             bytes.concat(bytes16(verificationGasLimit), bytes16(callGasLimit))
         );

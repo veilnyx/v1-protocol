@@ -3,7 +3,7 @@ pragma solidity ^0.8.24;
 
 import {Test} from "forge-std/Test.sol";
 import {Vm} from "forge-std/Vm.sol";
-import {ZTransaction, ZTransactionType} from "src/libraries/ZTransaction.sol";
+import {ShieldedTransaction, ShieldedTransactionType} from "src/libraries/ShieldedTransaction.sol";
 import {ShieldedAddressRegistrationData} from "src/libraries/ShieldedAddress.sol";
 import {ShieldedAccount} from "test/helpers/ShieldedAccount.sol";
 import {TreeUpdateData} from "src/libraries/QueuedMerkleTree.sol";
@@ -159,10 +159,13 @@ library FixtureLib {
     function loadShieldedTransaction(
         string memory name,
         Vm vm
-    ) external view returns (ZTransaction memory) {
+    ) external view returns (ShieldedTransaction memory) {
         bytes memory data = loadData(name, vm);
-        ZTransaction memory ztx = abi.decode(data, (ZTransaction));
-        return ztx;
+        ShieldedTransaction memory stx = abi.decode(
+            data,
+            (ShieldedTransaction)
+        );
+        return stx;
     }
 
     function loadShieldedAddressRegistrationData(

@@ -13,7 +13,7 @@ import {BaseTest} from "test/fixtures/BaseTest.sol";
 import {Fixture, FixtureLib} from "./fixtures/Fixture.sol";
 import {Verifier, TransactionVerifierInfo} from "src/core/Verifier.sol";
 import {VerifierTreeUpdate} from "src/verifiers/VerifierTreeUpdate.sol";
-import {ZTransaction} from "src/libraries/ZTransaction.sol";
+import {ShieldedTransaction} from "src/libraries/ShieldedTransaction.sol";
 
 import {console2} from "forge-std/console2.sol";
 
