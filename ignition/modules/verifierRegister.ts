@@ -1,12 +1,12 @@
 import { buildModule } from "@nomicfoundation/hardhat-ignition/modules";
 import { camelCase } from "../utils";
 
-const libraryName = "MerkleTreeLogic";
-const moduleId = camelCase(libraryName);
+const contractName = "VerifierRegister";
+const moduleId = camelCase(contractName);
 
 const module = buildModule(moduleId, (m) => {
-  const merkleTree = m.library(libraryName);
-  return { merkleTree };
+  const verifierRegister = m.contract(contractName);
+  return { verifierRegister };
 });
 
 export default module;

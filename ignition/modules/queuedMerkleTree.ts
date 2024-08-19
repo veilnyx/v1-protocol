@@ -1,8 +1,8 @@
 import { buildModule } from "@nomicfoundation/hardhat-ignition/modules";
-import { capitalize } from "../utils";
+import { camelCase } from "../utils";
 
-const libraryName = "QueuedMerkleTree";
-const moduleId = capitalize(libraryName);
+const libraryName = "QueuedMerkleTreeLogic";
+const moduleId = camelCase(libraryName);
 
 const module = buildModule(moduleId, (m) => {
   const queuedMerkleTree = m.library(libraryName);

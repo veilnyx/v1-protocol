@@ -1,8 +1,8 @@
 import { buildModule } from "@nomicfoundation/hardhat-ignition/modules";
-import { capitalize } from "../utils";
+import { camelCase } from "../utils";
 
 const contractName = "AdaptorHandler";
-const moduleId = capitalize(contractName);
+const moduleId = camelCase(contractName);
 
 const module = buildModule(moduleId, (m) => {
   const adaptor = m.contract(contractName);

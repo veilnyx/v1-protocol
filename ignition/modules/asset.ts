@@ -1,8 +1,8 @@
 import { buildModule } from "@nomicfoundation/hardhat-ignition/modules";
-import { capitalize } from "../utils";
+import { camelCase } from "../utils";
 
-const libraryName = "Asset";
-const moduleId = capitalize(libraryName);
+const libraryName = "AssetLogic";
+const moduleId = camelCase(libraryName);
 
 const module = buildModule(moduleId, (m) => {
   const asset = m.library(libraryName);

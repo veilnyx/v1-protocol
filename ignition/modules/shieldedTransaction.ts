@@ -1,11 +1,25 @@
 import { buildModule } from "@nomicfoundation/hardhat-ignition/modules";
-import { capitalize } from "../utils";
+import assetModule from "./asset";
+import merkleTreeModule from "./merkleTree";
+import queuedMerkleTreeModule from "./queuedMerkleTree";
+import { camelCase } from "../utils";
 
-const libraryName = "ShieldedTransaction";
-const moduleId = capitalize(libraryName);
+const libraryName = "ZTransactionLogic";
+const moduleId = camelCase(libraryName);
 
 const module = buildModule(moduleId, (m) => {
-  const shieldedTransaction = m.library(libraryName);
+  const { asset } = m.useModule(assetModule);
+  const { merkleTree } = m.useModule(merkleTreeModule);
+  const { queuedMerkleTree } = m.useModule(queuedMerkleTreeModule);
+
+  const shieldedTransaction = m.library(libraryName, {
+    libraries: {
+      AssetLogic: asset,
+      MerkleTreeLogic: merkleTree,
+      QueuedMerkleTreeLogic: queuedMerkleTree,
+    },
+  });
+
   return { shieldedTransaction };
 });
 

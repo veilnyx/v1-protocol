@@ -1,11 +1,17 @@
 import { buildModule } from "@nomicfoundation/hardhat-ignition/modules";
-import { capitalize } from "../utils";
+import merkleTreeModule from "./merkleTree";
+import { camelCase } from "../utils";
 
-const libraryName = "ShieldedAddress";
-const moduleId = capitalize(libraryName);
+const libraryName = "ShieldedAddressLogic";
+const moduleId = camelCase(libraryName);
 
 const module = buildModule(moduleId, (m) => {
-  const shieldedAddress = m.library(libraryName);
+  const { merkleTree } = m.useModule(merkleTreeModule);
+
+  const shieldedAddress = m.library(libraryName, {
+    libraries: { MerkleTreeLogic: merkleTree },
+  });
+
   return { shieldedAddress };
 });
 

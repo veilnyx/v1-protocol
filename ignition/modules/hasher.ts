@@ -1,8 +1,9 @@
 import { Hex } from "viem";
 import { buildModule } from "@nomicfoundation/hardhat-ignition/modules";
+import { camelCase } from "../utils";
 
 const contractName = "Hasher";
-const moduleId = contractName.toLowerCase();
+const moduleId = camelCase(contractName);
 
 const module = buildModule(moduleId, (m) => {
   const poseidonT3 = m.getParameter<Hex>("poseidonT3");

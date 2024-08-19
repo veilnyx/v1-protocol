@@ -1,14 +1,15 @@
 import { Hex } from "viem";
 import { buildModule } from "@nomicfoundation/hardhat-ignition/modules";
-import { capitalize } from "../utils";
+import poolModule from "./pool";
+import { camelCase } from "../utils";
 
 const contractName = "Paymaster";
-const moduleId = capitalize(contractName);
+const moduleId = camelCase(contractName);
 
 const module = buildModule(moduleId, (m) => {
   const entryPoint = m.getParameter<Hex>("entryPoint");
-  const pool = "0x";
-  const paymaster = m.contract(contractName, [entryPoint, pool]);
+  const { poolProxy } = m.useModule(poolModule);
+  const paymaster = m.contract(contractName, [entryPoint, poolProxy]);
   return { paymaster };
 });
 
