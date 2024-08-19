@@ -25,7 +25,7 @@ library AssetLogic {
     using SafeERC20 for IERC20;
 
     error ZeroAddress();
-    
+
     function getAssetOrRevert(
         mapping(uint24 => Asset) storage assets,
         uint24 assetId
@@ -43,11 +43,11 @@ library AssetLogic {
         AssetType assetType,
         address assetAddress
     ) public returns (uint16) {
-        if (_isAssetSupported(assetIds, assets, assetAddress)) {
+        if (_isAssetSupported(assetIds, assetAddress)) {
             revert IPool.DuplicateAsset(assetAddress);
         }
 
-        if(assetAddress == address(0)) {
+        if (assetAddress == address(0)) {
             revert ZeroAddress();
         }
 
@@ -135,11 +135,10 @@ library AssetLogic {
 
     function _isAssetSupported(
         mapping(address => uint24) storage assetIds,
-        mapping(uint24 => Asset) storage assets,
         address assetAddress
     ) internal view returns (bool) {
         uint24 assetId = assetIds[assetAddress];
-        return assets[assetId].isSupported;
+        return assetId != 0;
     }
 
     function _receiveERC20(
