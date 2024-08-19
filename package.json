@@ -33,6 +33,7 @@
     "@zkfi-tech/transaction": "link:../v1-sdk/packages/transaction",
     "@zkfi-tech/utils": "link:../v1-sdk/packages/utils",
     "@zkfi-tech/zk-prover": "link:../v1-sdk/packages/zk-prover",
+    "dotenv": "^16.4.5",
     "fixed-merkle-tree": "^0.7.3",
     "forge-std": "github:foundry-rs/forge-std#v1.8.2",
     "hardhat": "^2.22.8",
