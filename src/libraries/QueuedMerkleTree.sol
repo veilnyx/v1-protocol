@@ -5,6 +5,7 @@ import {FIELD_SIZE, ZERO_LEAF} from "../base/Constants.sol";
 import {IHasher} from "../interfaces/IHasher.sol";
 import {IVerifier} from "../interfaces/IVerifier.sol";
 import {IPool} from "../interfaces/IPool.sol";
+import {console2} from "forge-std/console2.sol";
 
 struct QueuedMerkleTree {
     uint8 depth;
@@ -135,14 +136,17 @@ library QueuedMerkleTreeLogic {
             }
         }
 
-        self.nextLeafIndex += self.queueSize;
+        // self.nextLeafIndex += self.queueSize;
         uint32 batchSize = self.queueEndIndex - self.queueStartIndex;
 
         if (batchSize < self.queueSize) {
             self.queueStartIndex = self.queueEndIndex;
+            self.nextLeafIndex += batchSize;
         } else {
             self.queueStartIndex += self.queueSize;
+            self.nextLeafIndex += self.queueSize;
         }
+        console2.log("New tree nextLeafIndex:", self.nextLeafIndex);
     }
 
     function _verifyUpdateProof(
