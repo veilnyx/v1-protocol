@@ -8,6 +8,7 @@ import {Paymaster} from "src/core/Paymaster.sol";
 import {ShieldedTransaction, ShieldedTransactionType} from "src/libraries/ShieldedTransaction.sol";
 import {Pool} from "src/core/Pool.sol";
 import {PoolTest} from "test/fixtures/PoolTest.sol";
+import {console2} from "forge-std/console2.sol";
 
 // import {PoolTransactTest} from "test/helpers/PoolTransact.t.sol";
 
@@ -46,6 +47,7 @@ contract PaymasterTest is PoolTest {
         feeAssetId = asset1.id;
         entryPoint = address(new EntryPoint());
         paymaster = new Paymaster(entryPoint, address(pool));
+        console2.log("paymaster:", address(paymaster));
         paymaster.setAssetFee(feeAssetId, feeValue);
     }
 
@@ -63,24 +65,22 @@ contract PaymasterTest is PoolTest {
         uint256 value = 1000 ether;
         vm.deal(address(this), value);
 
-        //     paymaster.depositToEntryPoint{value: value}();
+            paymaster.depositToEntryPoint{value: value}();
 
-        //     uint256 deposit = paymaster.getEntryPointDeposit();
-        //     assertEq(deposit, value);
+            uint256 deposit = paymaster.getEntryPointDeposit();
+            assertEq(deposit, value);
 
-        //     address withdrawAddress = address(
-        //         uint160(uint256(keccak256("withdraw")))
-        //     );
-        //     uint256 withdrawValue = 100 ether;
-        //     paymaster.withdrawFromEntryPoint(
-        //         payable(withdrawAddress),
-        //         withdrawValue
-        //     );
+            address withdrawAddress = makeAddr("withdraw");
+            uint256 withdrawValue = 100 ether;
+            paymaster.withdrawFromEntryPoint(
+                payable(withdrawAddress),
+                withdrawValue
+            );
 
-        //     uint256 newDeposit = paymaster.getEntryPointDeposit();
+            uint256 depositBal = paymaster.getEntryPointDeposit();
 
-        //     assertEq(newDeposit, value - withdrawValue);
-        //     assertEq(withdrawAddress.balance, withdrawValue);
+            assertEq(depositBal, value - withdrawValue);
+            assertEq(withdrawAddress.balance, withdrawValue);
     }
 
     function test_withdrawAsset() public {
@@ -162,7 +162,7 @@ contract PaymasterTest is PoolTest {
         paymaster.depositToEntryPoint{value: value}();
 
         ShieldedTransaction memory stx = _loadShieldedTransaction(
-            "withdraw_1_weth_with_fee"
+            "withdraw_10_weth_with_weth_fee"
         );
         pool.transact(stx);
 
@@ -182,7 +182,7 @@ contract PaymasterTest is PoolTest {
         paymaster.depositToEntryPoint{value: value}();
 
         ShieldedTransaction memory stx = _loadShieldedTransaction(
-            "withdraw_1_weth_with_fee"
+            "withdraw_10_weth_with_weth_fee"
         );
         pool.transact(stx);
 
