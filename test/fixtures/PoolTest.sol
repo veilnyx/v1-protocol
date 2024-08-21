@@ -125,14 +125,14 @@ contract PoolTest is PoolBaseTest, BaseScript {
         assetAddresses[0] = address(token1);
         assetAddresses[1] = address(token2);
         assetAddresses[2] = address(tokenReent);
-        
+
         // adding support for testnet tokens if any to provide support of adaptor testing
-        if(initAssetLength > 0) {
+        if (initAssetLength > 0) {
             uint i = 0;
-            do{
-            assetAddresses[3 + i] = _config.initAssetAddresses()[i];
-            ++i;
-            } while (i == initAssetLength);
+            do {
+                assetAddresses[3 + i] = _config.initAssetAddresses()[i];
+                ++i;
+            } while (i < initAssetLength);
         }
         pool.addAssets(assetType, assetAddresses);
         asset1 = pool.getAsset(assetAddresses[0]);

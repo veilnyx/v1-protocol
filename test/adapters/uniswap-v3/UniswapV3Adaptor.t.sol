@@ -20,7 +20,7 @@ contract UniswapV3AdaptorTest is PoolTest {
     address public WETH;
     address public USDC;
     IWToken public iWETH;
-    uint256 public constant INITIAL_SUPPLY = 1 ether;
+    uint256 public constant INITIAL_SUPPLY = 2 ether;
     uint256 public constant SWAP_AMT = 1 ether;
     address public user = 0x689EcF264657302052c3dfBD631e4c20d3ED0baB;
 
@@ -62,7 +62,7 @@ contract UniswapV3AdaptorTest is PoolTest {
         iWETH.deposit{value: INITIAL_SUPPLY}(); // wrapping eth to weth
         iWETH.approve(address(pool), INITIAL_SUPPLY); // depositing weth to pool
         ShieldedTransaction memory stxWethDeposit = _loadShieldedTransaction(
-            "deposit_1_testnet_weth"
+            "deposit_2_testnet_weth"
         );
         pool.transact(stxWethDeposit);
         vm.stopPrank();
@@ -99,7 +99,7 @@ contract UniswapV3AdaptorTest is PoolTest {
         );
 
         ShieldedTransaction memory stxDeposit = _loadShieldedTransaction(
-            "swap_1e16_orig_weth_to_usdc_via_bundler"
+            "swap_1_orig_weth_to_usdc_via_bundler"
         );
         pool.transact(stxDeposit);
 

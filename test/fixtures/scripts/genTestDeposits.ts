@@ -51,10 +51,10 @@ export const reqs = {
     revokerId: 0,
   },
    */
-  deposit_1_testnet_weth: {
+  deposit_2_testnet_weth: {
     type: TransactionType.DEPOSIT,
     assetIds: [testnetWeth],
-    values: [parseEther("1")],
+    values: [parseEther("2")],
     feeAssetId: 0,
     to: senderAccount.shieldedAddress.pack(),
     viaBundler: false,
