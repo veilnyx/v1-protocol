@@ -30,6 +30,8 @@ contract GatewayTest is Test {
     address payable beneficiary = payable(address(0x123));
 
     uint128 baseFee = 25 gwei;
+    uint24 assetId = 65537;
+    uint256 paymasterFeeValue = 0.1 ether;
 
     function setUp() public {
         entryPoint = new EntryPoint();
@@ -45,7 +47,7 @@ contract GatewayTest is Test {
         // Deposit to entry point
         vm.deal(address(this), 100 ether);
         paymaster.depositToEntryPoint{value: 100 ether}();
-        paymaster.setAssetFee(0x010001, 0.1 ether);
+        paymaster.setAssetFee(assetId, paymasterFeeValue);
     }
 
     function test_handleWrapAndDeposit() public {
@@ -57,14 +59,24 @@ contract GatewayTest is Test {
 
     function test_handleUserOp() public {
         ShieldedTransaction memory stx;
+
         uint24[] memory pubAssetIds = new uint24[](1);
-        pubAssetIds[0] = 0x010001;
-        // stx.pubAssetIds = pubAssetIds;
+        uint224[] memory pubAssetValues = new uint224[](1);
+        uint248[] memory pubAssets = new uint248[](1);
+        pubAssetIds[0] = assetId;
+        pubAssetValues[0] = 1 ether;
+        pubAssets[0] = uint248(
+            bytes31(
+                bytes.concat(bytes3(pubAssetIds[0]), bytes28(pubAssetValues[0]))
+            )
+        );
+
+        stx.pubAssets = pubAssets;
         stx.feeData = uint256(
             bytes32(
                 bytes.concat(
                     bytes20(address(paymaster)),
-                    bytes12(uint96(0.1 ether))
+                    bytes12(uint96(paymasterFeeValue))
                 )
             )
         );
