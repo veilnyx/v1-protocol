@@ -14,7 +14,7 @@ import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import {Asset, AssetType} from "src/libraries/Asset.sol";
 import {console} from "forge-std/console.sol";
 
-contract LidoAdaptorTest is PoolTest, BaseScript {
+contract LidoAdaptorTest is PoolTest {
     error CheckChainConfig();
 
     LidoAdaptor lidoAdaptor;

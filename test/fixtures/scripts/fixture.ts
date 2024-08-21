@@ -35,6 +35,8 @@ const assets = {
   weth: config.assets.weth,
   usdc: config.assets.usdc,
   reentrantToken: config.assets.reentrantToken,
+  testnetWeth: config.assets.testnetWeth,
+  testnetUsdc: config.assets.testnetUsdc
 };
 
 const revokerPublicKey = Point.fromArray([

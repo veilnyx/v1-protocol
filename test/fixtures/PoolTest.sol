@@ -19,8 +19,9 @@ import {MockVerifier} from "test/mocks/MockVerifier.sol";
 import {MockERC20} from "test/mocks/MockERC20.sol";
 import {MockVerifier} from "test/mocks/MockVerifier.sol";
 import {PoolBaseTest} from "./PoolBaseTest.sol";
+import {BaseScript} from "script/BaseScript.sol";
 
-contract PoolTest is PoolBaseTest {
+contract PoolTest is PoolBaseTest, BaseScript {
     using MerkleTreeLogic for MerkleTree;
 
     MockVerifier internal _mockVerifier = new MockVerifier();
@@ -119,9 +120,20 @@ contract PoolTest is PoolBaseTest {
         PoolBaseTest._setUp();
 
         AssetType assetType = AssetType.ERC20;
-        address[] memory assetAddresses = new address[](2);
+        uint256 initAssetLength = _config.initAssetAddresses().length;
+        address[] memory assetAddresses = new address[](3 + initAssetLength);
         assetAddresses[0] = address(token1);
         assetAddresses[1] = address(token2);
+        assetAddresses[2] = address(tokenReent);
+        
+        // adding support for testnet tokens if any to provide support of adaptor testing
+        if(initAssetLength > 0) {
+            uint i = 0;
+            do{
+            assetAddresses[3 + i] = _config.initAssetAddresses()[i];
+            ++i;
+            } while (i == initAssetLength);
+        }
         pool.addAssets(assetType, assetAddresses);
         asset1 = pool.getAsset(assetAddresses[0]);
         asset2 = pool.getAsset(assetAddresses[1]);
@@ -196,7 +208,10 @@ contract PoolTest is PoolBaseTest {
             "deposit_pre_tx"
         );
         pool.transact(stx);
+        _processCommitmentTreeQueue();
+    }
 
+    function _processCommitmentTreeQueue() internal {
         // Process the batch
         uint256[] memory leaves = pool.getQueuedLeaves();
         uint8 depth = pool.getCommitmentTreeDepth();

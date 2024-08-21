@@ -16,7 +16,6 @@ contract PoolReentrancyTest is PoolTest {
 
     ShieldedTransaction attackerWithdrawStx;
     MerkleTree internal refTree;
-    MockERC20ForReentrancyTest tokenReent;
     MockAttacker attacker;
     Asset assetReent;
     uint256 constant INITIAL_DEPOSIT = 1000 ether;
@@ -24,14 +23,6 @@ contract PoolReentrancyTest is PoolTest {
     function setUp() public {
         _setUp();
         refTree.init(fixture.commitmentTreeDepth, address(hasher));
-
-        // Deploying the ERC20 token for testing reentrancy attack
-        tokenReent = new MockERC20ForReentrancyTest(address(this));
-
-        AssetType assetType = AssetType.ERC20;
-        address[] memory assetAddresses = new address[](1);
-        assetAddresses[0] = address(tokenReent);
-        pool.addAssets(assetType, assetAddresses);
         assetReent = pool.getAsset(address(tokenReent));
 
         _mintAsset(assetReent, address(this), INITIAL_DEPOSIT);

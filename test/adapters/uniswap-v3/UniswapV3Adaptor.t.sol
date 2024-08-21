@@ -12,7 +12,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Asset, AssetType} from "src/libraries/Asset.sol";
 import {console} from "forge-std/console.sol";
 
-contract UniswapV3AdaptorTest is PoolTest, BaseScript {
+contract UniswapV3AdaptorTest is PoolTest {
     error CheckChainConfig();
 
     UniswapV3Adapter uniswapV3Adapter;
@@ -21,7 +21,7 @@ contract UniswapV3AdaptorTest is PoolTest, BaseScript {
     address public USDC;
     IWToken public iWETH;
     uint256 public constant INITIAL_SUPPLY = 1 ether;
-    uint256 public constant SWAP_AMT = 0.01 ether;
+    uint256 public constant SWAP_AMT = 1 ether;
     address public user = 0x689EcF264657302052c3dfBD631e4c20d3ED0baB;
 
     function setUp() external {
@@ -54,25 +54,20 @@ contract UniswapV3AdaptorTest is PoolTest, BaseScript {
 
         // TODO: Use a cheat code for Uni adp. address for consistency
         address poolOwner = pool.owner();
-        vm.startPrank(poolOwner);
+        vm.prank(poolOwner);
         pool.addAdaptorSupport(address(uniswapV3Adapter), true);
-
-        AssetType assetType = AssetType.ERC20;
-        address[] memory assetAddresses = new address[](2);
-        assetAddresses[0] = WETH;
-        assetAddresses[1] = USDC;
-        pool.addAssets(assetType, assetAddresses);
-        vm.stopPrank();
 
         vm.deal(user, INITIAL_SUPPLY * 2);
         vm.startPrank(user);
         iWETH.deposit{value: INITIAL_SUPPLY}(); // wrapping eth to weth
         iWETH.approve(address(pool), INITIAL_SUPPLY); // depositing weth to pool
         ShieldedTransaction memory stxWethDeposit = _loadShieldedTransaction(
-            "deposit_1_original_weth"
+            "deposit_1_testnet_weth"
         );
         pool.transact(stxWethDeposit);
         vm.stopPrank();
+
+        _processCommitmentTreeQueue();
     }
 
     function testUniswapZkFiAdaptorDeploy() external view {
@@ -85,10 +80,10 @@ contract UniswapV3AdaptorTest is PoolTest, BaseScript {
             address(pool)
         );
 
-        ShieldedTransaction memory stxDeposit = _loadShieldedTransaction(
-            "swap_1e16_orig_weth_to_usdc"
+        ShieldedTransaction memory stxSwap = _loadShieldedTransaction(
+            "swap_1_testnet_weth_to_usdc"
         );
-        pool.transact(stxDeposit);
+        pool.transact(stxSwap);
 
         // Asserts
         uint256 poolUSDCBalPostConvert = IERC20(USDC).balanceOf(address(pool));
