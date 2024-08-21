@@ -31,6 +31,7 @@ const receiverPubAddress = config.receiver.pubAddress;
 const addressTreeDepth = Number(config.addressTreeDepth);
 const commitmentTreeDepth = Number(config.commitmentTreeDepth);
 const commitmentTreeQueueSize = Number(config.commitmentTreeQueueSize);
+const qmtBatchSize = Number(config.qmtBatchSize);
 const assets = {
   weth: config.assets.weth,
   usdc: config.assets.usdc,
@@ -68,6 +69,7 @@ export const fixture = {
   addressTreeDepth,
   commitmentTreeDepth,
   commitmentTreeQueueSize,
+  qmtBatchSize,
   revokerPublicKey,
   encryptionPublicKey,
   assets,

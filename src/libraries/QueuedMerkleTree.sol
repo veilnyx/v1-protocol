@@ -5,7 +5,6 @@ import {FIELD_SIZE, ZERO_LEAF} from "../base/Constants.sol";
 import {IHasher} from "../interfaces/IHasher.sol";
 import {IVerifier} from "../interfaces/IVerifier.sol";
 import {IPool} from "../interfaces/IPool.sol";
-import {console2} from "forge-std/console2.sol";
 
 struct QueuedMerkleTree {
     uint8 depth;
@@ -118,7 +117,8 @@ library QueuedMerkleTreeLogic {
         QueuedMerkleTree storage self,
         TreeUpdateData calldata data
     ) public {
-        bool isValid = _verifyUpdateProof(self, data);
+        uint32 batchSize = self.queueEndIndex - self.queueStartIndex;
+        bool isValid = _verifyUpdateProof(self, data, batchSize);
 
         if (!isValid) {
             revert InvalidProof();
@@ -136,9 +136,6 @@ library QueuedMerkleTreeLogic {
             }
         }
 
-        // self.nextLeafIndex += self.queueSize;
-        uint32 batchSize = self.queueEndIndex - self.queueStartIndex;
-
         if (batchSize < self.queueSize) {
             self.queueStartIndex = self.queueEndIndex;
             self.nextLeafIndex += batchSize;
@@ -146,16 +143,19 @@ library QueuedMerkleTreeLogic {
             self.queueStartIndex += self.queueSize;
             self.nextLeafIndex += self.queueSize;
         }
-        console2.log("New tree nextLeafIndex:", self.nextLeafIndex);
     }
 
     function _verifyUpdateProof(
         QueuedMerkleTree storage self,
-        TreeUpdateData calldata data
+        TreeUpdateData calldata data,
+        uint32 batchSize
     ) internal view returns (bool) {
         uint256[] memory leaves = _getQueuedLeaves(self);
         uint256[] memory lastSubtrees = _getSubtree(self);
         uint256 lastRoot = self.roots[self.currentRootIndex];
+        uint256 nZeroLeaves = batchSize < self.queueSize
+            ? self.queueSize - batchSize
+            : 0;
 
         bytes memory vParams = abi.encodePacked(
             data.proof,
@@ -164,7 +164,8 @@ library QueuedMerkleTreeLogic {
             lastRoot,
             lastSubtrees,
             data.newRoot,
-            data.newSubtrees
+            data.newSubtrees,
+            nZeroLeaves
         );
 
         return IVerifier(self.verifier).verifyTreeUpdateProof(vParams);
