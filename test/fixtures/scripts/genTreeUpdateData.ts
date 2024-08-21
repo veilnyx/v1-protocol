@@ -8,20 +8,18 @@ import { fixture } from "./fixture";
 
 const dirFixtureData = path.resolve(__dirname, "../data");
 
-const batchSize = 10;
-
 export const genTreeUpdateData = async (sdk: Core) => {
   let initialTreeState: MerkleTreeState = getInitialTreeState();
   const treeUpdateData1 = await sdk.prover.proveTreeUpdate({
     lastTree: initialTreeState,
     leaves: fixture.leavesQueue1,
-    batchSize,
+    batchSize: fixture.qmtBatchSize,
   });
 
   const treeUpdateData2 = await sdk.prover.proveTreeUpdate({
     lastTree: treeUpdateData1.newTree,
     leaves: fixture.leavesQueue2,
-    batchSize,
+    batchSize: fixture.qmtBatchSize,
   });
 
   const encodedTreeUpdateData1 = treeUpdateData1.encode();
@@ -45,14 +43,14 @@ export const genTreeUpdateDataWithPartialQueue = async (sdk: Core) => {
   const treeUpdateData1 = await sdk.prover.proveTreeUpdate({
     lastTree: initialTreeState,
     leaves: leavesPartialQueue,
-    batchSize: 10,
+    batchSize: fixture.qmtBatchSize,
     forceUpdate: true,
   });
 
   const treeUpdateData2 = await sdk.prover.proveTreeUpdate({
     lastTree: treeUpdateData1.newTree,
     leaves: fixture.leavesQueue2,
-    batchSize,
+    batchSize: fixture.qmtBatchSize,
   });
 
   const encodedPartialTreeData = treeUpdateData1.encode();
