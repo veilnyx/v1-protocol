@@ -1,4 +1,4 @@
-// SPDX-License-Identifie–: MIT
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
@@ -292,10 +292,6 @@ contract Pool is
         address adaptorAddress
     ) external view returns (bool) {
         return _adaptors[adaptorAddress];
-    }
-
-    function isMarkedNullifier(uint256 nullifier) external view returns (bool) {
-        return _markedNullifiers[nullifier] != 0;
     }
 
     function areMarkedNullifiers(

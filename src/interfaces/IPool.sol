@@ -203,10 +203,6 @@ interface IPool {
         address adaptorAddress
     ) external view returns (bool);
 
-    /// @notice Returns if a nullifier is marked.
-    /// @param nullifier The nullifier to check.
-    function isMarkedNullifier(uint256 nullifier) external view returns (bool);
-
     /// @notice Returns if an array of nullifiers are marked.
     /// @param nullifiers The array of nullifiers to check.
     function areMarkedNullifiers(
