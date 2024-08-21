@@ -13,36 +13,56 @@ export const genTreeUpdateData = async (sdk: Core) => {
   const treeUpdateData1 = await sdk.prover.proveTreeUpdate({
     lastTree: initialTreeState,
     leaves: fixture.leavesQueue1,
+    batchSize: fixture.qmtBatchSize,
   });
 
   const treeUpdateData2 = await sdk.prover.proveTreeUpdate({
     lastTree: treeUpdateData1.newTree,
     leaves: fixture.leavesQueue2,
+    batchSize: fixture.qmtBatchSize,
   });
 
-  const encoded1 = treeUpdateData1.encode();
-  const encoded2 = treeUpdateData2.encode();
-  writeFileSync(`${dirFixtureData}/tree_update_data_1.txt`, encoded1);
-  writeFileSync(`${dirFixtureData}/tree_update_data_2.txt`, encoded2);
+  const encodedTreeUpdateData1 = treeUpdateData1.encode();
+  const encodedTreeUpdateData2 = treeUpdateData2.encode();
+  writeFileSync(
+    `${dirFixtureData}/tree_update_data_1.txt`,
+    encodedTreeUpdateData1
+  );
+  writeFileSync(
+    `${dirFixtureData}/tree_update_data_2.txt`,
+    encodedTreeUpdateData2
+  );
 };
 
 export const genTreeUpdateDataWithPartialQueue = async (sdk: Core) => {
   let initialTreeState: MerkleTreeState = getInitialTreeState();
 
   // adding ZERO_LEAF to make it 10 leaves
-  let leavesQueue: bigint[] = fixture.leavesQueuePartial;
-  leavesQueue[8] = BigInt(fixture.zeroLeaf);
-  leavesQueue[9] = BigInt(fixture.zeroLeaf);
+  let leavesPartialQueue: bigint[] = [...fixture.leavesQueuePartial];
 
-  const treeUpdateData = await sdk.prover.proveTreeUpdate({
+  const treeUpdateData1 = await sdk.prover.proveTreeUpdate({
     lastTree: initialTreeState,
-    leaves: leavesQueue,
+    leaves: leavesPartialQueue,
+    batchSize: fixture.qmtBatchSize,
+    forceUpdate: true,
   });
 
-  const encoded = treeUpdateData.encode();
+  const treeUpdateData2 = await sdk.prover.proveTreeUpdate({
+    lastTree: treeUpdateData1.newTree,
+    leaves: fixture.leavesQueue2,
+    batchSize: fixture.qmtBatchSize,
+  });
+
+  const encodedPartialTreeData = treeUpdateData1.encode();
+  const encodedFullTreeData = treeUpdateData2.encode();
+
   writeFileSync(
     `${dirFixtureData}/tree_update_data_partial_queue.txt`,
-    encoded
+    encodedPartialTreeData
+  );
+  writeFileSync(
+    `${dirFixtureData}/tree_update_data_2.txt`,
+    encodedFullTreeData
   );
 };
 
