@@ -7,7 +7,6 @@ import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/U
 import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
-// import {EIP712Upgradeable} from "@openzeppelin/contracts-upgradeable/utils/cryptography/EIP712Upgradeable.sol";
 import {EIP712} from "../libraries/EIP712.sol";
 import {IVerifier} from "../interfaces/IVerifier.sol";
 import {IPool} from "../interfaces/IPool.sol";
@@ -301,63 +300,6 @@ contract Pool is
 
         return markedArr;
     }
-
-    /**
-    // function assetCount(AssetType assetType) external view returns (uint24) {
-    //     return _assetCounts[assetType];
-    // }
-
-    function isAssetActive(address assetAddress) external view returns (bool) {
-        uint24 id = _assetIds[assetAddress];
-        return _assets[id].isActive;
-    }
-     
-
-    function zeroes(uint8 level) external view returns (uint256) {
-        return _commitmentTree.zeroes[level];
-    }
-
-    function getCommitmentTreeDepth() external view returns (uint8) {
-        return _commitmentTree.depth;
-    }
-
-    function getAddressTreeDepth() external view returns (uint8) {
-        return _addressTree.depth;
-    }
-
-     function getCommitmentTreeNextLeafIndex() external view returns (uint32) {
-        return _commitmentTree.nextLeafIndex;
-    }
-
-     function getCommitmentTreeLastRoot() external view returns (uint256) {
-        return _commitmentTree.roots[_commitmentTree.currentRootIndex];
-    }
-
-     function getCommitmentTreeCurrentRootIndex()
-        external
-        view
-        returns (uint256)
-    {
-        return _commitmentTree.currentRootIndex;
-    }
-
-    function getAddressTreeNextLeafIndex() external view returns (uint32) {
-        return _addressTree.nextLeafIndex;
-    }
-
-    function getAddressTreeLastRoot() external view returns (uint256) {
-        return _addressTree.roots[_addressTree.currentRootIndex];
-    }
-
-    function getQueuedLeaves() external view returns (uint256[] memory) {
-        return _commitmentTree.getQueuedLeaves();
-    }
-
-    function getAddressTreeCurrentRootIndex() external view returns (uint256) {
-        return _addressTree.currentRootIndex;
-    }
-
-    */
 
     function getCommitmentTreeState()
         external
