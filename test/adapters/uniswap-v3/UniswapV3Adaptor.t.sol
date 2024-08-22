@@ -99,7 +99,7 @@ contract UniswapV3AdaptorTest is PoolTest {
         );
 
         ShieldedTransaction memory stxDeposit = _loadShieldedTransaction(
-            "swap_1_orig_weth_to_usdc_via_bundler"
+            "swap_1_testnet_weth_to_usdc_via_bundler"
         );
         pool.transact(stxDeposit);
 

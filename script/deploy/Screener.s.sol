@@ -6,7 +6,7 @@ import {BaseScript} from "../BaseScript.sol";
 
 contract ScreenerDeploy is BaseScript {
     function run() external broadcast {
-        address sanctionList = _config.sanctionList();
-        new Screener(sanctionList);
+        address sanctionsList = _config.sanctionsList();
+        new Screener(sanctionsList);
     }
 }

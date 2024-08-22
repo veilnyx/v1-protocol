@@ -25,7 +25,7 @@ contract Config is Script {
     address public immutable uniswapSwapRouter02;
     address public immutable lido;
     address public immutable withdrawalQueueERC721;
-    address public immutable sanctionList;
+    address public immutable sanctionsList;
 
     AssetType public immutable initAssetType;
     address[] internal _initAssetAddresses;
@@ -107,9 +107,9 @@ contract Config is Script {
             lido = address(0);
         }
 
-        sanctionList = vm.parseJsonAddress(
+        sanctionsList = vm.parseJsonAddress(
             configJson,
-            string.concat(chainPrefix, ".sanctionList")
+            string.concat(chainPrefix, ".sanctionsList")
         );
 
         initAssetType = AssetType(

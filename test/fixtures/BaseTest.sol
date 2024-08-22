@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.20;
+pragma solidity ^0.8.24;
 
 import {Test} from "forge-std/Test.sol";
 import {ShieldedTransactionType, ShieldedTransaction} from "src/libraries/ShieldedTransaction.sol";
@@ -21,9 +21,8 @@ abstract contract BaseTest is Test {
         fixture = FixtureLib.load(vm);
         token1 = new MockERC20(address(this));
         token2 = new MockERC20(address(this));
-         // Deploying the ERC20 token for testing reentrancy attack
+        // Deploying the ERC20 token for testing reentrancy attack
         tokenReent = new MockERC20ForReentrancyTest(address(this));
-
     }
 
     function _loadShieldedTransaction(

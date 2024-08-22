@@ -23,7 +23,7 @@ export const reqs = {
         viaBundler: false,
         paymaster: zeroAddress
     },
-    swap_1_orig_weth_to_usdc_via_bundler: {
+    swap_1_testnet_weth_to_usdc_via_bundler: {
         type: TransactionType.CALL_ADAPTER,
         assetIds: [testnetWeth],
         values: [parseEther("1")],
