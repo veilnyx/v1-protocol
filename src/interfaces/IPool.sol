@@ -25,10 +25,10 @@ interface IPool {
         bytes metadata
     );
     event RevokerStatusUpdated(uint256 indexed id, bool status);
-    event NullifierMarked(uint256 indexed nullifier, uint32 markLeafIndex);
 
     event AssetAdded(address indexed assetAddress, uint24 assetId);
 
+    event NullifierMarked(uint256 indexed nullifier, uint32 markLeafIndex);
     // Commitments
     event Commitment(uint256 indexed leafIndex, uint256 indexed commitment);
 
@@ -159,14 +159,6 @@ interface IPool {
         ShieldedTransaction calldata stx
     ) external view returns (bool);
 
-    /// @notice Returns the no. of assets supported by asset type.
-    /// @param assetType The type of the asset. Ref. enum Asset::AssetType
-    function assetCount(AssetType assetType) external view returns (uint24);
-
-    /// @notice Returns if an asset is registered and active.
-    /// @param assetAddress The address of the asset to check.
-    function isAssetActive(address assetAddress) external view returns (bool);
-
     /// @notice Returns the data of an asset.
     /// @param assetId The id of the asset.
     function getAsset(uint24 assetId) external view returns (Asset memory);
@@ -209,8 +201,19 @@ interface IPool {
         uint256[] calldata nullifiers
     ) external view returns (bool[] memory);
 
-    /// @notice Returns the level hash of an empty merkle tree.
-    function zeroes(uint8 level) external view returns (uint256);
+    /**
+     * 
+     * 
+    /// @notice Returns the no. of assets supported by asset type.
+    /// @param assetType The type of the asset. Ref. enum Asset::AssetType
+    function assetCount(AssetType assetType) external view returns (uint24);
+
+    /// @notice Returns if an asset is registered and active.
+    /// @param assetAddress The address of the asset to check.
+    function isAssetActive(address assetAddress) external view returns (bool);
+
+
+
 
     /// @notice Returns the depth of the commitment merkle tree.
     function getCommitmentTreeDepth() external view returns (uint8);
@@ -218,23 +221,27 @@ interface IPool {
     /// @notice Returns the depth of the address merkle tree.
     function getAddressTreeDepth() external view returns (uint8);
 
+
     /// @notice Returns the next leaf index of the commitment merkle tree.
     function getCommitmentTreeNextLeafIndex() external view returns (uint32);
 
     /// @notice Returns the next leaf index of the address merkle tree.
     function getAddressTreeNextLeafIndex() external view returns (uint32);
 
-    /// @notice Returns the lastest root of the commitment merkle tree.
+     /// @notice Returns the lastest root of the commitment merkle tree.
     function getCommitmentTreeLastRoot() external view returns (uint256);
 
-    /// @notice Returns the lastest root of the address merkle tree.
-    function getAddressTreeLastRoot() external view returns (uint256);
-
-    /// @notice Returns the index of the commitment tree's root history array. We store a history of 100 roots for proof verification purposes.
+     /// @notice Returns the index of the commitment tree's root history array. We store a history of 100 roots for proof verification purposes.
     function getCommitmentTreeCurrentRootIndex()
         external
         view
         returns (uint256);
+
+        /// @notice Returns the level hash of an empty merkle tree.
+    function zeroes(uint8 level) external view returns (uint256);
+
+    /// @notice Returns the lastest root of the address merkle tree.
+    function getAddressTreeLastRoot() external view returns (uint256);
 
     /// @notice Returns the index of the address tree's root history array.
     function getAddressTreeCurrentRootIndex() external view returns (uint256);
@@ -248,4 +255,5 @@ interface IPool {
     /// @notice Returns whether a root value is a known address tree root.
     /// @param root The root value to check.
     function isKnownAddressTreeRoot(uint256 root) external view returns (bool);
+     */
 }
