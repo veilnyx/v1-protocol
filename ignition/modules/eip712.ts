@@ -1,12 +1,12 @@
 import { buildModule } from "@nomicfoundation/hardhat-ignition/modules";
 import { camelCase } from "../utils";
 
-const contractName = "AdaptorHandler";
-const moduleId = camelCase(contractName);
+const libraryName = "EIP712";
+const moduleId = (libraryName);
 
 const module = buildModule(moduleId, (m) => {
-  const adaptorHandler = m.contract(contractName);
-  return { adaptorHandler };
+    const eip712 = m.library(libraryName);
+    return { eip712 };
 });
 
 export default module;

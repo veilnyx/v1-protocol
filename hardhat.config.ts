@@ -11,10 +11,19 @@ dotenv.config();
 const rpcEthereumSepolia = process.env.RPC_ETHEREUM_SEPOLIA as string;
 const rpcOptimismSepolia = process.env.RPC_OPTIMISM_SEPOLIA as string;
 const privateKeys = [process.env.PRIVATE_KEY as string];
+const forkEnabled = process.env.HARDHAT_FORK === "true";
 
 const config: HardhatUserConfig = {
   solidity: "0.8.24",
   networks: {
+    hardhat: {
+      allowUnlimitedContractSize: false,
+      forking: {
+        url: rpcOptimismSepolia,
+        enabled: forkEnabled,
+        blockNumber: 16229898,
+      },
+    },
     ethereumSepolia: {
       url: rpcEthereumSepolia,
       accounts: privateKeys,

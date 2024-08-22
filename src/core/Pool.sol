@@ -1,4 +1,4 @@
-// SPDX-License-Identifie–: MIT
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
@@ -7,12 +7,12 @@ import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/U
 import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
-import {EIP712Upgradeable} from "@openzeppelin/contracts-upgradeable/utils/cryptography/EIP712Upgradeable.sol";
+import {EIP712} from "../libraries/EIP712.sol";
 import {IVerifier} from "../interfaces/IVerifier.sol";
 import {IPool} from "../interfaces/IPool.sol";
 import {IAdaptorHandler} from "../interfaces/IAdaptorHandler.sol";
 import {IScreener} from "../interfaces/IScreener.sol";
-import {EIP712_DOMAIN_NAME, EIP712_DOMAIN_VERSION, EIP712_TYPEHASH_REGISTER_ADDRESS, MESSAGE_REGISTER_ADDRESS} from "../base/Constants.sol";
+import {EIP712_DOMAIN_NAME, EIP712_DOMAIN_VERSION} from "../base/Constants.sol";
 import {PoolStorage} from "../base/PoolStorage.sol";
 import {Asset, AssetType, AssetLogic} from "../libraries/Asset.sol";
 import {MerkleTree, MerkleTreeLogic} from "../libraries/MerkleTree.sol";
@@ -27,7 +27,6 @@ contract Pool is
     OwnableUpgradeable,
     ReentrancyGuardUpgradeable,
     PausableUpgradeable,
-    EIP712Upgradeable,
     PoolStorage
 {
     using MerkleTreeLogic for MerkleTree;
@@ -58,7 +57,7 @@ contract Pool is
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
         __Pausable_init();
-        __EIP712_init(EIP712_DOMAIN_NAME, EIP712_DOMAIN_VERSION);
+        EIP712.init(EIP712_DOMAIN_NAME, EIP712_DOMAIN_VERSION);
 
         verifier = verifier_;
         adaptorHandler = adaptorHandler_;
@@ -170,10 +169,10 @@ contract Pool is
     function registerAddress(
         ShieldedAddressRegistrationData calldata addressRegData
     ) external whenNotPaused {
-        bytes32 hashStruct = _hashRegsiterAddressStruct(
+        bytes32 hashStruct = ShieldedAddressLogic.hashRegsiterAddressStruct(
             addressRegData.shieldedAddress
         );
-        bytes32 hashTypedData = _hashTypedDataV4(hashStruct);
+        bytes32 hashTypedData = EIP712.hashTypedDataV4(hashStruct);
 
         addressRegData.register({
             addressTree: _addressTree,
@@ -253,15 +252,6 @@ contract Pool is
         return _revokers[id];
     }
 
-    function assetCount(AssetType assetType) external view returns (uint24) {
-        return _assetCounts[assetType];
-    }
-
-    function isAssetActive(address assetAddress) external view returns (bool) {
-        uint24 id = _assetIds[assetAddress];
-        return _assets[id].isActive;
-    }
-
     function getAsset(uint24 assetId) external view returns (Asset memory) {
         return _assets[assetId];
     }
@@ -294,10 +284,6 @@ contract Pool is
         return _adaptors[adaptorAddress];
     }
 
-    function isMarkedNullifier(uint256 nullifier) external view returns (bool) {
-        return _markedNullifiers[nullifier] != 0;
-    }
-
     function areMarkedNullifiers(
         uint256[] calldata nullifiers
     ) external view returns (bool[] memory) {
@@ -315,64 +301,38 @@ contract Pool is
         return markedArr;
     }
 
-    function zeroes(uint8 level) external view returns (uint256) {
-        return _commitmentTree.zeroes[level];
-    }
-
-    function getCommitmentTreeDepth() external view returns (uint8) {
-        return _commitmentTree.depth;
-    }
-
-    function getAddressTreeDepth() external view returns (uint8) {
-        return _addressTree.depth;
-    }
-
-    function getCommitmentTreeNextLeafIndex() external view returns (uint32) {
-        return _commitmentTree.nextLeafIndex;
-    }
-
-    function getAddressTreeNextLeafIndex() external view returns (uint32) {
-        return _addressTree.nextLeafIndex;
-    }
-
-    function getCommitmentTreeLastRoot() external view returns (uint256) {
-        return _commitmentTree.roots[_commitmentTree.currentRootIndex];
-    }
-
-    function getAddressTreeLastRoot() external view returns (uint256) {
-        return _addressTree.roots[_addressTree.currentRootIndex];
-    }
-
-    function getCommitmentTreeCurrentRootIndex()
-        external
-        view
-        returns (uint256)
-    {
-        return _commitmentTree.currentRootIndex;
-    }
-
-    function getQueuedLeaves() external view returns (uint256[] memory) {
-        return _commitmentTree.getQueuedLeaves();
-    }
-
     function getCommitmentTreeState()
         external
         view
         returns (
             uint256[] memory queuedLeaves,
             uint256[] memory lastSubtrees,
-            uint256 nextLeafIndex,
-            uint32 lastRoot
+            uint256 lastRoot,
+            uint8 currentRootIndex,
+            uint32 nextLeafIndex
         )
     {
-        (queuedLeaves, lastSubtrees, nextLeafIndex, lastRoot) = _commitmentTree
-            .getState();
-
-        return (queuedLeaves, lastSubtrees, nextLeafIndex, lastRoot);
+        (
+            queuedLeaves,
+            lastSubtrees,
+            lastRoot,
+            currentRootIndex,
+            nextLeafIndex
+        ) = _commitmentTree.getState();
     }
 
-    function getAddressTreeCurrentRootIndex() external view returns (uint256) {
-        return _addressTree.currentRootIndex;
+    function getAddressTreeState()
+        external
+        view
+        returns (
+            uint256[] memory lastSubtrees,
+            uint256 lastRoot,
+            uint8 currentRootIndex,
+            uint32 nextLeafIndex
+        )
+    {
+        (lastSubtrees, lastRoot, currentRootIndex, nextLeafIndex) = _addressTree
+            .getState();
     }
 
     function isKnownCommitmentTreeRoot(
@@ -383,19 +343,6 @@ contract Pool is
 
     function isKnownAddressTreeRoot(uint256 root) external view returns (bool) {
         return _addressTree.isKnownRoot(root);
-    }
-
-    function _hashRegsiterAddressStruct(
-        bytes calldata shieldedAddress
-    ) internal pure returns (bytes32) {
-        return
-            keccak256(
-                abi.encode(
-                    EIP712_TYPEHASH_REGISTER_ADDRESS,
-                    keccak256(bytes(MESSAGE_REGISTER_ADDRESS)),
-                    keccak256(shieldedAddress)
-                )
-            );
     }
 
     function _authorizeUpgrade(

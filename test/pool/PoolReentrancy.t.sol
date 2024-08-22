@@ -15,14 +15,22 @@ contract PoolReentrancyTest is PoolTest {
     using MerkleTreeLogic for MerkleTree;
 
     ShieldedTransaction attackerWithdrawStx;
-    MerkleTree internal refTree;
+    MockERC20ForReentrancyTest tokenReent;
     MockAttacker attacker;
     Asset assetReent;
     uint256 constant INITIAL_DEPOSIT = 1000 ether;
 
     function setUp() public {
         _setUp();
-        refTree.init(fixture.commitmentTreeDepth, address(hasher));
+        _helperTree.init(fixture.commitmentTreeDepth, address(hasher));
+
+        // Deploying the ERC20 token for testing reentrancy attack
+        tokenReent = new MockERC20ForReentrancyTest(address(this));
+
+        AssetType assetType = AssetType.ERC20;
+        address[] memory assetAddresses = new address[](1);
+        assetAddresses[0] = address(tokenReent);
+        pool.addAssets(assetType, assetAddresses);
         assetReent = pool.getAsset(address(tokenReent));
 
         _mintAsset(assetReent, address(this), INITIAL_DEPOSIT);
@@ -55,17 +63,20 @@ contract PoolReentrancyTest is PoolTest {
     function _updateOnChainMT() internal {
         // UPDATE QUEUE MT SERVICE
         // service reading the queue and generating new merkle tree state on-chain
-        uint256[] memory leaves = pool.getQueuedLeaves();
+        (uint256[] memory leaves, , , , ) = pool.getCommitmentTreeState();
         for (uint8 i; i < leaves.length; ) {
-            refTree.insert(leaves[i]);
+            _helperTree.insert(leaves[i]);
             unchecked {
                 ++i;
             }
         }
 
+        (uint256[] memory lastSubtrees, uint256 lastRoot, , ) = _helperTree
+            .getState();
+
         TreeUpdateData memory treeUpdateData = TreeUpdateData({
-            newRoot: refTree.getLatestRoot(),
-            newSubtrees: refTree.getLastSubtrees(),
+            newRoot: lastRoot,
+            newSubtrees: lastSubtrees,
             proof: bytes("")
         });
 

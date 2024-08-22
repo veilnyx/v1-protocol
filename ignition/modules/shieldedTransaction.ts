@@ -4,7 +4,7 @@ import merkleTreeModule from "./merkleTree";
 import queuedMerkleTreeModule from "./queuedMerkleTree";
 import { camelCase } from "../utils";
 
-const libraryName = "ZTransactionLogic";
+const libraryName = "ShieldedTransactionLogic";
 const moduleId = camelCase(libraryName);
 
 const module = buildModule(moduleId, (m) => {

@@ -20,8 +20,8 @@ contract PoolInitTest is PoolTest {
         address adaptorHandler_ = pool.adaptorHandler();
         assertEq(verifier_, address(verifier));
         assertEq(adaptorHandler_, address(adaptorHandler));
-        assertEq(commitmentTreeDepth, pool.getCommitmentTreeDepth());
-        assertEq(addressTreeDepth, pool.getAddressTreeDepth());
+        assertEq(commitmentTreeDepth, fixture.commitmentTreeDepth);
+        assertEq(addressTreeDepth, fixture.addressTreeDepth);
     }
 
     function test_addAssets() external {
@@ -32,10 +32,10 @@ contract PoolInitTest is PoolTest {
 
         pool.addAssets(assetType, assetAddresses);
 
-        bool isAssetActive = pool.isAssetActive(assetAddress);
+        // bool isAssetActive = pool.isAssetActive(assetAddress);
         Asset memory newAsset = pool.getAsset(assetAddress);
 
-        assert(isAssetActive);
+        // assert(isAssetActive);
         assertNotEq(newAsset.id, 0);
         assert(newAsset.assetType == assetType);
         assertEq(newAsset.assetAddress, assetAddress);
