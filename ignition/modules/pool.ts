@@ -6,6 +6,7 @@ import adaptorHandlerModule from "./adaptorHandler";
 import assetModule from "./asset";
 import merkleTreeModule from "./merkleTree";
 import queuedMerkleTreeModule from "./queuedMerkleTree";
+import eip712Module from "./eip712";
 import shieldedAddressModule from "./shieldedAddress";
 import shieldedTransactionModule from "./shieldedTransaction";
 import { camelCase } from "../utils";
@@ -33,6 +34,7 @@ const module = buildModule(moduleId, (m) => {
   const { shieldedTransaction } = m.useModule(shieldedTransactionModule);
   const { shieldedAddress } = m.useModule(shieldedAddressModule);
   const { queuedMerkleTree } = m.useModule(queuedMerkleTreeModule);
+  const { eip712 } = m.useModule(eip712Module);
 
   const poolImpl = m.contract("Pool", [], {
     libraries: {
@@ -41,6 +43,7 @@ const module = buildModule(moduleId, (m) => {
       QueuedMerkleTreeLogic: queuedMerkleTree,
       ShieldedAddressLogic: shieldedAddress,
       ShieldedTransactionLogic: shieldedTransaction,
+      EIP712: eip712,
     },
   });
 

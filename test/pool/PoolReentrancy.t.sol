@@ -15,7 +15,6 @@ contract PoolReentrancyTest is PoolTest {
     using MerkleTreeLogic for MerkleTree;
 
     ShieldedTransaction attackerWithdrawStx;
-    MerkleTree internal refTree;
     MockERC20ForReentrancyTest tokenReent;
     MockAttacker attacker;
     Asset assetReent;
@@ -23,7 +22,7 @@ contract PoolReentrancyTest is PoolTest {
 
     function setUp() public {
         _setUp();
-        refTree.init(fixture.commitmentTreeDepth, address(hasher));
+        _helperTree.init(fixture.commitmentTreeDepth, address(hasher));
 
         // Deploying the ERC20 token for testing reentrancy attack
         tokenReent = new MockERC20ForReentrancyTest(address(this));
@@ -64,17 +63,20 @@ contract PoolReentrancyTest is PoolTest {
     function _updateOnChainMT() internal {
         // UPDATE QUEUE MT SERVICE
         // service reading the queue and generating new merkle tree state on-chain
-        uint256[] memory leaves = pool.getQueuedLeaves();
+        (uint256[] memory leaves, , , , ) = pool.getCommitmentTreeState();
         for (uint8 i; i < leaves.length; ) {
-            refTree.insert(leaves[i]);
+            _helperTree.insert(leaves[i]);
             unchecked {
                 ++i;
             }
         }
 
+        (uint256[] memory lastSubtrees, uint256 lastRoot, , ) = _helperTree
+            .getState();
+
         TreeUpdateData memory treeUpdateData = TreeUpdateData({
-            newRoot: refTree.getLatestRoot(),
-            newSubtrees: refTree.getLastSubtrees(),
+            newRoot: lastRoot,
+            newSubtrees: lastSubtrees,
             proof: bytes("")
         });
 

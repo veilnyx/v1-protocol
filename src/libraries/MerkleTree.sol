@@ -228,6 +228,7 @@ library MerkleTreeLogic {
         return false;
     }
 
+    /**
     function getRoot(
         MerkleTree storage self,
         uint8 rootIndex
@@ -240,10 +241,11 @@ library MerkleTreeLogic {
     ) external view returns (uint256) {
         return self.roots[self.currentRootIndex];
     }
+     */
 
-    function getLastSubtrees(
+    function _getSubtrees(
         MerkleTree storage self
-    ) external view returns (uint256[] memory) {
+    ) internal view returns (uint256[] memory) {
         uint256[] memory subtrees = new uint256[](self.depth);
 
         for (uint8 i; i < uint8(self.depth); ) {
@@ -254,5 +256,14 @@ library MerkleTreeLogic {
             }
         }
         return subtrees;
+    }
+
+    function getState(
+        MerkleTree storage self
+    ) public view returns (uint256[] memory, uint256, uint8, uint32) {
+        uint256[] memory lastSubtrees = _getSubtrees(self);
+        uint32 nextLeafIndex = self.nextLeafIndex;
+        uint256 lastRoot = self.roots[self.currentRootIndex];
+        return (lastSubtrees, lastRoot, self.currentRootIndex, nextLeafIndex);
     }
 }

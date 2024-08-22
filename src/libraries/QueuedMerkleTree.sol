@@ -151,7 +151,7 @@ library QueuedMerkleTreeLogic {
         uint32 batchSize
     ) internal view returns (bool) {
         uint256[] memory leaves = _getQueuedLeaves(self);
-        uint256[] memory lastSubtrees = _getSubtree(self);
+        uint256[] memory lastSubtrees = _getSubtrees(self);
         uint256 lastRoot = self.roots[self.currentRootIndex];
         uint256 nZeroLeaves = batchSize < self.queueSize
             ? self.queueSize - batchSize
@@ -185,7 +185,7 @@ library QueuedMerkleTreeLogic {
         return _getQueuedLeaves(tree);
     }
 
-    function _getSubtree(
+    function _getSubtrees(
         QueuedMerkleTree storage tree
     ) internal view returns (uint256[] memory) {
         uint256[] memory subtree = new uint256[](tree.depth);
@@ -223,24 +223,26 @@ library QueuedMerkleTreeLogic {
         return false;
     }
 
+    /**
     function getRoot(
         QueuedMerkleTree storage self,
         uint8 rootIndex
     ) external view returns (uint256) {
         return self.roots[rootIndex];
     }
+     */
 
     function getState(
         QueuedMerkleTree storage self
     )
         public
         view
-        returns (uint256[] memory, uint256[] memory, uint256, uint32)
+        returns (uint256[] memory, uint256[] memory, uint256, uint8, uint32)
     {
         uint256[] memory leaves = _getQueuedLeaves(self);
-        uint256[] memory lastSubtrees = _getSubtree(self);
+        uint256[] memory lastSubtrees = _getSubtrees(self);
         uint32 nextLeafIndex = self.nextLeafIndex;
         uint256 lastRoot = self.roots[self.currentRootIndex];
-        return (leaves, lastSubtrees, lastRoot, nextLeafIndex);
+        return (leaves, lastSubtrees, lastRoot, self.currentRootIndex, nextLeafIndex);
     }
 }

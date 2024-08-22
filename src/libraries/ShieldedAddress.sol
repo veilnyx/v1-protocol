@@ -6,6 +6,7 @@ import {FIELD_SIZE_DIV_2} from "../base/Constants.sol";
 import {MerkleTree, MerkleTreeLogic} from "./MerkleTree.sol";
 import {IPool} from "../interfaces/IPool.sol";
 import {IVerifier} from "../interfaces/IVerifier.sol";
+import {EIP712_TYPEHASH_REGISTER_ADDRESS, MESSAGE_REGISTER_ADDRESS} from "../base/Constants.sol";
 
 struct ShieldedAddressRegistrationData {
     bytes proof;
@@ -84,5 +85,18 @@ library ShieldedAddressLogic {
             return MASK_PACK | y;
         }
         return y;
+    }
+
+    function hashRegsiterAddressStruct(
+        bytes calldata shieldedAddress
+    ) public pure returns (bytes32) {
+        return
+            keccak256(
+                abi.encode(
+                    EIP712_TYPEHASH_REGISTER_ADDRESS,
+                    keccak256(bytes(MESSAGE_REGISTER_ADDRESS)),
+                    keccak256(shieldedAddress)
+                )
+            );
     }
 }
