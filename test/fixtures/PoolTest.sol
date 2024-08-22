@@ -1,81 +1,166 @@
 // SPDX-License-Identifier: UNLICENSED
-pragma solidity ^0.8.20;
+pragma solidity ^0.8.24;
 
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {Pool} from "src/core/Pool.sol";
-import {Verifier22} from "src/verifiers/Verifier22.sol";
-import {Verifier, VerifierInfo} from "src/core/Verifier.sol";
-import {Convertor} from "src/core/Convertor.sol";
+import {Verifier, TransactionVerifierInfo} from "src/core/Verifier.sol";
+import {AdaptorHandler} from "src/core/AdaptorHandler.sol";
+import {VerifierTransact21} from "src/verifiers/VerifierTransact21.sol";
+import {VerifierTransact22} from "src/verifiers/VerifierTransact22.sol";
+import {VerifierRegister} from "src/verifiers/VerifierRegister.sol";
 import {Asset, AssetType} from "src/libraries/Asset.sol";
-import {ZTransaction} from "src/libraries/ZTransaction.sol";
+import {ShieldedTransaction, ShieldedTransactionType, RevokerData} from "src/libraries/ShieldedTransaction.sol";
+import {MerkleTree, MerkleTreeLogic} from "src/libraries/MerkleTree.sol";
+import {TreeUpdateData} from "src/libraries/QueuedMerkleTree.sol";
+import {ShieldedAddressRegistrationData, ShieldedAddressLogic} from "src/libraries/ShieldedAddress.sol";
+import {IPool} from "src/interfaces/IPool.sol";
+import {MockScreener} from "test/mocks/MockScreener.sol";
+import {MockVerifier} from "test/mocks/MockVerifier.sol";
 import {MockERC20} from "test/mocks/MockERC20.sol";
-import {BaseTest} from "./BaseTest.sol";
+import {MockVerifier} from "test/mocks/MockVerifier.sol";
+import {PoolBaseTest} from "./PoolBaseTest.sol";
 
-contract PoolTest is BaseTest {
-    Verifier public verifier;
-    Convertor public convertor;
-    Pool public pool;
+contract PoolTest is PoolBaseTest {
+    using MerkleTreeLogic for MerkleTree;
 
-    uint256 public treeDepth = 32;
-    address public entryPoint;
-
-    MockERC20 public token1;
-    MockERC20 public token2;
+    MockVerifier internal _mockVerifier = new MockVerifier();
 
     Asset public asset1;
     Asset public asset2;
 
-    function _initFixture() internal virtual {
-        Verifier22 v22 = new Verifier22();
-        VerifierInfo[] memory vInfos = new VerifierInfo[](1);
-        vInfos[0] = VerifierInfo({
-            id: 2 * 10 + 2,
-            addr: address(v22),
-            selector: v22.verifyProof.selector
-        });
-        verifier = new Verifier(
-            vInfos,
-            fixture.revokerPublicKey,
-            fixture.encryptionPublicKey
+    MerkleTree internal _helperTree;
+
+    bytes revokerMetaData = abi.encode("Revoker 1", "Organization 1");
+
+    modifier expectNullifiersMarked(ShieldedTransaction memory stx_) {
+        (, , , , uint32 nextLeafIndex) = pool.getCommitmentTreeState();
+        uint32 nullifierMarkLeafIndex = nextLeafIndex + 1;
+
+        for (uint256 i = 0; i < stx_.nullifiers.length; i++) {
+            vm.expectEmit(true, true, true, true);
+            emit IPool.NullifierMarked(
+                stx_.nullifiers[i],
+                nullifierMarkLeafIndex
+            );
+        }
+
+        _;
+
+        // for (uint256 i = 0; i < stx_.nullifiers.length; i++) {
+        //     assertTrue(pool.isMarkedNullifier(stx_.nullifiers[i]));
+        // }
+    }
+
+    modifier expectCommitmentsInserted(ShieldedTransaction memory stx) {
+        // uint256 rootBeforeDeposit = pool.getCommitmentTreeLastRoot();
+        // uint256 currentRootIndexBeforeDeposit = pool
+        //     .getCommitmentTreeCurrentRootIndex();
+
+        (, , , , uint32 nextLeafIndex) = pool.getCommitmentTreeState();
+
+        for (uint256 i = 0; i < stx.commitments.length; ++i) {
+            vm.expectEmit(true, true, true, true);
+            emit IPool.Commitment(nextLeafIndex + i, stx.commitments[i]);
+        }
+
+        _;
+
+        // uint256 nextLeafIndexAfterDeposit = pool
+        //     .getCommitmentTreeNextLeafIndex();
+        // uint256 rootAfterDeposit = pool.getCommitmentTreeLastRoot();
+        // uint256 currentRootIndexAfterDeposit = pool
+        //     .getCommitmentTreeCurrentRootIndex();
+
+        // assertEq(nextIndex + stx.commitments.length, nextLeafIndexAfterDeposit);
+        // assertNotEq(rootBeforeDeposit, rootAfterDeposit);
+        // assertLt(currentRootIndexBeforeDeposit, currentRootIndexAfterDeposit);
+    }
+
+    modifier expectReceipt(ShieldedTransaction memory stx) {
+        (, , , , uint32 nextLeafIndex) = pool.getCommitmentTreeState();
+        uint24 feeAssetId = 0;
+        uint96 feeValue = 0;
+        address paymaster = address(0);
+        bytes memory assetsMemo;
+
+        // non transfer tx & transfer tx with fee
+        if (stx.pubAssets.length != 0) {
+            feeAssetId = uint24(bytes3(bytes31(stx.pubAssets[0])));
+            feeValue = uint96(stx.feeData);
+            paymaster = address(bytes20(bytes32(stx.feeData)));
+        }
+
+        if (stx.txType != ShieldedTransactionType.TRANSFER) {
+            assetsMemo = abi.encodePacked(stx.pubAssets);
+        } else {
+            assetsMemo = stx.assetsMemo;
+        }
+
+        vm.expectEmit(true, true, true, true);
+        emit IPool.Receipt(
+            stx.txType,
+            stx.revokerId,
+            (nextLeafIndex + uint32(stx.commitments.length) - 1),
+            address(bytes20(stx.targetData)),
+            feeAssetId,
+            feeValue,
+            paymaster,
+            stx.keysMemo,
+            assetsMemo,
+            stx.notesMemo,
+            bytes("")
         );
-        convertor = new Convertor();
-        entryPoint = address(0);
 
-        pool = new Pool();
+        _;
+    }
 
-        // Assets
-        token1 = new MockERC20(address(this));
-        token2 = new MockERC20(address(this));
-        asset1 = Asset({
-            id: 65537,
-            assetType: AssetType.ERC20,
-            assetAddress: address(token1),
-            isSupported: true
-        });
-        asset2 = Asset({
-            id: 65538,
-            assetType: AssetType.ERC20,
-            assetAddress: address(token2),
-            isSupported: true
-        });
+    function _setUp() internal virtual override {
+        PoolBaseTest._setUp();
 
         AssetType assetType = AssetType.ERC20;
         address[] memory assetAddresses = new address[](2);
         assetAddresses[0] = address(token1);
         assetAddresses[1] = address(token2);
+        pool.addAssets(assetType, assetAddresses);
+        asset1 = pool.getAsset(assetAddresses[0]);
+        asset2 = pool.getAsset(assetAddresses[1]);
 
-        bytes memory initData = abi.encodeWithSelector(
-            pool.initialize.selector,
-            treeDepth,
-            address(verifier),
-            address(convertor),
-            address(entryPoint),
-            assetType,
-            assetAddresses
+        // Register revoker
+        pool.registerRevoker(
+            fixture.revokerPublicKey,
+            fixture.encryptionPublicKey,
+            revokerMetaData
         );
 
-        ERC1967Proxy poolProxy = new ERC1967Proxy(address(pool), initData);
-        pool = Pool(address(poolProxy));
+        // Register a user - "sender"
+        (, uint256 senderPk) = makeAddrAndKey("sender");
+        bytes memory signature = _getRegisterAddressSignature(
+            senderPk,
+            bytes.concat(
+                bytes32(fixture.sender.rootAddress),
+                bytes32(fixture.sender.signPublicKey[0]),
+                bytes32(fixture.sender.signPublicKey[1]),
+                bytes32(fixture.sender.viewPublicKey[0]),
+                bytes32(fixture.sender.viewPublicKey[1])
+            )
+        );
+        ShieldedAddressRegistrationData
+            memory addressRegData = _loadShieldedAddressRegistrationData(
+                "register_sender"
+            );
+        addressRegData.signature = signature;
+        pool.registerAddress(addressRegData);
+    }
+
+    function _runExpectedTx(
+        ShieldedTransaction memory stx
+    )
+        internal
+        expectNullifiersMarked(stx)
+        expectCommitmentsInserted(stx)
+        expectReceipt(stx)
+    {
+        pool.transact(stx);
     }
 
     function _mintAsset(
@@ -98,29 +183,47 @@ contract PoolTest is BaseTest {
         return pool.getAsset(asset.assetAddress).id;
     }
 
-    // Deposits 10000 ether
-    function _mockDeposit() internal {
-        string memory path = string.concat(
-            vm.projectRoot(),
-            "/test/mocks/deposit.txt"
+    function _makePreDeposit() internal {
+        // Deposit 10000 WETH and 10000 USDC
+        uint256 deposit1 = 10000 ether;
+        uint256 deposit2 = 10000e6;
+        _mintAsset(asset1, address(this), deposit1);
+        _mintAsset(asset2, address(this), deposit2);
+        _approveAsset(asset1, address(pool), deposit1);
+        _approveAsset(asset2, address(pool), deposit2);
+        ShieldedTransaction memory stx = _loadShieldedTransaction(
+            "deposit_pre_tx"
         );
-        string memory file = vm.readFile(path);
-        bytes memory data = vm.parseBytes(file);
-        ZTransaction memory ztx = abi.decode(data, (ZTransaction));
+        pool.transact(stx);
 
-        _mintAsset(asset1, address(this), 10000 ether);
-        _mintAsset(asset2, address(this), 10000 ether);
-        _approveAsset(asset1, address(pool), 10000 ether);
-        _approveAsset(asset2, address(pool), 10000 ether);
-        pool.transact(ztx);
+        // Process the batch
+        uint8 depth = fixture.commitmentTreeDepth;
+        _helperTree.init(depth, address(hasher));
+        (uint256[] memory leaves, , , , ) = pool.getCommitmentTreeState();
+        for (uint256 i = 0; i < leaves.length; ++i) {
+            _helperTree.insert(leaves[i]);
+        }
+
+        (uint256[] memory lastSubtrees, uint256 lastRoot, , ) = _helperTree
+            .getState();
+
+        TreeUpdateData memory treeUpdateData = TreeUpdateData({
+            newRoot: lastRoot,
+            newSubtrees: lastSubtrees,
+            proof: bytes("")
+        });
+
+        _mockVerifierResult(true);
+        pool.updateCommitmentTree(treeUpdateData);
+        _mockVerifierReset();
     }
 
-    function _makeInitialDeposit() internal {
-        _mintAsset(asset1, address(this), 1000 ether);
-        _mintAsset(asset2, address(this), 1000 ether);
-        _approveAsset(asset1, address(pool), 1000 ether);
-        _approveAsset(asset2, address(pool), 1000 ether);
-        ZTransaction memory ztx = _loadZTx("deposit_1000_weth_usdc");
-        pool.transact(ztx);
+    function _mockVerifierResult(bool result) internal {
+        pool.mock_verifier(address(_mockVerifier));
+        _mockVerifier.setResult(result);
+    }
+
+    function _mockVerifierReset() internal {
+        pool.mock_verifier(address(verifier));
     }
 }

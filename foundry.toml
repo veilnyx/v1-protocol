@@ -1,7 +1,8 @@
 [profile.default]
-solc = "0.8.23"
+solc = "0.8.24"
 ffi = true
 ast = true
+via-ir = false
 build_info = true
 extra_output = ["storageLayout"]
 fs_permissions = [{ access = "read-write", path = "./" }]

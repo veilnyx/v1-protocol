@@ -1,9 +1,18 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.23;
+pragma solidity ^0.8.24;
+
+interface IPoseidon {
+    function poseidon(
+        uint256[2] calldata inputs
+    ) external view returns (uint256);
+
+    function poseidon(
+        uint256[3] calldata inputs
+    ) external view returns (uint256);
+}
 
 interface IHasher {
-    function poseidon(bytes32[2] calldata inputs) external pure returns (bytes32);
+    function hash(uint256[2] calldata inputs) external view returns (uint256);
+
+    function hash(uint256[3] calldata inputs) external view returns (uint256);
 }
-// interface IHasher {
-//     function _hash(uint256 x, uint256 y) external pure returns (uint256 hash);
-// }

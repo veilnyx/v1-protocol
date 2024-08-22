@@ -3,7 +3,7 @@ pragma solidity ^0.8.18;
 
 import {IAccount} from "@account-abstraction/contracts/interfaces/IAccount.sol";
 import {PackedUserOperation} from "@account-abstraction/contracts/interfaces/PackedUserOperation.sol";
-import {ZTransaction} from "../libraries/ZTransaction.sol";
+import {ShieldedTransaction} from "../libraries/ShieldedTransaction.sol";
 
 interface IGateway is IAccount {
     function validateUserOp(
@@ -12,9 +12,11 @@ interface IGateway is IAccount {
         uint256
     ) external view returns (uint256);
 
-    function handleUserOp(ZTransaction calldata ztx) external;
+    function handleUserOp(ShieldedTransaction calldata stx) external;
 
-    function handleWrapAndDeposit(ZTransaction calldata ztx) external payable;
+    function handleWrapAndDeposit(
+        ShieldedTransaction calldata stx
+    ) external payable;
 
     function withdrawEntryPointDepositTo(
         address payable withdrawAddress,

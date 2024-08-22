@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity ^0.8.23;
+pragma solidity ^0.8.24;
 
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -18,19 +18,21 @@ struct Asset {
     uint24 id;
     AssetType assetType;
     address assetAddress;
-    bool isSupported;
+    bool isActive;
 }
 
 library AssetLogic {
     using SafeERC20 for IERC20;
+
+    error ZeroAddress();
 
     function getAssetOrRevert(
         mapping(uint24 => Asset) storage assets,
         uint24 assetId
     ) public view returns (Asset memory asset) {
         asset = assets[assetId];
-        if (!asset.isSupported) {
-            revert IPool.UnsupportedAsset(assetId);
+        if (!asset.isActive) {
+            revert IPool.InactiveAsset(assetId);
         }
     }
 
@@ -41,8 +43,12 @@ library AssetLogic {
         AssetType assetType,
         address assetAddress
     ) public returns (uint16) {
-        if (_isAssetSupported(assetIds, assets, assetAddress)) {
+        if (_isAssetAdded(assetIds, assetAddress)) {
             revert IPool.DuplicateAsset(assetAddress);
+        }
+
+        if (assetAddress == address(0)) {
+            revert ZeroAddress();
         }
 
         // Uid of added asset
@@ -58,7 +64,7 @@ library AssetLogic {
             id: newAssetId,
             assetType: assetType,
             assetAddress: assetAddress,
-            isSupported: true
+            isActive: true
         });
 
         emit IPool.AssetAdded(assetAddress, newAssetId);
@@ -91,10 +97,10 @@ library AssetLogic {
     function updateAsset(
         mapping(uint24 => Asset) storage assets,
         uint24 assetId,
-        bool isSupported
+        bool isActive
     ) external {
         Asset storage asset = assets[assetId];
-        asset.isSupported = isSupported;
+        asset.isActive = isActive;
     }
 
     function receiveAsset(
@@ -108,7 +114,7 @@ library AssetLogic {
         if (asset.assetType == AssetType.ERC20) {
             _receiveERC20(asset, from, address(this), value);
         } else {
-            revert IPool.UnsupportedAsset(assetId);
+            revert IPool.InactiveAsset(assetId);
         }
     }
 
@@ -123,17 +129,25 @@ library AssetLogic {
         if (asset.assetType == AssetType.ERC20) {
             _transferERC20(asset, to, value);
         } else {
-            revert IPool.UnsupportedAsset(assetId);
+            revert IPool.InactiveAsset(assetId);
         }
     }
 
-    function _isAssetSupported(
+    function _isAssetAdded(
+        mapping(address => uint24) storage assetIds,
+        address assetAddress
+    ) internal view returns (bool) {
+        uint24 assetId = assetIds[assetAddress];
+        return assetId != 0;
+    }
+
+    function _isAssetActive(
         mapping(address => uint24) storage assetIds,
         mapping(uint24 => Asset) storage assets,
         address assetAddress
     ) internal view returns (bool) {
         uint24 assetId = assetIds[assetAddress];
-        return assets[assetId].isSupported;
+        return assets[assetId].isActive;
     }
 
     function _receiveERC20(

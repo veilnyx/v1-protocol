@@ -2,51 +2,72 @@
 pragma solidity ^0.8.20;
 
 import {Test} from "forge-std/Test.sol";
-import {ZTransactionType, ZTransaction} from "src/libraries/ZTransaction.sol";
-import {ZAccount} from "test/helpers/ZAccount.sol";
-import {ZKFi} from "test/helpers/ZKFi.sol";
+import {ShieldedTransactionType, ShieldedTransaction} from "src/libraries/ShieldedTransaction.sol";
+import {ShieldedAddressRegistrationData} from "src/libraries/ShieldedAddress.sol";
+import {TreeUpdateData} from "src/libraries/QueuedMerkleTree.sol";
+import {Hasher} from "src/core/Hasher.sol";
 import {Fixture, FixtureLib} from "test/fixtures/Fixture.sol";
-import {TransactionRequest} from "test/helpers/TransactionRequest.sol";
-import {ZAccountLogic} from "test/helpers/ZAccount.sol";
+import {MockERC20} from "test/mocks/MockERC20.sol";
 
 abstract contract BaseTest is Test {
-    using ZAccountLogic for ZAccount;
-
-    ZKFi public zkfi;
     Fixture public fixture;
 
-    constructor() {
-        zkfi = new ZKFi();
-        fixture = FixtureLib.load(zkfi);
+    MockERC20 public token1;
+    MockERC20 public token2;
+
+    function _setUp() internal virtual {
+        fixture = FixtureLib.load(vm);
+        token1 = new MockERC20(address(this));
+        token2 = new MockERC20(address(this));
     }
 
-    function _loadZTx(
+    function _loadShieldedTransaction(
         string memory name
-    ) internal view returns (ZTransaction memory) {
-        return FixtureLib.loadZTx(name, vm);
+    ) internal view returns (ShieldedTransaction memory) {
+        return FixtureLib.loadShieldedTransaction(name, vm);
     }
 
-    function _createTxReq(
-        ZTransactionType txType,
-        uint24[] memory assetIds,
-        uint256[] memory values
-    ) internal view returns (TransactionRequest memory) {
-        bytes memory to;
-        if (txType == ZTransactionType.WITHDRAW) {
-            to = abi.encode(fixture.withdrawAddress);
-        } else if (txType == ZTransactionType.CONVERT) {
-            to = abi.encode(address(0));
-        } else {
-            to = ZAccountLogic.addr(fixture.receiverAccount);
+    function _loadShieldedAddressRegistrationData(
+        string memory name
+    ) internal view returns (ShieldedAddressRegistrationData memory) {
+        return FixtureLib.loadShieldedAddressRegistrationData(name, vm);
+    }
+
+    function _loadTreeUpdateData(
+        string memory name
+    ) internal view returns (TreeUpdateData memory) {
+        return FixtureLib.loadTreeUpdateData(name, vm);
+    }
+
+    function _loadData(
+        string memory name
+    ) internal view returns (bytes memory) {
+        return FixtureLib.loadData(name, vm);
+    }
+
+    function _deployHasher() internal returns (Hasher) {
+        string memory t3Path = string.concat(
+            vm.projectRoot(),
+            "/src/poseidon/t3.txt"
+        );
+        string memory t4Path = string.concat(
+            vm.projectRoot(),
+            "/src/poseidon/t4.txt"
+        );
+
+        string memory t3BytecodeFile = vm.readFile(t3Path);
+        string memory t4BytecodeFile = vm.readFile(t4Path);
+        bytes memory t3Bytecode = vm.parseBytes(t3BytecodeFile);
+        bytes memory t4Bytecode = vm.parseBytes(t4BytecodeFile);
+
+        address poseidonT3;
+        address poseidonT4;
+        assembly {
+            poseidonT3 := create(0, add(t3Bytecode, 0x20), mload(t3Bytecode))
+            poseidonT4 := create(0, add(t4Bytecode, 0x20), mload(t4Bytecode))
         }
 
-        TransactionRequest memory req = TransactionRequest({
-            txType: txType,
-            assetIds: assetIds,
-            values: values,
-            to: to,
-            payload: bytes("")
-        });
-        return req;
+        Hasher hasher = new Hasher(poseidonT3, poseidonT4);
+        return hasher;
     }
 }

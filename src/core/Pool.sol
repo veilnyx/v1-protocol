@@ -1,18 +1,24 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.23;
+pragma solidity ^0.8.24;
 
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
+import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
+import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
+import {EIP712} from "../libraries/EIP712.sol";
 import {IVerifier} from "../interfaces/IVerifier.sol";
 import {IPool} from "../interfaces/IPool.sol";
-import {IConvertor} from "../interfaces/IConvertor.sol";
+import {IAdaptorHandler} from "../interfaces/IAdaptorHandler.sol";
+import {IScreener} from "../interfaces/IScreener.sol";
+import {EIP712_DOMAIN_NAME, EIP712_DOMAIN_VERSION} from "../base/Constants.sol";
 import {PoolStorage} from "../base/PoolStorage.sol";
-import {PoolAccount} from "../base/PoolAccount.sol";
 import {Asset, AssetType, AssetLogic} from "../libraries/Asset.sol";
-import {ZTransaction, ZTransactionLogic} from "../libraries/ZTransaction.sol";
 import {MerkleTree, MerkleTreeLogic} from "../libraries/MerkleTree.sol";
+import {QueuedMerkleTree, QueuedMerkleTreeLogic, TreeUpdateData} from "../libraries/QueuedMerkleTree.sol";
+import {ShieldedAddressRegistrationData, ShieldedAddressLogic} from "../libraries/ShieldedAddress.sol";
+import {ShieldedTransaction, ShieldedTransactionLogic, RevokerData} from "../libraries/ShieldedTransaction.sol";
 
 contract Pool is
     IPool,
@@ -20,51 +26,69 @@ contract Pool is
     UUPSUpgradeable,
     OwnableUpgradeable,
     ReentrancyGuardUpgradeable,
+    PausableUpgradeable,
     PoolStorage
 {
     using MerkleTreeLogic for MerkleTree;
-    using ZTransactionLogic for ZTransaction;
+    using QueuedMerkleTreeLogic for QueuedMerkleTree;
+    using ShieldedAddressLogic for ShieldedAddressRegistrationData;
+    using ShieldedTransactionLogic for ShieldedTransaction;
 
+    /// @notice Initializes the Pool contract with the given parameters.
+    /// @dev Pool is an UUPSUpgradeable contract, so it needs to be initialized.
+    /// @param addressTreeDepth The depth of the address tree.
+    /// @param commitmentTreeDepth The depth of the commitment tree.
+    /// @param verifier_ The address of the verifier contract. Verifier contract verifies the stx's zk proof, address proof and merkle tree queue proof.
+    /// @param adaptorHandler_ The address of the adaptor handler contract, responsible for delegate calling adaptors of external DeFi protocols.
+    /// @param screener_ The address of the screener contract, responsible for screening sanctioned addresseses.
+    /// @param hasher_ The address of the hasher contract. It provides a single interface to Poseidon hashing functions
+    /// @param withdrawFeeBps_ The fee in basis points (1/10000) that is charged for withdrawing assets from the pool.
     function initialize(
-        uint256 treeDepth,
+        uint8 addressTreeDepth,
+        uint8 commitmentTreeDepth,
+        uint8 commitmentTreeQueueSize,
         address verifier_,
-        address convertor_,
-        address entryPoint_,
-        AssetType initAssetType,
-        address[] calldata initAssetAddresses
+        address adaptorHandler_,
+        address screener_,
+        address hasher_,
+        uint256 withdrawFeeBps_
     ) external initializer {
         __Ownable_init(msg.sender);
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
+        __Pausable_init();
+        EIP712.init(EIP712_DOMAIN_NAME, EIP712_DOMAIN_VERSION);
 
         verifier = verifier_;
-        convertor = convertor_;
-        entryPoint = entryPoint_;
+        adaptorHandler = adaptorHandler_;
+        hasher = hasher_;
+        screener = screener_;
+        withdrawFeeBps = withdrawFeeBps_;
 
-        _tree.init(treeDepth);
-        _assetCounts[initAssetType] = AssetLogic.addAssets(
-            _assetIds,
-            _assets,
-            0,
-            initAssetType,
-            initAssetAddresses
+        _addressTree.init(addressTreeDepth, hasher_);
+        _commitmentTree.init(
+            commitmentTreeDepth,
+            commitmentTreeQueueSize,
+            hasher_,
+            verifier_
         );
     }
 
-    function transact(ZTransaction memory ztx) external nonReentrant {
-        ztx.execute({
-            tree: _tree,
-            assets: _assets,
-            convertProxies: _convertProxies,
-            markedNullifiers: _markedNullifiers,
-            verifier: verifier,
-            convertor: convertor
-        });
+    /////////////////////////////////////////
+    //         ADMIN WRITE METHODS         //
+    ////////////////////////////////////////
+
+    function pause() external onlyOwner {
+        _pause();
+    }
+
+    function unpause() external onlyOwner {
+        _unpause();
     }
 
     function addAssets(
         AssetType assetType,
-        address[] memory assetAddresses
+        address[] calldata assetAddresses
     ) external onlyOwner {
         _assetCounts[assetType] = AssetLogic.addAssets({
             assetIds: _assetIds,
@@ -75,34 +99,165 @@ contract Pool is
         });
     }
 
-    function setConvertProxy(
-        address proxyAddress,
+    function addAdaptorSupport(
+        address adaptorAddress,
         bool enable
     ) external onlyOwner {
-        _convertProxies[proxyAddress] = enable;
+        _adaptors[adaptorAddress] = enable;
     }
+
+    function registerRevoker(
+        uint256[2] calldata revokerPublicKey,
+        uint256[2] calldata encryptionPublicKey,
+        bytes calldata revokerMetadata
+    ) external onlyOwner {
+        uint16 id = _revokerCount;
+
+        RevokerData memory revokerData = RevokerData({
+            id: id,
+            isActive: true,
+            revokerPublicKey: revokerPublicKey,
+            encryptionPublicKey: encryptionPublicKey
+        });
+
+        _revokers[id] = revokerData;
+        emit RevokerRegistered(
+            id,
+            revokerPublicKey,
+            encryptionPublicKey,
+            revokerMetadata
+        );
+
+        _revokerCount += 1;
+    }
+
+    function withdrawProtocolFee(
+        uint24 assetId,
+        address to
+    ) external nonReentrant onlyOwner {
+        uint256 withdrawFeeCollected = _withdrawFees[assetId];
+        if (withdrawFeeCollected == 0) {
+            revert NoFeeToClaim(msg.sender, assetId);
+        }
+
+        _withdrawFees[assetId] = 0;
+        AssetLogic.transferAsset({
+            assets: _assets,
+            to: to,
+            assetId: assetId,
+            value: withdrawFeeCollected
+        });
+    }
+
+    function setRevokerStatus(uint256 id, bool isActive) external onlyOwner {
+        _revokers[id].isActive = isActive;
+        emit IPool.RevokerStatusUpdated(id, isActive);
+    }
+
+    function setScreener(address screener_) external onlyOwner {
+        screener = screener_;
+    }
+
+    function setWithdrawFeeBips(uint256 feeBps) external onlyOwner {
+        withdrawFeeBps = feeBps;
+    }
+
+    /////////////////////////////////////////
+    //        PUBLIC WRITE METHODS         //
+    ////////////////////////////////////////
+
+    function registerAddress(
+        ShieldedAddressRegistrationData calldata addressRegData
+    ) external whenNotPaused {
+        bytes32 hashStruct = ShieldedAddressLogic.hashRegsiterAddressStruct(
+            addressRegData.shieldedAddress
+        );
+        bytes32 hashTypedData = EIP712.hashTypedDataV4(hashStruct);
+
+        addressRegData.register({
+            addressTree: _addressTree,
+            publicAddresses: _publicAddresses,
+            rootAddresses: _rootAddresses,
+            verifier: verifier,
+            hashTypedData: hashTypedData
+        });
+    }
+
+    function updateCommitmentTree(
+        TreeUpdateData calldata treeUpdateData
+    ) external {
+        _commitmentTree.update(treeUpdateData);
+    }
+
+    function transact(
+        ShieldedTransaction calldata stx
+    ) external nonReentrant whenNotPaused {
+        stx.validate({
+            addressTree: _addressTree,
+            commitmentTree: _commitmentTree,
+            markedNullifiers: _markedNullifiers,
+            supportedAdaptors: _adaptors,
+            revokerDataMap: _revokers,
+            verifier: verifier
+        });
+
+        stx.execute({
+            commitmentTree: _commitmentTree,
+            assets: _assets,
+            withdrawFees: _withdrawFees,
+            paymasterFees: _paymasterFees,
+            adaptorHandler: adaptorHandler,
+            hasher: hasher,
+            withdrawFeeBps: withdrawFeeBps
+        });
+    }
+
+    function withdrawPaymasterFee(
+        uint24 assetId,
+        address to
+    ) external nonReentrant whenNotPaused {
+        address paymaster = msg.sender;
+        uint256 fee = _paymasterFees[paymaster][assetId];
+        if (fee == 0) {
+            revert NoFeeToClaim(paymaster, assetId);
+        }
+
+        _paymasterFees[paymaster][assetId] = 0;
+        AssetLogic.transferAsset({
+            assets: _assets,
+            to: to,
+            assetId: assetId,
+            value: fee
+        });
+    }
+
+    /////////////////////////////////////////
+    //         READ METHODS                //
+    ////////////////////////////////////////
 
     function verifyTransactionProof(
-        ZTransaction calldata ztx
-    ) external view returns (bool) {
-        return IVerifier(verifier).verifyTransactionProof(ztx);
+        ShieldedTransaction calldata stx
+    ) external view returns (bool result) {
+        RevokerData memory revokerData = _revokers[stx.revokerId];
+
+        result = stx._verifyProof({
+            revokerData: revokerData,
+            verifier: verifier
+        });
     }
 
-    function assetCount(AssetType assetType) external view returns (uint24) {
-        return _assetCounts[assetType];
-    }
-
-    function isAssetSupported(
-        address assetAddress
-    ) external view returns (bool) {
-        uint24 id = _assetIds[assetAddress];
-        return _assets[id].isSupported;
+    function getRevokerData(
+        uint256 id
+    ) external view returns (RevokerData memory) {
+        return _revokers[id];
     }
 
     function getAsset(uint24 assetId) external view returns (Asset memory) {
         return _assets[assetId];
     }
 
+    /// @notice Returns the data of an asset.
+    /// @param assetAddress The address of the asset.
     function getAsset(
         address assetAddress
     ) external view returns (Asset memory) {
@@ -110,55 +265,84 @@ contract Pool is
         return _assets[id];
     }
 
-    function isConvertProxySupported(
-        address proxyAddress
-    ) external view returns (bool) {
-        return _convertProxies[proxyAddress];
+    function getCollectedWithdrawFee(
+        uint24 assetId
+    ) external view returns (uint256) {
+        return _withdrawFees[assetId];
     }
 
-    function isMarkedNullifier(uint256 nullifier) external view returns (bool) {
-        return _markedNullifiers[nullifier];
+    function getCollectedPaymasterFee(
+        uint24 assertId,
+        address paymaster
+    ) external view returns (uint256) {
+        return _paymasterFees[paymaster][assertId];
+    }
+
+    function isAdaptorSupported(
+        address adaptorAddress
+    ) external view returns (bool) {
+        return _adaptors[adaptorAddress];
     }
 
     function areMarkedNullifiers(
         uint256[] calldata nullifiers
     ) external view returns (bool[] memory) {
         bool[] memory markedArr = new bool[](nullifiers.length);
-        for (uint256 i = 0; i < nullifiers.length; ) {
-            markedArr[i] = _markedNullifiers[nullifiers[i]];
+        uint256 nullifiersLen = nullifiers.length;
+
+        for (uint256 i = 0; i < nullifiersLen; ) {
+            markedArr[i] = _markedNullifiers[nullifiers[i]] != 0;
+
             unchecked {
                 ++i;
             }
         }
+
         return markedArr;
     }
 
-    function zeroes(uint256 level) external view returns (uint256) {
-        return _tree.zeroes[level];
+    function getCommitmentTreeState()
+        external
+        view
+        returns (
+            uint256[] memory queuedLeaves,
+            uint256[] memory lastSubtrees,
+            uint256 lastRoot,
+            uint8 currentRootIndex,
+            uint32 nextLeafIndex
+        )
+    {
+        (
+            queuedLeaves,
+            lastSubtrees,
+            lastRoot,
+            currentRootIndex,
+            nextLeafIndex
+        ) = _commitmentTree.getState();
     }
 
-    function getLastRoot() external view returns (uint256) {
-        return _tree.roots[_tree.currentRootIndex];
+    function getAddressTreeState()
+        external
+        view
+        returns (
+            uint256[] memory lastSubtrees,
+            uint256 lastRoot,
+            uint8 currentRootIndex,
+            uint32 nextLeafIndex
+        )
+    {
+        (lastSubtrees, lastRoot, currentRootIndex, nextLeafIndex) = _addressTree
+            .getState();
     }
 
-    function getCurrentRootIndex() external view returns (uint256) {
-        return _tree.currentRootIndex;
+    function isKnownCommitmentTreeRoot(
+        uint256 root
+    ) external view returns (bool) {
+        return _commitmentTree.isKnownRoot(root);
     }
 
-    function getLastSubtrees(uint256 level) external view returns (uint256) {
-        return _tree.lastSubtrees[level];
-    }
-
-    function isKnownRoot(uint256 root) external view returns (bool) {
-        return _tree.isKnownRoot(root, ROOT_HISTORY_SIZE);
-    }
-
-    function getRevokerPublicKey() external view returns (uint256, uint256) {
-        return IVerifier(verifier).getRevokerPublicKey();
-    }
-
-    function getEncryptionPublicKey() external view returns (uint256, uint256) {
-        return IVerifier(verifier).getEncryptionPublicKey();
+    function isKnownAddressTreeRoot(uint256 root) external view returns (bool) {
+        return _addressTree.isKnownRoot(root);
     }
 
     function _authorizeUpgrade(

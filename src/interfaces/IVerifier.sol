@@ -1,21 +1,24 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.23;
+pragma solidity ^0.8.24;
 
-import {ZTransaction} from "../libraries/ZTransaction.sol";
+import {ShieldedTransaction, RevokerData} from "../libraries/ShieldedTransaction.sol";
 
 interface IVerifier {
     error BadArguments();
 
-    function getRevokerPublicKey() external view returns (uint256, uint256);
-
-    function getEncryptionPublicKey() external view returns (uint256, uint256);
-
     function verifyTransactionProof(
-        ZTransaction memory ztx
+        uint16 vId,
+        bytes memory vInp
     ) external view returns (bool);
 
-    function getVerifierId(
+    function verifyAddressProof(bytes memory vInp) external view returns (bool);
+
+    function verifyTreeUpdateProof(
+        bytes calldata vInputs
+    ) external view returns (bool);
+
+    function getTransactionVerifierId(
         uint256 nIns,
         uint256 nOuts
-    ) external pure returns (uint256 id);
+    ) external pure returns (uint16 id);
 }

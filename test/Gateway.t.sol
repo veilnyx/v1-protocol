@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.23;
+pragma solidity ^0.8.24;
 
 import {Test} from "forge-std/Test.sol";
 import {console2} from "forge-std/console2.sol";
@@ -8,11 +8,11 @@ import {PackedUserOperation} from "@account-abstraction/contracts/interfaces/Pac
 import {Gateway} from "src/core/Gateway.sol";
 import {Paymaster} from "src/core/Paymaster.sol";
 import {IWToken} from "src/interfaces/IWToken.sol";
-import {ZTransaction, ZTransactionType} from "src/libraries/ZTransaction.sol";
+import {ShieldedTransaction, ShieldedTransactionType} from "src/libraries/ShieldedTransaction.sol";
 import {MockWToken} from "test/mocks/MockWToken.sol";
 
 contract MockPool {
-    function transact(ZTransaction calldata) external {
+    function transact(ShieldedTransaction calldata) external {
         // Simulate gas usage
         for (uint256 i = 0; i < 10; i++) {
             new MockWToken();
@@ -30,6 +30,8 @@ contract GatewayTest is Test {
     address payable beneficiary = payable(address(0x123));
 
     uint128 baseFee = 25 gwei;
+    uint24 assetId = 65537;
+    uint256 paymasterFeeValue = 0.1 ether;
 
     function setUp() public {
         entryPoint = new EntryPoint();
@@ -44,27 +46,37 @@ contract GatewayTest is Test {
 
         // Deposit to entry point
         vm.deal(address(this), 100 ether);
-        paymaster.deposit{value: 100 ether}();
-        paymaster.updateAssetFee(0x010001, 0.1 ether);
+        paymaster.depositToEntryPoint{value: 100 ether}();
+        paymaster.setAssetFee(assetId, paymasterFeeValue);
     }
 
     function test_handleWrapAndDeposit() public {
         vm.deal(address(this), 100 ether);
-        ZTransaction memory ztx;
-        ztx.txType = ZTransactionType.DEPOSIT;
-        gateway.handleWrapAndDeposit{value: 100 ether}(ztx);
+        ShieldedTransaction memory stx;
+        stx.txType = ShieldedTransactionType.DEPOSIT;
+        gateway.handleWrapAndDeposit{value: 100 ether}(stx);
     }
 
     function test_handleUserOp() public {
-        ZTransaction memory ztx;
+        ShieldedTransaction memory stx;
+
         uint24[] memory pubAssetIds = new uint24[](1);
-        pubAssetIds[0] = 0x010001;
-        ztx.pubAssetIds = pubAssetIds;
-        ztx.feeData = uint256(
+        uint224[] memory pubAssetValues = new uint224[](1);
+        uint248[] memory pubAssets = new uint248[](1);
+        pubAssetIds[0] = assetId;
+        pubAssetValues[0] = 1 ether;
+        pubAssets[0] = uint248(
+            bytes31(
+                bytes.concat(bytes3(pubAssetIds[0]), bytes28(pubAssetValues[0]))
+            )
+        );
+
+        stx.pubAssets = pubAssets;
+        stx.feeData = uint256(
             bytes32(
                 bytes.concat(
                     bytes20(address(paymaster)),
-                    bytes12(uint96(0.1 ether))
+                    bytes12(uint96(paymasterFeeValue))
                 )
             )
         );
@@ -79,7 +91,7 @@ contract GatewayTest is Test {
 
         PackedUserOperation memory userOp;
         userOp.sender = address(gateway);
-        userOp.callData = abi.encodeCall(Gateway.handleUserOp, ztx);
+        userOp.callData = abi.encodeCall(Gateway.handleUserOp, stx);
         userOp.accountGasLimits = bytes32(
             bytes.concat(bytes16(verificationGasLimit), bytes16(callGasLimit))
         );

@@ -1,75 +1,52 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.23;
+pragma solidity ^0.8.24;
 
 import {IVerifier} from "../interfaces/IVerifier.sol";
-import {ZTransaction, ZTransactionType, ZTransactionLogic} from "../libraries/ZTransaction.sol";
+import {VerifierRegister} from "../verifiers/VerifierRegister.sol";
+import {VerifierTreeUpdate} from "../verifiers/VerifierTreeUpdate.sol";
+import {ShieldedTransaction, ShieldedTransactionType, ShieldedTransactionLogic, RevokerData} from "../libraries/ShieldedTransaction.sol";
+import {MerkleTree} from "../libraries/MerkleTree.sol";
 
-struct VerifierInfo {
+struct TransactionVerifierInfo {
     uint16 id;
-    address addr;
     bytes4 selector;
+    address addr;
 }
 
 contract Verifier is IVerifier {
-    using ZTransactionLogic for ZTransaction;
-
-    uint256 public immutable REVOKER_PUBLIC_KEY_X;
-    uint256 public immutable REVOKER_PUBLIC_KEY_Y;
-
-    uint256 public immutable ENCRYPTION_PUBLIC_KEY_X;
-    uint256 public immutable ENCRYPTION_PUBLIC_KEY_Y;
+    using ShieldedTransactionLogic for ShieldedTransaction;
 
     /**
-     * @notice Verifier id to Verifier info mapping
+     * @notice Verifier id to Verifier info mapping for transaction verifiers only
      */
-    mapping(uint256 => VerifierInfo) public verifiers;
+    mapping(uint256 => TransactionVerifierInfo) internal _transactionVerifiers;
+    address internal _addressVerifier;
+    address internal _treeUpdateVerifier;
 
     constructor(
-        VerifierInfo[] memory vInfos,
-        uint256[2] memory revokerPublicKey,
-        uint256[2] memory encryptionPublicKey
+        TransactionVerifierInfo[] memory txvInfos,
+        address addressVerifier,
+        address treeUpdateVerifier
     ) {
-        uint256 len = vInfos.length;
-        for (uint256 i = 0; i < len; ) {
-            verifiers[vInfos[i].id] = vInfos[i];
+        uint256 len = txvInfos.length;
+
+        for (uint8 i = 0; i < len; ) {
+            _transactionVerifiers[txvInfos[i].id] = txvInfos[i];
             unchecked {
                 ++i;
             }
         }
 
-        REVOKER_PUBLIC_KEY_X = revokerPublicKey[0];
-        REVOKER_PUBLIC_KEY_Y = revokerPublicKey[1];
-
-        ENCRYPTION_PUBLIC_KEY_X = encryptionPublicKey[0];
-        ENCRYPTION_PUBLIC_KEY_Y = encryptionPublicKey[1];
+        _addressVerifier = addressVerifier;
+        _treeUpdateVerifier = treeUpdateVerifier;
     }
 
-    function getRevokerPublicKey() external view returns (uint256, uint256) {
-        return (REVOKER_PUBLIC_KEY_X, REVOKER_PUBLIC_KEY_Y);
-    }
-
-    function getEncryptionPublicKey() external view returns (uint256, uint256) {
-        return (ENCRYPTION_PUBLIC_KEY_X, ENCRYPTION_PUBLIC_KEY_Y);
-    }
-
-    function verifyTransactionProof(
-        ZTransaction memory ztx
+    function verifyAddressProof(
+        bytes calldata vParams
     ) public view returns (bool) {
-        VerifierInfo memory vInfo = getVerifier(
-            ztx.nullifiers.length,
-            ztx.commitments.length
+        (bool success, bytes memory result) = _addressVerifier.staticcall(
+            bytes.concat(VerifierRegister.verifyProof.selector, vParams)
         );
-
-        if (vInfo.addr == address(0)) {
-            revert("Verifier: verifier not found");
-        }
-
-        bytes memory vInp = ztx.toVerifierInput(
-            vInfo.selector,
-            ENCRYPTION_PUBLIC_KEY_X,
-            ENCRYPTION_PUBLIC_KEY_Y
-        );
-        (bool success, bytes memory result) = vInfo.addr.staticcall(vInp);
 
         if (!success) {
             revert("Verification call failed");
@@ -78,17 +55,51 @@ contract Verifier is IVerifier {
         return uint8(result[31]) == 1;
     }
 
-    function getVerifier(
-        uint256 nIns,
-        uint256 nOuts
-    ) public view returns (VerifierInfo memory) {
-        return verifiers[getVerifierId(nIns, nOuts)];
+    function verifyTreeUpdateProof(
+        bytes calldata vParams
+    ) public view returns (bool) {
+        (bool success, bytes memory result) = _treeUpdateVerifier.staticcall(
+            bytes.concat(VerifierTreeUpdate.verifyProof.selector, vParams)
+        );
+
+        if (!success) {
+            revert("Verification call failed");
+        }
+
+        return uint8(result[31]) == 1;
     }
 
-    function getVerifierId(
+    function verifyTransactionProof(
+        uint16 vId,
+        bytes calldata vParams
+    ) public view returns (bool) {
+        TransactionVerifierInfo memory vInfo = _transactionVerifiers[vId];
+
+        if (vInfo.addr == address(0)) {
+            revert("Verifier: verifier not found");
+        }
+
+        (bool success, bytes memory result) = vInfo.addr.staticcall(
+            bytes.concat(vInfo.selector, vParams)
+        );
+
+        if (!success) {
+            revert("Verification call failed");
+        }
+
+        return uint8(result[31]) == 1;
+    }
+
+    function getTransactionVerifier(
+        uint16 vId
+    ) public view returns (TransactionVerifierInfo memory) {
+        return _transactionVerifiers[vId];
+    }
+
+    function getTransactionVerifierId(
         uint256 nIns,
         uint256 nOuts
-    ) public pure returns (uint256 id) {
-        return nIns * 10 + nOuts;
+    ) public pure returns (uint16 id) {
+        return uint16(nIns * 10 + nOuts);
     }
 }

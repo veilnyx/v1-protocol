@@ -1,45 +1,37 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.23;
+pragma solidity ^0.8.24;
 
 import {Test} from "forge-std/Test.sol";
 import {console2} from "forge-std/console2.sol";
-import {Verifier, VerifierInfo} from "src/core/Verifier.sol";
-import {Verifier22} from "src/verifiers/Verifier22.sol";
-import {ZTransaction, ZTransactionType} from "src/libraries/ZTransaction.sol";
-import {TransactionRequest} from "test/helpers/TransactionRequest.sol";
-import {ZKFi, ZAccount} from "test/helpers/ZKFi.sol";
+import {Verifier, TransactionVerifierInfo} from "src/core/Verifier.sol";
+import {VerifierTransact21} from "src/verifiers/VerifierTransact21.sol";
+import {VerifierTransact22} from "src/verifiers/VerifierTransact22.sol";
+import {ShieldedTransaction, ShieldedTransactionType} from "src/libraries/ShieldedTransaction.sol";
 import {BaseTest} from "test/fixtures/BaseTest.sol";
 
 contract VerifierTest is BaseTest {
     Verifier internal _verifier;
 
     function setUp() public {
-        // _initFixture();
-        Verifier22 verifier22 = new Verifier22();
-        VerifierInfo[] memory vInfos = new VerifierInfo[](1);
-        vInfos[0] = VerifierInfo({
-            id: 2 * 10 + 2,
-            addr: address(verifier22),
-            selector: verifier22.verifyProof.selector
-        });
-        _verifier = new Verifier(
-            vInfos,
-            fixture.revokerPublicKey,
-            fixture.encryptionPublicKey
+        VerifierTransact21 vt21 = new VerifierTransact21();
+        VerifierTransact22 vt22 = new VerifierTransact22();
+        TransactionVerifierInfo[] memory vInfos = new TransactionVerifierInfo[](
+            2
         );
-    }
-
-    function test_PublicKeys() public view {
-        (uint256 revKeyX, uint256 revKeyY) = _verifier.getRevokerPublicKey();
-        (uint256 encKeyX, uint256 encKeyY) = _verifier.getEncryptionPublicKey();
-        assertEq(revKeyX, fixture.revokerPublicKey[0]);
-        assertEq(revKeyY, fixture.revokerPublicKey[1]);
-        assertEq(encKeyX, fixture.encryptionPublicKey[0]);
-        assertEq(encKeyY, fixture.encryptionPublicKey[1]);
+        vInfos[0] = TransactionVerifierInfo({
+            id: 21,
+            addr: address(vt21),
+            selector: vt21.verifyProof.selector
+        });
+        vInfos[1] = TransactionVerifierInfo({
+            id: 22,
+            addr: address(vt22),
+            selector: vt22.verifyProof.selector
+        });
     }
 
     function test_getVerifierId() public view {
-        uint256 id = _verifier.getVerifierId(2, 2);
+        uint256 id = _verifier.getTransactionVerifierId(2, 2);
         assertEq(id, 22);
     }
 }

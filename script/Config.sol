@@ -1,9 +1,8 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.23;
+pragma solidity ^0.8.24;
 
 import {console2} from "forge-std/console2.sol";
 import {Script} from "forge-std/Script.sol";
-import {stdJson} from "forge-std/stdJson.sol";
 import {AssetType} from "src/libraries/Asset.sol";
 
 struct CommonConfig {
@@ -12,99 +11,129 @@ struct CommonConfig {
 }
 
 contract Config is Script {
-    using stdJson for string;
+    uint256 public immutable chainId = block.chainid;
+    uint256[2] internal _revokerPublicKey;
+    uint256[2] internal _encryptionPublicKey;
+    uint8 public immutable addressTreeDepth;
+    uint8 public immutable commitmentTreeDepth;
+    uint8 public immutable commitmentTreeQueueSize;
+    uint256 public immutable withdrawFeeBps;
+    address public immutable entryPoint;
+    address public immutable gateway;
+    address public immutable paymaster;
+    address public immutable wToken;
+    address public immutable uniswapSwapRouter02;
+    address public immutable lido;
+    address public immutable withdrawalQueueERC721;
+    address public immutable sanctionList;
 
-    uint256 internal immutable _chainId = block.chainid;
-    uint256 internal immutable _revokerPublicKeyX;
-    uint256 internal immutable _revokerPublicKeyY;
-    uint256 internal immutable _encryptionPublicKeyX;
-    uint256 internal immutable _encryptionPublicKeyY;
-
-    uint256 internal immutable _treeDepth = 32;
-    mapping(uint256 => address) internal _entryPoints;
-    mapping(uint256 => address) internal _wTokens;
-
-    AssetType internal immutable _initAssetType;
-    mapping(uint256 => address[]) internal _initAssetAddresses;
+    AssetType public immutable initAssetType;
+    address[] internal _initAssetAddresses;
 
     constructor() {
         string memory path = string.concat(
             vm.projectRoot(),
             "/script/config.json"
         );
-        string memory json = vm.readFile(path);
-        _revokerPublicKeyX = vm.parseJsonUint(
-            json,
-            ".common.revokerPublicKey[0]"
-        );
-        _revokerPublicKeyY = vm.parseJsonUint(
-            json,
-            ".common.revokerPublicKey[1]"
-        );
+        string memory configJson = vm.readFile(path);
 
-        _encryptionPublicKeyX = vm.parseJsonUint(
-            json,
-            ".common.encryptionPublicKey[0]"
-        );
+        // common config
+        _revokerPublicKey = [
+            vm.parseJsonUint(configJson, ".common.revokerPublicKey[0]"),
+            vm.parseJsonUint(configJson, ".common.revokerPublicKey[1]")
+        ];
 
-        _encryptionPublicKeyY = vm.parseJsonUint(
-            json,
-            ".common.encryptionPublicKey[1]"
+        _encryptionPublicKey = [
+            vm.parseJsonUint(configJson, ".common.encryptionPublicKey[0]"),
+            vm.parseJsonUint(configJson, ".common.encryptionPublicKey[1]")
+        ];
+
+        addressTreeDepth = uint8(
+            vm.parseJsonUint(configJson, ".common.addressTreeDepth")
         );
 
-        string memory chainPrefix = string.concat(".", vm.toString(_chainId));
-
-        _treeDepth = vm.parseJsonUint(
-            json,
-            string.concat(chainPrefix, ".treeDepth")
+        commitmentTreeDepth = uint8(
+            vm.parseJsonUint(configJson, ".common.commitmentTreeDepth")
         );
 
-        _entryPoints[_chainId] = vm.parseJsonAddress(
-            json,
+        commitmentTreeQueueSize = uint8(
+            vm.parseJsonUint(configJson, ".common.commitmentTreeQueueSize")
+        );
+
+        withdrawFeeBps = vm.parseJsonUint(configJson, ".common.withdrawFeeBps");
+
+        // chain specific config
+        string memory chainPrefix = string.concat(".", vm.toString(chainId));
+
+        entryPoint = vm.parseJsonAddress(
+            configJson,
             string.concat(chainPrefix, ".entryPoint")
         );
 
-        _wTokens[_chainId] = vm.parseJsonAddress(
-            json,
+        gateway = vm.parseJsonAddress(
+            configJson,
+            string.concat(chainPrefix, ".gateway")
+        );
+
+        paymaster = vm.parseJsonAddress(
+            configJson,
+            string.concat(chainPrefix, ".paymaster")
+        );
+
+        wToken = vm.parseJsonAddress(
+            configJson,
             string.concat(chainPrefix, ".wToken")
         );
 
-        _initAssetType = AssetType(
-            vm.parseJsonUint(json, string.concat(chainPrefix, ".initAssetType"))
+        if (chainId == 11155111 || chainId == 1) {
+            uniswapSwapRouter02 = vm.parseJsonAddress(
+                configJson,
+                string.concat(chainPrefix, ".uniswapSwapRouter02")
+            );
+        } else {
+            uniswapSwapRouter02 = address(0);
+        }
+
+        if (chainId == 17000) {
+            lido = vm.parseJsonAddress(
+                configJson,
+                string.concat(chainPrefix, ".lido")
+            );
+            withdrawalQueueERC721 = vm.parseJsonAddress(
+                configJson,
+                string.concat(chainPrefix, ".withdrawalQueueERC721")
+            );
+        } else {
+            lido = address(0);
+        }
+
+        sanctionList = vm.parseJsonAddress(
+            configJson,
+            string.concat(chainPrefix, ".sanctionList")
         );
 
-        _initAssetAddresses[_chainId] = vm.parseJsonAddressArray(
-            json,
+        initAssetType = AssetType(
+            vm.parseJsonUint(
+                configJson,
+                string.concat(chainPrefix, ".initAssetType")
+            )
+        );
+
+        _initAssetAddresses = vm.parseJsonAddressArray(
+            configJson,
             string.concat(chainPrefix, ".initAssetAddresses")
         );
     }
 
     function revokerPublicKey() external view returns (uint256[2] memory) {
-        return [_revokerPublicKeyX, _revokerPublicKeyY];
+        return _revokerPublicKey;
     }
 
     function encryptionPublicKey() external view returns (uint256[2] memory) {
-        return [_encryptionPublicKeyX, _encryptionPublicKeyY];
-    }
-
-    function treeDepth() external pure returns (uint256) {
-        return _treeDepth;
-    }
-
-    function entryPoint() external view returns (address) {
-        return _entryPoints[block.chainid];
-    }
-
-    function wToken() external view returns (address) {
-        return _wTokens[block.chainid];
-    }
-
-    function initAssetType() external view returns (AssetType) {
-        return _initAssetType;
+        return _encryptionPublicKey;
     }
 
     function initAssetAddresses() external view returns (address[] memory) {
-        address[] memory addresses = _initAssetAddresses[block.chainid];
-        return addresses;
+        return _initAssetAddresses;
     }
 }
