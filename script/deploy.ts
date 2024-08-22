@@ -1,102 +1,158 @@
 import hre from "hardhat";
+import {
+  encodeAbiParameters,
+  encodeFunctionData,
+  parseAbiParameters,
+} from "viem";
 import poolModule from "../ignition/modules/pool";
-import config from "./config.json";
+import { loadConfigs, ChainParams, CommonParams } from "./configs";
+import { deployHasher } from "./hasher";
 
 const chainId = hre.network.config.chainId;
-const commonParams = config.common;
-const chainParams = config[chainId];
 
-// const hasherArtifacts = hre.artifacts.readArtifactSync("Hasher");
+const config = loadConfigs();
 
-// const main1 = async () => {
-//   const client = await hre.viem.getPublicClient();
-//   const wallets = await hre.viem.getWalletClients();
-//   const wallet = wallets[0];
-//   const [walletAddress] = await wallet.getAddresses();
+const commonParams = config.common as CommonParams;
+const chainParams = config[chainId] as ChainParams;
+const poolAbi = hre.artifacts.readArtifactSync("Pool").abi;
 
-//   const merkleTree = await hre.viem.deployContract("MerkleTreeLogic");
-//   const queuedMerkleTree = await hre.viem.deployContract(
-//     "QueuedMerkleTreeLogic"
-//   );
-//   const poolImpl = await hre.viem.deployContract("Pool", [], {
-//     libraries: {
-//       AssetLogic: zeroAddress,
-//       MerkleTreeLogic: merkleTree.address,
-//       QueuedMerkleTreeLogic: queuedMerkleTree.address,
-//       ShieldedAddressLogic: zeroAddress,
-//       ShieldedTransactionLogic: zeroAddress,
-//     },
-//   });
-//   console.log("poolImpl", poolImpl.address);
-//   //   console.log("chainParams", chainParams);
-//   const dHasher = await deployHasher();
-//   console.log("dHasher", dHasher);
+const main1 = async () => {
+  const client = await hre.viem.getPublicClient();
+  const wallets = await hre.viem.getWalletClients();
+  const wallet = wallets[0];
+  const [walletAddress] = await wallet.getAddresses();
 
-//   //   const hasher = await hre.viem.deployContract("Hasher", [
-//   //     chainParams.poseidonT3,
-//   //     chainParams.poseidonT4,
-//   //   ]);
-//   //   console.log("hasher", hasher.address);
+  const eip712 = await hre.viem.deployContract("EIP712");
+  const asset = await hre.viem.deployContract("AssetLogic");
+  const merkleTree = await hre.viem.deployContract("MerkleTreeLogic");
+  const queuedMerkleTree = await hre.viem.deployContract(
+    "QueuedMerkleTreeLogic"
+  );
+  const shieldedAddress = await hre.viem.deployContract(
+    "ShieldedAddressLogic",
+    [],
+    {
+      libraries: {
+        MerkleTreeLogic: merkleTree.address,
+      },
+    }
+  );
+  const shieldedTransaction = await hre.viem.deployContract(
+    "ShieldedTransactionLogic",
+    [],
+    {
+      libraries: {
+        AssetLogic: asset.address,
+        MerkleTreeLogic: merkleTree.address,
+        QueuedMerkleTreeLogic: queuedMerkleTree.address,
+      },
+    }
+  );
 
-//   const hasher = await hre.viem.getContractAt("Hasher", dHasher.hasher);
+  const zeroAddress = "0x0000000000000000000000000000000000000000";
+  const poolImpl = await hre.viem.deployContract("Pool", [], {
+    libraries: {
+      EIP712: eip712.address,
+      AssetLogic: asset.address,
+      MerkleTreeLogic: merkleTree.address,
+      QueuedMerkleTreeLogic: queuedMerkleTree.address,
+      ShieldedAddressLogic: shieldedAddress.address,
+      ShieldedTransactionLogic: shieldedTransaction.address,
+    },
+  });
 
-//   const v = await client.readContract({
-//     address: hasher.address,
-//     abi: hasherArtifacts.abi,
-//     functionName: "hash",
-//     args: [[BigInt(1), BigInt(2)]],
-//   });
-//   console.log("v", v);
+  const { hasher } = await deployHasher();
 
-//   const codeSize = await client.getCode({ address: hasher.address });
-//   console.log("codeSize", codeSize.length);
+  const args = [
+    commonParams.addressTreeDepth,
+    commonParams.commitmentTreeDepth,
+    commonParams.commitmentTreeQueueSize,
+    zeroAddress,
+    zeroAddress,
+    zeroAddress,
+    hasher,
+    BigInt(commonParams.withdrawFeeBps),
+  ];
 
-//   const args = [
-//     commonParams.addressTreeDepth,
-//     commonParams.commitmentTreeDepth,
-//     commonParams.commitmentTreeQueueSize,
-//     zeroAddress,
-//     zeroAddress,
-//     zeroAddress,
-//     hasher.address,
-//     BigInt(commonParams.withdrawFeeBps),
-//   ];
-//   console.log("args", args);
+  const initData = encodeFunctionData({
+    abi: poolAbi,
+    functionName: "initialize",
+    args: args as any,
+  });
 
-//   const poolAbi = hre.artifacts.readArtifactSync("Pool").abi;
+  const poolProxy = await hre.viem.deployContract("PoolProxy", [
+    poolImpl.address,
+    initData,
+  ]);
 
-//   try {
-//     //@ts-ignore
-//     const hash = await wallet.writeContract({
-//       address: poolImpl.address,
-//       abi: poolAbi,
-//       functionName: "initialize",
-//       args: args as any,
-//     });
-//     const rct = await client.waitForTransactionReceipt({ hash });
-//     console.log("rct", rct.status);
-//   } catch (error) {
-//     console.log(error.message);
-//   }
-// };
+  //@ts-ignore
+  const owner = await client.readContract({
+    address: poolProxy.address,
+    abi: poolAbi,
+    functionName: "owner",
+  });
+
+  try {
+    //@ts-ignore
+    const hash = await wallet.writeContract({
+      address: poolProxy.address,
+      abi: poolAbi,
+      functionName: "addAssets",
+      args: [chainParams.initAssetType, chainParams.initAssetAddresses],
+    });
+
+    const rct = await client.waitForTransactionReceipt({ hash });
+    console.log("rct", rct.status);
+
+    for (let i = 0; i < commonParams.revokers.length; i++) {
+      const revokerPublicKey = commonParams.revokers[i].revokerPublicKey;
+      const encryptionPublicKey = commonParams.revokers[i].encryptionPublicKey;
+      const revokerName = commonParams.revokers[i].name;
+      const revokerDescription = commonParams.revokers[i].description;
+      const metadata = encodeAbiParameters(
+        parseAbiParameters("string name, string description"),
+        [revokerName, revokerDescription]
+      );
+
+      //@ts-ignore
+      const hash = await wallet.writeContract({
+        address: poolProxy.address,
+        abi: poolAbi,
+        functionName: "registerRevoker",
+        args: [revokerPublicKey, encryptionPublicKey, metadata],
+      });
+
+      const rct = await client.waitForTransactionReceipt({ hash });
+      console.log("rct:revokerAdd", rct.status);
+    }
+  } catch (error) {
+    console.log(error.message);
+  }
+};
 
 const main = async () => {
-  const poolParams = {
-    ...commonParams,
-  };
-  const hasherParams = {
-    poseidonT3: chainParams.poseidonT3,
-    poseidonT4: chainParams.poseidonT4,
-  };
-  const screenerParams = {
-    sanctionsList: chainParams.sanctionsList,
-  };
-  await hre.ignition.deploy(poolModule, {
-    parameters: {
-      pool: poolParams,
-      hasher: hasherParams,
-      screener: screenerParams,
+  const parameters = {
+    pool: { ...commonParams },
+    hasher: {
+      poseidonT3: chainParams.poseidonT3,
+      poseidonT4: chainParams.poseidonT4,
     },
+    screener: {
+      sanctionsList: chainParams.sanctionsList,
+    },
+    poolAsset: {
+      initAssetType: chainParams.initAssetType,
+      initAssetAddresses: chainParams.initAssetAddresses,
+    },
+    poolRevoker: {
+      revokerPublicKey: [],
+      encryptionPublicKey: [],
+      metadata: "0x",
+    },
+  };
+
+  await hre.ignition.deploy(poolModule, {
+    parameters,
   });
 };
 
