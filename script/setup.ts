@@ -1,58 +1,65 @@
 import hre from "hardhat";
-import { encodeAbiParameters, parseAbiParameters } from "viem";
-import poolAssetModule from "../ignition/modules/poolAsset";
-import poolRevokerModule from "../ignition/modules/poolRevoker";
+import { encodeAbiParameters, Hex, parseAbiParameters } from "viem";
 import { loadConfigs, ChainParams, CommonParams } from "./configs";
 
-const chainId = hre.network.config.chainId;
-
 const config = loadConfigs();
+const poolAbi = hre.artifacts.readArtifactSync("Pool").abi;
 
-const commonParams = config.common as CommonParams;
-const chainParams = config[chainId] as ChainParams;
+export const addInitialAssets = async (poolAddress: Hex) => {
+  const client = await hre.viem.getPublicClient();
+  const wallets = await hre.viem.getWalletClients();
+  const wallet = wallets[0];
+  const chainId = await client.getChainId();
+  const chainParams = config[chainId] as ChainParams;
 
-const main = async () => {
-  const parameters = {
-    pool: { ...commonParams },
-    hasher: {
-      poseidonT3: chainParams.poseidonT3,
-      poseidonT4: chainParams.poseidonT4,
-    },
-    screener: {
-      sanctionsList: chainParams.sanctionsList,
-    },
-    poolAsset: {
-      initAssetType: chainParams.initAssetType,
-      initAssetAddresses: chainParams.initAssetAddresses,
-    },
-    poolRevoker: {
-      revokerPublicKey: [],
-      encryptionPublicKey: [],
-      metadata: "0x",
-    },
-  };
+  const assetType = chainParams.initAssetType;
+  const assetAddresses = chainParams.initAssetAddresses;
 
-  await hre.ignition.deploy(poolAssetModule, {
-    parameters,
+  console.log(`Adding ${assetAddresses.length} assets to pool...`);
+
+  //@ts-ignore
+  const hash = await wallet.writeContract({
+    address: poolAddress,
+    abi: poolAbi,
+    functionName: "addAssets",
+    args: [assetType, assetAddresses],
   });
+
+  const receipt = await client.waitForTransactionReceipt({ hash });
+  console.log("Receipt status:", receipt.status);
+  console.log("Done!");
+};
+
+export const registerRevokers = async (poolAddress: Hex) => {
+  const client = await hre.viem.getPublicClient();
+  const wallets = await hre.viem.getWalletClients();
+  const wallet = wallets[0];
+  const commonParams = config.common as CommonParams;
 
   for (let i = 0; i < commonParams.revokers.length; i++) {
     const revokerName = commonParams.revokers[i].name;
     const revokerDescription = commonParams.revokers[i].description;
 
-    parameters.poolRevoker.revokerPublicKey =
-      commonParams.revokers[i].revokerPublicKey;
-    parameters.poolRevoker.encryptionPublicKey =
-      commonParams.revokers[i].encryptionPublicKey;
-    parameters.poolRevoker.metadata = encodeAbiParameters(
+    const revokerPublicKey = commonParams.revokers[i].revokerPublicKey;
+    const encryptionPublicKey = commonParams.revokers[i].encryptionPublicKey;
+
+    const metadata = encodeAbiParameters(
       parseAbiParameters("string name, string description"),
       [revokerName, revokerDescription]
     );
 
-    await hre.ignition.deploy(poolRevokerModule, {
-      parameters,
+    console.log(`Registering revoker no. ${i}: ${revokerName}...`);
+
+    //@ts-ignore
+    const hash = await wallet.writeContract({
+      address: poolAddress,
+      abi: poolAbi,
+      functionName: "registerRevoker",
+      args: [revokerPublicKey, encryptionPublicKey, metadata],
     });
+
+    const receipt = await client.waitForTransactionReceipt({ hash });
+    console.log("Receipt status:", receipt.status);
+    console.log("Done!");
   }
 };
-
-main().catch(console.error);

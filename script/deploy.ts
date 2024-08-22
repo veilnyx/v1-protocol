@@ -7,17 +7,17 @@ import {
 import poolModule from "../ignition/modules/pool";
 import { loadConfigs, ChainParams, CommonParams } from "./configs";
 import { deployHasher } from "./hasher";
-
-const chainId = hre.network.config.chainId;
+import { addInitialAssets, registerRevokers } from "./setup";
 
 const config = loadConfigs();
-
-const commonParams = config.common as CommonParams;
-const chainParams = config[chainId] as ChainParams;
 const poolAbi = hre.artifacts.readArtifactSync("Pool").abi;
 
 const main1 = async () => {
   const client = await hre.viem.getPublicClient();
+  const chainId = await client.getChainId();
+  const commonParams = config.common as CommonParams;
+  const chainParams = config[chainId] as ChainParams;
+
   const wallets = await hre.viem.getWalletClients();
   const wallet = wallets[0];
   const [walletAddress] = await wallet.getAddresses();
@@ -131,6 +131,17 @@ const main1 = async () => {
 };
 
 const main = async () => {
+  const client = await hre.viem.getPublicClient();
+  const wallets = await hre.viem.getWalletClients();
+  const wallet = wallets[0];
+  const [walletAddress] = await wallet.getAddresses();
+  const chainId = await client.getChainId();
+  const commonParams = config.common as CommonParams;
+  const chainParams = config[chainId] as ChainParams;
+
+  console.log("Running deployment on chain:", chainId);
+  console.log("Deployer address:", walletAddress);
+
   const parameters = {
     pool: { ...commonParams },
     hasher: {
@@ -140,20 +151,18 @@ const main = async () => {
     screener: {
       sanctionsList: chainParams.sanctionsList,
     },
-    poolAsset: {
-      initAssetType: chainParams.initAssetType,
-      initAssetAddresses: chainParams.initAssetAddresses,
-    },
-    poolRevoker: {
-      revokerPublicKey: [],
-      encryptionPublicKey: [],
-      metadata: "0x",
-    },
   };
 
-  await hre.ignition.deploy(poolModule, {
+  const { poolProxy } = await hre.ignition.deploy(poolModule, {
     parameters,
   });
+  const poolAddress = poolProxy.address;
+
+  // SETUP ASSETS
+  //   await addInitialAssets(poolAddress);
+
+  // REGISTER REVOKERS
+  //   await registerRevokers(poolAddress);
 };
 
 main().catch(console.error);
