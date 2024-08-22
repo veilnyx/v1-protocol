@@ -16,7 +16,7 @@ export const reqs = {
         values: [parseEther("1")],
         feeAssetId: 0,
         // adaptor to which the ZkFi AdaptorHandler will call to execute swap
-        to: "0x192C8273dD35827036123b912C0238f7F515A9b3",
+        to: "0xbF71c5Ae43827387dAAF7358acAB5C81642b74b8",
         // payload:: refund: pool address (address(0)), outToken: testnetUsdc
         payload: "0x000000000000000000000000000000000000000000000000000000000001000500000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000" as `0x${string}`,
         revokerId: 0,
@@ -27,7 +27,7 @@ export const reqs = {
         type: TransactionType.CALL_ADAPTER,
         assetIds: [testnetWeth],
         values: [parseEther("1")],
-        to: "0x192C8273dD35827036123b912C0238f7F515A9b3", // adaptor to which the ZkFi Convertor will call to execute swap
+        to: "0xbF71c5Ae43827387dAAF7358acAB5C81642b74b8", // adaptor to which the ZkFi Convertor will call to execute swap
         revokerId: 0,
         feeAssetId: testnetWeth,
         viaBundler: true,
