@@ -23,9 +23,6 @@ contract PoolUserRegistration is PoolBaseTest {
         addressRegistrationData = _loadShieldedAddressRegistrationData(
             "register_sender"
         );
-        console2.log("unpacked ShieldedAddr being signed:");
-        console2.logBytes(addressRegistrationData.shieldedAddress); // uncompressed
-
         shieldedAddress = bytes.concat(
             bytes32(fixture.sender.rootAddress),
             bytes32(fixture.sender.signPublicKey[0]),
