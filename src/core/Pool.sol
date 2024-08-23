@@ -112,6 +112,15 @@ contract Pool is
         bytes calldata revokerMetadata
     ) external onlyOwner {
         uint16 id = _revokerCount;
+        uint256 revokerPublicKeyHash = uint256(
+            keccak256((abi.encode(revokerPublicKey)))
+        );
+
+        if (_revokerPublicKeys[revokerPublicKeyHash]) {
+            revert DuplicateRevoker(revokerPublicKey);
+        }
+
+        _revokerPublicKeys[revokerPublicKeyHash] = true;
 
         RevokerData memory revokerData = RevokerData({
             id: id,

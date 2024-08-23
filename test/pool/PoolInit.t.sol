@@ -48,7 +48,7 @@ contract PoolInitTest is PoolTest {
         (
             uint256[2] memory revokerKeys,
             uint256[2] memory encryptionKeys
-        ) = _getRevokerArrays();
+        ) = _getRevokerKeys();
 
         vm.expectEmit(true, true, true, true);
         emit IPool.RevokerRegistered(
@@ -61,12 +61,26 @@ contract PoolInitTest is PoolTest {
         pool.registerRevoker(revokerKeys, encryptionKeys, revokerMetaData);
     }
 
+    function test_revertOnDuplicateRevoker() external {
+        (
+            uint256[2] memory revokerKeys,
+            uint256[2] memory encryptionKeys
+        ) = _getRevokerKeys();
+
+        pool.registerRevoker(revokerKeys, encryptionKeys, revokerMetaData);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(IPool.DuplicateRevoker.selector, revokerKeys)
+        );
+        pool.registerRevoker(revokerKeys, encryptionKeys, revokerMetaData);
+    }
+
     function test_revertWhenNonOwnerAddsRevoker() external {
         address random = makeAddr("random");
         (
             uint256[2] memory revokerKeys,
             uint256[2] memory encryptionKeys
-        ) = _getRevokerArrays();
+        ) = _getRevokerKeys();
 
         vm.expectRevert(
             abi.encodeWithSelector(
@@ -82,7 +96,7 @@ contract PoolInitTest is PoolTest {
         (
             uint256[2] memory revokerKeys,
             uint256[2] memory encryptionKeys
-        ) = _getRevokerArrays();
+        ) = _getRevokerKeys();
 
         pool.registerRevoker(revokerKeys, encryptionKeys, revokerMetaData);
 
@@ -99,7 +113,7 @@ contract PoolInitTest is PoolTest {
         (
             uint256[2] memory revokerKeys,
             uint256[2] memory encryptionKeys
-        ) = _getRevokerArrays();
+        ) = _getRevokerKeys();
 
         pool.registerRevoker(revokerKeys, encryptionKeys, revokerMetaData);
         vm.expectEmit(true, true, true, true);
@@ -110,7 +124,7 @@ contract PoolInitTest is PoolTest {
         assertEq(revoker.isActive, false);
     }
 
-    function _getRevokerArrays()
+    function _getRevokerKeys()
         internal
         pure
         returns (

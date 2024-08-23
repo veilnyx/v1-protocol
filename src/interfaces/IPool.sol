@@ -63,6 +63,7 @@ interface IPool {
     error DuplicateAsset(address assetAddress);
     error InactiveAsset(uint24 assetId);
     error InvalidRevoker(uint256 id);
+    error DuplicateRevoker(uint256[2] publicKey);
     error NoFeeToClaim(address paymaster, uint24 assetId);
 
     /////////////////////////////////////////
