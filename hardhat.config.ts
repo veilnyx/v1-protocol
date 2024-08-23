@@ -5,6 +5,7 @@ import "@nomicfoundation/hardhat-foundry";
 import "@nomicfoundation/hardhat-ignition";
 import "@nomicfoundation/hardhat-toolbox-viem";
 import "@nomicfoundation/hardhat-ignition-viem";
+import "hardhat-contract-sizer";
 
 dotenv.config();
 
@@ -33,6 +34,11 @@ const config: HardhatUserConfig = {
       accounts: privateKeys,
     },
   },
+  contractSizer: {
+    runOnCompile: true,
+    strict: true,
+    unit: "kB"
+  }
 };
 
 export default config;
