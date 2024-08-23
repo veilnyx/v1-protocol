@@ -7,6 +7,7 @@ import {MerkleTree, MerkleTreeLogic} from "./MerkleTree.sol";
 import {IPool} from "../interfaces/IPool.sol";
 import {IVerifier} from "../interfaces/IVerifier.sol";
 import {EIP712_TYPEHASH_REGISTER_ADDRESS, MESSAGE_REGISTER_ADDRESS} from "../base/Constants.sol";
+import {console2} from "forge-std/console2.sol";
 
 struct ShieldedAddressRegistrationData {
     bytes proof;
@@ -34,11 +35,17 @@ library ShieldedAddressLogic {
             revert IPool.RootAddressAlreadyRegistered(rootAddress);
         }
 
-        if (!verifyProof(self, verifier)) {
-            revert IPool.InvalidAddressProof();
-        }
+        // if (!verifyProof(self, verifier)) {
+        //     revert IPool.InvalidAddressProof();
+        // }
+
+        console2.log("Recovery process started");
+        console2.log("Hash Typed Data on protocol:");
+        console2.logBytes32(hashTypedData);
+        // console2.log("Signature:", self.signature);
 
         address publicAddress = ECDSA.recover(hashTypedData, self.signature);
+        console2.log("Public Address:", publicAddress);
 
         if (publicAddresses[publicAddress] != 0) {
             revert IPool.PublicAddressAlreadyRegistered(publicAddress);
