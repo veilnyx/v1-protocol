@@ -35,9 +35,9 @@ library ShieldedAddressLogic {
             revert IPool.RootAddressAlreadyRegistered(rootAddress);
         }
 
-        // if (!verifyProof(self, verifier)) {
-        //     revert IPool.InvalidAddressProof();
-        // }
+        if (!verifyProof(self, verifier)) {
+            revert IPool.InvalidAddressProof();
+        }
 
         console2.log("Recovery process started");
         console2.log("Hash Typed Data on protocol:");
