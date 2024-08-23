@@ -34,6 +34,11 @@ library ShieldedAddressLogic {
             revert IPool.RootAddressAlreadyRegistered(rootAddress);
         }
 
+        /// @dev 160 bytes is the size of a shielded address in unpacked form. Verifier expects input in unpacked form.
+        if (self.shieldedAddress.length != 160) { 
+            revert IPool.BadArguments();
+        }
+        
         if (!verifyProof(self, verifier)) {
             revert IPool.InvalidAddressProof();
         }

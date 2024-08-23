@@ -23,6 +23,7 @@ contract PoolUserRegistration is PoolBaseTest {
         addressRegistrationData = _loadShieldedAddressRegistrationData(
             "register_sender"
         );
+
         shieldedAddress = bytes.concat(
             bytes32(fixture.sender.rootAddress),
             bytes32(fixture.sender.signPublicKey[0]),
@@ -33,7 +34,7 @@ contract PoolUserRegistration is PoolBaseTest {
 
         addressRegistrationData.signature = _getRegisterAddressSignature(
             senderPK,
-            addressRegistrationData.shieldedAddress
+            shieldedAddress
         );
     }
 
@@ -61,6 +62,15 @@ contract PoolUserRegistration is PoolBaseTest {
         pool.registerAddress(addressRegistrationData);
 
         assertEq(addressRegistrationData.shieldedAddress, shieldedAddress);
+    }
+
+    function test_revertWhenShieldedAddrPacked() public {
+        addressRegistrationData.shieldedAddress = fixture
+            .sender
+            .shieldedAddress; // packed
+
+        vm.expectRevert(abi.encodeWithSelector(IPool.BadArguments.selector));
+        pool.registerAddress(addressRegistrationData);
     }
 
     function test_userRegistrationWhenPaused() external {
