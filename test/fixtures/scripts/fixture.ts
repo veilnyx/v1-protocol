@@ -19,7 +19,7 @@ import {
 } from "@zkfi-tech/shared-types";
 import { Core } from "@zkfi-tech/core";
 import { ZTransaction } from "@zkfi-tech/zk-prover";
-import { Note, SIZE_KEY_MEMO } from "@zkfi-tech/transaction";
+import { Note, NoteMemoType, SIZE_ENCRYPTED_DECRYPTION_KEY } from "@zkfi-tech/transaction";
 import config from "../config.json";
 
 const senderSeed = BigInt(config.sender.seed);
@@ -176,35 +176,32 @@ export async function mockNotes(depositName: string, sdk: Core) {
   // Parse encrypted data
   const [encryptedRefundDataKey, ...encryptedNotesKeys] = splitToChunks(
     ztx.keysMemo,
-    SIZE_KEY_MEMO
+    SIZE_ENCRYPTED_DECRYPTION_KEY
   );
+
   const encryptedNoteMemoChunks = splitToChunks(ztx.notesMemo, 32).map((v) =>
     hexToBigInt(v)
   );
   const encryptedKeySeed = encryptedNoteMemoChunks.slice(0, 3);
-  const encryptedNotesDataArr = encryptedNoteMemoChunks.slice(3);
-  const numNotesData = encryptedNotesDataArr.length / 4;
-  const encryptedNotesData: bigint[][] = [];
-  for (let i = 0; i < numNotesData; i++) {
-    const start = i * 4;
-    const end = start + 4;
-    encryptedNotesData.push(encryptedNotesDataArr.slice(start, end));
-  }
-  const [encryptedRefundData, ...encryptedNotes] = encryptedNotesData;
+  const encryptedRefundData = encryptedNoteMemoChunks.slice(3, 7);
+
   // Decrypt refund data
   const refundDataDecryptionKey = Point.generate(
     bytesToBigInt(senderAccount.decrypt(hexToBytes(encryptedRefundDataKey)))
   );
+  
   const refundData = poseidonDecrypt(
     encryptedRefundData,
     refundDataDecryptionKey,
     BigInt(0),
     2
   );
+
   // Decrypt notes
+  const encryptedNotes = splitToChunks(ztx.noteMemos.sliceHex(7 * 32), (4 * 32)); // ignoring first 3 (encrypted key seed) and 4 (encrypted refund data) chunks  . The balance noteMemo are encrypted notes of (4 * 32) bytes each
   const notes = [];
   for (let i = 0; i < encryptedNotes.length; i++) {
-    const n = Note.decrypt(encryptedNotesKeys[i], encryptedNotes[i], {
+    const n = Note.decrypt(0, encryptedNotesKeys[i], encryptedNotes[i], {
       account: senderAccount,
       revoker: revokerPublicKey,
       leafIndex: i,

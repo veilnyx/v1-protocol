@@ -56,11 +56,15 @@ contract PoolTest is PoolBaseTest {
         // uint256 currentRootIndexBeforeDeposit = pool
         //     .getCommitmentTreeCurrentRootIndex();
 
-        (, , , , uint32 nextLeafIndex) = pool.getCommitmentTreeState();
+        (uint256[] memory queuedLeaves, , , , uint32 nextLeafIndex) = pool
+            .getCommitmentTreeState();
 
         for (uint256 i = 0; i < stx.commitments.length; ++i) {
             vm.expectEmit(true, true, true, true);
-            emit IPool.Commitment(nextLeafIndex + i, stx.commitments[i]);
+            emit IPool.Commitment(
+                nextLeafIndex + queuedLeaves.length + i,
+                stx.commitments[i]
+            );
         }
 
         _;

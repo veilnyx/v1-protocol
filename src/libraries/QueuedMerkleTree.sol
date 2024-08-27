@@ -87,7 +87,7 @@ library QueuedMerkleTreeLogic {
         uint32 startIdx = self.queueStartIndex;
         uint32 endIdx = self.queueEndIndex;
 
-        uint32 queueLen = endIdx - startIdx; //
+        uint32 queueLen = endIdx - startIdx;
         uint32 nLeaves = queueLen > n ? n : queueLen;
 
         uint256[] memory leaves = new uint256[](n);
@@ -171,37 +171,7 @@ library QueuedMerkleTreeLogic {
         return IVerifier(self.verifier).verifyTreeUpdateProof(vParams);
     }
 
-    function _getQueuedLeaves(
-        QueuedMerkleTree storage tree
-    ) internal view returns (uint256[] memory) {
-        uint32 nLeaves = tree.queueSize;
-        uint256[] memory leaves = peekQueuedLeaves(tree, nLeaves);
-        return leaves;
-    }
-
-    function getQueuedLeaves(
-        QueuedMerkleTree storage tree
-    ) external view returns (uint256[] memory) {
-        return _getQueuedLeaves(tree);
-    }
-
-    function _getSubtrees(
-        QueuedMerkleTree storage tree
-    ) internal view returns (uint256[] memory) {
-        uint256[] memory subtree = new uint256[](tree.depth);
-
-        for (uint8 i; i < tree.depth; ) {
-            subtree[i] = tree.lastSubtrees[i];
-
-            unchecked {
-                ++i;
-            }
-        }
-
-        return subtree;
-    }
-
-    function isKnownRoot(
+      function isKnownRoot(
         QueuedMerkleTree storage self,
         uint256 _root
     ) public view returns (bool) {
@@ -223,6 +193,48 @@ library QueuedMerkleTreeLogic {
         return false;
     }
 
+    /// @notice Returns padded leaves queue for internal operations
+    function _getQueuedLeaves(
+        QueuedMerkleTree storage tree
+    ) internal view returns (uint256[] memory) {
+        uint32 nLeaves = tree.queueSize;
+        uint256[] memory leaves = peekQueuedLeaves(tree, nLeaves);
+        return leaves;
+    }
+
+    /// @notice Returns unpadded leaves queue
+    function getQueuedLeaves(
+        QueuedMerkleTree storage self
+    ) public view returns (uint256[] memory queuedLeaves) {
+        uint32 startIdx = self.queueStartIndex;
+        uint32 endIdx = self.queueEndIndex;
+        uint32 queueLen = endIdx - startIdx;
+
+        for (uint32 i = 0; i < queueLen; ) {
+            queuedLeaves[i] = self.queuedLeaves[startIdx + i];
+
+            unchecked {
+                ++i;
+            }
+        }
+    }
+
+    function _getSubtrees(
+        QueuedMerkleTree storage tree
+    ) internal view returns (uint256[] memory) {
+        uint256[] memory subtree = new uint256[](tree.depth);
+
+        for (uint8 i; i < tree.depth; ) {
+            subtree[i] = tree.lastSubtrees[i];
+
+            unchecked {
+                ++i;
+            }
+        }
+
+        return subtree;
+    }
+
     /**
     function getRoot(
         QueuedMerkleTree storage self,
@@ -239,7 +251,7 @@ library QueuedMerkleTreeLogic {
         view
         returns (uint256[] memory, uint256[] memory, uint256, uint8, uint32)
     {
-        uint256[] memory leaves = _getQueuedLeaves(self);
+        uint256[] memory leaves = getQueuedLeaves(self);
         uint256[] memory lastSubtrees = _getSubtrees(self);
         uint32 nextLeafIndex = self.nextLeafIndex;
         uint256 lastRoot = self.roots[self.currentRootIndex];

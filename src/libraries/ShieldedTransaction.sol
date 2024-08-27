@@ -440,14 +440,16 @@ library ShieldedTransactionLogic {
         Params memory params,
         MemoParams memory memoParams
     ) internal {
-        // uint256 numCommitments = memoParams.commitments.length;
-        tree.queueLeaves(memoParams.commitments);
-
+        uint32 nextCommitmentIndex = tree.nextLeafIndex +
+            (tree.queueEndIndex - tree.queueStartIndex);
         for (uint8 i = 0; i < memoParams.commitments.length; ++i) {
-            uint32 leafIndex = tree.nextLeafIndex + i;
-            emit IPool.Commitment(leafIndex, memoParams.commitments[i]);
+            emit IPool.Commitment(
+                nextCommitmentIndex + i,
+                memoParams.commitments[i]
+            );
         }
 
+        tree.queueLeaves(memoParams.commitments);
         uint32 lastLeafIndex = tree.nextLeafIndex +
             (tree.queueEndIndex - tree.queueStartIndex) -
             1;
