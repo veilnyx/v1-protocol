@@ -440,13 +440,16 @@ library ShieldedTransactionLogic {
         Params memory params,
         MemoParams memory memoParams
     ) internal {
-        // uint256 numCommitments = memoParams.commitments.length;
-        tree.queueLeaves(memoParams.commitments);
+        // offset = nextLeafIdx + currentQueueLen
+        uint32 leafIndexOffset = tree.nextLeafIndex +
+            (tree.queueEndIndex - tree.queueStartIndex);
 
         for (uint8 i = 0; i < memoParams.commitments.length; ++i) {
-            uint32 leafIndex = tree.nextLeafIndex + i;
+            uint32 leafIndex = leafIndexOffset + i;
             emit IPool.Commitment(leafIndex, memoParams.commitments[i]);
         }
+
+        tree.queueLeaves(memoParams.commitments);
 
         uint32 lastLeafIndex = tree.nextLeafIndex +
             (tree.queueEndIndex - tree.queueStartIndex) -
@@ -518,10 +521,6 @@ library ShieldedTransactionLogic {
             memoParams.assetsMemo = stx.assetsMemo;
         } else {
             memoParams.assetsMemo = abi.encodePacked(stx.pubAssets);
-        }
-
-        if (stx.txType == ShieldedTransactionType.CALL_ADAPTOR) {
-            memoParams.refundMemo = abi.encodePacked(stx.refundAddress);
         }
 
         return memoParams;
