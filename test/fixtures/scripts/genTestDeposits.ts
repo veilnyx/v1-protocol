@@ -50,7 +50,7 @@ export const reqs = {
     paymaster: zeroAddress,
     revokerId: 0,
   },
-   */
+      */
   deposit_2_testnet_weth: {
     type: TransactionType.DEPOSIT,
     assetIds: [testnetWeth],
@@ -60,9 +60,11 @@ export const reqs = {
     viaBundler: false,
     paymaster: zeroAddress,
     revokerId: 0,
-  },
+  }
+
 };
 
 export const genTestDeposits = async (sdk: Core) => {
+  console.log("depositing asset:", testnetWeth);
   await generateTestTransactions(reqs, sdk);
 };

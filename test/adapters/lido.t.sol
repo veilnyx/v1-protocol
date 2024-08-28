@@ -24,7 +24,7 @@ contract LidoAdaptorTest is PoolTest {
     address public wstETH;
     address public WETH;
     IWToken public iWETH;
-    uint256 public constant INITIAL_SUPPLY = 1 ether;
+    uint256 public constant INITIAL_SUPPLY = 2 ether;
     uint256 public constant SWAP_AMT = 1 ether;
     address public user = 0x689EcF264657302052c3dfBD631e4c20d3ED0baB;
 
@@ -70,7 +70,7 @@ contract LidoAdaptorTest is PoolTest {
         // pool.addAssets(assetType, assetAddresses);
         // vm.stopPrank();
 
-        vm.deal(user, INITIAL_SUPPLY);
+        vm.deal(user, INITIAL_SUPPLY * 2);
         vm.startPrank(user);
         iWETH.deposit{value: INITIAL_SUPPLY}(); // wrapping eth to weth
         iWETH.approve(address(pool), INITIAL_SUPPLY); // depositing weth to pool
@@ -79,6 +79,8 @@ contract LidoAdaptorTest is PoolTest {
         );
         pool.transact(stxWethDeposit);
         vm.stopPrank();
+
+        _processCommitmentTreeQueue();
     }
 
     function testLidoAdaptorDeploy() external view {
@@ -93,7 +95,7 @@ contract LidoAdaptorTest is PoolTest {
         );
 
         ShieldedTransaction memory stxStake = _loadShieldedTransaction(
-            "stake_1_orig_weth_on_lido"
+            "stake_1_testnet_weth_on_lido"
         );
         pool.transact(stxStake);
 
@@ -156,7 +158,7 @@ contract LidoAdaptorTest is PoolTest {
         );
 
         assert(adpWstETHBalPostUnStake < adpWstETHBalBeforeUnStaking);
-        assert(IERC721(withdrawalQueueERC721).balanceOf(user) > 0);
+        assert(IERC721(withdrawalQueueERC721).balanceOf(user) > 0); // NFT received check
     }
 
     /// @dev Only allowing Lido tests to run on Holesky testnet and ETH mainnet. More chains can be added.
