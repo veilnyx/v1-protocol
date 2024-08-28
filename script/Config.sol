@@ -38,15 +38,15 @@ contract Config is Script {
         string memory configJson = vm.readFile(path);
 
         // common config
-        _revokerPublicKey = [
-            vm.parseJsonUint(configJson, ".common.revokerPublicKey[0]"),
-            vm.parseJsonUint(configJson, ".common.revokerPublicKey[1]")
-        ];
+        // _revokerPublicKey = [
+        //     vm.parseJsonUint(configJson, ".common.revokerPublicKey[0]"),
+        //     vm.parseJsonUint(configJson, ".common.revokerPublicKey[1]")
+        // ];
 
-        _encryptionPublicKey = [
-            vm.parseJsonUint(configJson, ".common.encryptionPublicKey[0]"),
-            vm.parseJsonUint(configJson, ".common.encryptionPublicKey[1]")
-        ];
+        // _encryptionPublicKey = [
+        //     vm.parseJsonUint(configJson, ".common.encryptionPublicKey[0]"),
+        //     vm.parseJsonUint(configJson, ".common.encryptionPublicKey[1]")
+        // ];
 
         addressTreeDepth = uint8(
             vm.parseJsonUint(configJson, ".common.addressTreeDepth")
