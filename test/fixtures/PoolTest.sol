@@ -119,12 +119,12 @@ contract PoolTest is PoolBaseTest, BaseScript {
         PoolBaseTest._setUp();
 
         AssetType assetType = AssetType.ERC20;
-        uint256 initAssetLength = _config.initAssetAddresses().length;
-        address[] memory assetAddresses = new address[](3 + initAssetLength);
         assetAddresses[0] = address(token1);
         assetAddresses[1] = address(token2);
         assetAddresses[2] = address(tokenReent);
-
+        uint256 initAssetLength = _config.initAssetAddresses().length;
+        address[] memory assetAddresses = new address[](3 + initAssetLength);
+        
         // adding support for testnet tokens if any to provide support of adaptor testing
         if (initAssetLength > 0) {
             uint i = 0;

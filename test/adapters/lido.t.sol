@@ -60,22 +60,22 @@ contract LidoAdaptorTest is PoolTest {
 
         // Asset & Adaptor support on Labyrinth Protocol
         address poolOwner = pool.owner();
-        vm.startPrank(poolOwner);
+        vm.prank(poolOwner);
         pool.addAdaptorSupport(address(lidoAdaptor), true);
 
-        AssetType assetType = AssetType.ERC20;
-        address[] memory assetAddresses = new address[](2);
-        assetAddresses[0] = WETH;
-        assetAddresses[1] = wstETH;
-        pool.addAssets(assetType, assetAddresses);
-        vm.stopPrank();
+        // AssetType assetType = AssetType.ERC20;
+        // address[] memory assetAddresses = new address[](2);
+        // assetAddresses[0] = WETH;
+        // assetAddresses[1] = wstETH;
+        // pool.addAssets(assetType, assetAddresses);
+        // vm.stopPrank();
 
         vm.deal(user, INITIAL_SUPPLY);
         vm.startPrank(user);
         iWETH.deposit{value: INITIAL_SUPPLY}(); // wrapping eth to weth
         iWETH.approve(address(pool), INITIAL_SUPPLY); // depositing weth to pool
         ShieldedTransaction memory stxWethDeposit = _loadShieldedTransaction(
-            "deposit_1_original_weth"
+            "deposit_2_testnet_weth"
         );
         pool.transact(stxWethDeposit);
         vm.stopPrank();
