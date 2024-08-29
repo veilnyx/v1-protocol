@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.24;
+pragma solidity 0.8.24;
 
 import {IAdaptor} from "../interfaces/IAdaptor.sol";
 import {IPool} from "../interfaces/IPool.sol";

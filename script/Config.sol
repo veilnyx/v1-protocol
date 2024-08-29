@@ -24,6 +24,7 @@ contract Config is Script {
     address public immutable wToken;
     address public immutable uniswapSwapRouter02;
     address public immutable lido;
+    address public immutable aave;
     address public immutable withdrawalQueueERC721;
     address public immutable sanctionsList;
 
@@ -90,6 +91,7 @@ contract Config is Script {
                 configJson,
                 string.concat(chainPrefix, ".uniswapSwapRouter02")
             );
+            aave = vm.parseJsonAddress(configJson, string.concat(chainPrefix, ".aave"));
             // lido
             lido = vm.parseJsonAddress(
                 configJson,

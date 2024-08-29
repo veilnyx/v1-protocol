@@ -88,7 +88,7 @@ contract LidoAdaptorTest is PoolTest {
         );
 
         ShieldedTransaction memory stxStake = _loadShieldedTransaction(
-            "stake_1_testnet_weth_on_lido"
+            "stake_1_testnet_weth"
         );
         pool.transact(stxStake);
 

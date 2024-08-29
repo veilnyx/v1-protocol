@@ -37,8 +37,19 @@ export const reqs = {
         payload:
             "0x000000000000000000000000000000000000000000000000000000000001000500000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000" as `0x${string}`, // refund: pool address (address(0))
     },
-     */
-    stake_1_testnet_weth_on_lido: {
+    stake_2_orig_usde_on_ethena: {
+        type: TransactionType.CALL_ADAPTER,
+        assetIds: [testnetUsdc],
+        values: [parseUnits("2", 6)],
+        to: "0x03E98aE18908eBc2Fe82e646E4DFB628963383c1", // adaptor addr. which the ZkFi adaptor handler will call to execute this convert req
+        revokerId: 0,
+        feeAssetId: 0,
+        viaBundler: false,
+        paymaster: zeroAddress,
+        payload:
+            "0x000000000000000000000000000000000000000000000000000000000001000500000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000" as `0x{string}`, // refund: pool address (address(0)), outToken: USDe
+    },
+    stake_1_testnet_weth: {
         type: TransactionType.CALL_ADAPTER,
         assetIds: [testnetWeth],
         values: [parseEther("1")],
@@ -51,20 +62,20 @@ export const reqs = {
         viaBundler: false,
         paymaster: zeroAddress
     },
-    /**
-    stake_2_orig_usde_on_ethena: {
-        type: TransactionType.CALL_ADAPTER,
-        assetIds: [testnetUsdc],
-        values: [parseUnits("2", 6)],
-        to: "0x03E98aE18908eBc2Fe82e646E4DFB628963383c1", // adaptor addr. which the ZkFi adaptor handler will call to execute this convert req
-        revokerId: 0,
-        feeAssetId: 0,
-        viaBundler: false,
-        paymaster: zeroAddress,
-        payload:
-            "0x000000000000000000000000000000000000000000000000000000000001000500000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000" as `0x{string}`, // refund: pool address (address(0)), outToken: USDe
-    }
     */
+    stake_1_testnet_weth_via_bundler: {
+        type: TransactionType.CALL_ADAPTER,
+        assetIds: [testnetWeth],
+        values: [parseEther("1")],
+        feeAssetId: testnetWeth,
+        // adaptor to which the ZkFi AdaptorHandler will call to execute swap
+        to: "0xbF71c5Ae43827387dAAF7358acAB5C81642b74b8",
+        // payload:: refund: pool address (address(0)), outToken: testnetUsdc
+        payload: "0x" as `0x${string}`,
+        revokerId: 0,
+        viaBundler: true,
+        paymaster: "0x03E98aE18908eBc2Fe82e646E4DFB628963383c1" as `0x${string}`,
+    },
 };
 
 export const genTestCallAdaptors = async (sdk: Core) => {
