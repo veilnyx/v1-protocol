@@ -41,7 +41,7 @@ export const reqs = {
     stake_1_testnet_weth_on_lido: {
         type: TransactionType.CALL_ADAPTER,
         assetIds: [testnetWeth],
-        values: [parseEther("0.5")],
+        values: [parseEther("1")],
         feeAssetId: 0,
         // adaptor to which the ZkFi AdaptorHandler will call to execute swap
         to: "0xbF71c5Ae43827387dAAF7358acAB5C81642b74b8",
