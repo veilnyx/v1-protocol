@@ -12,7 +12,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract LidoAdaptor is AdaptorBase {
     error InactiveAsset(uint24 assetId);
-    error UnstakingNotSupportedForAsset(uint24 assetId);
+    error InvalidAsset(uint24 assetId);
     error ZeroValues();
     error ZeroAddress();
 
@@ -40,7 +40,7 @@ contract LidoAdaptor is AdaptorBase {
     function handleAssets(
         uint24[] calldata inAssetIds,
         uint256[] calldata inValues,
-        bytes calldata payload
+        bytes calldata
     )
         external
         payable
@@ -59,32 +59,37 @@ contract LidoAdaptor is AdaptorBase {
             revert ZeroValues();
         }
 
-        if (inAsset.assetAddress == weth) {
-            // Staking request
-            // unwrapping weth
-            IWToken(weth).withdraw(stakeValue);
+        if (inAsset.assetAddress != weth) {
+            revert InvalidAsset(inAsset.id);
+        }
 
-            uint256 stEthShares = iLido.submit{value: stakeValue}(address(0)); // shares of stEth token in Lido. Shares do not change with rebasing.
-            uint256 stEthTokens = iLido.getPooledEthByShares(stEthShares); // converting shares to stEth tokens (rebasing token)
-            // wrapping into wstEth for keeping balances constant
-            IERC20(stEth).approve(wstEth, stEthTokens);
-            uint256 wstEthTokens = IWstEthToken(wstEth).wrap(stEthTokens);
+        // if (inAsset.assetAddress == weth) {
+        // Staking request
+        // unwrapping weth
+        IWToken(weth).withdraw(stakeValue);
 
-            // initializing the out token arrays
-            Asset memory outAsset = getAsset(wstEth);
-            if (!outAsset.isActive) {
-                revert InactiveAsset(outAsset.id);
-            }
+        uint256 stEthShares = iLido.submit{value: stakeValue}(address(0)); // shares of stEth token in Lido. Shares do not change with rebasing.
+        uint256 stEthTokens = iLido.getPooledEthByShares(stEthShares); // converting shares to stEth tokens (rebasing token)
+        // wrapping into wstEth for keeping balances constant
+        IERC20(stEth).approve(wstEth, stEthTokens);
+        uint256 wstEthTokens = IWstEthToken(wstEth).wrap(stEthTokens);
 
-            outValues = new uint256[](1);
-            outAssetIds = new uint24[](1);
+        // initializing the out token arrays
+        Asset memory outAsset = getAsset(wstEth);
+        if (!outAsset.isActive) {
+            revert InactiveAsset(outAsset.id);
+        }
 
-            outAssetIds[0] = outAsset.id;
-            outValues[0] = wstEthTokens;
-        } else {
+        outValues = new uint256[](1);
+        outAssetIds = new uint24[](1);
+
+        outAssetIds[0] = outAsset.id;
+        outValues[0] = wstEthTokens;
+        // } else {
+        /**
             // Unstaking request
             if (inAsset.assetAddress != wstEth) {
-                revert UnstakingNotSupportedForAsset(inAsset.id); // If not wEth, only wstEth is supported for unstaking. Lido returns `unstEth` NFTs as the withdrawal req. is queued on their end.
+                revert InvalidAsset(inAsset.id); // If not wEth, only wstEth is supported for unstaking. Lido returns `unstEth` NFTs as the withdrawal req. is queued on their end.
             }
 
             address withdrawalAddress = abi.decode(payload, (address));
@@ -108,6 +113,7 @@ contract LidoAdaptor is AdaptorBase {
             outAssetIds = new uint24[](0);
             outValues = new uint256[](0);
         }
+         */
     }
 
     /// @dev only for enabling `testWstEthUnstakingOnLido()` test. Pls comment this out for production use.

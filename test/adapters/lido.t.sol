@@ -63,13 +63,6 @@ contract LidoAdaptorTest is PoolTest {
         vm.prank(poolOwner);
         pool.addAdaptorSupport(address(lidoAdaptor), true);
 
-        // AssetType assetType = AssetType.ERC20;
-        // address[] memory assetAddresses = new address[](2);
-        // assetAddresses[0] = WETH;
-        // assetAddresses[1] = wstETH;
-        // pool.addAssets(assetType, assetAddresses);
-        // vm.stopPrank();
-
         vm.deal(user, INITIAL_SUPPLY * 2);
         vm.startPrank(user);
         iWETH.deposit{value: INITIAL_SUPPLY}(); // wrapping eth to weth
@@ -110,6 +103,7 @@ contract LidoAdaptorTest is PoolTest {
 
     /// @dev This test bypasses the Labyrinth protocol and directly tests the Lido integration from the LidoAdaptor.
     /// @dev Pls uncomment the `receive()` on the LidoAdaptor to enable this test.
+    /// @dev Will only run on Holesky testnet.
     function testWstEthUnStakingOnLidoBypassingLabyrinth() public {
         require(
             block.chainid == 17000,
