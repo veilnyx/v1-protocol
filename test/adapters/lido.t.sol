@@ -42,7 +42,7 @@ contract LidoAdaptorTest is PoolTest {
         wstETH = _config.initAssetAddresses()[2];
         lido = _config.lido();
         withdrawalQueueERC721 = _config.withdrawalQueueERC721();
-        if (lido == address(0)) {
+        if (lido == address(0) || stETH == address(0) || wstETH == address(0)) {
             revert CheckChainConfig();
         }
 
@@ -111,6 +111,10 @@ contract LidoAdaptorTest is PoolTest {
     /// @dev This test bypasses the Labyrinth protocol and directly tests the Lido integration from the LidoAdaptor.
     /// @dev Pls uncomment the `receive()` on the LidoAdaptor to enable this test.
     function testWstEthUnStakingOnLidoBypassingLabyrinth() public {
+        require(
+            block.chainid == 17000,
+            "Unstaking test only on Holesky testnet"
+        );
         uint256 initialDeposit = 10 ether;
         vm.deal(address(lidoAdaptor), initialDeposit);
         vm.prank(address(lidoAdaptor));
@@ -163,7 +167,7 @@ contract LidoAdaptorTest is PoolTest {
 
     /// @dev Only allowing Lido tests to run on Holesky testnet and ETH mainnet. More chains can be added.
     function shouldTestRun() internal view returns (bool) {
-        if (block.chainid != 17000) {
+        if (block.chainid != 17000 && block.chainid != 11155111) {
             console.log(
                 "Skipping Lido adaptor tests on the current chain as Lido protocol may not be deployed. To run Lido tests, kindly run the tests on the Holesky testnet where Lido is deployed. Ref: https://docs.lido.fi/deployed-contracts/holesky"
             );

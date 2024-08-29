@@ -90,8 +90,15 @@ contract Config is Script {
                 configJson,
                 string.concat(chainPrefix, ".uniswapSwapRouter02")
             );
-        } else {
-            uniswapSwapRouter02 = address(0);
+            // lido
+            lido = vm.parseJsonAddress(
+                configJson,
+                string.concat(chainPrefix, ".lido")
+            );
+            withdrawalQueueERC721 = vm.parseJsonAddress(
+                configJson,
+                string.concat(chainPrefix, ".withdrawalQueueERC721")
+            );
         }
 
         if (chainId == 17000) {
@@ -103,8 +110,6 @@ contract Config is Script {
                 configJson,
                 string.concat(chainPrefix, ".withdrawalQueueERC721")
             );
-        } else {
-            lido = address(0);
         }
 
         sanctionsList = vm.parseJsonAddress(
