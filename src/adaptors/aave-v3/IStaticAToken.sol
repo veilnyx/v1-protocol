@@ -2,6 +2,8 @@
 pragma solidity 0.8.24;
 
 interface IStaticAToken {
+    function aToken() external view returns (address);
+
     /**
      * @notice Deposits `ASSET` in the Aave protocol and mints static aTokens to msg.sender
      * @param assets The amount of underlying `ASSET` to deposit (e.g. deposit of 100 USDC)
