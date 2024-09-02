@@ -5,6 +5,8 @@ import {IAdaptor} from "../interfaces/IAdaptor.sol";
 import {IPool} from "../interfaces/IPool.sol";
 import {Asset, AssetType} from "../libraries/Asset.sol";
 
+error InactiveAsset(uint24 assetId);
+
 /// NOTE: THIS SHOULD BE STATELESS - NO STORAGE VARS!!
 abstract contract AdaptorBase is IAdaptor {
     IPool immutable _pool;
@@ -18,10 +20,18 @@ abstract contract AdaptorBase is IAdaptor {
     }
 
     function getAsset(uint24 assetId) public view returns (Asset memory) {
-        return _pool.getAsset(assetId);
+        Asset memory asset = _pool.getAsset(assetId);
+        if (!asset.isActive) {
+            revert InactiveAsset(asset.id);
+        }
+        return asset;
     }
 
     function getAsset(address assetAddress) public view returns (Asset memory) {
-        return _pool.getAsset(assetAddress);
+        Asset memory asset = _pool.getAsset(assetAddress);
+        if (!asset.isActive) {
+            revert InactiveAsset(asset.id);
+        }
+        return asset;
     }
 }
