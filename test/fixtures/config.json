@@ -46,8 +46,8 @@
     "usdc": 65538,
     "reentrantToken": 65539,
     "testnetWeth": 65540,
-    "testnetstEth": 65541,
-    "testnetWstEth": 65542
+    "aaveWethUnderlying": 65541,
+    "aaveWethStatic": 65542
   },
   "leavesQueue1": [
     "19014214495641488759237505126948346942972912379615652741039992445865937985820",
