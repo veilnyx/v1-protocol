@@ -9,7 +9,6 @@ import {ISwapRouter02} from "./ISwapRouter02.sol";
 
 contract UniswapV3Adapter is AdaptorBase {
     // Errors //
-    error InactiveAsset(uint24 assetId);
     error MultiAssetSwap();
     error ZeroValues();
 
@@ -44,9 +43,6 @@ contract UniswapV3Adapter is AdaptorBase {
         }
 
         Asset memory inAsset = getAsset(inAssetIds[0]);
-        if (!inAsset.isActive) {
-            revert InactiveAsset(inAssetIds[0]);
-        }
 
         // decoding payload
         (uint24 outAssetId, address beneficiary, uint256 minOut) = abi.decode(
@@ -55,9 +51,6 @@ contract UniswapV3Adapter is AdaptorBase {
         );
 
         Asset memory outAsset = getAsset(outAssetId);
-        if (!outAsset.isActive) {
-            revert InactiveAsset(outAssetId);
-        }
 
         if (beneficiary == address(0)) {
             // means the out tokens will go to the ZKFI AdaptorHandler and have to be processed to the pool

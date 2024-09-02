@@ -10,12 +10,11 @@ import {IWstEthToken} from "./IWstEthToken.sol";
 import {IWToken} from "../../interfaces/IWToken.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-contract LidoAdaptor is AdaptorBase {
-    error InactiveAsset(uint24 assetId);
-    error UnstakingNotSupportedForAsset(uint24 assetId);
-    error ZeroValues();
-    error ZeroAddress();
+error UnstakingNotSupportedForAsset(uint24 assetId);
+error ZeroValues();
+error ZeroAddress();
 
+contract LidoAdaptor is AdaptorBase {
     ILido public immutable iLido;
     IWithdrawQueueERC721 public immutable iWithdrawQueueERC721;
     address public immutable weth;
@@ -51,10 +50,6 @@ contract LidoAdaptor is AdaptorBase {
         Asset memory inAsset = getAsset(inAssetIds[0]);
         uint256 stakeValue = inValues[0];
 
-        if (!inAsset.isActive) {
-            revert InactiveAsset(inAssetIds[0]);
-        }
-
         if (stakeValue == 0) {
             revert ZeroValues();
         }
@@ -72,9 +67,6 @@ contract LidoAdaptor is AdaptorBase {
 
             // initializing the out token arrays
             Asset memory outAsset = getAsset(wstEth);
-            if (!outAsset.isActive) {
-                revert InactiveAsset(outAsset.id);
-            }
 
             outValues = new uint256[](1);
             outAssetIds = new uint24[](1);
