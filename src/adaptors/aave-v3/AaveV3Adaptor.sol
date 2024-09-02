@@ -7,7 +7,6 @@ import {IAave} from "./IAave.sol";
 import {IStaticAToken} from "./IStaticAToken.sol";
 import {IWToken} from "src/interfaces/IWToken.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {console} from "forge-std/Test.sol";
 
 /// @notice Supports lending of wETH token for now
 contract AaveV3Adaptor is AdaptorBase {

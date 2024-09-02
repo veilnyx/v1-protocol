@@ -6,7 +6,6 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {AdaptorBase} from "src/base/AdaptorBase.sol";
 import {Asset, AssetType} from "src/libraries/Asset.sol";
 import {ISwapRouter02} from "./ISwapRouter02.sol";
-import {console} from "forge-std/Test.sol";
 
 contract UniswapV3Adapter is AdaptorBase {
     // Errors //
@@ -42,7 +41,6 @@ contract UniswapV3Adapter is AdaptorBase {
             revert ZeroValues();
         } else {
             inValue = inValues[0];
-            console.log("UniswapV3Adp:: inValue to swap:", inValue);
         }
 
         Asset memory inAsset = getAsset(inAssetIds[0]);

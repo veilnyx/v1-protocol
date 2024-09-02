@@ -9,7 +9,6 @@ import {IWithdrawQueueERC721} from "./IWithdrawQueueERC721.sol";
 import {IWstEthToken} from "./IWstEthToken.sol";
 import {IWToken} from "../../interfaces/IWToken.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {console} from "forge-std/Test.sol";
 
 contract LidoAdaptor is AdaptorBase {
     error InactiveAsset(uint24 assetId);
@@ -109,11 +108,6 @@ contract LidoAdaptor is AdaptorBase {
             outAssetIds = new uint24[](0);
             outValues = new uint256[](0);
         }
-
-        console.log(
-            "Bal. of wstETH:",
-            IWstEthToken(wstEth).balanceOf(address(this))
-        );
     }
 
     /// @dev only for enabling `testWstEthUnstakingOnLido()` test. Pls comment this out for production use.
