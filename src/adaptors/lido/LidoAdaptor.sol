@@ -74,7 +74,7 @@ contract LidoAdaptor is AdaptorBase {
             outAssetIds[0] = outAsset.id;
             outValues[0] = wstEthTokens;
         } else {
-            // Unstaking request
+            // Unstaking request (NFT)
             if (inAsset.assetAddress != wstEth) {
                 revert UnstakingNotSupportedForAsset(inAsset.id); // If not wEth, only wstEth is supported for unstaking. Lido returns `unstEth` NFTs as the withdrawal req. is queued on their end.
             }

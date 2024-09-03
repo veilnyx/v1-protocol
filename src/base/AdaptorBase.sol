@@ -5,10 +5,13 @@ import {IAdaptor} from "../interfaces/IAdaptor.sol";
 import {IPool} from "../interfaces/IPool.sol";
 import {Asset, AssetType} from "../libraries/Asset.sol";
 
-error InactiveAsset(uint24 assetId);
-
 /// NOTE: THIS SHOULD BE STATELESS - NO STORAGE VARS!!
 abstract contract AdaptorBase is IAdaptor {
+    error InactiveAsset(uint24 assetId);
+    error ZeroValue();
+    error InvalidAction();
+    error UnsupportedAsset(uint24 assetId);
+
     IPool immutable _pool;
 
     constructor(address pool_) {

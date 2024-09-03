@@ -10,10 +10,7 @@ import {IStaticAToken} from "./IStaticAToken.sol";
 import {IStaticATokenFactory} from "./IStaticATokenFactory.sol";
 import {IAToken} from "./IAToken.sol";
 
-error UnsupportedAsset(uint24 assetId);
 error InsufficientBalance();
-error ZeroValues();
-error ZeroAddress();
 
 contract AaveV3Adaptor is AdaptorBase {
     IAave public immutable aave;
@@ -58,7 +55,7 @@ contract AaveV3Adaptor is AdaptorBase {
                 uint256(inValues[0])
             );
         } else {
-            revert("Invalid action");
+            revert InvalidAction();
         }
     }
 
@@ -70,7 +67,7 @@ contract AaveV3Adaptor is AdaptorBase {
         uint256 lendValue = inValue;
 
         if (lendValue == 0) {
-            revert ZeroValues();
+            revert ZeroValue();
         }
 
         // underlying asset -> static aToken -> aToken
