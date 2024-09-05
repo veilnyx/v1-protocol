@@ -4,7 +4,7 @@ pragma solidity ^0.8.24;
 import {IVerifier} from "../interfaces/IVerifier.sol";
 import {VerifierRegister} from "../verifiers/VerifierRegister.sol";
 import {VerifierTreeUpdate} from "../verifiers/VerifierTreeUpdate.sol";
-import {ShieldedTransaction, ShieldedTransactionType, ShieldedTransactionLogic, RevokerData} from "../libraries/ShieldedTransaction.sol";
+// import {ShieldedTransaction, ShieldedTransactionType, ShieldedTransactionLogic, RevokerData} from "../libraries/ShieldedTransaction.sol";
 import {MerkleTree} from "../libraries/MerkleTree.sol";
 
 struct TransactionVerifierInfo {
@@ -14,7 +14,7 @@ struct TransactionVerifierInfo {
 }
 
 contract Verifier is IVerifier {
-    using ShieldedTransactionLogic for ShieldedTransaction;
+    // using ShieldedTransactionLogic for ShieldedTransaction;
 
     /**
      * @notice Verifier id to Verifier info mapping for transaction verifiers only
