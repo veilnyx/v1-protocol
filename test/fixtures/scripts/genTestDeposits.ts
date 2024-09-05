@@ -4,7 +4,7 @@ import { TransactionType } from "@zkfi-tech/shared-types";
 import { fixture, generateTestTransactions } from "./fixture";
 
 const {
-  assets: { weth, usdc, reentrantToken, testnetWeth, aaveWethUnderlying, aaveWethStatic },
+  assets: { weth, usdc, reentrantToken, testnetUsdc, aaveWethUnderlying, aaveWethStatic },
   sender: { account: senderAccount },
 } = fixture;
 

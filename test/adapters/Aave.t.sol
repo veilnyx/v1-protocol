@@ -20,13 +20,14 @@ contract AaveAdaptorTest is PoolTest {
     address aave;
     address public WETH;
     address public constant WETH_AAVE_UNDERLYING =
-        0xC558DBdd856501FCd9aaF1E62eae57A9F0629a3c; // Laby pool WETH contract is diff. than the one supported by Aave.
+        0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2; // Laby pool WETH contract is diff. than the one supported by Aave.
 
     uint256 public constant INITIAL_SUPPLY = 2 ether;
     address public user = 0x689EcF264657302052c3dfBD631e4c20d3ED0baB;
     address public constant STATIC_A_TOKEN_FACTORY =
-        0xd210dFB43B694430B8d31762B5199e30c31266C8;
-    address public constant WETH_STATIC_A_TOKEN = 0x162B500569F42D9eCe937e6a61EDfef660A12E98;
+        0x411D79b8cC43384FDE66CaBf9b6a17180c842511;
+    address public constant WETH_STATIC_A_TOKEN =
+        0x252231882FB38481497f3C767469106297c8d93b;
 
     function setUp() external {
         require(shouldTestRun(), "LidoAdaptorTest: Chain not supported");
@@ -42,7 +43,11 @@ contract AaveAdaptorTest is PoolTest {
         }
 
         // deploying aave adaptor
-        aaveAdaptor = new AaveV3Adaptor(aave, address(pool), STATIC_A_TOKEN_FACTORY);
+        aaveAdaptor = new AaveV3Adaptor(
+            aave,
+            address(pool),
+            STATIC_A_TOKEN_FACTORY
+        );
         /// @dev update convert req fixture with this adaptor addr as `to`
         console.log("Aave adaptor deployed:", address(aaveAdaptor));
 
@@ -150,10 +155,10 @@ contract AaveAdaptorTest is PoolTest {
         ); // unlending directly through Aave adp
 
         // Asserts
-        uint256 adaptorwETHStaticBalAfterUnlending = IERC20(
-            WETH_STATIC_A_TOKEN
-        ).balanceOf(address(pool));
-        uint256 adpWETHBalAfterUnLending = IWToken(WETH_AAVE_UNDERLYING).balanceOf(address(aaveAdaptor));
+        uint256 adaptorwETHStaticBalAfterUnlending = IERC20(WETH_STATIC_A_TOKEN)
+            .balanceOf(address(pool));
+        uint256 adpWETHBalAfterUnLending = IWToken(WETH_AAVE_UNDERLYING)
+            .balanceOf(address(aaveAdaptor));
 
         assertEq(adaptorwETHStaticBalAfterUnlending, 0);
         assert(adpWETHBalAfterUnLending > 0);
@@ -161,7 +166,7 @@ contract AaveAdaptorTest is PoolTest {
 
     /// @dev Only allowing Lido tests to run on Holesky testnet and ETH mainnet. More chains can be added.
     function shouldTestRun() internal view returns (bool) {
-        if (block.chainid != 11155111) {
+        if (block.chainid != 11155111 && block.chainid != 1) {
             console.log(
                 "Skipping Aave adaptor tests on the current chain as Aave protocol may not be deployed. To run Aave tests, kindly run the tests on the ETH Sepolia testnet where Aave is deployed. Ref: https://github.com/bgd-labs/aave-address-book/blob/main/src/AaveV3Sepolia.sol"
             );

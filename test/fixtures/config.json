@@ -45,7 +45,7 @@
     "weth": 65537,
     "usdc": 65538,
     "reentrantToken": 65539,
-    "testnetWeth": 65540,
+    "testnetUsdc": 65540,
     "aaveWethUnderlying": 65541,
     "aaveWethStatic": 65542
   },

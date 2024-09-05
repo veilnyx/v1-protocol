@@ -37,7 +37,7 @@ const assets = {
   weth: config.assets.weth,
   usdc: config.assets.usdc,
   reentrantToken: config.assets.reentrantToken,
-  testnetWeth: config.assets.testnetWeth,
+  testnetUsdc: config.assets.testnetUsdc,
   aaveWethUnderlying: config.assets.aaveWethUnderlying,
   aaveWethStatic: config.assets.aaveWethStatic,
 };
