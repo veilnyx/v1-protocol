@@ -11,6 +11,7 @@ dotenv.config();
 
 const rpcEthereumSepolia = process.env.RPC_ETHEREUM_SEPOLIA as string;
 const rpcOptimismSepolia = process.env.RPC_OPTIMISM_SEPOLIA as string;
+const rpcTenderlyMainnet = process.env.RPC_TENDERLY_MAINNET as string;
 const privateKeys = [process.env.PRIVATE_KEY as string];
 const forkEnabled = process.env.HARDHAT_FORK === "true";
 
@@ -31,6 +32,10 @@ const config: HardhatUserConfig = {
     },
     optimismSepolia: {
       url: rpcOptimismSepolia,
+      accounts: privateKeys,
+    },
+    tenderlyMainnet: {
+      url: rpcTenderlyMainnet,
       accounts: privateKeys,
     },
   },
