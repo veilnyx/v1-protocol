@@ -3,10 +3,11 @@ import { HardhatUserConfig } from "hardhat/config";
 import "@nomicfoundation/hardhat-viem";
 import "@nomicfoundation/hardhat-foundry";
 import "@nomicfoundation/hardhat-ignition";
-import "@nomicfoundation/hardhat-toolbox-viem";
 import "@nomicfoundation/hardhat-ignition-viem";
 import "hardhat-contract-sizer";
+// import * as tdly from "@tenderly/hardhat-tenderly";
 
+// tdly.setup({ automaticVerifications: true });
 dotenv.config();
 
 const rpcEthereumSepolia = process.env.RPC_ETHEREUM_SEPOLIA as string;
@@ -37,8 +38,14 @@ const config: HardhatUserConfig = {
     tenderlyMainnet: {
       url: rpcTenderlyMainnet,
       accounts: privateKeys,
+      chainId: 1
     },
   },
+  // tenderly: {
+  //   username: "0xShiven",
+  //   project: "Labyrinth Integrations",
+  //   privateVerification: false // if true, contracts will be verified privately, if false, contracts will be verified publicly
+  // },
   contractSizer: {
     runOnCompile: true,
     strict: true,

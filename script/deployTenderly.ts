@@ -1,4 +1,5 @@
 import hre from "hardhat";
+import { tenderly } from 'hardhat';
 import {
   encodeAbiParameters,
   encodeFunctionData,
@@ -58,28 +59,35 @@ const deployVerifier = async () => {
 }
 
 const deployAdaptors = async (pool, chainParams) => {
-    const uniswap = await hre.viem.deployContract("UniswapV3Adapter", [
-      "0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45" as Hex,
-      pool
-    ])
-    console.log("UniswapV3Adapter deployed:", uniswap.address);
+  // @todo: Move addresses to Adaptor config file
+  const uniswapRouterMainnet = "0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45" as Hex;
+  const uniswap = await hre.viem.deployContract("UniswapV3Adapter", [
+    uniswapRouterMainnet,
+    pool
+  ])
+  console.log("UniswapV3Adapter deployed:", uniswap.address);
 
-    const aave = await hre.viem.deployContract("AaveV3Adaptor", [
-      "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2" as Hex,
-      pool,
-      "0x411D79b8cC43384FDE66CaBf9b6a17180c842511" as Hex
-    ]);
-    console.log("AaveV3Adapter deployed:", aave.address);
+  const aaveMainnet = "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2" as Hex;
+  const staticAaveTokenFactor = "0x411D79b8cC43384FDE66CaBf9b6a17180c842511" as Hex;
+  const aave = await hre.viem.deployContract("AaveV3Adaptor", [
+    aaveMainnet,
+    pool,
+    staticAaveTokenFactor
+  ]);
+  console.log("AaveV3Adapter deployed:", aave.address);
 
-    const lido = await hre.viem.deployContract("LidoAdaptor", [
-      "0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84" as Hex,
-      chainParams.initAssetAddresses[0],
-      "0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84" as Hex,
-      chainParams.initAssetAddresses[4],
-      "0x889edC2eDab5f40e902b864aD4d7AdE8E412F9B1" as Hex,
-      pool
-    ]);
-    console.log("LidoAdapter deployed:", lido.address);
+  const lidoMainnet = "0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84" as Hex;
+  const stETHMainnet = "0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84" as Hex;
+  const withdrawQueueLidoMainnet = "0x889edC2eDab5f40e902b864aD4d7AdE8E412F9B1" as Hex;
+  const lido = await hre.viem.deployContract("LidoAdaptor", [
+    lidoMainnet,
+    chainParams.initAssetAddresses[0],
+    stETHMainnet,
+    chainParams.initAssetAddresses[4],
+    withdrawQueueLidoMainnet,
+    pool
+  ]);
+  console.log("LidoAdapter deployed:", lido.address);
 }
 
 const defineChainViem = () => {
@@ -130,8 +138,12 @@ const main = async () => {
   const wallet = wallets[0];
   const [walletAddress] = await wallet.getAddresses();
 
-  // const safeERC20 = await hre.viem.deployContract("SafeERC20");
   const eip712 = await hre.viem.deployContract("EIP712");
+  // const eip712Rct = await client.waitForTransactionReceipt({ hash: eip712.address });
+  // await tenderly.verify({
+  //   address: eip712Rct.contractAddress,
+  //   name: "EIP712",
+  // });
   console.log("EIP712 deployed:", eip712.address);
   const asset = await hre.viem.deployContract("AssetLogic");
   console.log("AssetLogic deployed:", asset.address);

@@ -1,62 +1,38 @@
 import hre from "hardhat";
 
-const main = async () => {
-    const client = await hre.viem.getPublicClient();
+const setAssetFee = async (wallet: any, paymaster: string, assetId: number, fee: bigint) => {
     const paymasterAbi = hre.artifacts.readArtifactSync("Paymaster").abi;
-    const wallets = await hre.viem.getWalletClients();
-    const wallet = wallets[0];
-    const paymaster = "0x0a4e7527001e9970cec651b2e2ace9f65bd6e98b";
     try {
         //@ts-ignore
-        // WETH
         await wallet.writeContract({
             address: paymaster,
             abi: paymasterAbi,
             functionName: "setAssetFee",
-            args: [Number(65539), BigInt(10000000000000)],
+            args: [assetId, fee],
         });
-
-        //@ts-ignore
-        // USDC
-        await wallet.writeContract({
-            address: paymaster,
-            abi: paymasterAbi,
-            functionName: "setAssetFee",
-            args: [Number(65538), BigInt(1000000)],
-        });
-
-        //@ts-ignore
-        // static aave WETH
-        await wallet.writeContract({
-            address: paymaster,
-            abi: paymasterAbi,
-            functionName: "setAssetFee",
-            args: [Number(65539), BigInt(10000000000000)],
-        });
-
-        //@ts-ignore
-        // static aave USDC
-        await wallet.writeContract({
-            address: paymaster,
-            abi: paymasterAbi,
-            functionName: "setAssetFee",
-            args: [Number(65540), BigInt(1000000)],
-        });
-
-        //@ts-ignore
-        // wstETH Lido
-        await wallet.writeContract({
-            address: paymaster,
-            abi: paymasterAbi,
-            functionName: "setAssetFee",
-            args: [Number(65541), BigInt(10000000000000)],
-        });
-
-        console.log("Asset fees set in Paymaster");
     } catch {
         console.log("Error setting asset fee");
     }
-}
+};
+
+const main = async () => {
+    const wallets = await hre.viem.getWalletClients();
+    const wallet = wallets[0];
+    const paymaster = "0x0a4e7527001e9970cec651b2e2ace9f65bd6e98b";
+
+    const assetFees = [
+        { assetId: 65537, fee: BigInt(10000000000000) }, // WETH
+        { assetId: 65538, fee: BigInt(1000000) }, // USDC
+        { assetId: 65539, fee: BigInt(10000000000000) }, // static aave WETH
+        { assetId: 65540, fee: BigInt(1000000) }, // static aave USDC
+        { assetId: 65541, fee: BigInt(10000000000000) }, // wstETH Lido
+    ];
+
+    for (const { assetId, fee } of assetFees) {
+        await setAssetFee(wallet, paymaster, assetId, fee);
+    }
+
+    console.log("Asset fees set in Paymaster");
+};
 
 main();
-
