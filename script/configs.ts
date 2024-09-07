@@ -1,7 +1,9 @@
 import { Hex, isHex } from "viem";
 import configJson from "./config.json";
+import adaptorConfig from "./adaptorConfig.json";
 
 const { env, common, ...chains } = configJson;
+
 
 export type ChainParams = {
   entryPoint: Hex;
@@ -12,6 +14,12 @@ export type ChainParams = {
   initAssetType: number;
   initAssetAddresses: Hex[];
 };
+
+export type AdaptorParams = {
+  uniswap: Object;
+  aave: Object;
+  lido: Object;
+}
 
 export type CommonParams = {
   commitmentTreeDepth: number;
@@ -27,6 +35,7 @@ export type CommonParams = {
 };
 
 const chainParams: Record<number, ChainParams> = {};
+const adpParams: Record<number, AdaptorParams> = {};
 
 const getHex = (v: any) => {
   if (!isHex(v)) {
@@ -59,6 +68,38 @@ export function loadConfigs() {
     }),
   };
 
+  for (const [chainId, params] of Object.entries(adaptorConfig)) {
+    if (isNaN(Number(chainId))) {
+      throw new Error(`Invalid chainId: ${chainId}`);
+    }
+
+    const {
+      uniswap,
+      aave,
+      lido,
+    } = params;
+
+    adpParams[Number(chainId)] = {
+      uniswap: {
+        uniswapSwapRouter02: getHex(uniswap.uniswapSwapRouter02),
+      },
+      aave: {
+        aave: getHex(aave.aave),
+        aaveStaticTokenFactory: getHex(aave.aaveStaticTokenFactory),
+        aWETH: getHex(aave.aWETH),
+        aUSDC: getHex(aave.aUSDC),
+        staticAWETH: getHex(aave.staticAWETH),
+        staticAUSDC: getHex(aave.staticAUSDC),
+      },
+      lido: {
+        lido: getHex(lido.lido),
+        withdrawalQueueERC721: getHex(lido.withdrawalQueueERC721),
+        stETH: getHex(lido.stETH),
+        wstETH: getHex(lido.wstETH),
+      },
+    };
+  }
+
   for (const [chainId, params] of Object.entries(chains)) {
     if (isNaN(Number(chainId))) {
       throw new Error(`Invalid chainId: ${chainId}`);
@@ -83,7 +124,7 @@ export function loadConfigs() {
     };
   }
 
-  const configParams = { common: commonParams, ...chainParams };
+  const configParams = { common: commonParams, adpConfig: adpParams, ...chainParams };
 
   return configParams;
 }

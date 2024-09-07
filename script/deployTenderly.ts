@@ -1,5 +1,5 @@
 import hre from "hardhat";
-import { tenderly } from 'hardhat';
+// import { tenderly } from 'hardhat';
 import {
   encodeAbiParameters,
   encodeFunctionData,
@@ -9,7 +9,7 @@ import {
   Hex
 } from "viem";
 import poolModule from "../ignition/modules/pool";
-import { loadConfigs, ChainParams, CommonParams } from "./configs";
+import { loadConfigs, ChainParams, AdaptorParams, CommonParams } from "./configs";
 import { deployHasher } from "./hasher";
 import { addInitialAssets, registerRevokers } from "./setup";
 
@@ -58,33 +58,28 @@ const deployVerifier = async () => {
   return verifier.address;
 }
 
-const deployAdaptors = async (pool, chainParams) => {
-  // @todo: Move addresses to Adaptor config file
-  const uniswapRouterMainnet = "0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45" as Hex;
+const deployAdaptors = async (pool, chainParams, adpParams) => {
+  const { uniswap: uniswapConfig, aave: aaveConfig, lido: lidoConfig } = adpParams;
+
   const uniswap = await hre.viem.deployContract("UniswapV3Adapter", [
-    uniswapRouterMainnet,
+    uniswapConfig.uniswapSwapRouter02,
     pool
   ])
   console.log("UniswapV3Adapter deployed:", uniswap.address);
 
-  const aaveMainnet = "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2" as Hex;
-  const staticAaveTokenFactor = "0x411D79b8cC43384FDE66CaBf9b6a17180c842511" as Hex;
   const aave = await hre.viem.deployContract("AaveV3Adaptor", [
-    aaveMainnet,
+    aaveConfig.aave,
     pool,
-    staticAaveTokenFactor
+    aaveConfig.aaveStaticTokenFactory
   ]);
   console.log("AaveV3Adapter deployed:", aave.address);
 
-  const lidoMainnet = "0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84" as Hex;
-  const stETHMainnet = "0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84" as Hex;
-  const withdrawQueueLidoMainnet = "0x889edC2eDab5f40e902b864aD4d7AdE8E412F9B1" as Hex;
   const lido = await hre.viem.deployContract("LidoAdaptor", [
-    lidoMainnet,
-    chainParams.initAssetAddresses[0],
-    stETHMainnet,
-    chainParams.initAssetAddresses[4],
-    withdrawQueueLidoMainnet,
+    lidoConfig.lido,
+    chainParams.initAssetAddresses[0], // wETH
+    lidoConfig.stETH, // stETH
+    lidoConfig.wstETH, // wstETH
+    lidoConfig.withdrawalQueueERC721,
     pool
   ]);
   console.log("LidoAdapter deployed:", lido.address);
@@ -132,7 +127,9 @@ const main = async () => {
   const client = await hre.viem.getPublicClient();
   const chainId = await client.getChainId();
   const commonParams = config.common as CommonParams;
+  const adpParams = config.adpConfig[chainId] as AdaptorParams;
   const chainParams = config[chainId] as ChainParams;
+
 
   const wallets = await hre.viem.getWalletClients();
   const wallet = wallets[0];
@@ -222,7 +219,7 @@ const main = async () => {
 
   // Deploy Adaptors 
   // @todo Create seperate adaptor config
-  await deployAdaptors(poolProxy.address, chainParams);
+  await deployAdaptors(poolProxy.address, chainParams, adpParams);
 
   // ERC4337 infra setup
   const gateway = await hre.viem.deployContract("Gateway", [
