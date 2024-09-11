@@ -2,7 +2,6 @@
 pragma solidity 0.8.24;
 pragma abicoder v2;
 
-import {BaseScript} from "script/BaseScript.sol";
 import {PoolTest} from "test/fixtures/PoolTest.sol";
 import {Pool} from "src/core/Pool.sol";
 import {ShieldedTransaction} from "src/libraries/ShieldedTransaction.sol";

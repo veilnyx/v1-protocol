@@ -4,7 +4,7 @@ import { TransactionType } from "@zkfi-tech/shared-types";
 import { fixture, generateTestTransactions, mockNotes } from "./fixture";
 
 const {
-    assets: { weth, usdc, reentrantToken, testnetUsdc, aaveWethUnderlying, aaveWethStatic },
+    assets: { weth, usdc, reentrantToken, testnetUsdt, testnetCrvUsd },
     sender: { account: senderAccount, pubAddress: senderPubAddress },
     receiver: { account: receiverAccount },
 } = fixture;
@@ -75,7 +75,6 @@ export const reqs = {
         viaBundler: true,
         paymaster: "0x03E98aE18908eBc2Fe82e646E4DFB628963383c1" as `0x${string}`,
     },
-    */
     lend_1_aave_weth: {
         type: TransactionType.CALL_ADAPTER,
         assetIds: [aaveWethUnderlying],
@@ -89,9 +88,23 @@ export const reqs = {
         viaBundler: false,
         paymaster: zeroAddress,
     },
+    */
+    supply_2_usdt_crvUsd_on_curve: {
+        type: TransactionType.CALL_ADAPTER,
+        assetIds: [testnetUsdt, testnetCrvUsd],
+        values: [parseUnits("2", 6), parseUnits("2", 6)],
+        feeAssetId: 0,
+        // adaptor to which the ZkFi AdaptorHandler will call to execute swap
+        to: "0xbF71c5Ae43827387dAAF7358acAB5C81642b74b8",
+        // payload:: address pool: 0x390f3595bCa2Df7d23783dFd126427CCeb997BF4, action: 0 (supply)
+        payload: "0x000000000000000000000000390f3595bca2df7d23783dfd126427cceb997bf40000000000000000000000000000000000000000000000000000000000000000" as `0x${string}`,
+        revokerId: 0,
+        viaBundler: false,
+        paymaster: zeroAddress,
+    }
 };
 
 export const genTestCallAdaptors = async (sdk: Core) => {
-    await mockNotes("deposit_2_aave_weth_underlying", sdk);
+    await mockNotes("deposit_2_testnet_usdt_crvusd", sdk);
     await generateTestTransactions(reqs, sdk);
 };

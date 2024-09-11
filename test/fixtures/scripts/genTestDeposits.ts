@@ -4,7 +4,7 @@ import { TransactionType } from "@zkfi-tech/shared-types";
 import { fixture, generateTestTransactions } from "./fixture";
 
 const {
-  assets: { weth, usdc, reentrantToken, testnetUsdc, aaveWethUnderlying, aaveWethStatic },
+  assets: { weth, usdc, reentrantToken, testnetUsdt, testnetCrvUsd},
   sender: { account: senderAccount },
 } = fixture;
 
@@ -61,10 +61,10 @@ export const reqs = {
     revokerId: 0,
   }, 
     */
-  deposit_2_aave_weth_underlying: {
+  deposit_2_testnet_usdt_crvusd: {
     type: TransactionType.DEPOSIT,
-    assetIds: [aaveWethUnderlying],
-    values: [parseEther("2")],
+    assetIds: [testnetUsdt, testnetCrvUsd],
+    values: [parseUnits("2", 6), parseUnits("2", 6)],
     feeAssetId: 0,
     to: senderAccount.shieldedAddress.pack(),
     viaBundler: false,
@@ -74,6 +74,6 @@ export const reqs = {
 };
 
 export const genTestDeposits = async (sdk: Core) => {
-  console.log("depositing asset:", testnetWeth);
+  console.log("depositing assets...");
   await generateTestTransactions(reqs, sdk);
 };

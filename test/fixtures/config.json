@@ -45,9 +45,8 @@
     "weth": 65537,
     "usdc": 65538,
     "reentrantToken": 65539,
-    "testnetUsdc": 65540,
-    "aaveWethUnderlying": 65541,
-    "aaveWethStatic": 65542
+    "testnetUsdt": 65540,
+    "testnetCrvUsd": 65541
   },
   "leavesQueue1": [
     "19014214495641488759237505126948346942972912379615652741039992445865937985820",
