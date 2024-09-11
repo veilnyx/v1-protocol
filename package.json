@@ -9,7 +9,7 @@
     "coverage": "forge coverage --ir-minimum",
     "test:prepare": "ts-node test/fixtures/scripts/index.ts",
     "deploy:test": "cross-env HARDHAT_FORK=true hardhat run script/deploy.ts --network hardhat",
-    "genAdaptorPayload": "forge script script/setup/GenerateAdaptorPayload.s.sol:GenerateAdaptorPayload"
+    "genAdpPayload": "forge script script/setup/GenerateAdaptorPayload.s.sol:GenerateAdaptorPayload"
   },
   "keywords": [],
   "author": "zkFi Team",
