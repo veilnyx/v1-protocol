@@ -6,6 +6,7 @@ import {
   parseAbiParameters,
   defineChain,
   parseEther,
+  toFunctionSelector,
   Hex
 } from "viem";
 import poolModule from "../ignition/modules/pool";
@@ -16,6 +17,8 @@ import { addInitialAssets, registerRevokers } from "./setup";
 const config = loadConfigs();
 const poolAbi = hre.artifacts.readArtifactSync("Pool").abi;
 const paymasterAbi = hre.artifacts.readArtifactSync("Paymaster").abi;
+const verifier21Abi = hre.artifacts.readArtifactSync("VerifierTransact21").abi;
+const verifier22Abi = hre.artifacts.readArtifactSync("VerifierTransact22").abi;
 
 
 const deployVerifier = async () => {
@@ -36,13 +39,13 @@ const deployVerifier = async () => {
   const txVerifierInfos = [
     {
       id: 21,
-      selector: "0x6228e166",
-      addr: verifierRegister.address
+      selector: toFunctionSelector(verifier21Abi[0]),
+      addr: verifierTransact21.address
     },
     {
       id: 22,
-      selector: "0x3cc08b24",
-      addr: verifierTreeUpdate.address
+      selector: toFunctionSelector(verifier22Abi[0]),
+      addr: verifierTransact22.address
     }
     // Add more TransactionVerifierInfo structs as needed
   ];
@@ -104,7 +107,7 @@ const defineChainViem = () => {
   return labyrinthChain;
 }
 
-const fundPaymaster = async (paymaster, wallet, client) => {
+const fundPaymaster = async (paymaster, amount, wallet, client) => {
   try {
     //@ts-ignore
     const hash = await wallet.writeContract({
@@ -112,24 +115,25 @@ const fundPaymaster = async (paymaster, wallet, client) => {
       abi: paymasterAbi,
       functionName: "depositToEntryPoint",
       args: [],
-      value: parseEther('50'),
+      value: parseEther(amount),
     });
 
     const rct = await client.waitForTransactionReceipt({ hash });
     console.log("rct:paymasterFunded", rct.status);
-  } catch {
+  } catch (error) {
     console.log("Error funding paymaster");
+    console.log(error.message);
   }
 }
 
 const main = async () => {
+
   // const labyrinthChain = defineChainViem();
   const client = await hre.viem.getPublicClient();
   const chainId = await client.getChainId();
   const commonParams = config.common as CommonParams;
   const adpParams = config.adpConfig[chainId] as AdaptorParams;
   const chainParams = config[chainId] as ChainParams;
-
 
   const wallets = await hre.viem.getWalletClients();
   const wallet = wallets[0];
@@ -235,7 +239,7 @@ const main = async () => {
   ]);
   console.log("Paymaster deployed:", paymaster.address);
 
-  await fundPaymaster(paymaster.address, wallet, client);
+  await fundPaymaster(paymaster.address, "20", wallet, client);
 
   // Asset & Revoker Setup
   //@ts-ignore
