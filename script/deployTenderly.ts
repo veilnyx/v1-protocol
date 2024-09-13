@@ -61,7 +61,7 @@ const deployVerifier = async () => {
   return verifier.address;
 }
 
-const deployAdaptors = async (pool, chainParams, adpParams) => {
+const deployAdaptors = async (pool, chainParams, adpParams, wallet, client) => {
   const { uniswap: uniswapConfig, aave: aaveConfig, lido: lidoConfig } = adpParams;
 
   const uniswap = await hre.viem.deployContract("UniswapV3Adapter", [
@@ -69,6 +69,7 @@ const deployAdaptors = async (pool, chainParams, adpParams) => {
     pool
   ])
   console.log("UniswapV3Adapter deployed:", uniswap.address);
+  await addAdpatorSupport(pool, uniswap.address, true, client, wallet);
 
   const aave = await hre.viem.deployContract("AaveV3Adaptor", [
     aaveConfig.aave,
@@ -76,6 +77,7 @@ const deployAdaptors = async (pool, chainParams, adpParams) => {
     aaveConfig.aaveStaticTokenFactory
   ]);
   console.log("AaveV3Adapter deployed:", aave.address);
+  await addAdpatorSupport(pool, aave.address, true, client, wallet);
 
   const lido = await hre.viem.deployContract("LidoAdaptor", [
     lidoConfig.lido,
@@ -86,6 +88,25 @@ const deployAdaptors = async (pool, chainParams, adpParams) => {
     pool
   ]);
   console.log("LidoAdapter deployed:", lido.address);
+  await addAdpatorSupport(pool, lido.address, true, client, wallet);
+}
+
+const addAdpatorSupport = async (pool, adpAddress, enable, client, wallet) => {
+  try {
+    //@ts-ignore
+    const hash = await wallet.writeContract({
+      address: pool,
+      abi: poolAbi,
+      functionName: "addAdaptorSupport",
+      args: [adpAddress, enable]
+    });
+
+    const rct = await client.waitForTransactionReceipt({ hash });
+    console.log("rct:addAdpSupport", rct.status);
+  } catch (error) {
+    console.log("Error supporting adp");
+    console.log(error.message);
+  }
 }
 
 const defineChainViem = () => {
@@ -222,8 +243,7 @@ const main = async () => {
   console.log("PoolProxy deployed:", poolProxy.address);
 
   // Deploy Adaptors 
-  // @todo Create seperate adaptor config
-  await deployAdaptors(poolProxy.address, chainParams, adpParams);
+  await deployAdaptors(poolProxy.address, chainParams, adpParams, wallet, client);
 
   // ERC4337 infra setup
   const gateway = await hre.viem.deployContract("Gateway", [
