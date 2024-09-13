@@ -17,9 +17,6 @@ contract CurveNGAdaptor is AdaptorBase, Ownable {
     error AssetNotSupportedByPool(address asset, address curvePool);
 
     ICurvePool public curve;
-    /// @todo Support all coins of all pools supported
-    /// @todo Support LP token of all pools supported. LP token and Curve curvePool share the same contract.
-
     uint8 constant ACTION_SUPPLY = 0;
     uint8 constant ACTION_WITHDRAW = 1;
 
@@ -195,21 +192,13 @@ contract CurveNGAdaptor is AdaptorBase, Ownable {
     }
      */
 
-
     function _calcLPTokens2CoinPool(
         uint256[] memory inValues,
         bool isDeposit
     ) internal view returns (uint256 lpTokenAmount) {
         // using static `amounts` array as expected by curePool contract
         uint256[2] memory amounts = [inValues[0], inValues[1]];
-        (, bytes memory lpToken) = address(curve).staticcall(
-            abi.encodeWithSignature(
-                "calc_token_amount(uint256[2],bool)",
-                amounts,
-                isDeposit
-            )
-        );
-        uint256 lpTokenAmount = abi.decode(lpToken, (uint256));
+        uint256 lpTokenAmount = curve.calc_token_amount(amounts, isDeposit);
         return lpTokenAmount;
     }
 
@@ -221,32 +210,21 @@ contract CurveNGAdaptor is AdaptorBase, Ownable {
         // using static `amounts` array as expected by curePool contract
         uint256[2] memory amounts = [inValues[0], inValues[1]];
 
-        (, bytes memory lpToken) = address(curve).call(
-            abi.encodeWithSignature(
-                "add_liquidity(uint256[2],uint256,address)",
-                amounts,
-                minLPTokens,
-                receiver
-            )
+        uint256 lpTokenAmount = curve.add_liquidity(
+            amounts,
+            minLPTokens,
+            receiver
         );
-        uint256 lpTokenAmount = abi.decode(lpToken, (uint256));
         return lpTokenAmount;
     }
 
-     function _calcLPTokens3CoinPool(
+    function _calcLPTokens3CoinPool(
         uint256[] memory inValues,
         bool isDeposit
     ) internal view returns (uint256 lpTokenAmount) {
         // using static `amounts` array as expected by curePool contract
         uint256[3] memory amounts = [inValues[0], inValues[1], inValues[2]];
-        (, bytes memory lpToken) = address(curve).staticcall(
-            abi.encodeWithSignature(
-                "calc_token_amount(uint256[3],bool)",
-                amounts,
-                isDeposit
-            )
-        );
-        uint256 lpTokenAmount = abi.decode(lpToken, (uint256));
+        uint256 lpTokenAmount = curve.calc_token_amount(amounts, isDeposit);
         return lpTokenAmount;
     }
 
@@ -258,15 +236,11 @@ contract CurveNGAdaptor is AdaptorBase, Ownable {
         // using static `amounts` array as expected by curePool contract
         uint256[3] memory amounts = [inValues[0], inValues[1], inValues[2]];
 
-        (, bytes memory lpToken) = address(curve).call(
-            abi.encodeWithSignature(
-                "add_liquidity(uint256[3],uint256,address)",
-                amounts,
-                minLPTokens,
-                receiver
-            )
+         uint256 lpTokenAmount = curve.add_liquidity(
+            amounts,
+            minLPTokens,
+            receiver
         );
-        uint256 lpTokenAmount = abi.decode(lpToken, (uint256));
         return lpTokenAmount;
     }
 }

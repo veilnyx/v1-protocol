@@ -119,6 +119,10 @@ contract CurveAdaptorTest is PoolTest {
 
         assert(outAssetIds.length == 1);
         assert(outValues[0] > 0);
+        console.log(
+            "LP token amount received:",
+            IERC20(crvUSD_USDT_Pool).balanceOf(address(curveAdaptor))
+        );
     }
 
     /**
