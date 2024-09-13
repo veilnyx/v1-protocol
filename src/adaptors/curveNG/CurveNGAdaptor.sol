@@ -2,34 +2,23 @@
 pragma solidity 0.8.24;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {AdaptorBase} from "../../base/AdaptorBase.sol";
 import {Asset, AssetType} from "../../libraries/Asset.sol";
 import {IWToken} from "../../interfaces/IWToken.sol";
 import {ICurvePool} from "./ICurvePool.sol";
-import {console2} from "forge-std/src/console2.sol";
-
-error InsufficientBalance();
-error UnsupportedPool(address pool);
-error InvalidInput();
-error AssetNotSupportedByPool(address asset, address pool);
-
-struct CoinSet {
-    // Storage of coins in a pool
-    address[] _coins;
-    // Position is the index of the coin in the `_coins` array plus 1.
-    // Position 0 is used to mean a value is not in the set.
-    mapping(address coin => uint256) _positions;
-}
 
 contract CurveNGAdaptor is AdaptorBase, Ownable {
-    ICurvePool public curve;
-    /// @todo Add mapping to support multiple pools.
-    /// @todo Support all coins of all pools supported
-    /// @todo Support LP token of all pools supported. LP token and Curve pool share the same contract.
+    using SafeERC20 for IERC20;
 
-    /// @notice Liquidity pool and LP token share the same contract
-    mapping(address pool => CoinSet) internal _poolForCoins;
+    error InsufficientBalance();
+    error InvalidInput();
+    error AssetNotSupportedByPool(address asset, address curvePool);
+
+    ICurvePool public curve;
+    /// @todo Support all coins of all pools supported
+    /// @todo Support LP token of all pools supported. LP token and Curve curvePool share the same contract.
 
     uint8 constant ACTION_SUPPLY = 0;
     uint8 constant ACTION_WITHDRAW = 1;
@@ -47,17 +36,41 @@ contract CurveNGAdaptor is AdaptorBase, Ownable {
         override
         returns (uint24[] memory outAssetIds, uint256[] memory outValues)
     {
-        (address pool, uint8 action) = abi.decode(payload, (address, uint8));
-        CoinSet storage poolCoinSet = _poolForCoins[pool];
-        uint256 poolCoinQty = poolCoinSet._coins.length;
-        curve = ICurvePool(pool);
+        (address curvePool, uint8 action) = abi.decode(
+            payload,
+            (address, uint8)
+        );
+        curve = ICurvePool(curvePool);
+        uint256 NCoins = 0;
+        bool success = true;
 
-        if (poolCoinQty == 0) {
-            revert UnsupportedPool(pool);
+        do {
+            try curve.coins(NCoins) returns (address) {
+                NCoins++;
+            } catch {
+                success = false;
+            }
+        } while (success);
+
+        if (NCoins == 0) {
+            revert InvalidInput();
         }
 
-        if (poolCoinQty != inAssetIds.length) {
+        if (NCoins != inAssetIds.length) {
             revert InvalidInput();
+        }
+
+        for (uint256 i; i < inAssetIds.length; i++) {
+            address inAssetAddr = getAsset(inAssetIds[i]).assetAddress;
+            bool supported = false;
+
+            for (uint256 j; j < NCoins; j++) {
+                if (inAssetAddr == curve.coins(j)) {
+                    supported = true;
+                }
+            }
+
+            if (!supported) revert InvalidInput();
         }
 
         outAssetIds = new uint24[](1);
@@ -65,9 +78,9 @@ contract CurveNGAdaptor is AdaptorBase, Ownable {
 
         if (action == ACTION_SUPPLY) {
             (outAssetIds[0], outValues[0]) = _supply(
+                NCoins,
                 inAssetIds,
-                inValues,
-                poolCoinSet
+                inValues
             );
         }
         /**
@@ -83,11 +96,10 @@ contract CurveNGAdaptor is AdaptorBase, Ownable {
     }
 
     function _supply(
+        uint256 NCoins,
         uint24[] memory inAssetIds,
-        uint256[] memory inValues,
-        CoinSet storage poolCoinSet
+        uint256[] memory inValues
     ) internal returns (uint24 outAssetId, uint256 outAssetValue) {
-        console2.log("Adp::Inside _supply()");
         for (uint256 i = 0; i < inAssetIds.length; i++) {
             Asset memory inAsset = getAsset(inAssetIds[i]);
             address inputAsset = inAsset.assetAddress;
@@ -97,35 +109,49 @@ contract CurveNGAdaptor is AdaptorBase, Ownable {
                 revert ZeroValue();
             }
 
-            if (poolCoinSet._positions[inputAsset] == 0) {
-                revert AssetNotSupportedByPool(inputAsset, address(curve));
-            }
-
-            uint256 tokenBal = IERC20(inputAsset).balanceOf(address(this));
-            if (tokenBal < lendValue) {
+            uint256 assetBal = IERC20(inputAsset).balanceOf(address(this));
+            if (assetBal < lendValue) {
                 revert InsufficientBalance();
             }
-
-            IERC20(inputAsset).approve(address(curve), lendValue);
+            IERC20(inputAsset).forceApprove(address(curve), lendValue);
         }
 
-        uint256 expectedLPTokens = calcLPTokens(inValues, true);
-        console2.log("Adp::Expected LP Tokens: ", expectedLPTokens);
+        /// @dev creating different functions for different curve pools as the curvePool contract expects a static sized `amounts` array in it's `calc_token_amount(uint256[2],bool)`, etc func. signature. We cannot use dynamic array niether can we create the func. signature string dynamically using string manupulation for abi.encodeWithSignature("funcSign", params) as `abi.encodeWithSignature` expects a constant string at compile time.
+        if (NCoins == 2) {
+            uint256 expectedLPTokens = _calcLPTokens2CoinPool(inValues, true);
 
-        // 0.5% slippage
-        uint256 minLPTokens = expectedLPTokens -
-            ((expectedLPTokens * 5) / 1000);
+            // 0.5% slippage
+            uint256 minLPTokens = expectedLPTokens -
+                ((expectedLPTokens * 5) / 1000);
 
-        uint256 lpTokens = curve.add_liquidity(
-            inValues,
-            minLPTokens,
-            address(this)
-        );
-        console2.log("Adp::LP Tokens received: ", lpTokens);
+            uint256 lpTokens = _addLiquidity2CoinPool(
+                inValues,
+                minLPTokens,
+                address(this)
+            );
 
-        // LP tokens and Curve Pool share the same contract
-        outAssetId = getAsset(address(curve)).id;
-        outAssetValue = lpTokens;
+            // LP tokens and Curve Pool share the same contract
+            outAssetId = getAsset(address(curve)).id;
+            outAssetValue = lpTokens;
+        }
+
+        if (NCoins == 3) {
+            uint256 expectedLPTokens = _calcLPTokens3CoinPool(inValues, true);
+
+            // 0.5% slippage
+            uint256 minLPTokens = expectedLPTokens -
+                ((expectedLPTokens * 5) / 1000);
+
+            uint256 lpTokens = _addLiquidity3CoinPool(
+                inValues,
+                minLPTokens,
+                address(this)
+            );
+
+            // LP tokens and Curve Pool share the same contract
+            outAssetId = getAsset(address(curve)).id;
+            outAssetValue = lpTokens;
+        }
     }
 
     /**
@@ -169,24 +195,78 @@ contract CurveNGAdaptor is AdaptorBase, Ownable {
     }
      */
 
-    function calcLPTokens(
-        uint256[] memory amounts,
+
+    function _calcLPTokens2CoinPool(
+        uint256[] memory inValues,
         bool isDeposit
-    ) public view returns (uint256 lpTokenAmount) {
-        return curve.calc_token_amount(amounts, isDeposit);
+    ) internal view returns (uint256 lpTokenAmount) {
+        // using static `amounts` array as expected by curePool contract
+        uint256[2] memory amounts = [inValues[0], inValues[1]];
+        (, bytes memory lpToken) = address(curve).staticcall(
+            abi.encodeWithSignature(
+                "calc_token_amount(uint256[2],bool)",
+                amounts,
+                isDeposit
+            )
+        );
+        uint256 lpTokenAmount = abi.decode(lpToken, (uint256));
+        return lpTokenAmount;
     }
 
-    function addPool(address pool, address[] memory coins) external onlyOwner {
-        /// @todo add check if pool already exists
-        CoinSet storage coinSet = _poolForCoins[pool];
+    function _addLiquidity2CoinPool(
+        uint256[] memory inValues,
+        uint256 minLPTokens,
+        address receiver
+    ) internal returns (uint256 lpTokenAmount) {
+        // using static `amounts` array as expected by curePool contract
+        uint256[2] memory amounts = [inValues[0], inValues[1]];
 
-        if (coinSet._coins.length > 0) {
-            revert InvalidInput();
-        }
+        (, bytes memory lpToken) = address(curve).call(
+            abi.encodeWithSignature(
+                "add_liquidity(uint256[2],uint256,address)",
+                amounts,
+                minLPTokens,
+                receiver
+            )
+        );
+        uint256 lpTokenAmount = abi.decode(lpToken, (uint256));
+        return lpTokenAmount;
+    }
 
-        coinSet._coins = coins;
-        for (uint256 i = 0; i < coins.length; i++) {
-            coinSet._positions[coins[i]] = i + 1;
-        }
+     function _calcLPTokens3CoinPool(
+        uint256[] memory inValues,
+        bool isDeposit
+    ) internal view returns (uint256 lpTokenAmount) {
+        // using static `amounts` array as expected by curePool contract
+        uint256[3] memory amounts = [inValues[0], inValues[1], inValues[2]];
+        (, bytes memory lpToken) = address(curve).staticcall(
+            abi.encodeWithSignature(
+                "calc_token_amount(uint256[3],bool)",
+                amounts,
+                isDeposit
+            )
+        );
+        uint256 lpTokenAmount = abi.decode(lpToken, (uint256));
+        return lpTokenAmount;
+    }
+
+    function _addLiquidity3CoinPool(
+        uint256[] memory inValues,
+        uint256 minLPTokens,
+        address receiver
+    ) internal returns (uint256 lpTokenAmount) {
+        // using static `amounts` array as expected by curePool contract
+        uint256[3] memory amounts = [inValues[0], inValues[1], inValues[2]];
+
+        (, bytes memory lpToken) = address(curve).call(
+            abi.encodeWithSignature(
+                "add_liquidity(uint256[3],uint256,address)",
+                amounts,
+                minLPTokens,
+                receiver
+            )
+        );
+        uint256 lpTokenAmount = abi.decode(lpToken, (uint256));
+        return lpTokenAmount;
     }
 }
