@@ -90,6 +90,23 @@ contract CurveAdaptorTest is PoolTest {
         assert(curveLPTokenBalPostSupply > curveLPTokenBalBeforeSupply);
         */
 
+        (
+            uint24[] memory outAssetIds,
+            uint256[] memory outValues
+        ) = _depositInCurve();
+
+        assert(outAssetIds.length == 1);
+        assert(outValues[0] > 0);
+        console.log(
+            "LP token amount received:",
+            IERC20(crvUSD_USDT_Pool).balanceOf(address(curveAdaptor))
+        );
+    }
+
+    function _depositInCurve()
+        internal
+        returns (uint24[] memory, uint256[] memory)
+    {
         uint24[] memory inAssetIds = new uint24[](2);
         inAssetIds[0] = pool.getAsset(USDT).id;
         inAssetIds[1] = pool.getAsset(crvUSD).id;
@@ -117,11 +134,29 @@ contract CurveAdaptorTest is PoolTest {
         ).handleAssets(inAssetIds, inValues, payload); // staking directly through CurveAdaptor
         vm.stopPrank();
 
-        assert(outAssetIds.length == 1);
+        return (outAssetIds, outValues);
+    }
+
+    function testWithdrawOnCurve() public {
+        (
+            uint24[] memory depositedAssetIds,
+            uint256[] memory depositedValues
+        ) = _depositInCurve();
+        bytes memory payload = abi.encode(crvUSD_USDT_Pool, uint8(1));
+
+        vm.startPrank(user);
+        (uint24[] memory outAssetIds, uint256[] memory outValues) = IAdaptor(
+            address(curveAdaptor)
+        ).handleAssets(depositedAssetIds, depositedValues, payload); // staking directly through CurveAdaptor
+        vm.stopPrank();
+
+        assert(outAssetIds.length == 2);
         assert(outValues[0] > 0);
+        assert(outValues[1] > 0);
         console.log(
-            "LP token amount received:",
-            IERC20(crvUSD_USDT_Pool).balanceOf(address(curveAdaptor))
+            "Underlying tokens received:",
+            IERC20(USDT).balanceOf(address(curveAdaptor)),
+            IERC20(crvUSD).balanceOf(address(curveAdaptor))
         );
     }
 

@@ -37,4 +37,26 @@ interface ICurvePool {
         uint256 _min_mint_amount,
         address receiver
     ) external returns (uint256 lpTokenAmount);
+
+    function calc_withdraw_one_coin(
+        uint256 _burn_amount,
+        int128 i
+    ) external view returns (uint256 coinAmount);
+
+    function remove_liquidity(
+        uint256 _burn_amount,
+        uint256[2] memory _min_amounts,
+        address receiver
+    ) external returns (uint256[2] memory coinsReceived);
+
+    /// @notice Withdraw coins from the pool in an imbalanced amount
+    /// @param _amounts List of amounts of underlying coins to withdraw
+    /// @param _max_burn_amount Maximum amount of LP token to burn in the withdrawal
+    /// @param _receiver Address that receives the withdrawn coins
+    /// @return Actual amount of the LP token burned in the withdrawal
+    function remove_liquidity_imbalance(
+        uint256[2] memory _amounts,
+        uint256 _max_burn_amount,
+        address _receiver
+    ) external returns (uint256);
 }
