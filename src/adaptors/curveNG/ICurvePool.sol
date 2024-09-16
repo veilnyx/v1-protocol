@@ -2,8 +2,6 @@
 pragma solidity 0.8.24;
 
 interface ICurvePool {
-    function N_COINS() external view returns (uint256);
-
     function coins(uint256 i) external view returns (address);
 
     /// @notice Function to calculate the addition or reduction of token supply from a deposit (add liquidity) or withdrawal (remove liquidity) for 2 coin pools. This function does take fees into consideration.
@@ -49,6 +47,13 @@ interface ICurvePool {
         address receiver
     ) external returns (uint256[2] memory coinsReceived);
 
+    function remove_liquidity_one_coin(
+        uint256 _burn_amount,
+        int128 i,
+        uint256 _min_received,
+        address receiver
+    ) external returns (uint256 coinsReceived);
+
     /// @notice Withdraw coins from the pool in an imbalanced amount
     /// @param _amounts List of amounts of underlying coins to withdraw
     /// @param _max_burn_amount Maximum amount of LP token to burn in the withdrawal
@@ -59,4 +64,8 @@ interface ICurvePool {
         uint256 _max_burn_amount,
         address _receiver
     ) external returns (uint256);
+
+    function balances(uint256 i) external view returns (uint256);
+
+    function exchange(int128 i, int128 j, uint256 dx, uint256 min_dy) external returns (uint256 dy);
 }

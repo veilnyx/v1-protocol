@@ -4,9 +4,14 @@ evm_version = "cancun"
 ffi = true
 ast = true
 via-ir = false
+optimizer = true
+optimizer-runs = 500
 build_info = true
 extra_output = ["storageLayout"]
 fs_permissions = [{ access = "read-write", path = "./" }]
+
+[profile.lite]
+optimizer = false
 
 [profile.ci.fuzz]
 runs = 10_000

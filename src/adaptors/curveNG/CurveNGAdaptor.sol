@@ -17,14 +17,13 @@ contract CurveNGAdaptor is AdaptorBase, Ownable {
     error InvalidInput();
     error AssetNotSupportedByPool(address asset, address curvePool);
 
-    ICurvePool public curve;
     uint8 constant ACTION_SUPPLY = 0;
     uint8 constant ACTION_WITHDRAW = 1;
 
     enum WithdrawType {
         BALANCED,
-        IMBALANCED
         SINGLE,
+        IMBALANCED
     }
 
     constructor(address pool_) AdaptorBase(pool_) Ownable(msg.sender) {}
@@ -40,16 +39,17 @@ contract CurveNGAdaptor is AdaptorBase, Ownable {
         override
         returns (uint24[] memory outAssetIds, uint256[] memory outValues)
     {
-        (address curvePool, uint8 action) = abi.decode(
-            payload,
-            (address, uint8)
-        );
-        curve = ICurvePool(curvePool);
+        (
+            address curvePool,
+            uint8 action,
+            uint8 withdrawType,
+            uint8 singleCoinIndex,
+            uint256[] memory underlyingTokenAmts
+        ) = abi.decode(payload, (address, uint8, uint8, uint8, uint256[]));
         uint256 NCoins = 0;
         bool success = true;
-
         do {
-            try curve.coins(NCoins) returns (address) {
+            try ICurvePool(curvePool).coins(NCoins) returns (address) {
                 NCoins++;
             } catch {
                 success = false;
@@ -61,44 +61,194 @@ contract CurveNGAdaptor is AdaptorBase, Ownable {
         }
 
         if (action == ACTION_SUPPLY) {
-            outAssetIds = new uint24[](1);
-            outValues = new uint256[](1);
-
-            (outAssetIds[0], outValues[0]) = _supply(
+            _supplyChecksAndApprove(
+                ICurvePool(curvePool),
                 NCoins,
                 inAssetIds,
                 inValues
             );
-        } else if (action == ACTION_WITHDRAW) {
-            outAssetIds = new uint24[](NCoins);
-            outValues = new uint256[](NCoins);
 
-            (outAssetIds, outValues) = _withdraw(
+            outAssetIds = new uint24[](1);
+            outValues = new uint256[](1);
+
+            (outAssetIds[0], outValues[0]) = _supply(
+                ICurvePool(curvePool),
                 NCoins,
-                inAssetIds[0],
-                uint256(inValues[0])
+                inValues
             );
+        } else if (action == ACTION_WITHDRAW) {
+            _withdrawChecksAndApprove(
+                ICurvePool(curvePool),
+                inAssetIds[0],
+                inValues[0]
+            );
+
+            if (NCoins == 2) {
+                if (withdrawType == uint8(WithdrawType.BALANCED)) {
+                    /// @todo This implementation results in `revert: Withdrawal resulted in fewer coins than expected`. Need to investigate.
+                    /// @notice hardcoding the minAmt of both tokens to 0 for now.
+                    /**
+                    uint256 minAmtTokenA = _calcWithdrawOneCoin(inValues[0] / 2, 0);
+                    console2.log("minAmtTokenA", minAmtTokenA);
+                    uint256 minAmtTokenB = _calcWithdrawOneCoin(inValues[0] / 2, 1);
+                    console2.log("minAmtTokenB", minAmtTokenB);
+
+                    // allow 0.5% slippage
+                    minAmtTokenA = minAmtTokenA - ((minAmtTokenA * 5) / 1000);
+                    minAmtTokenB = minAmtTokenB - ((minAmtTokenB * 5) / 1000);
+                    */
+                    outValues = new uint256[](2);
+                    outAssetIds = new uint24[](2);
+
+                    outValues = _withdrawLiquidityBalanced2CoinPool(
+                        ICurvePool(curvePool),
+                        inValues[0]
+                    );
+
+                    // preparing the outAssetIds arr
+                    for (uint256 i; i < NCoins; i++) {
+                        outAssetIds[i] = getAsset(
+                            ICurvePool(curvePool).coins(i)
+                        ).id;
+                    }
+                }
+
+                if (withdrawType == uint8(WithdrawType.SINGLE)) {
+                    if (
+                        ICurvePool(curvePool).coins(singleCoinIndex) ==
+                        address(0)
+                    ) {
+                        revert InvalidInput();
+                    }
+
+                    outValues = new uint256[](1);
+                    outAssetIds = new uint24[](1);
+
+                    outValues[0] = _withdrawLiquiditySingle2CoinPool(
+                        ICurvePool(curvePool),
+                        inValues[0],
+                        singleCoinIndex
+                    );
+                    console2.log("Single coins received", outValues[0]);
+
+                    outAssetIds[0] = getAsset(
+                        ICurvePool(curvePool).coins(singleCoinIndex)
+                    ).id;
+                }
+
+                if (withdrawType == uint8(WithdrawType.IMBALANCED)) {
+                    if (
+                        underlyingTokenAmts[0] == 0 ||
+                        underlyingTokenAmts[1] == 0
+                    ) {
+                        revert InvalidInput();
+                    }
+                    // creating a static array to send to the curve pool
+                    // uint256[2] memory _underlyingTokenAmts;
+                    // _underlyingTokenAmts[0] = underlyingTokenAmts[0];
+                    // _underlyingTokenAmts[1] = underlyingTokenAmts[1];
+
+                    _withdrawLiquidityImbalance2CoinPool(
+                        ICurvePool(curvePool),
+                        [underlyingTokenAmts[0], underlyingTokenAmts[1]],
+                        inValues[0]
+                    );
+
+                    outValues = new uint256[](2);
+                    outAssetIds = new uint24[](2);
+
+                    outValues[0] = underlyingTokenAmts[0];
+                    outValues[1] = underlyingTokenAmts[0];
+
+                    // preparing the outAssetIds arr
+                    for (uint256 i; i < NCoins; i++) {
+                        outAssetIds[i] = getAsset(
+                            ICurvePool(curvePool).coins(i)
+                        ).id;
+                    }
+                }
+            }
+
+            /// @dev Getting stack too deep.
+            // (outAssetIds, outValues) = _withdraw(
+            //     curve,
+            //     NCoins,
+            //     inAssetIds[0],
+            //     uint256(inValues[0]),
+            //     withdrawType,
+            //     singleCoinIndex,
+            //     singleCoinAddress
+            // );
         } else {
             revert InvalidAction();
         }
     }
 
+    
     function _supply(
+        ICurvePool curve,
+        uint256 NCoins,
+        uint256[] memory inValues
+    ) internal returns (uint24 outAssetId, uint256 outAssetValue) {
+        /// @dev creating different functions for different curve pools as the curvePool contract expects a static sized `amounts` array in it's `calc_token_amount(uint256[2],bool)`, etc func. signature. We cannot use dynamic array niether can we create the func. signature string dynamically using string manupulation for abi.encodeWithSignature("funcSign", params) as `abi.encodeWithSignature` expects a constant string at compile time.
+        if (NCoins == 2) {
+            uint256 expectedLPTokens = _calcLPTokens2CoinPool(
+                curve,
+                inValues,
+                true
+            );
+
+            // 0.5% slippage
+            uint256 minLPTokens = expectedLPTokens -
+                ((expectedLPTokens * 5) / 1000);
+
+            outAssetValue = _addLiquidity2CoinPool(
+                curve,
+                inValues,
+                minLPTokens,
+                address(this)
+            );
+
+            // LP tokens and Curve Pool share the same contract
+            outAssetId = getAsset(address(curve)).id;
+        }
+
+        if (NCoins == 3) {
+            uint256 expectedLPTokens = _calcLPTokens3CoinPool(
+                curve,
+                inValues,
+                true
+            );
+
+            // 0.5% slippage
+            uint256 minLPTokens = expectedLPTokens -
+                ((expectedLPTokens * 5) / 1000);
+
+            outAssetValue = _addLiquidity3CoinPool(
+                curve,
+                inValues,
+                minLPTokens,
+                address(this)
+            );
+
+            // LP tokens and Curve Pool share the same contract
+            outAssetId = getAsset(address(curve)).id;
+        }
+    }
+
+    
+    function _supplyChecksAndApprove(
+        ICurvePool curve,
         uint256 NCoins,
         uint24[] memory inAssetIds,
         uint256[] memory inValues
-    ) internal returns (uint24 outAssetId, uint256 outAssetValue) {
-        if (NCoins != inAssetIds.length || NCoins != inValues.length) {
-            revert InvalidInput();
-        }
-
-        // Check if the input assets are supported by the curve pool
+    ) internal {
         for (uint256 i; i < inAssetIds.length; i++) {
-            address inAssetAddr = getAsset(inAssetIds[i]).assetAddress;
+            Asset memory inAsset = getAsset(inAssetIds[i]);
             bool supported = false;
 
             for (uint256 j; j < NCoins; j++) {
-                if (inAssetAddr == curve.coins(j)) {
+                if (inAsset.assetAddress == curve.coins(j)) {
                     supported = true;
                 }
             }
@@ -109,68 +259,36 @@ contract CurveNGAdaptor is AdaptorBase, Ownable {
                 revert ZeroValue();
             }
 
-            Asset memory inAsset = getAsset(inAssetIds[i]);
-            address inputAsset = inAsset.assetAddress;
-            uint256 lendValue = inValues[i];
-
-            uint256 assetBal = IERC20(inputAsset).balanceOf(address(this));
-            if (assetBal < lendValue) {
+            if (
+                IERC20(inAsset.assetAddress).balanceOf(address(this)) <
+                inValues[i]
+            ) {
                 revert InsufficientBalance();
             }
-            IERC20(inputAsset).forceApprove(address(curve), lendValue);
-        }
 
-        /// @dev creating different functions for different curve pools as the curvePool contract expects a static sized `amounts` array in it's `calc_token_amount(uint256[2],bool)`, etc func. signature. We cannot use dynamic array niether can we create the func. signature string dynamically using string manupulation for abi.encodeWithSignature("funcSign", params) as `abi.encodeWithSignature` expects a constant string at compile time.
-        if (NCoins == 2) {
-            uint256 expectedLPTokens = _calcLPTokens2CoinPool(inValues, true);
+            if (NCoins != inAssetIds.length || NCoins != inValues.length) {
+                revert InvalidInput();
+            }
 
-            // 0.5% slippage
-            uint256 minLPTokens = expectedLPTokens -
-                ((expectedLPTokens * 5) / 1000);
-
-            uint256 lpTokens = _addLiquidity2CoinPool(
-                inValues,
-                minLPTokens,
-                address(this)
+            IERC20(inAsset.assetAddress).forceApprove(
+                address(curve),
+                inValues[i]
             );
-
-            // LP tokens and Curve Pool share the same contract
-            outAssetId = getAsset(address(curve)).id;
-            outAssetValue = lpTokens;
-        }
-
-        if (NCoins == 3) {
-            uint256 expectedLPTokens = _calcLPTokens3CoinPool(inValues, true);
-
-            // 0.5% slippage
-            uint256 minLPTokens = expectedLPTokens -
-                ((expectedLPTokens * 5) / 1000);
-
-            uint256 lpTokens = _addLiquidity3CoinPool(
-                inValues,
-                minLPTokens,
-                address(this)
-            );
-
-            // LP tokens and Curve Pool share the same contract
-            outAssetId = getAsset(address(curve)).id;
-            outAssetValue = lpTokens;
         }
     }
 
-    function _withdraw(
-        uint256 NCoins,
+    
+    function _withdrawChecksAndApprove(
+        ICurvePool curve,
         uint24 inAssetId,
         uint256 inValue
-    )
-        internal
-        returns (uint24[] memory outAssetIds, uint256[] memory outAssetValues)
-    {
-        // Redeeming/Withdrawing
+    ) internal {
         Asset memory inAsset = getAsset(inAssetId);
-        address lpToken = inAsset.assetAddress;
 
-        if (lpToken == address(0)) {
+        if (
+            inAsset.assetAddress == address(0) ||
+            inAsset.assetAddress != address(curve)
+        ) {
             revert UnsupportedAsset(inAsset.id);
         }
 
@@ -178,111 +296,169 @@ contract CurveNGAdaptor is AdaptorBase, Ownable {
             revert ZeroValue();
         }
 
-        uint256 lpTokenBal = IERC20(lpToken).balanceOf(address(this));
-        if (lpTokenBal < inValue) {
+        if (IERC20(inAsset.assetAddress).balanceOf(address(this)) < inValue) {
             revert InsufficientBalance();
         }
 
-        IERC20(lpToken).forceApprove(address(curve), inValue);
-
-        if (NCoins == 2) {
-            /// @todo This implementation results in `revert: Withdrawal resulted in fewer coins than expected`. Need to investigate. 
-            /// @notice hardcoding the minAmt of both tokens to 0 for now.
-            /**
-            uint256 minAmtTokenA = _calcWithdrawOneCoin(inValue / 2, 0);
-            console2.log("minAmtTokenA", minAmtTokenA);
-            uint256 minAmtTokenB = _calcWithdrawOneCoin(inValue / 2, 1);
-            console2.log("minAmtTokenB", minAmtTokenB);
-
-            // allow 0.5% slippage
-            minAmtTokenA = minAmtTokenA - ((minAmtTokenA * 5) / 1000);
-            minAmtTokenB = minAmtTokenB - ((minAmtTokenB * 5) / 1000);
-             */
-            uint256 minAmtTokenA = 0;
-            uint256 minAmtTokenB = 0;
-            
-            uint256[2] memory coinsReceived = _withdrawLiquidity2CoinPool(
-                inValue,
-                minAmtTokenA,
-                minAmtTokenB
-            );
-            console2.log("USDT received", coinsReceived[0]);
-            console2.log("CRV received", coinsReceived[1]);
-            outAssetValues = new uint256[](2);
-            outAssetIds = new uint24[](2);
-
-            outAssetValues[0] = coinsReceived[0];
-            outAssetValues[1] = coinsReceived[1];
-        }
-
-        // preparing the outAssetIds arr
-        for (uint256 i; i < NCoins; i++) {
-            outAssetIds[i] = getAsset(curve.coins(i)).id;
-        }
+        IERC20(address(curve)).forceApprove(address(curve), inValue);
     }
 
+    /////////////////////////////
+    ////// Getter func. /////////
+    /////////////////////////////
+    /// @dev Commenting out to reduce local variables
+    /**
+    function getPoolCoinsAndIndexes(
+        address pool
+    )
+        external
+        view
+        returns (
+            address[] memory coins,
+            uint256[] memory balances,
+            uint24[] memory assetIds,
+            uint8[] memory indexes
+        )
+    {
+        ICurvePool curve = ICurvePool(pool);
+        uint8 NCoins = 0;
+        bool success = true;
+        coins = new address[](3);
+        balances = new uint256[](3);
+        assetIds = new uint24[](3);
+        indexes = new uint8[](3);
+
+        do {
+            try curve.coins(uint256(NCoins)) returns (address coinAddress) {
+                coins[NCoins] = coinAddress;
+                balances[NCoins] = curve.balances(uint256(NCoins));
+                assetIds[NCoins] = getAsset(coinAddress).id;
+                indexes[NCoins] = NCoins;
+
+                NCoins++;
+            } catch {
+                success = false;
+            }
+        } while (success);
+    }
+    */
+
+    /////////////////////////////
+    /// Internal func. /////////
+    /////////////////////////////
+
+    
+    // Two pool functions
     function _calcLPTokens2CoinPool(
+        ICurvePool curve,
         uint256[] memory inValues,
         bool isDeposit
-    ) internal view returns (uint256 lpTokenAmount) {
+    ) internal view returns (uint256) {
         // using static `amounts` array as expected by curePool contract
-        uint256[2] memory amounts = [inValues[0], inValues[1]];
-        lpTokenAmount = curve.calc_token_amount(amounts, isDeposit);
+        // uint256[2] memory amounts = [inValues[0], inValues[1]];
+        curve.calc_token_amount([inValues[0], inValues[1]], isDeposit);
     }
 
+    
     function _addLiquidity2CoinPool(
+        ICurvePool curve,
         uint256[] memory inValues,
         uint256 minLPTokens,
         address receiver
-    ) internal returns (uint256 lpTokenAmount) {
+    ) internal returns (uint256) {
         // using static `amounts` array as expected by curePool contract
-        uint256[2] memory amounts = [inValues[0], inValues[1]];
+        // uint256[2] memory amounts = [inValues[0], inValues[1]];
 
-        lpTokenAmount = curve.add_liquidity(amounts, minLPTokens, receiver);
+        return
+            curve.add_liquidity(
+                [inValues[0], inValues[1]],
+                minLPTokens,
+                receiver
+            );
     }
 
+    
     function _calcWithdrawOneCoin(
+        ICurvePool curve,
         uint256 burnAmount,
         int128 i
-    ) internal view returns (uint256 coinAmount) {
-        coinAmount = curve.calc_withdraw_one_coin(burnAmount, i);
+    ) internal view returns (uint256) {
+        return curve.calc_withdraw_one_coin(burnAmount, i);
     }
 
-    function _withdrawLiquidity2CoinPool(
-        uint256 inValue,
-        uint256 minAmtTokenA,
-        uint256 minAmtTokenB
-    ) internal returns (uint256[2] memory coinsReceived) {
-        uint256[2] memory minAmts = [minAmtTokenA, minAmtTokenB];
-
-        uint256[2] memory received = curve.remove_liquidity({
-            _burn_amount: inValue,
-            _min_amounts: minAmts,
+    function _withdrawLiquidityBalanced2CoinPool(
+        ICurvePool curve,
+        uint256 withdrawLPTokens
+    ) internal returns (uint256[] memory) {
+        uint256[] memory coinsReceived = new uint256[](2);
+        uint256[2] memory _coinsReceived = curve.remove_liquidity({
+            _burn_amount: withdrawLPTokens,
+            _min_amounts: [uint256(0), uint256(0)],
             receiver: address(this)
         });
 
-        // returning a dynamic array
-        coinsReceived[0] = received[0];
-        coinsReceived[1] = received[1];
+        coinsReceived[0] = _coinsReceived[0];
+        coinsReceived[1] = _coinsReceived[1];
+        return coinsReceived;
     }
 
+    
+    function _withdrawLiquiditySingle2CoinPool(
+        ICurvePool curve,
+        uint256 withdrawLPTokens,
+        uint8 singleCoinIndex
+    ) internal returns (uint256) {
+        return
+            curve.remove_liquidity_one_coin(
+                withdrawLPTokens,
+                int8(singleCoinIndex),
+                0,
+                address(this)
+            );
+    }
+
+    function _withdrawLiquidityImbalance2CoinPool(
+        ICurvePool curve,
+        uint256[2] memory _underlyingTokenAmts,
+        uint256 withdrawLPTokens
+    ) internal {
+        curve.remove_liquidity_imbalance({
+            _amounts: _underlyingTokenAmts,
+            _max_burn_amount: withdrawLPTokens,
+            _receiver: address(this)
+        });
+        console2.log("Imbal withdraw lp tokens burnt successfully");
+    }
+
+    // Three pool functions
     function _calcLPTokens3CoinPool(
+        ICurvePool curve,
         uint256[] memory inValues,
         bool isDeposit
-    ) internal view returns (uint256 lpTokenAmount) {
+    ) internal view returns (uint256) {
         // using static `amounts` array as expected by curePool contract
-        uint256[3] memory amounts = [inValues[0], inValues[1], inValues[2]];
-        lpTokenAmount = curve.calc_token_amount(amounts, isDeposit);
+        // uint256[3] memory amounts = [inValues[0], inValues[1], inValues[2]];
+        return
+            curve.calc_token_amount(
+                [inValues[0], inValues[1], inValues[2]],
+                isDeposit
+            );
     }
 
     function _addLiquidity3CoinPool(
+        ICurvePool curve,
         uint256[] memory inValues,
         uint256 minLPTokens,
         address receiver
-    ) internal returns (uint256 lpTokenAmount) {
+    ) internal returns (uint256) {
         // using static `amounts` array as expected by curePool contract
-        uint256[3] memory amounts = [inValues[0], inValues[1], inValues[2]];
+        // uint256[3] memory amounts = [inValues[0], inValues[1], inValues[2]];
 
-        lpTokenAmount = curve.add_liquidity(amounts, minLPTokens, receiver);
+        return
+            curve.add_liquidity(
+                [inValues[0], inValues[1], inValues[2]],
+                minLPTokens,
+                receiver
+            );
     }
 }
