@@ -3,7 +3,6 @@ pragma solidity 0.8.24;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {AdaptorBase} from "../../base/AdaptorBase.sol";
 import {Asset, AssetType} from "../../libraries/Asset.sol";
 import {IWToken} from "../../interfaces/IWToken.sol";
@@ -30,7 +29,7 @@ struct PoolUnderlyingTokensInfo {
     uint8[] indexes;
 }
 
-contract CurveNGAdaptor is AdaptorBase, Ownable {
+contract CurveNGAdaptor is AdaptorBase {
     using SafeERC20 for IERC20;
 
     error InsufficientBalance();
@@ -40,7 +39,7 @@ contract CurveNGAdaptor is AdaptorBase, Ownable {
     uint8 constant ACTION_SUPPLY = 0;
     uint8 constant ACTION_WITHDRAW = 1;
 
-    constructor(address pool_) AdaptorBase(pool_) Ownable(msg.sender) {}
+    constructor(address pool_) AdaptorBase(pool_) {}
 
     function handleAssets(
         uint24[] calldata inAssetIds,
