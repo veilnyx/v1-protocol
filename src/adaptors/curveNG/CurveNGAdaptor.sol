@@ -10,6 +10,14 @@ import {IWToken} from "../../interfaces/IWToken.sol";
 import {ICurvePool} from "./ICurvePool.sol";
 import {console2} from "forge-std/console2.sol";
 
+struct Payload {
+    address curvePool;
+    uint8 action;
+    uint8 withdrawType;
+    uint8 singleCoinIndex;
+    uint256[] underlyingTokenAmts;
+}
+
 contract CurveNGAdaptor is AdaptorBase, Ownable {
     using SafeERC20 for IERC20;
 
@@ -39,17 +47,14 @@ contract CurveNGAdaptor is AdaptorBase, Ownable {
         override
         returns (uint24[] memory outAssetIds, uint256[] memory outValues)
     {
-        (
-            address curvePool,
-            uint8 action,
-            uint8 withdrawType,
-            uint8 singleCoinIndex,
-            uint256[] memory underlyingTokenAmts
-        ) = abi.decode(payload, (address, uint8, uint8, uint8, uint256[]));
+        Payload memory decodedPayload = abi.decode(payload, (Payload));
+
         uint256 NCoins = 0;
         bool success = true;
         do {
-            try ICurvePool(curvePool).coins(NCoins) returns (address) {
+            try ICurvePool(decodedPayload.curvePool).coins(NCoins) returns (
+                address
+            ) {
                 NCoins++;
             } catch {
                 success = false;
@@ -60,9 +65,9 @@ contract CurveNGAdaptor is AdaptorBase, Ownable {
             revert InvalidInput();
         }
 
-        if (action == ACTION_SUPPLY) {
+        if (decodedPayload.action == ACTION_SUPPLY) {
             _supplyChecksAndApprove(
-                ICurvePool(curvePool),
+                ICurvePool(decodedPayload.curvePool),
                 NCoins,
                 inAssetIds,
                 inValues
@@ -72,19 +77,21 @@ contract CurveNGAdaptor is AdaptorBase, Ownable {
             outValues = new uint256[](1);
 
             (outAssetIds[0], outValues[0]) = _supply(
-                ICurvePool(curvePool),
+                ICurvePool(decodedPayload.curvePool),
                 NCoins,
                 inValues
             );
-        } else if (action == ACTION_WITHDRAW) {
+        } else if (decodedPayload.action == ACTION_WITHDRAW) {
             _withdrawChecksAndApprove(
-                ICurvePool(curvePool),
+                ICurvePool(decodedPayload.curvePool),
                 inAssetIds[0],
                 inValues[0]
             );
 
             if (NCoins == 2) {
-                if (withdrawType == uint8(WithdrawType.BALANCED)) {
+                if (
+                    decodedPayload.withdrawType == uint8(WithdrawType.BALANCED)
+                ) {
                     /// @todo This implementation results in `revert: Withdrawal resulted in fewer coins than expected`. Need to investigate.
                     /// @notice hardcoding the minAmt of both tokens to 0 for now.
                     /**
@@ -101,22 +108,23 @@ contract CurveNGAdaptor is AdaptorBase, Ownable {
                     outAssetIds = new uint24[](2);
 
                     outValues = _withdrawLiquidityBalanced2CoinPool(
-                        ICurvePool(curvePool),
+                        ICurvePool(decodedPayload.curvePool),
                         inValues[0]
                     );
 
                     // preparing the outAssetIds arr
                     for (uint256 i; i < NCoins; i++) {
                         outAssetIds[i] = getAsset(
-                            ICurvePool(curvePool).coins(i)
+                            ICurvePool(decodedPayload.curvePool).coins(i)
                         ).id;
                     }
                 }
 
-                if (withdrawType == uint8(WithdrawType.SINGLE)) {
+                if (decodedPayload.withdrawType == uint8(WithdrawType.SINGLE)) {
                     if (
-                        ICurvePool(curvePool).coins(singleCoinIndex) ==
-                        address(0)
+                        ICurvePool(decodedPayload.curvePool).coins(
+                            decodedPayload.singleCoinIndex
+                        ) == address(0)
                     ) {
                         revert InvalidInput();
                     }
@@ -125,45 +133,53 @@ contract CurveNGAdaptor is AdaptorBase, Ownable {
                     outAssetIds = new uint24[](1);
 
                     outValues[0] = _withdrawLiquiditySingle2CoinPool(
-                        ICurvePool(curvePool),
+                        ICurvePool(decodedPayload.curvePool),
                         inValues[0],
-                        singleCoinIndex
+                        decodedPayload.singleCoinIndex
                     );
                     console2.log("Single coins received", outValues[0]);
 
                     outAssetIds[0] = getAsset(
-                        ICurvePool(curvePool).coins(singleCoinIndex)
+                        ICurvePool(decodedPayload.curvePool).coins(
+                            decodedPayload.singleCoinIndex
+                        )
                     ).id;
                 }
 
-                if (withdrawType == uint8(WithdrawType.IMBALANCED)) {
+                if (
+                    decodedPayload.withdrawType ==
+                    uint8(WithdrawType.IMBALANCED)
+                ) {
                     if (
-                        underlyingTokenAmts[0] == 0 ||
-                        underlyingTokenAmts[1] == 0
+                        decodedPayload.underlyingTokenAmts[0] == 0 ||
+                        decodedPayload.underlyingTokenAmts[1] == 0
                     ) {
                         revert InvalidInput();
                     }
                     // creating a static array to send to the curve pool
                     // uint256[2] memory _underlyingTokenAmts;
-                    // _underlyingTokenAmts[0] = underlyingTokenAmts[0];
-                    // _underlyingTokenAmts[1] = underlyingTokenAmts[1];
+                    // _underlyingTokenAmts[0] = decodedPayload.underlyingTokenAmts[0];
+                    // _underlyingTokenAmts[1] = decodedPayload.underlyingTokenAmts[1];
 
                     _withdrawLiquidityImbalance2CoinPool(
-                        ICurvePool(curvePool),
-                        [underlyingTokenAmts[0], underlyingTokenAmts[1]],
+                        ICurvePool(decodedPayload.curvePool),
+                        [
+                            decodedPayload.underlyingTokenAmts[0],
+                            decodedPayload.underlyingTokenAmts[1]
+                        ],
                         inValues[0]
                     );
 
                     outValues = new uint256[](2);
                     outAssetIds = new uint24[](2);
 
-                    outValues[0] = underlyingTokenAmts[0];
-                    outValues[1] = underlyingTokenAmts[0];
+                    outValues[0] = decodedPayload.underlyingTokenAmts[0];
+                    outValues[1] = decodedPayload.underlyingTokenAmts[0];
 
                     // preparing the outAssetIds arr
                     for (uint256 i; i < NCoins; i++) {
                         outAssetIds[i] = getAsset(
-                            ICurvePool(curvePool).coins(i)
+                            ICurvePool(decodedPayload.curvePool).coins(i)
                         ).id;
                     }
                 }
@@ -175,8 +191,8 @@ contract CurveNGAdaptor is AdaptorBase, Ownable {
             //     NCoins,
             //     inAssetIds[0],
             //     uint256(inValues[0]),
-            //     withdrawType,
-            //     singleCoinIndex,
+            //     decodedPayload.withdrawType,
+            //     decodedPayload.singleCoinIndex,
             //     singleCoinAddress
             // );
         } else {
@@ -184,7 +200,6 @@ contract CurveNGAdaptor is AdaptorBase, Ownable {
         }
     }
 
-    
     function _supply(
         ICurvePool curve,
         uint256 NCoins,
@@ -236,7 +251,6 @@ contract CurveNGAdaptor is AdaptorBase, Ownable {
         }
     }
 
-    
     function _supplyChecksAndApprove(
         ICurvePool curve,
         uint256 NCoins,
@@ -277,7 +291,6 @@ contract CurveNGAdaptor is AdaptorBase, Ownable {
         }
     }
 
-    
     function _withdrawChecksAndApprove(
         ICurvePool curve,
         uint24 inAssetId,
@@ -306,8 +319,6 @@ contract CurveNGAdaptor is AdaptorBase, Ownable {
     /////////////////////////////
     ////// Getter func. /////////
     /////////////////////////////
-    /// @dev Commenting out to reduce local variables
-    /**
     function getPoolCoinsAndIndexes(
         address pool
     )
@@ -341,13 +352,11 @@ contract CurveNGAdaptor is AdaptorBase, Ownable {
             }
         } while (success);
     }
-    */
 
     /////////////////////////////
     /// Internal func. /////////
     /////////////////////////////
 
-    
     // Two pool functions
     function _calcLPTokens2CoinPool(
         ICurvePool curve,
@@ -356,10 +365,9 @@ contract CurveNGAdaptor is AdaptorBase, Ownable {
     ) internal view returns (uint256) {
         // using static `amounts` array as expected by curePool contract
         // uint256[2] memory amounts = [inValues[0], inValues[1]];
-        curve.calc_token_amount([inValues[0], inValues[1]], isDeposit);
+        return curve.calc_token_amount([inValues[0], inValues[1]], isDeposit);
     }
 
-    
     function _addLiquidity2CoinPool(
         ICurvePool curve,
         uint256[] memory inValues,
@@ -377,7 +385,6 @@ contract CurveNGAdaptor is AdaptorBase, Ownable {
             );
     }
 
-    
     function _calcWithdrawOneCoin(
         ICurvePool curve,
         uint256 burnAmount,
@@ -402,7 +409,6 @@ contract CurveNGAdaptor is AdaptorBase, Ownable {
         return coinsReceived;
     }
 
-    
     function _withdrawLiquiditySingle2CoinPool(
         ICurvePool curve,
         uint256 withdrawLPTokens,
