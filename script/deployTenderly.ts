@@ -89,6 +89,11 @@ const deployAdaptors = async (pool, chainParams, adpParams, wallet, client) => {
   ]);
   console.log("LidoAdapter deployed:", lido.address);
   await addAdpatorSupport(pool, lido.address, true, client, wallet);
+
+  const curve = await hre.viem.deployContract("CurveNGAdaptor", [
+    pool
+  ]);
+  await addAdpatorSupport(pool, curve.address, true, client, wallet);
 }
 
 const addAdpatorSupport = async (pool, adpAddress, enable, client, wallet) => {
@@ -147,8 +152,46 @@ const fundPaymaster = async (paymaster, amount, wallet, client) => {
   }
 }
 
-const main = async () => {
+const addAssetsAndRevokers = async (poolProxy, chainParams, commonParams, client) => {
+  try {
+    //@ts-ignore
+    const hash = await wallet.writeContract({
+      address: poolProxy.address,
+      abi: poolAbi,
+      functionName: "addAssets",
+      args: [chainParams.initAssetType, chainParams.initAssetAddresses],
+    });
 
+    const rct = await client.waitForTransactionReceipt({ hash });
+    console.log("rct:addAsset", rct.status);
+
+    for (let i = 0; i < commonParams.revokers.length; i++) {
+      const revokerPublicKey = commonParams.revokers[i].revokerPublicKey;
+      const encryptionPublicKey = commonParams.revokers[i].encryptionPublicKey;
+      const revokerName = commonParams.revokers[i].name;
+      const revokerDescription = commonParams.revokers[i].description;
+      const metadata = encodeAbiParameters(
+        parseAbiParameters("string name, string description"),
+        [revokerName, revokerDescription]
+      );
+
+      //@ts-ignore
+      const hash = await wallet.writeContract({
+        address: poolProxy.address,
+        abi: poolAbi,
+        functionName: "registerRevoker",
+        args: [revokerPublicKey, encryptionPublicKey, metadata],
+      });
+
+      const rct = await client.waitForTransactionReceipt({ hash });
+      console.log("rct:revokerAdd", rct.status);
+    }
+  } catch (error) {
+    console.log(error.message);
+  }
+}
+
+const main = async () => {
   // const labyrinthChain = defineChainViem();
   const client = await hre.viem.getPublicClient();
   const chainId = await client.getChainId();
@@ -159,7 +202,6 @@ const main = async () => {
   const wallets = await hre.viem.getWalletClients();
   const wallet = wallets[0];
   const [walletAddress] = await wallet.getAddresses();
-
   const eip712 = await hre.viem.deployContract("EIP712");
   // const eip712Rct = await client.waitForTransactionReceipt({ hash: eip712.address });
   // await tenderly.verify({
@@ -262,49 +304,7 @@ const main = async () => {
   await fundPaymaster(paymaster.address, "20", wallet, client);
 
   // Asset & Revoker Setup
-  //@ts-ignore
-  const owner = await client.readContract({
-    address: poolProxy.address,
-    abi: poolAbi,
-    functionName: "owner",
-  });
-
-  try {
-    //@ts-ignore
-    const hash = await wallet.writeContract({
-      address: poolProxy.address,
-      abi: poolAbi,
-      functionName: "addAssets",
-      args: [chainParams.initAssetType, chainParams.initAssetAddresses],
-    });
-
-    const rct = await client.waitForTransactionReceipt({ hash });
-    console.log("rct:addAsset", rct.status);
-
-    for (let i = 0; i < commonParams.revokers.length; i++) {
-      const revokerPublicKey = commonParams.revokers[i].revokerPublicKey;
-      const encryptionPublicKey = commonParams.revokers[i].encryptionPublicKey;
-      const revokerName = commonParams.revokers[i].name;
-      const revokerDescription = commonParams.revokers[i].description;
-      const metadata = encodeAbiParameters(
-        parseAbiParameters("string name, string description"),
-        [revokerName, revokerDescription]
-      );
-
-      //@ts-ignore
-      const hash = await wallet.writeContract({
-        address: poolProxy.address,
-        abi: poolAbi,
-        functionName: "registerRevoker",
-        args: [revokerPublicKey, encryptionPublicKey, metadata],
-      });
-
-      const rct = await client.waitForTransactionReceipt({ hash });
-      console.log("rct:revokerAdd", rct.status);
-    }
-  } catch (error) {
-    console.log(error.message);
-  }
+  await addAssetsAndRevokers(poolProxy.address, chainParams, commonParams, client);
 };
 
 main().catch(console.error);
