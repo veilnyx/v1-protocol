@@ -2,7 +2,6 @@
 pragma solidity 0.8.24;
 
 interface IStaticAToken {
-
     function aToken() external view returns (address);
 
     /**
