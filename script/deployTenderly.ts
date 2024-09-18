@@ -93,6 +93,7 @@ const deployAdaptors = async (pool, chainParams, adpParams, wallet, client) => {
   const curve = await hre.viem.deployContract("CurveNGAdaptor", [
     pool
   ]);
+  console.log("CurveNGAdp deployed:", curve.address);
   await addAdpatorSupport(pool, curve.address, true, client, wallet);
 }
 
@@ -152,7 +153,7 @@ const fundPaymaster = async (paymaster, amount, wallet, client) => {
   }
 }
 
-const addAssetsAndRevokers = async (poolProxy, chainParams, commonParams, client) => {
+const addAssetsAndRevokers = async (poolProxy, chainParams, commonParams, client, wallet) => {
   try {
     //@ts-ignore
     const hash = await wallet.writeContract({
@@ -304,7 +305,7 @@ const main = async () => {
   await fundPaymaster(paymaster.address, "20", wallet, client);
 
   // Asset & Revoker Setup
-  await addAssetsAndRevokers(poolProxy.address, chainParams, commonParams, client);
+  await addAssetsAndRevokers(poolProxy.address, chainParams, commonParams, client, wallet);
 };
 
 main().catch(console.error);
