@@ -16,7 +16,6 @@ import {MockPool} from "test/mocks/MockPool.sol";
 import {MockScreener} from "test/mocks/MockScreener.sol";
 import {MockERC20} from "test/mocks/MockERC20.sol";
 import {BaseTest} from "./BaseTest.sol";
-import {console2} from "forge-std/console2.sol";
 
 contract PoolBaseTest is BaseTest {
     bytes32 private constant TYPE_HASH =
@@ -96,8 +95,6 @@ contract PoolBaseTest is BaseTest {
         bytes32 hashTypedData = _getHashTypedRegisterAddressStruct(
             shieldedAddress
         );
-        console2.log("Hash Typed Data in test:");
-        console2.logBytes32(hashTypedData);
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(userPK, hashTypedData);
         return abi.encodePacked(r, s, v);
     }

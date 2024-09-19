@@ -9,6 +9,7 @@ import {
   parseEther,
   size,
   sliceHex,
+  stringToHex,
   stringToBytes,
 } from "viem";
 import { ShieldedAccount } from "@zkfi-tech/account";
@@ -19,8 +20,9 @@ import {
 } from "@zkfi-tech/shared-types";
 import { Core } from "@zkfi-tech/core";
 import { ZTransaction } from "@zkfi-tech/zk-prover";
-import { Note, SIZE_KEY_MEMO } from "@zkfi-tech/transaction";
+import { Note, SIZE_ENCRYPTED_DECRYPTION_KEY, SIZE_FULLY_ENCRYPTED_NOTE_DATA } from "@zkfi-tech/transaction";
 import config from "../config.json";
+import test from 'node:test';
 
 const senderSeed = BigInt(config.sender.seed);
 const receiverSeed = BigInt(config.receiver.seed);
@@ -36,6 +38,10 @@ const assets = {
   weth: config.assets.weth,
   usdc: config.assets.usdc,
   reentrantToken: config.assets.reentrantToken,
+  testnetWeth: config.assets.testnetWeth,
+  testnetUsdc: config.assets.testnetUsdc,
+  testnetUsdt: config.assets.testnetUsdt,
+  testnetCrvUsd: config.assets.testnetCrvUsd,
 };
 
 const revokerPublicKey = Point.fromArray([
@@ -171,40 +177,39 @@ export async function mockNotes(depositName: string, sdk: Core) {
     "utf-8"
   ) as Hex;
   const ztx = ZTransaction.decode(encoded) as any;
+  // let notesMemo: Hex = stringToHex(ztx.notesMemo);
   const revokerData = await sdk.getRevokerData(0);
   const revokerPublicKey = revokerData.revokerPublicKey;
   // Parse encrypted data
   const [encryptedRefundDataKey, ...encryptedNotesKeys] = splitToChunks(
     ztx.keysMemo,
-    SIZE_KEY_MEMO
+    SIZE_ENCRYPTED_DECRYPTION_KEY
   );
-  const encryptedNoteMemoChunks = splitToChunks(ztx.notesMemo, 32).map((v) =>
-    hexToBigInt(v)
-  );
-  const encryptedKeySeed = encryptedNoteMemoChunks.slice(0, 3);
-  const encryptedNotesDataArr = encryptedNoteMemoChunks.slice(3);
-  const numNotesData = encryptedNotesDataArr.length / 4;
-  const encryptedNotesData: bigint[][] = [];
-  for (let i = 0; i < numNotesData; i++) {
-    const start = i * 4;
-    const end = start + 4;
-    encryptedNotesData.push(encryptedNotesDataArr.slice(start, end));
-  }
-  const [encryptedRefundData, ...encryptedNotes] = encryptedNotesData;
-  // Decrypt refund data
-  const refundDataDecryptionKey = Point.generate(
-    bytesToBigInt(senderAccount.decrypt(hexToBytes(encryptedRefundDataKey)))
-  );
-  const refundData = poseidonDecrypt(
-    encryptedRefundData,
-    refundDataDecryptionKey,
-    BigInt(0),
-    2
-  );
+
+  // const encryptedNotesMemoChunks = splitToChunks(notesMemo, 32).map((v) =>
+  //   hexToBigInt(v)
+  // );
+  // const encryptedKeySeed = encryptedNotesMemoChunks.slice(0, 3);
+  // const encryptedRefundData = encryptedNotesMemoChunks.slice(3, 7);
+
+  // // Decrypt refund data
+  // const refundDataDecryptionKey = Point.generate(
+  //   bytesToBigInt(senderAccount.decrypt(hexToBytes(encryptedRefundDataKey)))
+  // );
+
+  // const refundData = poseidonDecrypt(
+  //   encryptedRefundData,
+  //   refundDataDecryptionKey,
+  //   BigInt(0),
+  //   2
+  // );
+
   // Decrypt notes
+  const encryptedNotesHex = sliceHex(ztx.notesMemo, 7 * 32); // ignoring first 3 (encrypted key seed) and 4 (encrypted refund data) chunks. The balance notesMemo are encrypted notes of (4 * 32) bytes each
+  const encryptedNotes = splitToChunks(encryptedNotesHex, SIZE_FULLY_ENCRYPTED_NOTE_DATA);
   const notes = [];
   for (let i = 0; i < encryptedNotes.length; i++) {
-    const n = Note.decrypt(encryptedNotesKeys[i], encryptedNotes[i], {
+    const n = Note.decrypt(0, encryptedNotesKeys[i], encryptedNotes[i], {
       account: senderAccount,
       revoker: revokerPublicKey,
       leafIndex: i,
@@ -213,6 +218,7 @@ export async function mockNotes(depositName: string, sdk: Core) {
       notes.push(n);
     }
   }
+  console.log("Fixture::Notes decrypted: ", notes);
   const z = Fp.from(BigInt(keccak256(stringToBytes("zero")))).val;
   for (let i = 0; i < notes.length; i++) {
     //@ts-ignore

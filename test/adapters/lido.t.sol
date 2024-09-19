@@ -2,7 +2,6 @@
 pragma solidity 0.8.24;
 pragma abicoder v2;
 
-import {BaseScript} from "script/BaseScript.sol";
 import {PoolTest} from "test/fixtures/PoolTest.sol";
 import {Pool} from "src/core/Pool.sol";
 import {ShieldedTransaction} from "src/libraries/ShieldedTransaction.sol";
@@ -14,7 +13,7 @@ import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import {Asset, AssetType} from "src/libraries/Asset.sol";
 import {console} from "forge-std/console.sol";
 
-contract LidoAdaptorTest is PoolTest, BaseScript {
+contract LidoAdaptorTest is PoolTest {
     error CheckChainConfig();
 
     LidoAdaptor lidoAdaptor;
@@ -24,7 +23,7 @@ contract LidoAdaptorTest is PoolTest, BaseScript {
     address public wstETH;
     address public WETH;
     IWToken public iWETH;
-    uint256 public constant INITIAL_SUPPLY = 1 ether;
+    uint256 public constant INITIAL_SUPPLY = 2 ether;
     uint256 public constant SWAP_AMT = 1 ether;
     address public user = 0x689EcF264657302052c3dfBD631e4c20d3ED0baB;
 
@@ -42,7 +41,7 @@ contract LidoAdaptorTest is PoolTest, BaseScript {
         wstETH = _config.initAssetAddresses()[2];
         lido = _config.lido();
         withdrawalQueueERC721 = _config.withdrawalQueueERC721();
-        if (lido == address(0)) {
+        if (lido == address(0) || stETH == address(0) || wstETH == address(0)) {
             revert CheckChainConfig();
         }
 
@@ -60,25 +59,20 @@ contract LidoAdaptorTest is PoolTest, BaseScript {
 
         // Asset & Adaptor support on Labyrinth Protocol
         address poolOwner = pool.owner();
-        vm.startPrank(poolOwner);
+        vm.prank(poolOwner);
         pool.addAdaptorSupport(address(lidoAdaptor), true);
 
-        AssetType assetType = AssetType.ERC20;
-        address[] memory assetAddresses = new address[](2);
-        assetAddresses[0] = WETH;
-        assetAddresses[1] = wstETH;
-        pool.addAssets(assetType, assetAddresses);
-        vm.stopPrank();
-
-        vm.deal(user, INITIAL_SUPPLY);
+        vm.deal(user, INITIAL_SUPPLY * 2);
         vm.startPrank(user);
         iWETH.deposit{value: INITIAL_SUPPLY}(); // wrapping eth to weth
         iWETH.approve(address(pool), INITIAL_SUPPLY); // depositing weth to pool
         ShieldedTransaction memory stxWethDeposit = _loadShieldedTransaction(
-            "deposit_1_original_weth"
+            "deposit_2_testnet_weth"
         );
         pool.transact(stxWethDeposit);
         vm.stopPrank();
+
+        _processCommitmentTreeQueue();
     }
 
     function testLidoAdaptorDeploy() external view {
@@ -93,7 +87,7 @@ contract LidoAdaptorTest is PoolTest, BaseScript {
         );
 
         ShieldedTransaction memory stxStake = _loadShieldedTransaction(
-            "stake_1_orig_weth_on_lido"
+            "stake_1_testnet_weth"
         );
         pool.transact(stxStake);
 
@@ -108,7 +102,12 @@ contract LidoAdaptorTest is PoolTest, BaseScript {
 
     /// @dev This test bypasses the Labyrinth protocol and directly tests the Lido integration from the LidoAdaptor.
     /// @dev Pls uncomment the `receive()` on the LidoAdaptor to enable this test.
+    /// @dev Will only run on Holesky testnet.
     function testWstEthUnStakingOnLidoBypassingLabyrinth() public {
+        require(
+            block.chainid == 17000,
+            "Unstaking test only on Holesky testnet"
+        );
         uint256 initialDeposit = 10 ether;
         vm.deal(address(lidoAdaptor), initialDeposit);
         vm.prank(address(lidoAdaptor));
@@ -156,12 +155,12 @@ contract LidoAdaptorTest is PoolTest, BaseScript {
         );
 
         assert(adpWstETHBalPostUnStake < adpWstETHBalBeforeUnStaking);
-        assert(IERC721(withdrawalQueueERC721).balanceOf(user) > 0);
+        assert(IERC721(withdrawalQueueERC721).balanceOf(user) > 0); // NFT received check
     }
 
     /// @dev Only allowing Lido tests to run on Holesky testnet and ETH mainnet. More chains can be added.
     function shouldTestRun() internal view returns (bool) {
-        if (block.chainid != 17000) {
+        if (block.chainid != 17000 && block.chainid != 11155111) {
             console.log(
                 "Skipping Lido adaptor tests on the current chain as Lido protocol may not be deployed. To run Lido tests, kindly run the tests on the Holesky testnet where Lido is deployed. Ref: https://docs.lido.fi/deployed-contracts/holesky"
             );

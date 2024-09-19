@@ -1,0 +1,11 @@
+{
+  "EIP712#EIP712": "0x834Edc9015b9Dc77394Cc165eA7d987AE9394CF7",
+  "adaptorHandler#AdaptorHandler": "0xcf95b66dFea4957561D5eA8594f666e7dd5792C4",
+  "assetLogic#AssetLogic": "0x55E3203c1768405B48652CC48f8cC940959Fa495",
+  "hasher#Hasher": "0x558DFd1899B9319b3c31ec6e56E4615b49f4b366",
+  "merkleTreeLogic#MerkleTreeLogic": "0x128BF6bD53bDE2eC7883892428966003bd65Ca57",
+  "queuedMerkleTreeLogic#QueuedMerkleTreeLogic": "0x272Eb3dA5A96421555f02f7175020143eA7542C9",
+  "screener#Screener": "0x62e6700c57A69FD6477e12744C6A486AF4F2bd2A",
+  "verifierRegister#VerifierRegister": "0xEccDF8AD6a00c24077120C46fC2317A5A65519C2",
+  "verifierTransact#VerifierTransact21": "0xe2828B72aB16cF5eC2c13171Bd1Eb9E68433310A"
+}

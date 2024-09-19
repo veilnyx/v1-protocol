@@ -74,14 +74,14 @@ contract LidoAdaptor is AdaptorBase {
             outAssetIds[0] = outAsset.id;
             outValues[0] = wstEthTokens;
         } else {
-            // Unstaking request
+            // Unstaking request (NFT)
             if (inAsset.assetAddress != wstEth) {
-                revert UnstakingNotSupportedForAsset(inAsset.id); // If not wEth, only wstEth is supported for claiming `unstEth` NFTs from Lido
+                revert UnstakingNotSupportedForAsset(inAsset.id); // If not wEth, only wstEth is supported for unstaking. Lido returns `unstEth` NFTs as the withdrawal req. is queued on their end.
             }
 
             address withdrawalAddress = abi.decode(payload, (address));
             if (withdrawalAddress == address(0)) {
-                revert ZeroAddress();
+                revert ZeroAddress(); // Withdraw address cannot be a Pool's addr as Lido returns `unstEth` NFTs because the withdrawal req. is queued on their end.
             }
 
             uint256[] memory amounts = new uint256[](1);
@@ -103,6 +103,6 @@ contract LidoAdaptor is AdaptorBase {
     }
 
     /// @dev only for enabling `testWstEthUnstakingOnLido()` test. Pls comment this out for production use.
-    // Allow Lido adaptor to receive unwrapped Ether
+    // Allow Lido adaptor to receive unwrapped Ether, to send to Lido for staking
     // receive() external payable {}
 }
