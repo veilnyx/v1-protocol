@@ -1,0 +1,59 @@
+{
+    "1": {
+        "uniswap": {
+            "uniswapSwapRouter02": "0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45"
+        },
+        "aave": {
+            "aave": "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2",
+            "aaveStaticTokenFactory": "0x411D79b8cC43384FDE66CaBf9b6a17180c842511",
+            "aWETH": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+            "aUSDC": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+            "staticAWETH": "0x252231882FB38481497f3C767469106297c8d93b",
+            "staticAUSDC": "0x73edDFa87C71ADdC275c2b9890f5c3a8480bC9E6"
+        },
+        "lido": {
+            "lido": "0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84",
+            "withdrawalQueueERC721": "0x889edC2eDab5f40e902b864aD4d7AdE8E412F9B1",
+            "stETH": "0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84",
+            "wstETH": "0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0"
+        }
+    },
+    "7800": {
+        "uniswap": {
+            "uniswapSwapRouter02": "0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45"
+        },
+        "aave": {
+            "aave": "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2",
+            "aaveStaticTokenFactory": "0x411D79b8cC43384FDE66CaBf9b6a17180c842511",
+            "aWETH": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+            "aUSDC": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+            "staticAWETH": "0x252231882FB38481497f3C767469106297c8d93b",
+            "staticAUSDC": "0x73edDFa87C71ADdC275c2b9890f5c3a8480bC9E6"
+        },
+        "lido": {
+            "lido": "0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84",
+            "withdrawalQueueERC721": "0x889edC2eDab5f40e902b864aD4d7AdE8E412F9B1",
+            "stETH": "0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84",
+            "wstETH": "0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0"
+        }
+    },
+    "11155111": {
+        "uniswap": {
+            "uniswapSwapRouter02": "0x3bFA4769FB09eefC5a80d6E87c3B9C650f7Ae48E"
+        },
+        "aave": {
+            "aave": "0x6Ae43d3271ff6888e7Fc43Fd7321a503ff738951",
+            "aaveStaticTokenFactory": "0xd210dFB43B694430B8d31762B5199e30c31266C8",
+            "aWETH": "0xC558DBdd856501FCd9aaF1E62eae57A9F0629a3c",
+            "aUSDC": "0x94a9D9AC8a22534E3FaCa9F4e7F2E2cf85d5E4C8",
+            "staticAWETH": "0x162B500569F42D9eCe937e6a61EDfef660A12E98",
+            "staticAUSDC": "0x8A88124522dbBF1E56352ba3DE1d9F78C143751e"
+        },
+        "lido": {
+            "lido": "0x3e3FE7dBc6B4C189E7128855dD526361c49b40Af",
+            "withdrawalQueueERC721": "0x1583C7b3f4C3B008720E6BcE5726336b0aB25fdd",
+            "stETH": "0x3e3FE7dBc6B4C189E7128855dD526361c49b40Af",
+            "wstETH": "0xB82381A3fBD3FaFA77B3a7bE693342618240067b"
+        }
+    }
+}

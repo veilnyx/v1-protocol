@@ -1,16 +1,25 @@
 import hre from "hardhat";
+// import { tenderly } from 'hardhat';
 import {
   encodeAbiParameters,
   encodeFunctionData,
   parseAbiParameters,
+  defineChain,
+  parseEther,
+  toFunctionSelector,
+  Hex
 } from "viem";
 import poolModule from "../ignition/modules/pool";
-import { loadConfigs, ChainParams, CommonParams } from "./configs";
+import { loadConfigs, ChainParams, AdaptorParams, CommonParams } from "./configs";
 import { deployHasher } from "./hasher";
 import { addInitialAssets, registerRevokers } from "./setup";
 
 const config = loadConfigs();
 const poolAbi = hre.artifacts.readArtifactSync("Pool").abi;
+const paymasterAbi = hre.artifacts.readArtifactSync("Paymaster").abi;
+const verifier21Abi = hre.artifacts.readArtifactSync("VerifierTransact21").abi;
+const verifier22Abi = hre.artifacts.readArtifactSync("VerifierTransact22").abi;
+
 
 const deployVerifier = async () => {
   const verifierRegister = await hre.viem.deployContract("VerifierRegister");
@@ -30,13 +39,13 @@ const deployVerifier = async () => {
   const txVerifierInfos = [
     {
       id: 21,
-      selector: "0x6228e166",
-      addr: verifierRegister.address
+      selector: toFunctionSelector(verifier21Abi[0]),
+      addr: verifierTransact21.address
     },
     {
       id: 22,
-      selector: "0x3cc08b24",
-      addr: verifierTreeUpdate.address
+      selector: toFunctionSelector(verifier22Abi[0]),
+      addr: verifierTransact22.address
     }
     // Add more TransactionVerifierInfo structs as needed
   ];
@@ -46,36 +55,160 @@ const deployVerifier = async () => {
     verifierRegister.address,
     verifierTreeUpdate.address,
   ]
-    /**
-    , {
-      libraries: {
-        ShieldedTransactionLogic: shieldedTransaction.address,
-      }
-    }
-     */
   );
   console.log("Verifier deployed:", verifier.address);
 
   return verifier.address;
 }
 
+const deployAdaptors = async (pool, chainParams, adpParams, wallet, client) => {
+  const { uniswap: uniswapConfig, aave: aaveConfig, lido: lidoConfig } = adpParams;
+
+  const uniswap = await hre.viem.deployContract("UniswapV3Adapter", [
+    uniswapConfig.uniswapSwapRouter02,
+    pool
+  ])
+  console.log("UniswapV3Adapter deployed:", uniswap.address);
+  await addAdpatorSupport(pool, uniswap.address, true, client, wallet);
+
+  const aave = await hre.viem.deployContract("AaveV3Adaptor", [
+    aaveConfig.aave,
+    pool,
+    aaveConfig.aaveStaticTokenFactory
+  ]);
+  console.log("AaveV3Adapter deployed:", aave.address);
+  await addAdpatorSupport(pool, aave.address, true, client, wallet);
+
+  const lido = await hre.viem.deployContract("LidoAdaptor", [
+    lidoConfig.lido,
+    chainParams.initAssetAddresses[0], // wETH
+    lidoConfig.stETH, // stETH
+    lidoConfig.wstETH, // wstETH
+    lidoConfig.withdrawalQueueERC721,
+    pool
+  ]);
+  console.log("LidoAdapter deployed:", lido.address);
+  await addAdpatorSupport(pool, lido.address, true, client, wallet);
+
+  const curve = await hre.viem.deployContract("CurveNGAdaptor", [
+    pool
+  ]);
+  console.log("CurveNGAdp deployed:", curve.address);
+  await addAdpatorSupport(pool, curve.address, true, client, wallet);
+}
+
+const addAdpatorSupport = async (pool, adpAddress, enable, client, wallet) => {
+  try {
+    //@ts-ignore
+    const hash = await wallet.writeContract({
+      address: pool,
+      abi: poolAbi,
+      functionName: "addAdaptorSupport",
+      args: [adpAddress, enable]
+    });
+
+    const rct = await client.waitForTransactionReceipt({ hash });
+    console.log("rct:addAdpSupport", rct.status);
+  } catch (error) {
+    console.log("Error supporting adp");
+    console.log(error.message);
+  }
+}
+
+const defineChainViem = () => {
+  const labyrinthChain = defineChain({
+    name: "Labyrinth Mainnet Simulation v1.0",
+    id: 7800,
+    nativeCurrency: {
+      decimals: 18,
+      name: 'Ether',
+      symbol: 'ETH',
+    },
+    rpcUrls: {
+      default: {
+        http: [process.env.RPC_TENDERLY_MAINNET as string]
+      },
+    },
+  });
+
+  return labyrinthChain;
+}
+
+const fundPaymaster = async (paymaster, amount, wallet, client) => {
+  try {
+    //@ts-ignore
+    const hash = await wallet.writeContract({
+      address: paymaster,
+      abi: paymasterAbi,
+      functionName: "depositToEntryPoint",
+      args: [],
+      value: parseEther(amount),
+    });
+
+    const rct = await client.waitForTransactionReceipt({ hash });
+    console.log("rct:paymasterFunded", rct.status);
+  } catch (error) {
+    console.log("Error funding paymaster");
+    console.log(error.message);
+  }
+}
+
+const addAssetsAndRevokers = async (poolProxy, chainParams, commonParams, client, wallet) => {
+  try {
+    //@ts-ignore
+    const hash = await wallet.writeContract({
+      address: poolProxy,
+      abi: poolAbi,
+      functionName: "addAssets",
+      args: [chainParams.initAssetType, chainParams.initAssetAddresses],
+    });
+
+    const rct = await client.waitForTransactionReceipt({ hash });
+    console.log("rct:addAsset", rct.status);
+
+    for (let i = 0; i < commonParams.revokers.length; i++) {
+      const revokerPublicKey = commonParams.revokers[i].revokerPublicKey;
+      const encryptionPublicKey = commonParams.revokers[i].encryptionPublicKey;
+      const revokerName = commonParams.revokers[i].name;
+      const revokerDescription = commonParams.revokers[i].description;
+      const metadata = encodeAbiParameters(
+        parseAbiParameters("string name, string description"),
+        [revokerName, revokerDescription]
+      );
+
+      //@ts-ignore
+      const hash = await wallet.writeContract({
+        address: poolProxy,
+        abi: poolAbi,
+        functionName: "registerRevoker",
+        args: [revokerPublicKey, encryptionPublicKey, metadata],
+      });
+
+      const rct = await client.waitForTransactionReceipt({ hash });
+      console.log("rct:revokerAdd", rct.status);
+    }
+  } catch (error) {
+    console.log(error.message);
+  }
+}
+
 const main = async () => {
+  // const labyrinthChain = defineChainViem();
   const client = await hre.viem.getPublicClient();
   const chainId = await client.getChainId();
   const commonParams = config.common as CommonParams;
+  const adpParams = config.adpConfig[chainId] as AdaptorParams;
   const chainParams = config[chainId] as ChainParams;
 
   const wallets = await hre.viem.getWalletClients();
   const wallet = wallets[0];
   const [walletAddress] = await wallet.getAddresses();
-
-  // const address = await hre.viem.deployContract("Address");
-  // const safeERC20 = await hre.viem.deployContract("SafeERC20", [], {
-  //   libraries: {
-  //     Address: address.address,
-  //   }
-  // });
   const eip712 = await hre.viem.deployContract("EIP712");
+  // const eip712Rct = await client.waitForTransactionReceipt({ hash: eip712.address });
+  // await tenderly.verify({
+  //   address: eip712Rct.contractAddress,
+  //   name: "EIP712",
+  // });
   console.log("EIP712 deployed:", eip712.address);
   const asset = await hre.viem.deployContract("AssetLogic");
   console.log("AssetLogic deployed:", asset.address);
@@ -109,12 +242,6 @@ const main = async () => {
     }
   );
   console.log("ShieldedTransactionLogic deployed:", shieldedTransaction.address);
-
-  // const adaptorHandler = await hre.viem.deployContract("AdaptorHandler", [], {
-  //   libraries: {
-  //     SafeERC20: safeERC20.address,
-  //   }
-  // });
   const adaptorHandler = await hre.viem.deployContract("AdaptorHandler");
   console.log("AdaptorHandler deployed: ", adaptorHandler.address);
 
@@ -158,51 +285,27 @@ const main = async () => {
   ]);
   console.log("PoolProxy deployed:", poolProxy.address);
 
-  /**
-  //@ts-ignore
-  const owner = await client.readContract({
-    address: poolProxy.address,
-    abi: poolAbi,
-    functionName: "owner",
-  });
+  // Deploy Adaptors 
+  await deployAdaptors(poolProxy.address, chainParams, adpParams, wallet, client);
 
-  try {
-    //@ts-ignore
-    const hash = await wallet.writeContract({
-      address: poolProxy.address,
-      abi: poolAbi,
-      functionName: "addAssets",
-      args: [chainParams.initAssetType, chainParams.initAssetAddresses],
-    });
+  // ERC4337 infra setup
+  const gateway = await hre.viem.deployContract("Gateway", [
+    chainParams.entryPoint,
+    chainParams.wToken,
+    poolProxy.address,
+  ]);
+  console.log("Gateway deployed:", gateway.address);
 
-    const rct = await client.waitForTransactionReceipt({ hash });
-    console.log("rct", rct.status);
+  const paymaster = await hre.viem.deployContract("Paymaster", [
+    chainParams.entryPoint,
+    gateway.address,
+  ]);
+  console.log("Paymaster deployed:", paymaster.address);
 
-    for (let i = 0; i < commonParams.revokers.length; i++) {
-      const revokerPublicKey = commonParams.revokers[i].revokerPublicKey;
-      const encryptionPublicKey = commonParams.revokers[i].encryptionPublicKey;
-      const revokerName = commonParams.revokers[i].name;
-      const revokerDescription = commonParams.revokers[i].description;
-      const metadata = encodeAbiParameters(
-        parseAbiParameters("string name, string description"),
-        [revokerName, revokerDescription]
-      );
+  await fundPaymaster(paymaster.address, "20", wallet, client);
 
-      //@ts-ignore
-      const hash = await wallet.writeContract({
-        address: poolProxy.address,
-        abi: poolAbi,
-        functionName: "registerRevoker",
-        args: [revokerPublicKey, encryptionPublicKey, metadata],
-      });
-
-      const rct = await client.waitForTransactionReceipt({ hash });
-      console.log("rct:revokerAdd", rct.status);
-    }
-  } catch (error) {
-    console.log(error.message);
-  }
-     */
+  // Asset & Revoker Setup
+  await addAssetsAndRevokers(poolProxy.address, chainParams, commonParams, client, wallet);
 };
 
 main().catch(console.error);
