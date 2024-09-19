@@ -157,7 +157,7 @@ const addAssetsAndRevokers = async (poolProxy, chainParams, commonParams, client
   try {
     //@ts-ignore
     const hash = await wallet.writeContract({
-      address: poolProxy.address,
+      address: poolProxy,
       abi: poolAbi,
       functionName: "addAssets",
       args: [chainParams.initAssetType, chainParams.initAssetAddresses],
@@ -178,7 +178,7 @@ const addAssetsAndRevokers = async (poolProxy, chainParams, commonParams, client
 
       //@ts-ignore
       const hash = await wallet.writeContract({
-        address: poolProxy.address,
+        address: poolProxy,
         abi: poolAbi,
         functionName: "registerRevoker",
         args: [revokerPublicKey, encryptionPublicKey, metadata],
