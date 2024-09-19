@@ -23,7 +23,7 @@ interface ICurvePool {
     ///////////////////////////////////
     /////// Withdraw functions ///////
     /////////////////////////////////
-
+    
     /// @notice Withdraw underlying tokens in a balanced ratio from a 2 coin pool.
     function remove_liquidity(
         uint256 _burn_amount,
@@ -32,7 +32,7 @@ interface ICurvePool {
     ) external returns (uint256[2] memory coinsReceived);
 
     /// @notice Withdraw underlying tokens in a balanced ration from a 3 coin pool.
-    function remove_liquidity(
+     function remove_liquidity(
         uint256 _burn_amount,
         uint256[3] memory _min_amounts,
         address receiver
@@ -57,8 +57,8 @@ interface ICurvePool {
     ) external returns (uint256);
 
     /// @notice Function to withdraw a single coin in return of the pool lp token for both 2 & 3 coin pool.
-    /// @dev This function has the common func. signature for both 2 & 3 coin pools.
-    function remove_liquidity_one_coin(
+    /// @dev This function has the common func. signature for both 2 & 3 coin pools. 
+      function remove_liquidity_one_coin(
         uint256 _burn_amount,
         int128 i,
         uint256 _min_received,

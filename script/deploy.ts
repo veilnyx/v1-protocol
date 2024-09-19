@@ -28,6 +28,8 @@ const main1 = async () => {
   const queuedMerkleTree = await hre.viem.deployContract(
     "QueuedMerkleTreeLogic"
   );
+
+  
   const shieldedAddress = await hre.viem.deployContract(
     "ShieldedAddressLogic",
     [],
@@ -157,6 +159,7 @@ const main = async () => {
     parameters,
   });
   const poolAddress = poolProxy.address;
+  console.log("Pool deployed at:", poolAddress);
 
   // SETUP ASSETS
   //   await addInitialAssets(poolAddress);

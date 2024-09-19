@@ -5,7 +5,6 @@ import {Test, console} from "forge-std/Test.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {ShieldedTransaction} from "src/libraries/ShieldedTransaction.sol";
 import {PoolTest} from "test/fixtures/PoolTest.sol";
-import {MockERC20ForReentrancyTest} from "test/mocks/MockERC20ForReentrancyTest.sol";
 import {MockAttacker} from "test/mocks/MockAttacker.t.sol";
 import {Asset, AssetType} from "src/libraries/Asset.sol";
 import {TreeUpdateData} from "src/libraries/QueuedMerkleTree.sol";
@@ -15,7 +14,6 @@ contract PoolReentrancyTest is PoolTest {
     using MerkleTreeLogic for MerkleTree;
 
     ShieldedTransaction attackerWithdrawStx;
-    MockERC20ForReentrancyTest tokenReent;
     MockAttacker attacker;
     Asset assetReent;
     uint256 constant INITIAL_DEPOSIT = 1000 ether;
@@ -23,9 +21,6 @@ contract PoolReentrancyTest is PoolTest {
     function setUp() public {
         _setUp();
         _helperTree.init(fixture.commitmentTreeDepth, address(hasher));
-
-        // Deploying the ERC20 token for testing reentrancy attack
-        tokenReent = new MockERC20ForReentrancyTest(address(this));
 
         AssetType assetType = AssetType.ERC20;
         address[] memory assetAddresses = new address[](1);

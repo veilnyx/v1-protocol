@@ -31,6 +31,10 @@ const config: HardhatUserConfig = {
       url: rpcEthereumSepolia,
       accounts: privateKeys,
     },
+    tenderlyMainnet:{
+      url: rpcTenderlyMainnet,
+      accounts: privateKeys,
+    },
     optimismSepolia: {
       url: rpcOptimismSepolia,
       accounts: privateKeys,

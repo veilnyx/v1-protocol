@@ -19,20 +19,35 @@ export const deployHasher = async (wallet, client) => {
 
   const bytecodes = [poseidonT3Code, poseidonT4Code];
 
-  const hashPoseidonT3 = await wallet.deployContract({
+ const hashPoseidonT3 = await wallet.deployContract({
     bytecode: poseidonT3Code,
     abi: [],
     account: address
   });
-
+  
   const receiptPT3 = await client.waitForTransactionReceipt({ hash: hashPoseidonT3 });
 
   const hashPoseidonT4 = await wallet.deployContract({
-    bytecode: poseidonT4Code,
+    bytescode: poseidonT4Code,
     abi: [],
-    account: address
+    account:address
   });
   const receiptPT4 = await client.waitForTransactionReceipt({ hash: hashPoseidonT4 });
+  
+  // const hashes = await Promise.all(
+  //   bytecodes.map((bytecode) => {
+  //     //@ts-ignore
+  //     return wallet.deployContract({
+  //       bytecode,
+  //       abi: [],
+  //       account: address,
+  //     });
+  //   })
+  // );
+
+  // const receipts = await Promise.all(
+  //   hashes.map((hash) => client.waitForTransactionReceipt({ hash }))
+  // );
 
   const poseidonT3 = receiptPT3.contractAddress;
   console.log("PoseidonT3 deployed:", poseidonT3);

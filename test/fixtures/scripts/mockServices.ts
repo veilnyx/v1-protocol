@@ -33,6 +33,7 @@ export class MockAddressResolver implements IAddressResolver {
 
 export class MockTreeSource implements ITreeSource {
   private _tree: MerkleTree;
+  lastUpdatedLeafIndex = 2**32;
 
   constructor(tree: MerkleTree) {
     this._tree = tree;

@@ -10,7 +10,6 @@ import {ISwapRouter02} from "./ISwapRouter02.sol";
 contract UniswapV3Adapter is AdaptorBase {
     // Errors //
     error MultiAssetSwap();
-    error ZeroValues();
 
     ISwapRouter02 public immutable swapRouter02;
     uint24 public constant feeTier = 3000;
@@ -37,7 +36,7 @@ contract UniswapV3Adapter is AdaptorBase {
         }
 
         if (inValues[0] == 0) {
-            revert ZeroValues();
+            revert ZeroValue();
         } else {
             inValue = inValues[0];
         }

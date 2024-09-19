@@ -311,7 +311,7 @@ library ShieldedTransactionLogic {
 
         _receivePubAssets(assets, outPubAssets, adaptorHandler);
 
-        /// @dev Creating commitments and output noteMemos for received tokens. This is done on the protocol side for CONVERT txns because the exact value of converted tokens can only be determined after executing the CONVERT tx.
+        /// @dev Creating commitments and output noteMemos for received tokens. This is done on the protocol side for CALL_ADAPTOR txns because the exact value of converted tokens can only be determined after executing the tx.
         /// @dev `refundAddress` is used as the recipient's blinded address.
         /// @dev `refundAddressMemo` contains the encrypted blinding factor which can only be decrypted by the owner of `refundAddress`. This blinding needs to be submitted as a proof to prove ownership over the refund notes.
         uint256 outLen = outPubAssets.length;
