@@ -35,13 +35,13 @@ contract BeefyV7Adaptor is AdaptorBase {
         outValues = new uint256[](1);
 
         if (action == uint8(Action.DEPOSIT)) {
-            /* (outAssetId[0], outValues[0]) = */ _deposit(
+            (outAssetIds[0], outValues[0]) = _deposit(
                 inAssetIds[0],
                 inValues[0],
                 vault
             );
         } else if (action == uint8(Action.WITHDRAW)) {
-            /* (outAssetId[0], outValues[0]) = */ _withdraw(
+            (outAssetIds[0], outValues[0]) = _withdraw(
                 inAssetIds[0],
                 inValues[0],
                 vault
@@ -55,7 +55,7 @@ contract BeefyV7Adaptor is AdaptorBase {
         uint24 inAssetId,
         uint256 inValue,
         address vault
-    ) internal /* returns (uint24 inAssetId, uint256 inValue)*/ {
+    ) internal returns (uint24 outAssetId, uint256 outValue) {
         Asset memory inAsset = getAsset(inAssetId);
         address wantToken = IBeefyVault(vault).want();
 
@@ -63,28 +63,47 @@ contract BeefyV7Adaptor is AdaptorBase {
             revert ZeroValue();
         }
 
-        if (inAsset.assetAddress != wantToken) {
-            revert UnsupportedAsset(inAsset.id);
-        }
-
         if (IERC20(inAsset.assetAddress).balanceOf(address(this)) < inValue) {
             revert InsufficientBalance();
+        }
+
+        if (inAsset.assetAddress != wantToken) {
+            revert UnsupportedAsset(inAsset.id);
         }
 
         IERC20(inAsset.assetAddress).forceApprove(vault, inValue);
         IBeefyVault(vault).deposit(inValue);
 
-        console2.log(
-            "Beefy mooToken shares received:",
-            IERC20(vault).balanceOf(address(this))
-        );
+        outAssetId = getAsset(vault).id;
+        outValue = IERC20(vault).balanceOf(address(this));
+        return (outAssetId, outValue);
     }
 
     function _withdraw(
         uint24 inAssetId,
         uint256 inValue,
         address vault
-    ) internal /* returns (uint24 inAssetId, uint256 inValue)*/ {
+    ) internal returns (uint24 outAssetId, uint256 outValue) {
+        Asset memory inAsset = getAsset(inAssetId);
+        address wantToken = IBeefyVault(vault).want();
 
+        if (inValue == 0) {
+            revert ZeroValue();
+        }
+
+        if (IERC20(inAsset.assetAddress).balanceOf(address(this)) < inValue) {
+            revert InsufficientBalance();
+        }
+
+        if (inAsset.assetAddress != vault) {
+            revert UnsupportedAsset(inAsset.id);
+        }
+
+        IERC20(inAsset.assetAddress).forceApprove(vault, inValue);
+        IBeefyVault(vault).withdraw(inValue);
+
+        outAssetId = getAsset(wantToken).id;
+        outValue = IERC20(wantToken).balanceOf(address(this));
+        return (outAssetId, outValue);
     }
 }

@@ -74,6 +74,35 @@ contract BeefyAdaptorTest is PoolTest {
         assert(mooTokenBal > 0);
     }
 
+    function testWithdrawInBeefyVault() public {
+        console.log("Initiating withdraw on Beefy");
+        vm.startPrank(user);
+        deal(mooToken, user, INITIAL_SUPPLY);
+        IERC20(mooToken).transfer(address(beefyAdp), INITIAL_SUPPLY);
+
+        uint24[] memory inAssetIds = new uint24[](1);
+        inAssetIds[0] = pool.getAsset(mooToken).id;
+        uint256[] memory inValues = new uint256[](1);
+        inValues[0] = INITIAL_SUPPLY;
+        bytes memory payload = abi.encode(uint8(1), beefyVault);
+
+        // Supplying
+        beefyAdp.handleAssets({
+            inAssetIds: inAssetIds,
+            inValues: inValues,
+            payload: payload
+        });
+        vm.stopPrank();
+        console.log("Withdrawing done!");
+        uint256 lpTokenBal = IERC20(wantLPToken).balanceOf(
+            address(beefyAdp)
+        );
+        console.log("lpToken received:", lpTokenBal);
+        assert(lpTokenBal > 0);
+    }
+
+    /**
+
     /**
     function testsUSDeUnStakingOnEthena() public {
         console.log("Initiating unstaking on Ethena");
