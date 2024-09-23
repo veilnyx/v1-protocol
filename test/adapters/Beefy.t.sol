@@ -5,83 +5,81 @@ pragma abicoder v2;
 import {PoolTest} from "test/fixtures/PoolTest.sol";
 import {Pool} from "src/core/Pool.sol";
 import {ShieldedTransaction} from "src/libraries/ShieldedTransaction.sol";
-import {EthenaAdaptor} from "src/adaptors/ETHENA/EthenaAdaptor.sol";
+import {BeefyV7Adaptor as BeefyAdp} from "src/adaptors/beefy-v7/BeefyV7Adaptor.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Asset, AssetType} from "src/libraries/Asset.sol";
-import {IEthena} from "src/adaptors/Ethena/IEthena.sol";
-import {console} from "forge-std/console.sol";
+import {console} from "forge-std/Test.sol";
 
-contract EthenaAdaptorTest is PoolTest {
+contract BeefyAdaptorTest is PoolTest {
     error CheckChainConfig();
 
-    EthenaAdaptor ethenaAdaptor;
-    address uniswapSwapRouter02;
-    address public constant USDe = 0x4c9EDD5852cd905f086C759E8383e09bff1E68B3;
-    address public constant sUSDe = 0x9D39A5DE30e57443BfF2A8307A4256c8797A3497;
-    address public constant ETHENA = 0x9D39A5DE30e57443BfF2A8307A4256c8797A3497;
-    uint256 public constant WETH_INITIAL_SUPPLY = 1 ether;
-    uint256 public constant INITIAL_SUPPLY = 2e6;
+    BeefyAdp beefyAdp;
+    address public constant wantLPToken = 0xb819feeF8F0fcDC268AfE14162983A69f6BF179E;
+    address public constant mooToken = 0x92A14518434a46E88CB4C3918AD33B3344099E02;
+    address public constant beefyVault = 0x92A14518434a46E88CB4C3918AD33B3344099E02;
     address public user = 0x689EcF264657302052c3dfBD631e4c20d3ED0baB;
+    uint256 public constant INITIAL_SUPPLY = 2e6;
 
     function setUp() external {
-        require(shouldTestRun(), "EthenaAdaptorTest: Chain not supported");
+        require(shouldTestRun(), "BeefyAdpTest: Chain not supported");
         PoolTest._setUp();
 
         // deploying Ethena adaptor
-        ethenaAdaptor = new EthenaAdaptor(ETHENA, USDe, sUSDe, address(pool));
+        beefyAdp = new BeefyAdp(address(pool));
 
         /// @dev update convert req fixture with this adaptor addr as `to`
-        console.log("Ethena adaptor deployed:", address(ethenaAdaptor));
+        console.log("Beefy adaptor deployed:", address(beefyAdp));
 
         // Asset & Adaptor support on Labyrinth Protocol
         address poolOwner = pool.owner();
         vm.startPrank(poolOwner);
-        pool.addAdaptorSupport(address(ethenaAdaptor), true);
+        pool.addAdaptorSupport(address(beefyAdp), true);
 
         AssetType assetType = AssetType.ERC20;
         address[] memory assetAddresses = new address[](2);
-        assetAddresses[0] = USDe;
-        assetAddresses[1] = sUSDe;
+        assetAddresses[0] = wantLPToken;
+        assetAddresses[1] = mooToken;
         pool.addAssets(assetType, assetAddresses);
         vm.stopPrank();
     }
 
-    function testEthenaAdaptorDeploy() external view {
-        assert(address(ethenaAdaptor) != address(0));
+    function testBeefyAdaptorDeploy() external view {
+        assert(address(beefyAdp) != address(0));
     }
 
-    function testUSDeStakingOnEthena() public {
-        console.log("Initiating staking on Ethena");
+    function testDepositInBeefyVault() public {
+        console.log("Initiating supply on Beefy");
         vm.startPrank(user);
-        deal(USDe, user, INITIAL_SUPPLY);
-        IERC20(USDe).approve(address(pool), INITIAL_SUPPLY);
-        ShieldedTransaction memory ztxDeposit = _loadShieldedTransaction(
-            "deposit_2_original_usde"
-        );
-        pool.transact(ztxDeposit);
+        deal(wantLPToken, user, INITIAL_SUPPLY);
+        IERC20(wantLPToken).transfer(address(beefyAdp), INITIAL_SUPPLY);
 
-        uint256 poolsUSDeBalBeforeStaking = IERC20(sUSDe).balanceOf(
-            address(pool)
-        );
+        uint24[] memory inAssetIds = new uint24[](1);
+        inAssetIds[0] = pool.getAsset(wantLPToken).id;
+        uint256[] memory inValues = new uint256[](1);
+        inValues[0] = INITIAL_SUPPLY;
+        bytes memory payload = abi.encode(uint8(0), beefyVault);
 
-        ShieldedTransaction memory ztxStake = _loadShieldedTransaction(
-            "stake_2_orig_usde_on_ethena"
-        );
-        pool.transact(ztxStake);
+        // Supplying
+        beefyAdp.handleAssets({
+            inAssetIds: inAssetIds,
+            inValues: inValues,
+            payload: payload
+        });
         vm.stopPrank();
-
-        // Asserts
-        uint256 poolsUSDeBalPostStake = IERC20(sUSDe).balanceOf(address(pool));
-        console.log("Pool sUSDe bal before swap:", poolsUSDeBalBeforeStaking);
-        console.log("Pool sUSDe bal after swap:", poolsUSDeBalPostStake);
-        assert(poolsUSDeBalPostStake > poolsUSDeBalBeforeStaking);
+        console.log("Staking done!");
+        uint256 mooTokenBal = IERC20(mooToken).balanceOf(
+            address(beefyAdp)
+        );
+        console.log("mooTokens received:", mooTokenBal);
+        assert(mooTokenBal > 0);
     }
 
+    /**
     function testsUSDeUnStakingOnEthena() public {
         console.log("Initiating unstaking on Ethena");
         vm.startPrank(user);
         deal(USDe, user, INITIAL_SUPPLY);
-        IERC20(USDe).transfer(address(ethenaAdaptor), INITIAL_SUPPLY);
+        IERC20(USDe).transfer(address(beefyAdp), INITIAL_SUPPLY);
 
         uint24[] memory inAssetIds = new uint24[](1);
         inAssetIds[0] = pool.getAsset(USDe).id;
@@ -90,7 +88,7 @@ contract EthenaAdaptorTest is PoolTest {
         inValues[0] = INITIAL_SUPPLY;
 
         // Staking
-        ethenaAdaptor.handleAssets({
+        beefyAdp.handleAssets({
             inAssetIds: inAssetIds,
             inValues: inValues,
             payload: abi.encode(address(0))
@@ -98,7 +96,7 @@ contract EthenaAdaptorTest is PoolTest {
         vm.stopPrank();
         console.log("Staking done!");
         uint256 sUSDeBalAfterStaking = IERC20(sUSDe).balanceOf(
-            address(ethenaAdaptor)
+            address(beefyAdp)
         );
         console.log("sUSDe received:", sUSDeBalAfterStaking);
 
@@ -110,7 +108,7 @@ contract EthenaAdaptorTest is PoolTest {
 
         // Unstaking
         console.log("Unstaking now!!");
-        ethenaAdaptor.handleAssets({
+        beefyAdp.handleAssets({
             inAssetIds: inAssetIds,
             inValues: inValues,
             payload: abi.encode(user)
@@ -118,7 +116,7 @@ contract EthenaAdaptorTest is PoolTest {
 
         // Asserts
         uint256 sUSDeBalPostUnStaking = IERC20(sUSDe).balanceOf(
-            address(ethenaAdaptor)
+            address(beefyAdp)
         );
         uint256 USDeBalPostUnStaking = IERC20(USDe).balanceOf(user);
         console.log("Pool sUSDe bal after unstaking:", sUSDeBalPostUnStaking);
@@ -126,12 +124,13 @@ contract EthenaAdaptorTest is PoolTest {
         assert(sUSDeBalPostUnStaking == 0);
         assert(USDeBalPostUnStaking > 0);
     }
+     */
 
     /// @dev Only allowing Lido tests to run on Holesky testnet and ETH mainnet. More chains can be added.
     function shouldTestRun() internal view returns (bool) {
         if (block.chainid != 1) {
             console.log(
-                "Skipping Ethena adaptor tests on the current chain as Ethena protocol may not be deployed. To run Ethena tests, kindly run the tests on the ETH Mainnet fork. Ref: https://ETHENA-labs.gitbook.io/ETHENA-labs/solution-design/key-addresses"
+                "Skipping Beefy adaptor tests on the current chain as Beefy protocol may not be deployed. To run Beefy tests, kindly run the tests on the ETH Mainnet fork. Ref: https://ETHENA-labs.gitbook.io/ETHENA-labs/solution-design/key-addresses"
             );
             return false;
         }

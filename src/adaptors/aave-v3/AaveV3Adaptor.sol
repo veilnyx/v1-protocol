@@ -10,8 +10,6 @@ import {IStaticAToken} from "./IStaticAToken.sol";
 import {IStaticATokenFactory} from "./IStaticATokenFactory.sol";
 import {IAToken} from "./IAToken.sol";
 
-error InsufficientBalance();
-
 contract AaveV3Adaptor is AdaptorBase {
     IAave public immutable aave;
     address public immutable STATIC_A_TOKEN_FACTORY;
