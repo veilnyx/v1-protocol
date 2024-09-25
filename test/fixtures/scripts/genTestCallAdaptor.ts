@@ -4,7 +4,7 @@ import { TransactionType } from "@zkfi-tech/shared-types";
 import { fixture, generateTestTransactions, mockNotes } from "./fixture";
 
 const {
-    assets: { testnetUsdt, testnetCrvUsd },
+    assets: { testnetUSDT, testnetCRVUSD },
     sender: { account: senderAccount, pubAddress: senderPubAddress },
     receiver: { account: receiverAccount },
 } = fixture;
@@ -88,10 +88,23 @@ export const reqs = {
         viaBundler: false,
         paymaster: zeroAddress,
     },
-    */
+    supply_2_wantLPToken: {
+        type: TransactionType.CALL_ADAPTER,
+        assetIds: [wantLPToken],
+        values: [parseEther("2")],
+        feeAssetId: 0,
+        // adaptor to which the ZkFi AdaptorHandler will call to execute swap
+        to: "0xbF71c5Ae43827387dAAF7358acAB5C81642b74b8",
+        // payload:: action: 0 (supply)
+        payload: "0x000000000000000000000000000000000000000000000000000000000000000000000000000000000000000092a14518434a46e88cb4c3918ad33b3344099e02" as `0x${string}`,
+        revokerId: 0,
+        viaBundler: false,
+        paymaster: zeroAddress,
+    }
+        */
     supply_2_usdt_crvUsd_on_curve: {
         type: TransactionType.CALL_ADAPTER,
-        assetIds: [testnetUsdt, testnetCrvUsd],
+        assetIds: [testnetUSDT, testnetCRVUSD],
         values: [parseUnits("2", 6), parseUnits("2", 6)],
         feeAssetId: 0,
         // adaptor to which the ZkFi AdaptorHandler will call to execute swap
@@ -102,6 +115,7 @@ export const reqs = {
         viaBundler: false,
         paymaster: zeroAddress,
     }
+
 };
 
 export const genTestCallAdaptors = async (sdk: Core) => {

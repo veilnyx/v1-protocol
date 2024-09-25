@@ -49,7 +49,6 @@ contract CurveAdaptorTest is PoolTest {
         deal(USDT, user, INITIAL_SUPPLY_USDT);
         deal(crvUSD, user, INITIAL_SUPPLY_CRVUSD);
 
-        /**
         vm.startPrank(user);
         SafeERC20.forceApprove(IERC20(USDT), address(pool), INITIAL_SUPPLY_USDT);
         SafeERC20.forceApprove(IERC20(crvUSD), address(pool), INITIAL_SUPPLY_CRVUSD);
@@ -60,8 +59,7 @@ contract CurveAdaptorTest is PoolTest {
         pool.transact(stxDeposit);
         vm.stopPrank();
 
-        _processCommitmentTreeQueue();
-         */
+        _processCommitmentTreeQueue(); 
     }
 
     function testCurveAdaptorDeploy() external view {
@@ -72,11 +70,10 @@ contract CurveAdaptorTest is PoolTest {
     function testDepositOnCurve() public {
         console.log("Initiating deposit on Curve");
 
-        /**
-        //     ShieldedTransaction memory stxSupply = _loadShieldedTransaction(
-        //     "supply_2_usdt_crvUsd_on_curve"
-        // );
-        // pool.transact(stxSupply);
+        ShieldedTransaction memory stxSupply = _loadShieldedTransaction(
+            "supply_2_usdt_crvUsd_on_curve"
+        );
+        pool.transact(stxSupply);
          // Asserts
         uint256 curveLPTokenBalPostSupply = IERC20(crvUSD_USDT_Pool).balanceOf(
             address(user)
@@ -90,19 +87,18 @@ contract CurveAdaptorTest is PoolTest {
             curveLPTokenBalPostSupply
         );
         assert(curveLPTokenBalPostSupply > curveLPTokenBalBeforeSupply);
-        */
+        
+        // (
+        //     uint24[] memory outAssetIds,
+        //     uint256[] memory outValues
+        // ) = _depositInCurve();
 
-        (
-            uint24[] memory outAssetIds,
-            uint256[] memory outValues
-        ) = _depositInCurve();
-
-        assert(outAssetIds.length == 1);
-        assert(outValues[0] > 0);
-        console.log(
-            "LP token amount received:",
-            IERC20(crvUSD_USDT_Pool).balanceOf(address(curveAdaptor))
-        );
+        // assert(outAssetIds.length == 1);
+        // assert(outValues[0] > 0);
+        // console.log(
+        //     "LP token amount received:",
+        //     IERC20(crvUSD_USDT_Pool).balanceOf(address(curveAdaptor))
+        // );
     }
 
     function testBalancedWithdraw() public {

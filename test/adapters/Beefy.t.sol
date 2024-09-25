@@ -14,9 +14,12 @@ contract BeefyAdaptorTest is PoolTest {
     error CheckChainConfig();
 
     BeefyAdp beefyAdp;
-    address public constant wantLPToken = 0xb819feeF8F0fcDC268AfE14162983A69f6BF179E;
-    address public constant mooToken = 0x92A14518434a46E88CB4C3918AD33B3344099E02;
-    address public constant beefyVault = 0x92A14518434a46E88CB4C3918AD33B3344099E02;
+    address public constant wantLPToken =
+        0xb819feeF8F0fcDC268AfE14162983A69f6BF179E;
+    address public constant mooToken =
+        0x92A14518434a46E88CB4C3918AD33B3344099E02;
+    address public constant beefyVault =
+        0x92A14518434a46E88CB4C3918AD33B3344099E02;
     address public user = 0x689EcF264657302052c3dfBD631e4c20d3ED0baB;
     uint256 public constant INITIAL_SUPPLY = 2e6;
 
@@ -45,6 +48,9 @@ contract BeefyAdaptorTest is PoolTest {
 
     function testBeefyAdaptorDeploy() external view {
         assert(address(beefyAdp) != address(0));
+        bytes memory payload = abi.encode(uint8(0), beefyVault);
+        console.logString("Payload:");
+        console.logBytes(payload);
     }
 
     function testDepositInBeefyVault() public {
@@ -67,9 +73,7 @@ contract BeefyAdaptorTest is PoolTest {
         });
         vm.stopPrank();
         console.log("Staking done!");
-        uint256 mooTokenBal = IERC20(mooToken).balanceOf(
-            address(beefyAdp)
-        );
+        uint256 mooTokenBal = IERC20(mooToken).balanceOf(address(beefyAdp));
         console.log("mooTokens received:", mooTokenBal);
         assert(mooTokenBal > 0);
     }
@@ -94,9 +98,7 @@ contract BeefyAdaptorTest is PoolTest {
         });
         vm.stopPrank();
         console.log("Withdrawing done!");
-        uint256 lpTokenBal = IERC20(wantLPToken).balanceOf(
-            address(beefyAdp)
-        );
+        uint256 lpTokenBal = IERC20(wantLPToken).balanceOf(address(beefyAdp));
         console.log("lpToken received:", lpTokenBal);
         assert(lpTokenBal > 0);
     }

@@ -4,7 +4,7 @@ import { TransactionType } from "@zkfi-tech/shared-types";
 import { fixture, generateTestTransactions } from "./fixture";
 
 const {
-  assets: { testnetUsdt, testnetCrvUsd },
+  assets: { testnetUSDT, testnetCRVUSD },
   sender: { account: senderAccount },
 } = fixture;
 
@@ -60,10 +60,20 @@ export const reqs = {
     paymaster: zeroAddress,
     revokerId: 0,
   }, 
-    */
+  deposit_2_wantLPToken: {
+    type: TransactionType.DEPOSIT,
+    assetIds: [wantLPToken],
+    values: [parseEther("2")],
+    feeAssetId: 0,
+    to: senderAccount.shieldedAddress.pack(),
+    viaBundler: false,
+    paymaster: zeroAddress,
+    revokerId: 0,
+  },
+  */
   deposit_2_testnet_usdt_crvusd: {
     type: TransactionType.DEPOSIT,
-    assetIds: [testnetUsdt, testnetCrvUsd],
+    assetIds: [testnetUSDT, testnetCRVUSD],
     values: [parseUnits("2", 6), parseUnits("2", 6)],
     feeAssetId: 0,
     to: senderAccount.shieldedAddress.pack(),
@@ -71,6 +81,7 @@ export const reqs = {
     paymaster: zeroAddress,
     revokerId: 0,
   },
+  
 };
 
 export const genTestDeposits = async (sdk: Core) => {
