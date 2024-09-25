@@ -47,8 +47,12 @@
     "reentrantToken": 65539,
     "testnetWeth": 65540,
     "testnetUsdc": 65541,
-    "testnetUsdt": 65542,
-    "testnetCrvUsd": 65543
+    "staticAWETH": 65542,
+    "staticAUSDC": 65543,
+    "wstETH": 65544,
+    "testnetUsdt": 65545,
+    "testnetCrvUsd": 65546,
+    "testnetCurveLPToken": 65547
   },
   "leavesQueue1": [
     "19014214495641488759237505126948346942972912379615652741039992445865937985820",
