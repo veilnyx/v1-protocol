@@ -32,6 +32,7 @@ struct PoolUnderlyingTokensInfo {
 contract CurveNGAdaptor is AdaptorBase {
     using SafeERC20 for IERC20;
 
+    error InsufficientBalance();
     error InvalidInput();
     error AssetNotSupportedByPool(address asset, address curvePool);
 
