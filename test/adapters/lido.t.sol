@@ -17,10 +17,10 @@ contract LidoAdaptorTest is PoolTest {
     error CheckChainConfig();
 
     LidoAdaptor lidoAdaptor;
-    address lido;
-    address withdrawalQueueERC721;
-    address public stETH;
-    address public wstETH;
+    address lido = 0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84;
+    address withdrawalQueueERC721 = 0x889edC2eDab5f40e902b864aD4d7AdE8E412F9B1;
+    address public stETH = 0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84;
+    address public wstETH = 0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0;
     address public WETH;
     IWToken public iWETH;
     uint256 public constant INITIAL_SUPPLY = 2 ether;
@@ -36,14 +36,6 @@ contract LidoAdaptorTest is PoolTest {
             revert CheckChainConfig();
         }
         iWETH = IWToken(WETH);
-
-        stETH = _config.initAssetAddresses()[1];
-        wstETH = _config.initAssetAddresses()[2];
-        lido = _config.lido();
-        withdrawalQueueERC721 = _config.withdrawalQueueERC721();
-        if (lido == address(0) || stETH == address(0) || wstETH == address(0)) {
-            revert CheckChainConfig();
-        }
 
         // deploying Uniswap adaptor
         lidoAdaptor = new LidoAdaptor(

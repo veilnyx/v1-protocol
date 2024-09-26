@@ -14,15 +14,39 @@ struct AddressInfo {
     uint256 last_modified;
 }
 
+interface IPoseidonT3 {
+    function poseidon(uint256[2] calldata inValues) external returns (uint256);
+}
+
+interface IPoseidonT4 {
+    function poseidon(uint256[3] calldata inValues) external returns (uint256);
+}
+
 /// @dev Static script that generates the `targetPayload` bytes for convert txns or any other purpose (if required).
 /// @dev The components to be encoded are static and should be updated as required.
 contract GenerateAdaptorPayload is Script {
     function run() external {
-        bytes memory payload = abi.encode(
-            address(0x390f3595bCa2Df7d23783dFd126427CCeb997BF4),
-            uint8(0)
+        address poseidonT3 = 0x9122b25a94712dEDDe5D32cAA38A7e9e86D9337c;
+        address poseidonT4 = 0x8eB83D9eDe9F044C3e004DcB71cd0DF0B1413bcB;
+        uint256 codeSizeT3;
+        uint256 codeSizeT4;
+        assembly {
+            codeSizeT3 := extcodesize(poseidonT3)
+            codeSizeT4 := extcodesize(poseidonT4)
+        }
+        console2.log("Code size of poseidonT3: %s", codeSizeT3);
+        console2.log("Code size of poseidonT4: %s", codeSizeT4);
+
+        uint256 returnT3 = IPoseidonT3(poseidonT3).poseidon(
+            [uint256(65538), uint256(123)]
         );
-        console2.logBytes(payload);
+
+        uint256 returnT4 = IPoseidonT4(poseidonT4).poseidon(
+            [uint256(43434443423432423), uint256(820382083), uint256(3480384)]
+        );
+
+        console2.log("PoseidonT3 returns:", returnT3);
+        console2.log("PoseidonT4 returns:", returnT4);
 
         // getting StableSwap Factory addr
         /**

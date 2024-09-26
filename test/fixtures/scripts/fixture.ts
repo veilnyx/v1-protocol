@@ -40,8 +40,8 @@ const assets = {
   reentrantToken: config.assets.reentrantToken,
   testnetWeth: config.assets.testnetWeth,
   testnetUsdc: config.assets.testnetUsdc,
-  testnetUSDT: config.assets.testnetUSDT,
-  testnetCRVUSD: config.assets.testnetCRVUSD,
+  testnetUsdt: config.assets.testnetUsdt,
+  testnetCrvUsd: config.assets.testnetCrvUsd,
 };
 
 const revokerPublicKey = Point.fromArray([

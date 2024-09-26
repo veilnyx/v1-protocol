@@ -4,11 +4,21 @@ import { TransactionType } from "@zkfi-tech/shared-types";
 import { fixture, generateTestTransactions } from "./fixture";
 
 const {
-  assets: { testnetUSDT, testnetCRVUSD },
+  assets: { testnetWeth, testnetUsdt, testnetCrvUsd },
   sender: { account: senderAccount },
 } = fixture;
 
 export const reqs = {
+  deposit_2_testnet_weth: {
+    type: TransactionType.DEPOSIT,
+    assetIds: [testnetWeth],
+    values: [parseEther("2")],
+    feeAssetId: 0,
+    to: senderAccount.shieldedAddress.pack(),
+    viaBundler: false,
+    paymaster: zeroAddress,
+    revokerId: 0,
+  }, 
   /**
   deposit_pre_tx: {
     type: TransactionType.DEPOSIT,
@@ -50,16 +60,6 @@ export const reqs = {
     paymaster: zeroAddress,
     revokerId: 0,
   },
-  deposit_2_testnet_weth: {
-    type: TransactionType.DEPOSIT,
-    assetIds: [testnetWeth],
-    values: [parseEther("2")],
-    feeAssetId: 0,
-    to: senderAccount.shieldedAddress.pack(),
-    viaBundler: false,
-    paymaster: zeroAddress,
-    revokerId: 0,
-  }, 
   deposit_2_wantLPToken: {
     type: TransactionType.DEPOSIT,
     assetIds: [wantLPToken],
@@ -70,7 +70,6 @@ export const reqs = {
     paymaster: zeroAddress,
     revokerId: 0,
   },
-  */
   deposit_2_testnet_usdt_crvusd: {
     type: TransactionType.DEPOSIT,
     assetIds: [testnetUSDT, testnetCRVUSD],
@@ -81,7 +80,7 @@ export const reqs = {
     paymaster: zeroAddress,
     revokerId: 0,
   },
-  
+  */
 };
 
 export const genTestDeposits = async (sdk: Core) => {

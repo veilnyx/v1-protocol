@@ -5,6 +5,7 @@ pragma abicoder v2;
 import {BaseScript} from "script/BaseScript.sol";
 import {PoolTest} from "test/fixtures/PoolTest.sol";
 import {Pool} from "src/core/Pool.sol";
+import {IPool} from "src/interfaces/IPool.sol";
 import {ShieldedTransaction} from "src/libraries/ShieldedTransaction.sol";
 import {UniswapV3Adapter} from "src/adaptors/uniswap-v3/UniswapV3Adapter.sol";
 import {IWToken} from "src/interfaces/IWToken.sol";
@@ -16,7 +17,7 @@ contract UniswapV3AdaptorTest is PoolTest {
     error CheckChainConfig();
 
     UniswapV3Adapter uniswapV3Adapter;
-    address uniswapSwapRouter02;
+    address uniswapSwapRouter02 = 0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45;
     address public WETH;
     address public USDC;
     IWToken public iWETH;
@@ -37,11 +38,6 @@ contract UniswapV3AdaptorTest is PoolTest {
             revert CheckChainConfig();
         }
 
-        uniswapSwapRouter02 = _config.uniswapSwapRouter02();
-        if (uniswapSwapRouter02 == address(0)) {
-            revert CheckChainConfig();
-        }
-
         iWETH = IWToken(WETH);
 
         // deploying Uniswap adaptor
@@ -49,10 +45,12 @@ contract UniswapV3AdaptorTest is PoolTest {
             uniswapSwapRouter02,
             address(pool)
         );
+
+        // uniswapV3Adapter = 0x14992438240Be80bE2077DCb6615805C2E72362d;
+        
         /// @dev update convert req fixture with this adaptor addr as `to`
         console.log("Uniswap adaptor:", address(uniswapV3Adapter));
 
-        // TODO: Use a cheat code for Uni adp. address for consistency
         address poolOwner = pool.owner();
         vm.prank(poolOwner);
         pool.addAdaptorSupport(address(uniswapV3Adapter), true);

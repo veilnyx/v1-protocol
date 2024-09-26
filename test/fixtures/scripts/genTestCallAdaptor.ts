@@ -4,13 +4,12 @@ import { TransactionType } from "@zkfi-tech/shared-types";
 import { fixture, generateTestTransactions, mockNotes } from "./fixture";
 
 const {
-    assets: { testnetUSDT, testnetCRVUSD },
+    assets: { testnetWeth, testnetUsdt, testnetCrvUsd },
     sender: { account: senderAccount, pubAddress: senderPubAddress },
     receiver: { account: receiverAccount },
 } = fixture;
 
 export const reqs = {
-    /**
     swap_1_testnet_weth_to_usdc: {
         type: TransactionType.CALL_ADAPTER,
         assetIds: [testnetWeth],
@@ -24,6 +23,7 @@ export const reqs = {
         viaBundler: false,
         paymaster: zeroAddress
     },
+    /**
     swap_1_testnet_weth_to_usdc_via_bundler: {
         type: TransactionType.CALL_ADAPTER,
         assetIds: [testnetWeth],
@@ -88,6 +88,19 @@ export const reqs = {
         viaBundler: false,
         paymaster: zeroAddress,
     },
+    supply_2_usdt_crvUsd_on_curve: {
+        type: TransactionType.CALL_ADAPTER,
+        assetIds: [testnetUsdt, testnetCrvUsd],
+        values: [parseUnits("2", 6), parseUnits("2", 6)],
+        feeAssetId: 0,
+        // adaptor to which the ZkFi AdaptorHandler will call to execute swap
+        to: "0xbF71c5Ae43827387dAAF7358acAB5C81642b74b8",
+        // payload:: address pool: 0x390f3595bCa2Df7d23783dFd126427CCeb997BF4, action: 0 (supply)
+        payload: "0x000000000000000000000000390f3595bca2df7d23783dfd126427cceb997bf40000000000000000000000000000000000000000000000000000000000000000" as `0x${string}`,
+        revokerId: 0,
+        viaBundler: false,
+        paymaster: zeroAddress,
+    },
     supply_2_wantLPToken: {
         type: TransactionType.CALL_ADAPTER,
         assetIds: [wantLPToken],
@@ -101,24 +114,10 @@ export const reqs = {
         viaBundler: false,
         paymaster: zeroAddress,
     }
-        */
-    supply_2_usdt_crvUsd_on_curve: {
-        type: TransactionType.CALL_ADAPTER,
-        assetIds: [testnetUSDT, testnetCRVUSD],
-        values: [parseUnits("2", 6), parseUnits("2", 6)],
-        feeAssetId: 0,
-        // adaptor to which the ZkFi AdaptorHandler will call to execute swap
-        to: "0xbF71c5Ae43827387dAAF7358acAB5C81642b74b8",
-        // payload:: address pool: 0x390f3595bCa2Df7d23783dFd126427CCeb997BF4, action: 0 (supply)
-        payload: "0x000000000000000000000000390f3595bca2df7d23783dfd126427cceb997bf40000000000000000000000000000000000000000000000000000000000000000" as `0x${string}`,
-        revokerId: 0,
-        viaBundler: false,
-        paymaster: zeroAddress,
-    }
-
+*/
 };
 
 export const genTestCallAdaptors = async (sdk: Core) => {
-    await mockNotes("deposit_2_testnet_usdt_crvusd", sdk);
+    await mockNotes("deposit_2_testnet_weth", sdk);
     await generateTestTransactions(reqs, sdk);
 };

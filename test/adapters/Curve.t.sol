@@ -50,8 +50,16 @@ contract CurveAdaptorTest is PoolTest {
         deal(crvUSD, user, INITIAL_SUPPLY_CRVUSD);
 
         vm.startPrank(user);
-        SafeERC20.forceApprove(IERC20(USDT), address(pool), INITIAL_SUPPLY_USDT);
-        SafeERC20.forceApprove(IERC20(crvUSD), address(pool), INITIAL_SUPPLY_CRVUSD);
+        SafeERC20.forceApprove(
+            IERC20(USDT),
+            address(pool),
+            INITIAL_SUPPLY_USDT
+        );
+        SafeERC20.forceApprove(
+            IERC20(crvUSD),
+            address(pool),
+            INITIAL_SUPPLY_CRVUSD
+        );
 
         ShieldedTransaction memory stxDeposit = _loadShieldedTransaction(
             "deposit_2_testnet_usdt_crvusd"
@@ -59,7 +67,7 @@ contract CurveAdaptorTest is PoolTest {
         pool.transact(stxDeposit);
         vm.stopPrank();
 
-        _processCommitmentTreeQueue(); 
+        _processCommitmentTreeQueue();
     }
 
     function testCurveAdaptorDeploy() external view {
@@ -69,12 +77,13 @@ contract CurveAdaptorTest is PoolTest {
     /// @dev Make sure the `CurveAdaptor::receive()` is commented out for this test to work.
     function testDepositOnCurve() public {
         console.log("Initiating deposit on Curve");
-
+        uint256 curveLPTokenBalBeforeSupply = IERC20(crvUSD_USDT_Pool)
+            .balanceOf(address(user));
         ShieldedTransaction memory stxSupply = _loadShieldedTransaction(
             "supply_2_usdt_crvUsd_on_curve"
         );
         pool.transact(stxSupply);
-         // Asserts
+        // Asserts
         uint256 curveLPTokenBalPostSupply = IERC20(crvUSD_USDT_Pool).balanceOf(
             address(user)
         );
@@ -87,7 +96,7 @@ contract CurveAdaptorTest is PoolTest {
             curveLPTokenBalPostSupply
         );
         assert(curveLPTokenBalPostSupply > curveLPTokenBalBeforeSupply);
-        
+
         // (
         //     uint24[] memory outAssetIds,
         //     uint256[] memory outValues

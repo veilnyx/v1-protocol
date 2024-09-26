@@ -22,10 +22,6 @@ contract Config is Script {
     address public immutable gateway;
     address public immutable paymaster;
     address public immutable wToken;
-    address public immutable uniswapSwapRouter02;
-    address public immutable lido;
-    address public immutable aave;
-    address public immutable withdrawalQueueERC721;
     address public immutable sanctionsList;
 
     AssetType public immutable initAssetType;
@@ -85,34 +81,6 @@ contract Config is Script {
             configJson,
             string.concat(chainPrefix, ".wToken")
         );
-
-        if (chainId == 11155111 || chainId == 1) {
-            uniswapSwapRouter02 = vm.parseJsonAddress(
-                configJson,
-                string.concat(chainPrefix, ".uniswapSwapRouter02")
-            );
-            aave = vm.parseJsonAddress(configJson, string.concat(chainPrefix, ".aave"));
-            // lido
-            lido = vm.parseJsonAddress(
-                configJson,
-                string.concat(chainPrefix, ".lido")
-            );
-            withdrawalQueueERC721 = vm.parseJsonAddress(
-                configJson,
-                string.concat(chainPrefix, ".withdrawalQueueERC721")
-            );
-        }
-
-        if (chainId == 17000) {
-            lido = vm.parseJsonAddress(
-                configJson,
-                string.concat(chainPrefix, ".lido")
-            );
-            withdrawalQueueERC721 = vm.parseJsonAddress(
-                configJson,
-                string.concat(chainPrefix, ".withdrawalQueueERC721")
-            );
-        }
 
         sanctionsList = vm.parseJsonAddress(
             configJson,

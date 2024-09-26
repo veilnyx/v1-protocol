@@ -12,45 +12,26 @@ const poseidonT3Code = readFileSync(poseidonT3Path, "utf-8") as Hex;
 const poseidonT4Code = readFileSync(poseidonT4Path, "utf-8") as Hex;
 
 export const deployHasher = async (wallet, client) => {
-  // const client = await hre.viem.getPublicClient();
-  // const wallets = await hre.viem.getWalletClients();
-  // const wallet = wallets[0];
   const [address] = await wallet.getAddresses();
 
-  const bytecodes = [poseidonT3Code, poseidonT4Code];
-
- const hashPoseidonT3 = await wallet.deployContract({
+  const hashPoseidonT3 = await wallet.deployContract({
     bytecode: poseidonT3Code,
     abi: [],
     account: address
   });
-  
+
   const receiptPT3 = await client.waitForTransactionReceipt({ hash: hashPoseidonT3 });
 
   const hashPoseidonT4 = await wallet.deployContract({
-    bytescode: poseidonT4Code,
+    bytecode: poseidonT4Code,
     abi: [],
-    account:address
+    account: address
   });
   const receiptPT4 = await client.waitForTransactionReceipt({ hash: hashPoseidonT4 });
-  
-  // const hashes = await Promise.all(
-  //   bytecodes.map((bytecode) => {
-  //     //@ts-ignore
-  //     return wallet.deployContract({
-  //       bytecode,
-  //       abi: [],
-  //       account: address,
-  //     });
-  //   })
-  // );
-
-  // const receipts = await Promise.all(
-  //   hashes.map((hash) => client.waitForTransactionReceipt({ hash }))
-  // );
 
   const poseidonT3 = receiptPT3.contractAddress;
   console.log("PoseidonT3 deployed:", poseidonT3);
+
   const poseidonT4 = receiptPT4.contractAddress;
   console.log("PoseidonT4 deployed:", poseidonT4);
 
