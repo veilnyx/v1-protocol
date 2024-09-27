@@ -7,10 +7,12 @@ import {Pool} from "src/core/Pool.sol";
 import {ShieldedTransaction} from "src/libraries/ShieldedTransaction.sol";
 import {BeefyV7Adaptor as BeefyAdp} from "src/adaptors/beefy-v7/BeefyV7Adaptor.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Asset, AssetType} from "src/libraries/Asset.sol";
 import {console} from "forge-std/Test.sol";
 
 contract BeefyAdaptorTest is PoolTest {
+    using SafeERC20 for IERC20;
     error CheckChainConfig();
 
     BeefyAdp beefyAdp;
@@ -21,7 +23,7 @@ contract BeefyAdaptorTest is PoolTest {
     address public constant beefyVault =
         0x92A14518434a46E88CB4C3918AD33B3344099E02;
     address public user = 0x689EcF264657302052c3dfBD631e4c20d3ED0baB;
-    uint256 public constant INITIAL_SUPPLY = 2e6;
+    uint256 public constant INITIAL_SUPPLY = 2 ether;
 
     function setUp() external {
         require(shouldTestRun(), "BeefyAdpTest: Chain not supported");
@@ -33,17 +35,10 @@ contract BeefyAdaptorTest is PoolTest {
         /// @dev update convert req fixture with this adaptor addr as `to`
         console.log("Beefy adaptor deployed:", address(beefyAdp));
 
-        // Asset & Adaptor support on Labyrinth Protocol
+        // Adaptor support on Labyrinth Protocol
         address poolOwner = pool.owner();
-        vm.startPrank(poolOwner);
+        vm.prank(poolOwner);
         pool.addAdaptorSupport(address(beefyAdp), true);
-
-        AssetType assetType = AssetType.ERC20;
-        address[] memory assetAddresses = new address[](2);
-        assetAddresses[0] = wantLPToken;
-        assetAddresses[1] = mooToken;
-        pool.addAssets(assetType, assetAddresses);
-        vm.stopPrank();
     }
 
     function testBeefyAdaptorDeploy() external view {
@@ -53,7 +48,56 @@ contract BeefyAdaptorTest is PoolTest {
         console.logBytes(payload);
     }
 
-    function testDepositInBeefyVault() public {
+    function testSupplyInBeefyVault() public {
+        console.log("Initiating supply on Beefy");
+        vm.startPrank(user);
+        deal(wantLPToken, user, INITIAL_SUPPLY);
+        IERC20(wantLPToken).forceApprove(address(pool), INITIAL_SUPPLY);
+
+        ShieldedTransaction memory depositStx = _loadShieldedTransaction(
+            "deposit_2_wantLPToken"
+        );
+        pool.transact(depositStx);
+        _processCommitmentTreeQueue();
+
+        ShieldedTransaction memory supplyInBeefyStx = _loadShieldedTransaction(
+            "supply_2_wantLPToken"
+        );
+        pool.transact(supplyInBeefyStx);
+        vm.stopPrank();
+
+        console.log("Staking done!");
+        uint256 mooTokenBal = IERC20(mooToken).balanceOf(address(pool));
+        console.log("mooTokens received:", mooTokenBal);
+        assert(mooTokenBal > 0);
+        assertGreaterThan(mooTokenBal, 0);
+    }
+
+    function testWithdrawInBeefyVault() public {
+        console.log("Initiating withdraw on Beefy");
+        vm.startPrank(user);
+        deal(mooToken, user, INITIAL_SUPPLY);
+        IERC20(mooToken).forceApprove(address(pool), INITIAL_SUPPLY);
+
+        ShieldedTransaction memory depositStx = _loadShieldedTransaction(
+            "deposit_2_mooLPToken"
+        );
+        pool.transact(depositStx);
+        _processCommitmentTreeQueue();
+
+        ShieldedTransaction memory supplyInBeefyStx = _loadShieldedTransaction(
+            "supply_2_mooLPToken"
+        );
+        pool.transact(supplyInBeefyStx);
+        vm.stopPrank();
+
+        console.log("Staking done!");
+        uint256 wantTokenBal = IERC20(wantLPToken).balanceOf(address(pool));
+        console.log("wantTokens received:", wantTokenBal);
+        assert(wantTokenBal > 0);
+    }
+
+    function testDepositInBeefyVaultDirectly() public {
         console.log("Initiating supply on Beefy");
         vm.startPrank(user);
         deal(wantLPToken, user, INITIAL_SUPPLY);
@@ -78,7 +122,7 @@ contract BeefyAdaptorTest is PoolTest {
         assert(mooTokenBal > 0);
     }
 
-    function testWithdrawInBeefyVault() public {
+    function testWithdrawInBeefyVaultDirectly() public {
         console.log("Initiating withdraw on Beefy");
         vm.startPrank(user);
         deal(mooToken, user, INITIAL_SUPPLY);

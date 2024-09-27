@@ -4,25 +4,12 @@ import { TransactionType } from "@zkfi-tech/shared-types";
 import { fixture, generateTestTransactions, mockNotes } from "./fixture";
 
 const {
-    assets: { testnetWeth, testnetUsdt, testnetCrvUsd },
+    assets: { testnetWeth, testnetUsdt, testnetCrvUsd, beefyWantToken, beefyMooToken },
     sender: { account: senderAccount, pubAddress: senderPubAddress },
     receiver: { account: receiverAccount },
 } = fixture;
 
 export const reqs = {
-    supply_5_usdt_crvUsd_on_curve: {
-        type: TransactionType.CALL_ADAPTER,
-        assetIds: [testnetUsdt, testnetCrvUsd],
-        values: [parseUnits("5", 6), parseUnits("5", 18)],
-        feeAssetId: 0,
-        // adaptor to which the ZkFi AdaptorHandler will call to execute swap
-        to: "0xbF71c5Ae43827387dAAF7358acAB5C81642b74b8",
-        // payload:: address pool: 0x390f3595bCa2Df7d23783dFd126427CCeb997BF4, action: 0 (supply)
-        payload: "0x0000000000000000000000000000000000000000000000000000000000000020000000000000000000000000390f3595bca2df7d23783dfd126427cceb997bf400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000a0000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000" as `0x${string}`,
-        revokerId: 0,
-        viaBundler: false,
-        paymaster: zeroAddress,
-    }
     /**,
     swap_1_testnet_weth_to_usdc: {
         type: TransactionType.CALL_ADAPTER,
@@ -101,9 +88,22 @@ export const reqs = {
         viaBundler: false,
         paymaster: zeroAddress,
     },
+    supply_5_usdt_crvUsd_on_curve: {
+        type: TransactionType.CALL_ADAPTER,
+        assetIds: [testnetUsdt, testnetCrvUsd],
+        values: [parseUnits("5", 6), parseUnits("5", 18)],
+        feeAssetId: 0,
+        // adaptor to which the ZkFi AdaptorHandler will call to execute swap
+        to: "0xbF71c5Ae43827387dAAF7358acAB5C81642b74b8",
+        // payload:: address pool: 0x390f3595bCa2Df7d23783dFd126427CCeb997BF4, action: 0 (supply)
+        payload: "0x0000000000000000000000000000000000000000000000000000000000000020000000000000000000000000390f3595bca2df7d23783dfd126427cceb997bf400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000a0000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000" as `0x${string}`,
+        revokerId: 0,
+        viaBundler: false,
+        paymaster: zeroAddress,
+    },
     supply_2_wantLPToken: {
         type: TransactionType.CALL_ADAPTER,
-        assetIds: [wantLPToken],
+        assetIds: [beefyWantToken],
         values: [parseEther("2")],
         feeAssetId: 0,
         // adaptor to which the ZkFi AdaptorHandler will call to execute swap
@@ -114,10 +114,23 @@ export const reqs = {
         viaBundler: false,
         paymaster: zeroAddress,
     }
-*/
+        */
+    supply_2_mooLPToken: {
+        type: TransactionType.CALL_ADAPTER,
+        assetIds: [beefyMooToken],
+        values: [parseEther("2")],
+        feeAssetId: 0,
+        // adaptor to which the ZkFi AdaptorHandler will call to execute swap
+        to: "0xbF71c5Ae43827387dAAF7358acAB5C81642b74b8",
+        // payload:: action: 0 (supply)
+        payload: "0x000000000000000000000000000000000000000000000000000000000000000100000000000000000000000092a14518434a46e88cb4c3918ad33b3344099e02" as `0x${string}`,
+        revokerId: 0,
+        viaBundler: false,
+        paymaster: zeroAddress,
+    }
 };
 
 export const genTestCallAdaptors = async (sdk: Core) => {
-    await mockNotes("deposit_5_testnet_usdt_crvusd", sdk);
+    await mockNotes("deposit_2_mooLPToken", sdk);
     await generateTestTransactions(reqs, sdk);
 };

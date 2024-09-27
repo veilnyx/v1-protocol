@@ -5,8 +5,7 @@ import {Script} from "forge-std/Script.sol";
 import {AdaptorHandler} from "src/core/AdaptorHandler.sol";
 import {console2} from "forge-std/console2.sol";
 import {Pool} from "src/core/Pool.sol";
-import {IStableSwapFactory} from "src/adaptors/curveNG/IStableSwapFactory.sol";
-import {ICurvePool} from "src/adaptors/curveNG/ICurvePool.sol";
+import {Payload} from "src/adaptors/curveNG/CurveNGAdaptor.sol";
 struct AddressInfo {
     address addr;
     string description;
@@ -14,39 +13,24 @@ struct AddressInfo {
     uint256 last_modified;
 }
 
-interface IPoseidonT3 {
-    function poseidon(uint256[2] calldata inValues) external returns (uint256);
-}
-
-interface IPoseidonT4 {
-    function poseidon(uint256[3] calldata inValues) external returns (uint256);
-}
-
 /// @dev Static script that generates the `targetPayload` bytes for convert txns or any other purpose (if required).
 /// @dev The components to be encoded are static and should be updated as required.
 contract GenerateAdaptorPayload is Script {
     function run() external {
-        address poseidonT3 = 0x9122b25a94712dEDDe5D32cAA38A7e9e86D9337c;
-        address poseidonT4 = 0x8eB83D9eDe9F044C3e004DcB71cd0DF0B1413bcB;
-        uint256 codeSizeT3;
-        uint256 codeSizeT4;
-        assembly {
-            codeSizeT3 := extcodesize(poseidonT3)
-            codeSizeT4 := extcodesize(poseidonT4)
-        }
-        console2.log("Code size of poseidonT3: %s", codeSizeT3);
-        console2.log("Code size of poseidonT4: %s", codeSizeT4);
-
-        uint256 returnT3 = IPoseidonT3(poseidonT3).poseidon(
-            [uint256(65538), uint256(123)]
+        /**
+        bytes memory payload = bytes(
+            "0xb74cba1c000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000c00000000000000000000000000000000000000000000000000000000000000120000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000100060000000000000000000000000000000000000000000000000000000000010007000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000009896800000000000000000000000000000000000000000000000008ac7230489e8000000000000000000000000000000000000000000000000000000000000000000c000000000000000000000000096266f43ceddfeff150dc4997350a850f0d7067500000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000000000000a00000000000000000000000000000000000000000000000000000000000000000"
         );
 
-        uint256 returnT4 = IPoseidonT4(poseidonT4).poseidon(
-            [uint256(43434443423432423), uint256(820382083), uint256(3480384)]
+        Payload memory decodedPayload = abi.decode(payload, (Payload));
+        console2.log("Adaptor Address: %s", decodedPayload.curvePool);
+         */
+        console2.logBytes(
+            abi.encode(
+                uint8(1),
+                address(0x92A14518434a46E88CB4C3918AD33B3344099E02)
+            )
         );
-
-        console2.log("PoseidonT3 returns:", returnT3);
-        console2.log("PoseidonT4 returns:", returnT4);
 
         // getting StableSwap Factory addr
         /**

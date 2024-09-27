@@ -42,6 +42,8 @@ const assets = {
   testnetUsdc: config.assets.testnetUsdc,
   testnetUsdt: config.assets.testnetUsdt,
   testnetCrvUsd: config.assets.testnetCrvUsd,
+  beefyWantToken: config.assets.beefyWantToken,
+  beefyMooToken: config.assets.beefyMooToken,
 };
 
 const revokerPublicKey = Point.fromArray([

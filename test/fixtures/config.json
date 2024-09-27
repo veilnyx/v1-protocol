@@ -52,7 +52,9 @@
     "wstETH": 65544,
     "testnetUsdt": 65545,
     "testnetCrvUsd": 65546,
-    "testnetCurveLPToken": 65547
+    "testnetCurveLPToken": 65547,
+    "beefyWantToken": 65548,
+    "beefyMooToken": 65549
   },
   "leavesQueue1": [
     "19014214495641488759237505126948346942972912379615652741039992445865937985820",
