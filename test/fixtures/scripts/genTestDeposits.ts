@@ -9,6 +9,7 @@ const {
 } = fixture;
 
 export const reqs = {
+  /**
   deposit_2_testnet_weth: {
     type: TransactionType.DEPOSIT,
     assetIds: [testnetWeth],
@@ -19,7 +20,6 @@ export const reqs = {
     paymaster: zeroAddress,
     revokerId: 0,
   }, 
-  /**
   deposit_pre_tx: {
     type: TransactionType.DEPOSIT,
     assetIds: [weth, usdc],
@@ -70,17 +70,17 @@ export const reqs = {
     paymaster: zeroAddress,
     revokerId: 0,
   },
-  deposit_2_testnet_usdt_crvusd: {
+  */
+  deposit_5_testnet_usdt_crvusd: {
     type: TransactionType.DEPOSIT,
-    assetIds: [testnetUSDT, testnetCRVUSD],
-    values: [parseUnits("2", 6), parseUnits("2", 6)],
+    assetIds: [testnetUsdt, testnetCrvUsd],
+    values: [parseUnits("5", 6), parseUnits("5", 18)],
     feeAssetId: 0,
     to: senderAccount.shieldedAddress.pack(),
     viaBundler: false,
     paymaster: zeroAddress,
     revokerId: 0,
   },
-  */
 };
 
 export const genTestDeposits = async (sdk: Core) => {
