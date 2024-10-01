@@ -16,9 +16,9 @@ contract UniswapV3AdaptorTest is PoolTest {
     error CheckChainConfig();
 
     UniswapV3Adapter uniswapV3Adapter;
-    address uniswapSwapRouter02;
-    address public WETH;
-    address public USDC;
+    address uniswapSwapRouter02 = 0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45;
+    address public WETH = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
+    address public USDC = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48;
     IWToken public iWETH;
     uint256 public constant INITIAL_SUPPLY = 2 ether;
     uint256 public constant SWAP_AMT = 1 ether;
@@ -27,20 +27,6 @@ contract UniswapV3AdaptorTest is PoolTest {
     function setUp() external {
         require(shouldTestRun(), "UniswapV3AdaptorTest: Chain not supported");
         _setUp();
-
-        WETH = _config.initAssetAddresses()[0];
-        if (WETH == address(0)) {
-            revert CheckChainConfig();
-        }
-        USDC = _config.initAssetAddresses()[1];
-        if (USDC == address(0)) {
-            revert CheckChainConfig();
-        }
-
-        uniswapSwapRouter02 = _config.uniswapSwapRouter02();
-        if (uniswapSwapRouter02 == address(0)) {
-            revert CheckChainConfig();
-        }
 
         iWETH = IWToken(WETH);
 

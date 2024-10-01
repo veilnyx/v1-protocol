@@ -19,7 +19,6 @@ contract EthenaAdaptorTest is PoolTest {
     EthenaAdaptor ethenaAdaptor;
     address uniswapSwapRouter02;
     address public constant USDe = 0x4c9EDD5852cd905f086C759E8383e09bff1E68B3;
-    address public constant sUSDe = 0x9D39A5DE30e57443BfF2A8307A4256c8797A3497;
     address public constant ETHENA = 0x9D39A5DE30e57443BfF2A8307A4256c8797A3497;
     uint256 public constant WETH_INITIAL_SUPPLY = 1 ether;
     uint256 public constant INITIAL_SUPPLY = 2e6;
@@ -30,21 +29,15 @@ contract EthenaAdaptorTest is PoolTest {
         PoolTest._setUp();
 
         // deploying Ethena adaptor
-        ethenaAdaptor = new EthenaAdaptor(ETHENA, USDe, sUSDe, address(pool));
+        ethenaAdaptor = new EthenaAdaptor(ETHENA, USDe, address(pool));
 
         /// @dev update convert req fixture with this adaptor addr as `to`
         console.log("Ethena adaptor deployed:", address(ethenaAdaptor));
 
-        // Asset & Adaptor support on Labyrinth Protocol
+        // Adaptor support on Labyrinth Protocol
         address poolOwner = pool.owner();
         vm.startPrank(poolOwner);
         pool.addAdaptorSupport(address(ethenaAdaptor), true);
-
-        AssetType assetType = AssetType.ERC20;
-        address[] memory assetAddresses = new address[](2);
-        assetAddresses[0] = USDe;
-        assetAddresses[1] = sUSDe;
-        pool.addAssets(assetType, assetAddresses);
         vm.stopPrank();
     }
 
@@ -62,7 +55,7 @@ contract EthenaAdaptorTest is PoolTest {
         );
         pool.transact(ztxDeposit);
 
-        uint256 poolsUSDeBalBeforeStaking = IERC20(sUSDe).balanceOf(
+        uint256 poolsUSDeBalBeforeStaking = IERC20(ETHENA).balanceOf(
             address(pool)
         );
 
@@ -73,9 +66,9 @@ contract EthenaAdaptorTest is PoolTest {
         vm.stopPrank();
 
         // Asserts
-        uint256 poolsUSDeBalPostStake = IERC20(sUSDe).balanceOf(address(pool));
-        console.log("Pool sUSDe bal before swap:", poolsUSDeBalBeforeStaking);
-        console.log("Pool sUSDe bal after swap:", poolsUSDeBalPostStake);
+        uint256 poolsUSDeBalPostStake = IERC20(ETHENA).balanceOf(address(pool));
+        console.log("Pool ETHENA bal before swap:", poolsUSDeBalBeforeStaking);
+        console.log("Pool ETHENA bal after swap:", poolsUSDeBalPostStake);
         assert(poolsUSDeBalPostStake > poolsUSDeBalBeforeStaking);
     }
 
@@ -99,15 +92,15 @@ contract EthenaAdaptorTest is PoolTest {
         });
         vm.stopPrank();
         console.log("Staking done!");
-        uint256 sUSDeBalAfterStaking = IERC20(sUSDe).balanceOf(
+        uint256 sUSDeBalAfterStaking = IERC20(ETHENA).balanceOf(
             address(ethenaAdaptor)
         );
-        console.log("sUSDe received:", sUSDeBalAfterStaking);
+        console.log("ETHENA received:", sUSDeBalAfterStaking);
 
         // will increament timestamp by the cool down duration since user will only be able to unstake after this cooldown period. `Ethena::coolDownDuration()`
         uint24 coolDownDuration = IEthena(ETHENA).cooldownDuration();
         vm.warp(block.timestamp + coolDownDuration + 1 hours);
-        inAssetIds[0] = pool.getAsset(sUSDe).id;
+        inAssetIds[0] = pool.getAsset(ETHENA).id;
         inValues[0] = sUSDeBalAfterStaking;
 
         // Unstaking
@@ -119,11 +112,11 @@ contract EthenaAdaptorTest is PoolTest {
         });
 
         // Asserts
-        uint256 sUSDeBalPostUnStaking = IERC20(sUSDe).balanceOf(
+        uint256 sUSDeBalPostUnStaking = IERC20(ETHENA).balanceOf(
             address(ethenaAdaptor)
         );
         uint256 USDeBalPostUnStaking = IERC20(USDe).balanceOf(user);
-        console.log("Pool sUSDe bal after unstaking:", sUSDeBalPostUnStaking);
+        console.log("Pool ETHENA bal after unstaking:", sUSDeBalPostUnStaking);
         console.log("Pool USDe bal after unstaking:", USDeBalPostUnStaking);
         assert(sUSDeBalPostUnStaking == 0);
         assert(USDeBalPostUnStaking > 0);

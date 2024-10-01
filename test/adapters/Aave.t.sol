@@ -17,8 +17,8 @@ contract AaveAdaptorTest is PoolTest {
     error CheckChainConfig();
 
     AaveV3Adaptor aaveAdaptor;
-    address aave;
-    address public WETH;
+    address aave = 0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2;
+    address public WETH = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
     address public constant WETH_AAVE_UNDERLYING =
         0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2; // Laby pool WETH contract is diff. than the one supported by Aave.
 
@@ -32,15 +32,6 @@ contract AaveAdaptorTest is PoolTest {
     function setUp() external {
         require(shouldTestRun(), "LidoAdaptorTest: Chain not supported");
         PoolTest._setUp();
-        WETH = _config.wToken();
-        if (WETH == address(0)) {
-            revert CheckChainConfig();
-        }
-
-        aave = _config.aave();
-        if (aave == address(0)) {
-            revert CheckChainConfig();
-        }
 
         // deploying aave adaptor
         aaveAdaptor = new AaveV3Adaptor(
