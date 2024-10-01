@@ -68,6 +68,7 @@ const deployVerifier = async (tenderlyDeployConfig) => {
 const deployAdaptors = async (pool, chainParams, adpParams, wallet, client, tenderlyDeployConfig) => {
   const { uniswap: uniswapConfig, aave: aaveConfig, lido: lidoConfig, ethena: ethenaConfig } = adpParams;
 
+  /**
   const uniswap = await hre.viem.deployContract("UniswapV3Adapter", [
     uniswapConfig.uniswapSwapRouter02,
     pool
@@ -99,12 +100,14 @@ const deployAdaptors = async (pool, chainParams, adpParams, wallet, client, tend
   ], tenderlyDeployConfig);
   console.log("CurveNGAdp deployed:", curve.address);
   await addAdpatorSupport(pool, curve.address, true, client, wallet);
-
+ */
   const ethena = await hre.viem.deployContract("EthenaAdaptor", [
     ethenaConfig.ethena,
     ethenaConfig.usde,
     pool
-  ]);
+  ], tenderlyDeployConfig);
+  console.log("Ethena deployed:", ethena.address);
+  await addAdpatorSupport(pool, ethena.address, true, client, wallet);
 }
 
 const addAdpatorSupport = async (pool, adpAddress, enable, client, wallet) => {
@@ -228,7 +231,7 @@ const main = async () => {
 
   const eip712 = await hre.viem.deployContract("EIP712", [], tenderlyDeployConfig);
   console.log("EIP712 deployed:", eip712.address);
-
+  
   const asset = await hre.viem.deployContract("AssetLogic", [], tenderlyDeployConfig);
   console.log("AssetLogic deployed:", asset.address);
   const merkleTree = await hre.viem.deployContract("MerkleTreeLogic", [], tenderlyDeployConfig);
@@ -237,7 +240,7 @@ const main = async () => {
     "QueuedMerkleTreeLogic", [], tenderlyDeployConfig
   );
   console.log("QueuedMerkleTreeLogic deployed:", queuedMerkleTree.address);
-
+  
   const shieldedAddress = await hre.viem.deployContract(
     "ShieldedAddressLogic",
     [],
@@ -249,7 +252,7 @@ const main = async () => {
     },
   );
   console.log("ShieldedAddressLogic deployed:", shieldedAddress.address);
-
+  
   const shieldedTransaction = await hre.viem.deployContract(
     "ShieldedTransactionLogic",
     [],
@@ -265,7 +268,7 @@ const main = async () => {
   console.log("ShieldedTransactionLogic deployed:", shieldedTransaction.address);
   const adaptorHandler = await hre.viem.deployContract("AdaptorHandler", [], tenderlyDeployConfig);
   console.log("AdaptorHandler deployed: ", adaptorHandler.address);
-
+  
   const poolImpl = await hre.viem.deployContract("Pool", [], {
     client: tenderlyDeployConfig.client,
     libraries: {
@@ -278,12 +281,12 @@ const main = async () => {
     },
   });
   console.log("Pool deployed:", poolImpl.address);
-
+  
   const { hasher } = await deployHasher(wallet, client, tenderlyDeployConfig);
   console.log("Hasher deployed:", hasher);
-
+  
   const verifier = await deployVerifier(tenderlyDeployConfig);
-
+  
   const args = [
     commonParams.addressTreeDepth,
     commonParams.commitmentTreeDepth,
@@ -294,22 +297,22 @@ const main = async () => {
     hasher,
     BigInt(commonParams.withdrawFeeBps),
   ];
-
+  
   const initData = encodeFunctionData({
     abi: poolAbi,
     functionName: "initialize",
     args: args as any,
   });
-
+  
   const poolProxy = await hre.viem.deployContract("PoolProxy", [
     poolImpl.address,
     initData,
   ], tenderlyDeployConfig);
   console.log("PoolProxy deployed:", poolProxy.address);
-
+  
   // Deploy Adaptors 
   await deployAdaptors(poolProxy.address, chainParams, adpParams, wallet, client, tenderlyDeployConfig);
-
+  
   // ERC4337 infra setup
   const gateway = await hre.viem.deployContract("Gateway", [
     chainParams.entryPoint,
@@ -317,15 +320,15 @@ const main = async () => {
     poolProxy.address,
   ], tenderlyDeployConfig);
   console.log("Gateway deployed:", gateway.address);
-
+  
   const paymaster = await hre.viem.deployContract("Paymaster", [
     chainParams.entryPoint,
     gateway.address,
   ], tenderlyDeployConfig);
   console.log("Paymaster deployed:", paymaster.address);
-
+  
   await fundPaymaster(paymaster.address, "20", wallet, client);
-
+  
   // Asset & Revoker Setup
   await addAssetsAndRevokers(poolProxy.address, chainParams, commonParams, client, wallet);
 };

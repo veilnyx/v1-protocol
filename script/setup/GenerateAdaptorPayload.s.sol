@@ -24,7 +24,7 @@ contract GenerateAdaptorPayload is Script {
         // );
         // console2.logBytes(payload);
 
-        address poseidon = 0xa515E4262797613B42101BfCe8B577c3BE08A696;
+        address poseidon = 0x40FC57D12aE0E2D7DB9DbDBEA3f5f7526B0DEaE5;
         uint256 poseidonSize;
         assembly {
             poseidonSize := extcodesize(poseidon)
