@@ -18,11 +18,18 @@ struct AddressInfo {
 /// @dev The components to be encoded are static and should be updated as required.
 contract GenerateAdaptorPayload is Script {
     function run() external {
-        bytes memory payload = abi.encode(
-            address(0x390f3595bCa2Df7d23783dFd126427CCeb997BF4),
-            uint8(0)
-        );
-        console2.logBytes(payload);
+        // bytes memory payload = abi.encode(
+        //     address(0x390f3595bCa2Df7d23783dFd126427CCeb997BF4),
+        //     uint8(0)
+        // );
+        // console2.logBytes(payload);
+
+        address poseidon = 0xa515E4262797613B42101BfCe8B577c3BE08A696;
+        uint256 poseidonSize;
+        assembly {
+            poseidonSize := extcodesize(poseidon)
+        }
+        console2.log(poseidonSize);
 
         // getting StableSwap Factory addr
         /**
