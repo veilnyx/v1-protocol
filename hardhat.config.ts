@@ -13,6 +13,7 @@ dotenv.config();
 const rpcEthereumSepolia = process.env.RPC_ETHEREUM_SEPOLIA as string;
 const rpcOptimismSepolia = process.env.RPC_OPTIMISM_SEPOLIA as string;
 const rpcTenderlyMainnet = process.env.RPC_TENDERLY_MAINNET as string;
+const rpcTenderlyMainnetCustomId = process.env.RPC_TENDERLY_MAINNET_CUSTOM_ID as string;
 const privateKeys = [process.env.PRIVATE_KEY as string];
 const forkEnabled = process.env.HARDHAT_FORK === "true";
 
@@ -31,20 +32,20 @@ const config: HardhatUserConfig = {
       url: rpcEthereumSepolia,
       accounts: privateKeys,
     },
-    tenderlyMainnet: {
-      url: rpcTenderlyMainnet,
-      accounts: privateKeys,
-    },
     optimismSepolia: {
       url: rpcOptimismSepolia,
       accounts: privateKeys,
     },
+    tenderlyMainnet: {
+      url: rpcTenderlyMainnet,
+      accounts: privateKeys,
+    },
+    tenderlyMainnetCustomId: {
+      url: rpcTenderlyMainnetCustomId,
+      accounts: privateKeys,
+      chainId: 7800
+    }
   },
-  // tenderly: {
-  //   username: "0xShiven",
-  //   project: "Labyrinth Integrations",
-  //   privateVerification: false // if true, contracts will be verified privately, if false, contracts will be verified publicly
-  // },
   contractSizer: {
     runOnCompile: true,
     strict: true,
