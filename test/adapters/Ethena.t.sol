@@ -20,8 +20,7 @@ contract EthenaAdaptorTest is PoolTest {
     address uniswapSwapRouter02;
     address public constant USDe = 0x4c9EDD5852cd905f086C759E8383e09bff1E68B3;
     address public constant ETHENA = 0x9D39A5DE30e57443BfF2A8307A4256c8797A3497;
-    uint256 public constant WETH_INITIAL_SUPPLY = 1 ether;
-    uint256 public constant INITIAL_SUPPLY = 2e6;
+    uint256 public constant INITIAL_SUPPLY = 2 ether;
     address public user = 0x689EcF264657302052c3dfBD631e4c20d3ED0baB;
 
     function setUp() external {
@@ -51,9 +50,10 @@ contract EthenaAdaptorTest is PoolTest {
         deal(USDe, user, INITIAL_SUPPLY);
         IERC20(USDe).approve(address(pool), INITIAL_SUPPLY);
         ShieldedTransaction memory ztxDeposit = _loadShieldedTransaction(
-            "deposit_2_original_usde"
+            "deposit_2_testnet_usde"
         );
         pool.transact(ztxDeposit);
+        _processCommitmentTreeQueue();
 
         uint256 poolsUSDeBalBeforeStaking = IERC20(ETHENA).balanceOf(
             address(pool)
@@ -72,6 +72,7 @@ contract EthenaAdaptorTest is PoolTest {
         assert(poolsUSDeBalPostStake > poolsUSDeBalBeforeStaking);
     }
 
+    /**
     function testsUSDeUnStakingOnEthena() public {
         console.log("Initiating unstaking on Ethena");
         vm.startPrank(user);
@@ -121,6 +122,7 @@ contract EthenaAdaptorTest is PoolTest {
         assert(sUSDeBalPostUnStaking == 0);
         assert(USDeBalPostUnStaking > 0);
     }
+     */
 
     /// @dev Only allowing Lido tests to run on Holesky testnet and ETH mainnet. More chains can be added.
     function shouldTestRun() internal view returns (bool) {

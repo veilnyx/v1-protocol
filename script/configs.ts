@@ -19,6 +19,7 @@ export type AdaptorParams = {
   uniswap: Object;
   aave: Object;
   lido: Object;
+  ethena: Object;
 }
 
 export type CommonParams = {
@@ -77,6 +78,7 @@ export function loadConfigs() {
       uniswap,
       aave,
       lido,
+      ethena
     } = params;
 
     adpParams[Number(chainId)] = {
@@ -97,6 +99,10 @@ export function loadConfigs() {
         stETH: getHex(lido.stETH),
         wstETH: getHex(lido.wstETH),
       },
+      ethena: {
+        ethena: getHex(ethena.ethena),
+        usde: getHex(ethena.usde),
+      }
     };
   }
 

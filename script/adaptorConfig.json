@@ -16,6 +16,10 @@
             "withdrawalQueueERC721": "0x889edC2eDab5f40e902b864aD4d7AdE8E412F9B1",
             "stETH": "0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84",
             "wstETH": "0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0"
+        },
+        "ethena": {
+            "ethena": "0x9D39A5DE30e57443BfF2A8307A4256c8797A3497",
+            "usde": "0x4c9EDD5852cd905f086C759E8383e09bff1E68B3"
         }
     },
     "7800": {
@@ -35,6 +39,10 @@
             "withdrawalQueueERC721": "0x889edC2eDab5f40e902b864aD4d7AdE8E412F9B1",
             "stETH": "0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84",
             "wstETH": "0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0"
+        },
+        "ethena": {
+            "ethena": "0x9D39A5DE30e57443BfF2A8307A4256c8797A3497",
+            "usde": "0x4c9EDD5852cd905f086C759E8383e09bff1E68B3"
         }
     },
     "11155111": {
@@ -54,6 +62,10 @@
             "withdrawalQueueERC721": "0x1583C7b3f4C3B008720E6BcE5726336b0aB25fdd",
             "stETH": "0x3e3FE7dBc6B4C189E7128855dD526361c49b40Af",
             "wstETH": "0xB82381A3fBD3FaFA77B3a7bE693342618240067b"
+        },
+        "ethena": {
+            "ethena": "",
+            "usde": "0x9458caaca74249abbe9e964b3ce155b98ec88ef2"
         }
     }
 }

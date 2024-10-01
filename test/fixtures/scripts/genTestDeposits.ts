@@ -2,9 +2,10 @@ import { parseEther, parseUnits, zeroAddress } from "viem";
 import { Core } from "@zkfi-tech/core";
 import { TransactionType } from "@zkfi-tech/shared-types";
 import { fixture, generateTestTransactions } from "./fixture";
+import { parse } from 'path';
 
 const {
-  assets: { testnetUsdt, testnetCrvUsd },
+  assets: { testnetUsde },
   sender: { account: senderAccount },
 } = fixture;
 
@@ -59,12 +60,21 @@ export const reqs = {
     viaBundler: false,
     paymaster: zeroAddress,
     revokerId: 0,
-  }, 
-    */
-  deposit_2_testnet_usdt_crvusd: {
+  }, deposit_2_testnet_usdt_crvusd: {
     type: TransactionType.DEPOSIT,
     assetIds: [testnetUsdt, testnetCrvUsd],
     values: [parseUnits("2", 6), parseUnits("2", 6)],
+    feeAssetId: 0,
+    to: senderAccount.shieldedAddress.pack(),
+    viaBundler: false,
+    paymaster: zeroAddress,
+    revokerId: 0,
+  }, 
+  */
+  deposit_2_testnet_usde: {
+    type: TransactionType.DEPOSIT,
+    assetIds: [testnetUsde],
+    values: [parseEther("2")],
     feeAssetId: 0,
     to: senderAccount.shieldedAddress.pack(),
     viaBundler: false,
