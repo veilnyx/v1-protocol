@@ -68,7 +68,6 @@ const deployVerifier = async (tenderlyDeployConfig) => {
 const deployAdaptors = async (pool, chainParams, adpParams, wallet, client, tenderlyDeployConfig) => {
   const { uniswap: uniswapConfig, aave: aaveConfig, lido: lidoConfig, ethena: ethenaConfig } = adpParams;
 
-  /**
   const uniswap = await hre.viem.deployContract("UniswapV3Adapter", [
     uniswapConfig.uniswapSwapRouter02,
     pool
@@ -100,7 +99,7 @@ const deployAdaptors = async (pool, chainParams, adpParams, wallet, client, tend
   ], tenderlyDeployConfig);
   console.log("CurveNGAdp deployed:", curve.address);
   await addAdpatorSupport(pool, curve.address, true, client, wallet);
- */
+ 
   const ethena = await hre.viem.deployContract("EthenaAdaptor", [
     ethenaConfig.ethena,
     ethenaConfig.usde,
