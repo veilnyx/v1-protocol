@@ -18,10 +18,10 @@ contract LidoAdaptorTest is PoolTest {
 
     LidoAdaptor lidoAdaptor;
     address lido = 0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84;
-    address withdrawalQueueERC721 = 0x889edC2eDab5f40e902b864aD4d7AdE8E412F9B1;
+    address withdrawalQueueERC721;
     address public stETH = 0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84;
     address public wstETH = 0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0;
-    address public WETH;
+    address public WETH = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
     IWToken public iWETH;
     uint256 public constant INITIAL_SUPPLY = 2 ether;
     uint256 public constant SWAP_AMT = 1 ether;
@@ -31,10 +31,6 @@ contract LidoAdaptorTest is PoolTest {
         require(shouldTestRun(), "LidoAdaptorTest: Chain not supported");
         _setUp();
 
-        WETH = _config.wToken();
-        if (WETH == address(0)) {
-            revert CheckChainConfig();
-        }
         iWETH = IWToken(WETH);
 
         // deploying Uniswap adaptor

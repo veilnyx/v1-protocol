@@ -1,5 +1,4 @@
 import hre from "hardhat";
-// import { tenderly } from 'hardhat';
 import {
   encodeAbiParameters,
   encodeFunctionData,
@@ -7,32 +6,36 @@ import {
   defineChain,
   parseEther,
   toFunctionSelector,
-  Hex
+  http,
+  createWalletClient,
+  Chain
 } from "viem";
-import poolModule from "../ignition/modules/pool";
+
+import { DeployContractConfig } from '@nomicfoundation/hardhat-viem/types';
 import { loadConfigs, ChainParams, AdaptorParams, CommonParams } from "./configs";
 import { deployHasher } from "./hasher";
-import { addInitialAssets, registerRevokers } from "./setup";
+import { privateKeyToAccount } from 'viem/accounts';
 
 const config = loadConfigs();
+const privateKey = process.env.PRIVATE_KEY as `0x{string}`;
 const poolAbi = hre.artifacts.readArtifactSync("Pool").abi;
 const paymasterAbi = hre.artifacts.readArtifactSync("Paymaster").abi;
 const verifier21Abi = hre.artifacts.readArtifactSync("VerifierTransact21").abi;
 const verifier22Abi = hre.artifacts.readArtifactSync("VerifierTransact22").abi;
 
 
-const deployVerifier = async () => {
-  const verifierRegister = await hre.viem.deployContract("VerifierRegister");
+const deployVerifier = async (tenderlyDeployConfig) => {
+  const verifierRegister = await hre.viem.deployContract("VerifierRegister", [], tenderlyDeployConfig);
   console.log("VerifierRegister deployed:", verifierRegister.address);
 
-  const verifierTreeUpdate = await hre.viem.deployContract("VerifierTreeUpdate");
+  const verifierTreeUpdate = await hre.viem.deployContract("VerifierTreeUpdate", [], tenderlyDeployConfig);
   console.log("VerifierTreeUpdate deployed:", verifierTreeUpdate.address);
 
   // Tx Verifiers
-  const verifierTransact21 = await hre.viem.deployContract("VerifierTransact21");
+  const verifierTransact21 = await hre.viem.deployContract("VerifierTransact21", [], tenderlyDeployConfig);
   console.log("VerifierTransact21 deployed:", verifierTransact21.address);
 
-  const verifierTransact22 = await hre.viem.deployContract("VerifierTransact22");
+  const verifierTransact22 = await hre.viem.deployContract("VerifierTransact22", [], tenderlyDeployConfig);
   console.log("VerifierTransact22 deployed:", verifierTransact22.address);
 
   // Prepare the TransactionVerifierInfo array
@@ -54,20 +57,21 @@ const deployVerifier = async () => {
     txVerifierInfos,
     verifierRegister.address,
     verifierTreeUpdate.address,
-  ]
+  ],
+    tenderlyDeployConfig
   );
   console.log("Verifier deployed:", verifier.address);
 
   return verifier.address;
 }
 
-const deployAdaptors = async (pool, chainParams, adpParams, wallet, client) => {
-  const { uniswap: uniswapConfig, aave: aaveConfig, lido: lidoConfig } = adpParams;
+const deployAdaptors = async (pool, chainParams, adpParams, wallet, client, tenderlyDeployConfig) => {
+  const { uniswap: uniswapConfig, aave: aaveConfig, lido: lidoConfig, ethena: ethenaConfig } = adpParams;
 
   const uniswap = await hre.viem.deployContract("UniswapV3Adapter", [
     uniswapConfig.uniswapSwapRouter02,
     pool
-  ])
+  ], tenderlyDeployConfig)
   console.log("UniswapV3Adapter deployed:", uniswap.address);
   await addAdpatorSupport(pool, uniswap.address, true, client, wallet);
 
@@ -75,7 +79,7 @@ const deployAdaptors = async (pool, chainParams, adpParams, wallet, client) => {
     aaveConfig.aave,
     pool,
     aaveConfig.aaveStaticTokenFactory
-  ]);
+  ], tenderlyDeployConfig);
   console.log("AaveV3Adapter deployed:", aave.address);
   await addAdpatorSupport(pool, aave.address, true, client, wallet);
 
@@ -86,15 +90,23 @@ const deployAdaptors = async (pool, chainParams, adpParams, wallet, client) => {
     lidoConfig.wstETH, // wstETH
     lidoConfig.withdrawalQueueERC721,
     pool
-  ]);
+  ], tenderlyDeployConfig);
   console.log("LidoAdapter deployed:", lido.address);
   await addAdpatorSupport(pool, lido.address, true, client, wallet);
 
   const curve = await hre.viem.deployContract("CurveNGAdaptor", [
     pool
-  ]);
+  ], tenderlyDeployConfig);
   console.log("CurveNGAdp deployed:", curve.address);
   await addAdpatorSupport(pool, curve.address, true, client, wallet);
+ 
+  const ethena = await hre.viem.deployContract("EthenaAdaptor", [
+    ethenaConfig.ethena,
+    ethenaConfig.usde,
+    pool
+  ], tenderlyDeployConfig);
+  console.log("Ethena deployed:", ethena.address);
+  await addAdpatorSupport(pool, ethena.address, true, client, wallet);
 }
 
 const addAdpatorSupport = async (pool, adpAddress, enable, client, wallet) => {
@@ -115,8 +127,8 @@ const addAdpatorSupport = async (pool, adpAddress, enable, client, wallet) => {
   }
 }
 
-const defineChainViem = () => {
-  const labyrinthChain = defineChain({
+const createTenderlyChain = (): Chain => {
+  const tenderlyChain = defineChain({
     name: "Labyrinth Mainnet Simulation v1.0",
     id: 7800,
     nativeCurrency: {
@@ -126,12 +138,12 @@ const defineChainViem = () => {
     },
     rpcUrls: {
       default: {
-        http: [process.env.RPC_TENDERLY_MAINNET as string]
+        http: [process.env.RPC_TENDERLY_MAINNET_CUSTOM_ID as string]
       },
     },
   });
 
-  return labyrinthChain;
+  return tenderlyChain;
 }
 
 const fundPaymaster = async (paymaster, amount, wallet, client) => {
@@ -193,47 +205,58 @@ const addAssetsAndRevokers = async (poolProxy, chainParams, commonParams, client
 }
 
 const main = async () => {
-  // const labyrinthChain = defineChainViem();
-  const client = await hre.viem.getPublicClient();
+  const tenderlyChain = createTenderlyChain();
+  const client = await hre.viem.getPublicClient({
+    chain: tenderlyChain
+  });
   const chainId = await client.getChainId();
+  const wallet = createWalletClient({
+    chain: tenderlyChain,
+    transport: http(tenderlyChain.rpcUrls.default.http[0]),
+    account: privateKeyToAccount(privateKey)
+  });
+
+  const tenderlyDeployConfig: DeployContractConfig = {
+    //@ts-ignore
+    client: {
+      public: client,
+      wallet: wallet
+    }
+  }
+
   const commonParams = config.common as CommonParams;
   const adpParams = config.adpConfig[chainId] as AdaptorParams;
   const chainParams = config[chainId] as ChainParams;
 
-  const wallets = await hre.viem.getWalletClients();
-  const wallet = wallets[0];
-  const [walletAddress] = await wallet.getAddresses();
-  const eip712 = await hre.viem.deployContract("EIP712");
-  // const eip712Rct = await client.waitForTransactionReceipt({ hash: eip712.address });
-  // await tenderly.verify({
-  //   address: eip712Rct.contractAddress,
-  //   name: "EIP712",
-  // });
+  const eip712 = await hre.viem.deployContract("EIP712", [], tenderlyDeployConfig);
   console.log("EIP712 deployed:", eip712.address);
-  const asset = await hre.viem.deployContract("AssetLogic");
+  
+  const asset = await hre.viem.deployContract("AssetLogic", [], tenderlyDeployConfig);
   console.log("AssetLogic deployed:", asset.address);
-  const merkleTree = await hre.viem.deployContract("MerkleTreeLogic");
+  const merkleTree = await hre.viem.deployContract("MerkleTreeLogic", [], tenderlyDeployConfig);
   console.log("MerkleTreeLogic deployed:", merkleTree.address);
   const queuedMerkleTree = await hre.viem.deployContract(
-    "QueuedMerkleTreeLogic"
+    "QueuedMerkleTreeLogic", [], tenderlyDeployConfig
   );
   console.log("QueuedMerkleTreeLogic deployed:", queuedMerkleTree.address);
-
+  
   const shieldedAddress = await hre.viem.deployContract(
     "ShieldedAddressLogic",
     [],
     {
+      client: tenderlyDeployConfig.client,
       libraries: {
         MerkleTreeLogic: merkleTree.address,
       },
-    }
+    },
   );
   console.log("ShieldedAddressLogic deployed:", shieldedAddress.address);
-
+  
   const shieldedTransaction = await hre.viem.deployContract(
     "ShieldedTransactionLogic",
     [],
     {
+      client: tenderlyDeployConfig.client,
       libraries: {
         AssetLogic: asset.address,
         MerkleTreeLogic: merkleTree.address,
@@ -242,10 +265,11 @@ const main = async () => {
     }
   );
   console.log("ShieldedTransactionLogic deployed:", shieldedTransaction.address);
-  const adaptorHandler = await hre.viem.deployContract("AdaptorHandler");
+  const adaptorHandler = await hre.viem.deployContract("AdaptorHandler", [], tenderlyDeployConfig);
   console.log("AdaptorHandler deployed: ", adaptorHandler.address);
-
+  
   const poolImpl = await hre.viem.deployContract("Pool", [], {
+    client: tenderlyDeployConfig.client,
     libraries: {
       EIP712: eip712.address,
       AssetLogic: asset.address,
@@ -256,12 +280,12 @@ const main = async () => {
     },
   });
   console.log("Pool deployed:", poolImpl.address);
-
-  const { hasher } = await deployHasher(wallet, client);
+  
+  const { hasher } = await deployHasher(wallet, client, tenderlyDeployConfig);
   console.log("Hasher deployed:", hasher);
-
-  const verifier = await deployVerifier();
-
+  
+  const verifier = await deployVerifier(tenderlyDeployConfig);
+  
   const args = [
     commonParams.addressTreeDepth,
     commonParams.commitmentTreeDepth,
@@ -272,38 +296,38 @@ const main = async () => {
     hasher,
     BigInt(commonParams.withdrawFeeBps),
   ];
-
+  
   const initData = encodeFunctionData({
     abi: poolAbi,
     functionName: "initialize",
     args: args as any,
   });
-
+  
   const poolProxy = await hre.viem.deployContract("PoolProxy", [
     poolImpl.address,
     initData,
-  ]);
+  ], tenderlyDeployConfig);
   console.log("PoolProxy deployed:", poolProxy.address);
-
+  
   // Deploy Adaptors 
-  await deployAdaptors(poolProxy.address, chainParams, adpParams, wallet, client);
-
+  await deployAdaptors(poolProxy.address, chainParams, adpParams, wallet, client, tenderlyDeployConfig);
+  
   // ERC4337 infra setup
   const gateway = await hre.viem.deployContract("Gateway", [
     chainParams.entryPoint,
     chainParams.wToken,
     poolProxy.address,
-  ]);
+  ], tenderlyDeployConfig);
   console.log("Gateway deployed:", gateway.address);
-
+  
   const paymaster = await hre.viem.deployContract("Paymaster", [
     chainParams.entryPoint,
     gateway.address,
-  ]);
+  ], tenderlyDeployConfig);
   console.log("Paymaster deployed:", paymaster.address);
-
+  
   await fundPaymaster(paymaster.address, "20", wallet, client);
-
+  
   // Asset & Revoker Setup
   await addAssetsAndRevokers(poolProxy.address, chainParams, commonParams, client, wallet);
 };

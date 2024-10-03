@@ -70,7 +70,7 @@ contract BeefyAdaptorTest is PoolTest {
         uint256 mooTokenBal = IERC20(mooToken).balanceOf(address(pool));
         console.log("mooTokens received:", mooTokenBal);
         assert(mooTokenBal > 0);
-        assertGreaterThan(mooTokenBal, 0);
+        // assertGreaterThan(mooTokenBal, 0);
     }
 
     function testWithdrawInBeefyVault() public {

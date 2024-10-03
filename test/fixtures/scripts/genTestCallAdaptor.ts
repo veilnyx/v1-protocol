@@ -37,18 +37,6 @@ export const reqs = {
         payload:
             "0x000000000000000000000000000000000000000000000000000000000001000500000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000" as `0x${string}`, // refund: pool address (address(0))
     },
-    stake_2_orig_usde_on_ethena: {
-        type: TransactionType.CALL_ADAPTER,
-        assetIds: [testnetUsdc],
-        values: [parseUnits("2", 6)],
-        to: "0x03E98aE18908eBc2Fe82e646E4DFB628963383c1", // adaptor addr. which the ZkFi adaptor handler will call to execute this convert req
-        revokerId: 0,
-        feeAssetId: 0,
-        viaBundler: false,
-        paymaster: zeroAddress,
-        payload:
-            "0x000000000000000000000000000000000000000000000000000000000001000500000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000" as `0x{string}`, // refund: pool address (address(0)), outToken: USDe
-    },
     stake_1_testnet_weth: {
         type: TransactionType.CALL_ADAPTER,
         assetIds: [testnetWeth],
@@ -96,23 +84,21 @@ export const reqs = {
         // adaptor to which the ZkFi AdaptorHandler will call to execute swap
         to: "0xbF71c5Ae43827387dAAF7358acAB5C81642b74b8",
         // payload:: address pool: 0x390f3595bCa2Df7d23783dFd126427CCeb997BF4, action: 0 (supply)
-        payload: "0x0000000000000000000000000000000000000000000000000000000000000020000000000000000000000000390f3595bca2df7d23783dfd126427cceb997bf400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000a0000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000" as `0x${string}`,
+        payload: "0x000000000000000000000000390f3595bca2df7d23783dfd126427cceb997bf40000000000000000000000000000000000000000000000000000000000000000" as `0x${string}`,
         revokerId: 0,
         viaBundler: false,
         paymaster: zeroAddress,
     },
-    supply_2_wantLPToken: {
+    stake_2_orig_usde_on_ethena: {
         type: TransactionType.CALL_ADAPTER,
-        assetIds: [beefyWantToken],
+        assetIds: [testnetUsde],
         values: [parseEther("2")],
-        feeAssetId: 0,
-        // adaptor to which the ZkFi AdaptorHandler will call to execute swap
-        to: "0xbF71c5Ae43827387dAAF7358acAB5C81642b74b8",
-        // payload:: action: 0 (supply)
-        payload: "0x000000000000000000000000000000000000000000000000000000000000000000000000000000000000000092a14518434a46e88cb4c3918ad33b3344099e02" as `0x${string}`,
+        to: "0xbF71c5Ae43827387dAAF7358acAB5C81642b74b8", // adaptor addr. which the ZkFi adaptor handler will call to execute this convert req
         revokerId: 0,
+        feeAssetId: 0,
         viaBundler: false,
         paymaster: zeroAddress,
+        payload: "0x0000000000000000000000000000000000000000000000000000000000000000" as `0x${string}`
     }
         */
     supply_2_mooLPToken: {

@@ -11,20 +11,19 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 /// @notice Unstaking is not supported. User's will have to unstake from Ethena's UI after withdrawing their `sUSDe` from Labyrinth.
 contract EthenaAdaptor is AdaptorBase {
     IEthena public immutable ethena;
-     // Ethena's stable coin that will be staked
+    // Ethena's stable coin that will be staked
     address public immutable USDe;
-     // represents the share of USDe tokens staked in Ethena (non-rebasing)
+    // represents the share of USDe tokens staked in Ethena (non-rebasing)
     address public immutable sUSDe;
 
     constructor(
         address ethena_,
         address USDe_,
-        address sUSDe_,
         address pool_
     ) AdaptorBase(pool_) {
         ethena = IEthena(ethena_);
         USDe = USDe_;
-        sUSDe = sUSDe_;
+        sUSDe = ethena_;
     }
 
     function handleAssets(
@@ -39,12 +38,12 @@ contract EthenaAdaptor is AdaptorBase {
         returns (uint24[] memory outAssetIds, uint256[] memory outValues)
     {
         Asset memory inAsset = getAsset(inAssetIds[0]);
-        if(inAsset.assetAddress != USDe) {
+        if (inAsset.assetAddress != USDe) {
             revert UnsupportedAsset(inAsset.id);
         }
-        
+
         uint256 stakeValue = inValues[0];
-        if(stakeValue == 0) {
+        if (stakeValue == 0) {
             revert ZeroValue();
         }
 

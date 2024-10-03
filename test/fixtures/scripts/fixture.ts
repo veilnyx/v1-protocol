@@ -42,6 +42,7 @@ const assets = {
   testnetUsdc: config.assets.testnetUsdc,
   testnetUsdt: config.assets.testnetUsdt,
   testnetCrvUsd: config.assets.testnetCrvUsd,
+  testnetUsde: config.assets.testnetUsde,
   beefyWantToken: config.assets.beefyWantToken,
   beefyMooToken: config.assets.beefyMooToken,
 };
