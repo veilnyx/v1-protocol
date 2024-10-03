@@ -351,7 +351,7 @@ contract CurveNGAdaptor is AdaptorBase {
         }
     }
 
-    function totalLPTokenSupply(address pool) external returns (uint256) {
+    function totalLPTokenSupply(address pool) external view returns (uint256) {
         return ICurvePool(pool).totalSupply();
     }
 

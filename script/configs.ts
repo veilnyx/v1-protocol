@@ -96,6 +96,7 @@ export function loadConfigs() {
       lido: {
         lido: getHex(lido.lido),
         withdrawalQueueERC721: getHex(lido.withdrawalQueueERC721),
+        wETH: getHex(lido.wETH),
         stETH: getHex(lido.stETH),
         wstETH: getHex(lido.wstETH),
       },
