@@ -21,6 +21,12 @@
         "ethena": {
             "ethena": "0x9D39A5DE30e57443BfF2A8307A4256c8797A3497",
             "usde": "0x4c9EDD5852cd905f086C759E8383e09bff1E68B3"
+        },
+        "beefy": {
+            "assets": {
+                "sUSDeCrvUSDWantToken": "0x57064F49Ad7123C92560882a45518374ad982e85",
+                "mooCurveCrvUSDsUSDe": "0xBF7fc2A3d96d80f47b3b89BE84afe10376CE96A5"
+            }
         }
     },
     "7800": {
@@ -45,30 +51,12 @@
         "ethena": {
             "ethena": "0x9D39A5DE30e57443BfF2A8307A4256c8797A3497",
             "usde": "0x4c9EDD5852cd905f086C759E8383e09bff1E68B3"
-        }
-    },
-    "11155111": {
-        "uniswap": {
-            "uniswapSwapRouter02": "0x3bFA4769FB09eefC5a80d6E87c3B9C650f7Ae48E"
         },
-        "aave": {
-            "aave": "0x6Ae43d3271ff6888e7Fc43Fd7321a503ff738951",
-            "aaveStaticTokenFactory": "0xd210dFB43B694430B8d31762B5199e30c31266C8",
-            "aWETH": "0xC558DBdd856501FCd9aaF1E62eae57A9F0629a3c",
-            "aUSDC": "0x94a9D9AC8a22534E3FaCa9F4e7F2E2cf85d5E4C8",
-            "staticAWETH": "0x162B500569F42D9eCe937e6a61EDfef660A12E98",
-            "staticAUSDC": "0x8A88124522dbBF1E56352ba3DE1d9F78C143751e"
-        },
-        "lido": {
-            "lido": "0x3e3FE7dBc6B4C189E7128855dD526361c49b40Af",
-            "withdrawalQueueERC721": "0x1583C7b3f4C3B008720E6BcE5726336b0aB25fdd",
-            "wETH": "0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14",
-            "stETH": "0x3e3FE7dBc6B4C189E7128855dD526361c49b40Af",
-            "wstETH": "0xB82381A3fBD3FaFA77B3a7bE693342618240067b"
-        },
-        "ethena": {
-            "ethena": "0x0000000000000000000000000000000000000000000000000000000000000000",
-            "usde": "0x9458caaca74249abbe9e964b3ce155b98ec88ef2"
+        "beefy": {
+            "assets": {
+                "sUSDeCrvUSDWantToken": "0x57064F49Ad7123C92560882a45518374ad982e85",
+                "mooCurveCrvUSDsUSDe": "0xBF7fc2A3d96d80f47b3b89BE84afe10376CE96A5"
+            }
         }
     }
 }

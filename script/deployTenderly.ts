@@ -65,7 +65,7 @@ const deployVerifier = async (tenderlyDeployConfig) => {
   return verifier.address;
 }
 
-const deployUniswap = async (uniswapParams, pool, tenderlyDeployConfig, client, wallet) => {
+const deployUniswap = async (uniswapParams, pool, tenderlyDeployConfig, wallet, client) => {
   const uniswap = await hre.viem.deployContract("UniswapV3Adapter", [
     uniswapParams.uniswapSwapRouter02,
     pool
@@ -74,7 +74,7 @@ const deployUniswap = async (uniswapParams, pool, tenderlyDeployConfig, client, 
   await addAdpatorSupport(pool, uniswap.address, true, client, wallet);
 }
 
-const deployAave = async (aaveParams, pool, tenderlyDeployConfig, client, wallet) => {
+const deployAave = async (aaveParams, pool, tenderlyDeployConfig, wallet, client) => {
   const aave = await hre.viem.deployContract("AaveV3Adaptor", [
     aaveParams.aave,
     pool,
@@ -84,7 +84,7 @@ const deployAave = async (aaveParams, pool, tenderlyDeployConfig, client, wallet
   await addAdpatorSupport(pool, aave.address, true, client, wallet);
 }
 
-const deployLido = async (lidoParams, pool, tenderlyDeployConfig, client, wallet) => {
+const deployLido = async (lidoParams, pool, tenderlyDeployConfig, wallet, client) => {
   const lido = await hre.viem.deployContract("LidoAdaptor", [
     lidoParams.lido,
     lidoParams.wETH, // wETH
@@ -97,16 +97,15 @@ const deployLido = async (lidoParams, pool, tenderlyDeployConfig, client, wallet
   await addAdpatorSupport(pool, lido.address, true, client, wallet);
 }
 
-const deployCurve = async (pool, tenderlyDeployConfig, client, wallet) => {
+const deployCurve = async (pool, tenderlyDeployConfig, wallet, client) => {
   const curve = await hre.viem.deployContract("CurveNGAdaptor", [
     pool
   ], tenderlyDeployConfig);
   console.log("CurveNGAdp deployed:", curve.address);
   await addAdpatorSupport(pool, curve.address, true, client, wallet);
-
 }
 
-const deployEthena = async (ethenaParams, pool, tenderlyDeployConfig, client, wallet) => {
+const deployEthena = async (ethenaParams, pool, tenderlyDeployConfig, wallet, client) => {
   const ethena = await hre.viem.deployContract("EthenaAdaptor", [
     ethenaParams.ethena,
     ethenaParams.usde,
@@ -116,14 +115,26 @@ const deployEthena = async (ethenaParams, pool, tenderlyDeployConfig, client, wa
   await addAdpatorSupport(pool, ethena.address, true, client, wallet);
 }
 
-const deployAdaptors = async (pool, adpParams, wallet, client, tenderlyDeployConfig) => {
-  const { uniswap: uniswapParams, aave: aaveParams, lido: lidoParams, ethena: ethenaParams } = adpParams;
+const deployBeefy = async (beefyParams, pool, tenderlyDeployConfig, wallet, client) => {
+  const beefy = await hre.viem.deployContract("BeefyV7Adaptor", [
+    pool
+  ], tenderlyDeployConfig);
+  console.log("Beefy deployed:", beefy.address);
+  await addAdpatorSupport(pool, beefy.address, true, client, wallet);
 
-  await deployUniswap(uniswapParams, pool, tenderlyDeployConfig, client, wallet);
-  await deployAave(aaveParams, pool, tenderlyDeployConfig, client, wallet);
-  await deployLido(lidoParams, pool, tenderlyDeployConfig, client, wallet);
-  await deployCurve(pool, tenderlyDeployConfig, client, wallet);
-  await deployEthena(ethenaParams, pool, tenderlyDeployConfig, client, wallet);
+  const assets = [beefyParams.assets.sUSDeCrvUSDWantToken, beefyParams.assets.mooCurveCrvUSDsUSDe];
+  await addAssets(assets, 1, pool, wallet, client);
+}
+
+const deployAdaptors = async (pool, adpParams, wallet, client, tenderlyDeployConfig) => {
+  const { uniswap: uniswapParams, aave: aaveParams, lido: lidoParams, ethena: ethenaParams, beefy: beefyParams } = adpParams;
+
+  await deployUniswap(uniswapParams, pool, tenderlyDeployConfig, wallet, client);
+  await deployAave(aaveParams, pool, tenderlyDeployConfig, wallet, client);
+  await deployLido(lidoParams, pool, tenderlyDeployConfig, wallet, client);
+  await deployCurve(pool, tenderlyDeployConfig, wallet, client);
+  await deployEthena(ethenaParams, pool, tenderlyDeployConfig, wallet, client);
+  await deployBeefy(beefyParams, pool, tenderlyDeployConfig, wallet, client);
 }
 
 const addAdpatorSupport = async (pool, adpAddress, enable, client, wallet) => {
@@ -179,6 +190,24 @@ const fundPaymaster = async (paymaster, amount, wallet, client) => {
   } catch (error) {
     console.log("Error funding paymaster");
     console.log(error.message);
+  }
+}
+
+const addAssets = async (assets, assetType, poolAddr, wallet, client) => {
+  console.log("Adding assets:", assets);
+  try {
+    //@ts-ignore
+    const hash = await wallet.writeContract({
+      address: poolAddr,
+      abi: poolAbi,
+      functionName: "addAssets",
+      args: [assetType, assets],
+    });
+
+    const rct = await client.waitForTransactionReceipt({ hash });
+    console.log("rct:addAsset", rct.status);
+  } catch (e) {
+    console.log("Error adding assets:", e);
   }
 }
 

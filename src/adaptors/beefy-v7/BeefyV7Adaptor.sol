@@ -6,7 +6,6 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {IBeefyVault} from "./IBeefyVault.sol";
 import {AdaptorBase} from "../../base/AdaptorBase.sol";
 import {Asset} from "../../libraries/Asset.sol";
-import {console2} from "forge-std/console2.sol";
 
 enum Action {
     DEPOSIT,
