@@ -32,7 +32,6 @@ struct PoolUnderlyingTokensInfo {
 contract CurveNGAdaptor is AdaptorBase {
     using SafeERC20 for IERC20;
 
-    error InsufficientBalance();
     error InvalidInput();
     error AssetNotSupportedByPool(address asset, address curvePool);
 
@@ -352,7 +351,7 @@ contract CurveNGAdaptor is AdaptorBase {
         }
     }
 
-    function totalLPTokenSupply(address pool) external returns (uint256) {
+    function totalLPTokenSupply(address pool) external view returns (uint256) {
         return ICurvePool(pool).totalSupply();
     }
 

@@ -65,48 +65,76 @@ const deployVerifier = async (tenderlyDeployConfig) => {
   return verifier.address;
 }
 
-const deployAdaptors = async (pool, chainParams, adpParams, wallet, client, tenderlyDeployConfig) => {
-  const { uniswap: uniswapConfig, aave: aaveConfig, lido: lidoConfig, ethena: ethenaConfig } = adpParams;
-
+const deployUniswap = async (uniswapParams, pool, tenderlyDeployConfig, wallet, client) => {
   const uniswap = await hre.viem.deployContract("UniswapV3Adapter", [
-    uniswapConfig.uniswapSwapRouter02,
+    uniswapParams.uniswapSwapRouter02,
     pool
   ], tenderlyDeployConfig)
   console.log("UniswapV3Adapter deployed:", uniswap.address);
   await addAdpatorSupport(pool, uniswap.address, true, client, wallet);
+}
 
+const deployAave = async (aaveParams, pool, tenderlyDeployConfig, wallet, client) => {
   const aave = await hre.viem.deployContract("AaveV3Adaptor", [
-    aaveConfig.aave,
+    aaveParams.aave,
     pool,
-    aaveConfig.aaveStaticTokenFactory
+    aaveParams.aaveStaticTokenFactory
   ], tenderlyDeployConfig);
   console.log("AaveV3Adapter deployed:", aave.address);
   await addAdpatorSupport(pool, aave.address, true, client, wallet);
+}
 
+const deployLido = async (lidoParams, pool, tenderlyDeployConfig, wallet, client) => {
   const lido = await hre.viem.deployContract("LidoAdaptor", [
-    lidoConfig.lido,
-    chainParams.initAssetAddresses[0], // wETH
-    lidoConfig.stETH, // stETH
-    lidoConfig.wstETH, // wstETH
-    lidoConfig.withdrawalQueueERC721,
+    lidoParams.lido,
+    lidoParams.wETH, // wETH
+    lidoParams.stETH, // stETH
+    lidoParams.wstETH, // wstETH
+    lidoParams.withdrawalQueueERC721,
     pool
   ], tenderlyDeployConfig);
   console.log("LidoAdapter deployed:", lido.address);
   await addAdpatorSupport(pool, lido.address, true, client, wallet);
+}
 
+const deployCurve = async (pool, tenderlyDeployConfig, wallet, client) => {
   const curve = await hre.viem.deployContract("CurveNGAdaptor", [
     pool
   ], tenderlyDeployConfig);
   console.log("CurveNGAdp deployed:", curve.address);
   await addAdpatorSupport(pool, curve.address, true, client, wallet);
- 
+}
+
+const deployEthena = async (ethenaParams, pool, tenderlyDeployConfig, wallet, client) => {
   const ethena = await hre.viem.deployContract("EthenaAdaptor", [
-    ethenaConfig.ethena,
-    ethenaConfig.usde,
+    ethenaParams.ethena,
+    ethenaParams.usde,
     pool
   ], tenderlyDeployConfig);
   console.log("Ethena deployed:", ethena.address);
   await addAdpatorSupport(pool, ethena.address, true, client, wallet);
+}
+
+const deployBeefy = async (beefyParams, pool, tenderlyDeployConfig, wallet, client) => {
+  const beefy = await hre.viem.deployContract("BeefyV7Adaptor", [
+    pool
+  ], tenderlyDeployConfig);
+  console.log("Beefy deployed:", beefy.address);
+  await addAdpatorSupport(pool, beefy.address, true, client, wallet);
+
+  const assets = [beefyParams.assets.sUSDeCrvUSDWantToken, beefyParams.assets.mooCurveCrvUSDsUSDe];
+  await addAssets(assets, 1, pool, wallet, client);
+}
+
+const deployAdaptors = async (pool, adpParams, wallet, client, tenderlyDeployConfig) => {
+  const { uniswap: uniswapParams, aave: aaveParams, lido: lidoParams, ethena: ethenaParams, beefy: beefyParams } = adpParams;
+
+  await deployUniswap(uniswapParams, pool, tenderlyDeployConfig, wallet, client);
+  await deployAave(aaveParams, pool, tenderlyDeployConfig, wallet, client);
+  await deployLido(lidoParams, pool, tenderlyDeployConfig, wallet, client);
+  await deployCurve(pool, tenderlyDeployConfig, wallet, client);
+  await deployEthena(ethenaParams, pool, tenderlyDeployConfig, wallet, client);
+  await deployBeefy(beefyParams, pool, tenderlyDeployConfig, wallet, client);
 }
 
 const addAdpatorSupport = async (pool, adpAddress, enable, client, wallet) => {
@@ -162,6 +190,24 @@ const fundPaymaster = async (paymaster, amount, wallet, client) => {
   } catch (error) {
     console.log("Error funding paymaster");
     console.log(error.message);
+  }
+}
+
+const addAssets = async (assets, assetType, poolAddr, wallet, client) => {
+  console.log("Adding assets:", assets);
+  try {
+    //@ts-ignore
+    const hash = await wallet.writeContract({
+      address: poolAddr,
+      abi: poolAbi,
+      functionName: "addAssets",
+      args: [assetType, assets],
+    });
+
+    const rct = await client.waitForTransactionReceipt({ hash });
+    console.log("rct:addAsset", rct.status);
+  } catch (e) {
+    console.log("Error adding assets:", e);
   }
 }
 
@@ -230,7 +276,7 @@ const main = async () => {
 
   const eip712 = await hre.viem.deployContract("EIP712", [], tenderlyDeployConfig);
   console.log("EIP712 deployed:", eip712.address);
-  
+
   const asset = await hre.viem.deployContract("AssetLogic", [], tenderlyDeployConfig);
   console.log("AssetLogic deployed:", asset.address);
   const merkleTree = await hre.viem.deployContract("MerkleTreeLogic", [], tenderlyDeployConfig);
@@ -239,7 +285,7 @@ const main = async () => {
     "QueuedMerkleTreeLogic", [], tenderlyDeployConfig
   );
   console.log("QueuedMerkleTreeLogic deployed:", queuedMerkleTree.address);
-  
+
   const shieldedAddress = await hre.viem.deployContract(
     "ShieldedAddressLogic",
     [],
@@ -251,7 +297,7 @@ const main = async () => {
     },
   );
   console.log("ShieldedAddressLogic deployed:", shieldedAddress.address);
-  
+
   const shieldedTransaction = await hre.viem.deployContract(
     "ShieldedTransactionLogic",
     [],
@@ -267,7 +313,7 @@ const main = async () => {
   console.log("ShieldedTransactionLogic deployed:", shieldedTransaction.address);
   const adaptorHandler = await hre.viem.deployContract("AdaptorHandler", [], tenderlyDeployConfig);
   console.log("AdaptorHandler deployed: ", adaptorHandler.address);
-  
+
   const poolImpl = await hre.viem.deployContract("Pool", [], {
     client: tenderlyDeployConfig.client,
     libraries: {
@@ -280,12 +326,12 @@ const main = async () => {
     },
   });
   console.log("Pool deployed:", poolImpl.address);
-  
+
   const { hasher } = await deployHasher(wallet, client, tenderlyDeployConfig);
   console.log("Hasher deployed:", hasher);
-  
+
   const verifier = await deployVerifier(tenderlyDeployConfig);
-  
+
   const args = [
     commonParams.addressTreeDepth,
     commonParams.commitmentTreeDepth,
@@ -296,22 +342,22 @@ const main = async () => {
     hasher,
     BigInt(commonParams.withdrawFeeBps),
   ];
-  
+
   const initData = encodeFunctionData({
     abi: poolAbi,
     functionName: "initialize",
     args: args as any,
   });
-  
+
   const poolProxy = await hre.viem.deployContract("PoolProxy", [
     poolImpl.address,
     initData,
   ], tenderlyDeployConfig);
   console.log("PoolProxy deployed:", poolProxy.address);
-  
+
   // Deploy Adaptors 
-  await deployAdaptors(poolProxy.address, chainParams, adpParams, wallet, client, tenderlyDeployConfig);
-  
+  await deployAdaptors(poolProxy.address, adpParams, wallet, client, tenderlyDeployConfig);
+
   // ERC4337 infra setup
   const gateway = await hre.viem.deployContract("Gateway", [
     chainParams.entryPoint,
@@ -319,15 +365,15 @@ const main = async () => {
     poolProxy.address,
   ], tenderlyDeployConfig);
   console.log("Gateway deployed:", gateway.address);
-  
+
   const paymaster = await hre.viem.deployContract("Paymaster", [
     chainParams.entryPoint,
     gateway.address,
   ], tenderlyDeployConfig);
   console.log("Paymaster deployed:", paymaster.address);
-  
+
   await fundPaymaster(paymaster.address, "20", wallet, client);
-  
+
   // Asset & Revoker Setup
   await addAssetsAndRevokers(poolProxy.address, chainParams, commonParams, client, wallet);
 };

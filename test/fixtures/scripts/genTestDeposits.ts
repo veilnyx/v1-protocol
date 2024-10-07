@@ -5,12 +5,22 @@ import { fixture, generateTestTransactions } from "./fixture";
 import { parse } from 'path';
 
 const {
-  assets: { testnetUsde },
+  assets: { testnetWeth, testnetUsdt, testnetCrvUsd, beefyWantToken, beefyMooToken },
   sender: { account: senderAccount },
 } = fixture;
 
 export const reqs = {
   /**
+  deposit_2_testnet_weth: {
+    type: TransactionType.DEPOSIT,
+    assetIds: [testnetWeth],
+    values: [parseEther("2")],
+    feeAssetId: 0,
+    to: senderAccount.shieldedAddress.pack(),
+    viaBundler: false,
+    paymaster: zeroAddress,
+    revokerId: 0,
+  }, 
   deposit_pre_tx: {
     type: TransactionType.DEPOSIT,
     assetIds: [weth, usdc],
@@ -51,29 +61,20 @@ export const reqs = {
     paymaster: zeroAddress,
     revokerId: 0,
   },
-  deposit_2_testnet_weth: {
-    type: TransactionType.DEPOSIT,
-    assetIds: [testnetWeth],
-    values: [parseEther("2")],
-    feeAssetId: 0,
-    to: senderAccount.shieldedAddress.pack(),
-    viaBundler: false,
-    paymaster: zeroAddress,
-    revokerId: 0,
-  }, deposit_2_testnet_usdt_crvusd: {
+  deposit_5_testnet_usdt_crvusd: {
     type: TransactionType.DEPOSIT,
     assetIds: [testnetUsdt, testnetCrvUsd],
-    values: [parseUnits("2", 6), parseUnits("2", 6)],
+    values: [parseUnits("5", 6), parseUnits("5", 18)],
     feeAssetId: 0,
     to: senderAccount.shieldedAddress.pack(),
     viaBundler: false,
     paymaster: zeroAddress,
     revokerId: 0,
-  }, 
+  },
   */
-  deposit_2_testnet_usde: {
+  deposit_2_wantLPToken: {
     type: TransactionType.DEPOSIT,
-    assetIds: [testnetUsde],
+    assetIds: [beefyWantToken],
     values: [parseEther("2")],
     feeAssetId: 0,
     to: senderAccount.shieldedAddress.pack(),
@@ -81,6 +82,16 @@ export const reqs = {
     paymaster: zeroAddress,
     revokerId: 0,
   },
+  deposit_2_mooLPToken: {
+    type: TransactionType.DEPOSIT,
+    assetIds: [beefyMooToken],
+    values: [parseEther("2")],
+    feeAssetId: 0,
+    to: senderAccount.shieldedAddress.pack(),
+    viaBundler: false,
+    paymaster: zeroAddress,
+    revokerId: 0,
+  }
 };
 
 export const genTestDeposits = async (sdk: Core) => {

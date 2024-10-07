@@ -4,13 +4,13 @@ import { TransactionType } from "@zkfi-tech/shared-types";
 import { fixture, generateTestTransactions, mockNotes } from "./fixture";
 
 const {
-    assets: { testnetUsde },
+    assets: { testnetWeth, testnetUsdt, testnetCrvUsd, beefyWantToken, beefyMooToken },
     sender: { account: senderAccount, pubAddress: senderPubAddress },
     receiver: { account: receiverAccount },
 } = fixture;
 
 export const reqs = {
-    /**
+    /**,
     swap_1_testnet_weth_to_usdc: {
         type: TransactionType.CALL_ADAPTER,
         assetIds: [testnetWeth],
@@ -76,10 +76,10 @@ export const reqs = {
         viaBundler: false,
         paymaster: zeroAddress,
     },
-    supply_2_usdt_crvUsd_on_curve: {
+    supply_5_usdt_crvUsd_on_curve: {
         type: TransactionType.CALL_ADAPTER,
         assetIds: [testnetUsdt, testnetCrvUsd],
-        values: [parseUnits("2", 6), parseUnits("2", 6)],
+        values: [parseUnits("5", 6), parseUnits("5", 18)],
         feeAssetId: 0,
         // adaptor to which the ZkFi AdaptorHandler will call to execute swap
         to: "0xbF71c5Ae43827387dAAF7358acAB5C81642b74b8",
@@ -88,7 +88,7 @@ export const reqs = {
         revokerId: 0,
         viaBundler: false,
         paymaster: zeroAddress,
-    },*/
+    },
     stake_2_orig_usde_on_ethena: {
         type: TransactionType.CALL_ADAPTER,
         assetIds: [testnetUsde],
@@ -100,9 +100,23 @@ export const reqs = {
         paymaster: zeroAddress,
         payload: "0x0000000000000000000000000000000000000000000000000000000000000000" as `0x${string}`
     }
+        */
+    supply_2_mooLPToken: {
+        type: TransactionType.CALL_ADAPTER,
+        assetIds: [beefyMooToken],
+        values: [parseEther("2")],
+        feeAssetId: 0,
+        // adaptor to which the ZkFi AdaptorHandler will call to execute swap
+        to: "0xbF71c5Ae43827387dAAF7358acAB5C81642b74b8",
+        // payload:: action: 0 (supply)
+        payload: "0x000000000000000000000000000000000000000000000000000000000000000100000000000000000000000092a14518434a46e88cb4c3918ad33b3344099e02" as `0x${string}`,
+        revokerId: 0,
+        viaBundler: false,
+        paymaster: zeroAddress,
+    }
 };
 
 export const genTestCallAdaptors = async (sdk: Core) => {
-    await mockNotes("deposit_2_testnet_usde", sdk);
+    await mockNotes("deposit_2_mooLPToken", sdk);
     await generateTestTransactions(reqs, sdk);
 };

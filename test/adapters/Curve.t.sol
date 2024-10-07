@@ -25,7 +25,6 @@ contract CurveAdaptorTest is PoolTest {
     address public crvUSD = 0xf939E0A03FB07F59A73314E73794Be0E57ac1b4E;
     address public crvUSD_USDT_Pool =
         0x390f3595bCa2Df7d23783dFd126427CCeb997BF4;
-    address[] poolCoins = new address[](3);
 
     function setUp() external {
         require(shouldTestRun(), "CurveAdaptorTest: Chain not supported");
@@ -35,33 +34,35 @@ contract CurveAdaptorTest is PoolTest {
         curveAdaptor = new CurveAdaptor(address(pool));
         /// @dev update convert req fixture with this adaptor addr as `to`
         console.log("Curve adaptor deployed:", address(curveAdaptor));
-        poolCoins[0] = USDT;
-        poolCoins[1] = crvUSD;
-        poolCoins[2] = crvUSD_USDT_Pool;
 
-        // Asset & Adaptor support on Labyrinth Protocol
+        // Adaptor support on Labyrinth Protocol
         address poolOwner = pool.owner();
         vm.startPrank(poolOwner);
         pool.addAdaptorSupport(address(curveAdaptor), true);
-        pool.addAssets(AssetType.ERC20, poolCoins);
         vm.stopPrank();
 
         deal(USDT, user, INITIAL_SUPPLY_USDT);
         deal(crvUSD, user, INITIAL_SUPPLY_CRVUSD);
 
-        /**
         vm.startPrank(user);
-        SafeERC20.forceApprove(IERC20(USDT), address(pool), INITIAL_SUPPLY_USDT);
-        SafeERC20.forceApprove(IERC20(crvUSD), address(pool), INITIAL_SUPPLY_CRVUSD);
+        SafeERC20.forceApprove(
+            IERC20(USDT),
+            address(pool),
+            INITIAL_SUPPLY_USDT
+        );
+        SafeERC20.forceApprove(
+            IERC20(crvUSD),
+            address(pool),
+            INITIAL_SUPPLY_CRVUSD
+        );
 
         ShieldedTransaction memory stxDeposit = _loadShieldedTransaction(
-            "deposit_2_testnet_usdt_crvusd"
+            "deposit_5_testnet_usdt_crvusd"
         );
         pool.transact(stxDeposit);
         vm.stopPrank();
 
         _processCommitmentTreeQueue();
-         */
     }
 
     function testCurveAdaptorDeploy() external view {
@@ -72,15 +73,20 @@ contract CurveAdaptorTest is PoolTest {
     function testDepositOnCurve() public {
         console.log("Initiating deposit on Curve");
 
-        /**
-        //     ShieldedTransaction memory stxSupply = _loadShieldedTransaction(
-        //     "supply_2_usdt_crvUsd_on_curve"
-        // );
-        // pool.transact(stxSupply);
-         // Asserts
-        uint256 curveLPTokenBalPostSupply = IERC20(crvUSD_USDT_Pool).balanceOf(
-            address(user)
+        uint256 curveLPTokenBalBeforeSupply = IERC20(crvUSD_USDT_Pool)
+            .balanceOf(address(pool));
+
+        ShieldedTransaction memory stxSupply = _loadShieldedTransaction(
+            "supply_5_usdt_crvUsd_on_curve"
         );
+
+        pool.transact(stxSupply);
+
+        // Asserts
+        uint256 curveLPTokenBalPostSupply = IERC20(crvUSD_USDT_Pool).balanceOf(
+            address(pool)
+        );
+
         console.log(
             "Pool lp token bal before supply:",
             curveLPTokenBalBeforeSupply
@@ -90,8 +96,9 @@ contract CurveAdaptorTest is PoolTest {
             curveLPTokenBalPostSupply
         );
         assert(curveLPTokenBalPostSupply > curveLPTokenBalBeforeSupply);
-        */
 
+        // direct adaptor testing
+        /**
         (
             uint24[] memory outAssetIds,
             uint256[] memory outValues
@@ -103,6 +110,7 @@ contract CurveAdaptorTest is PoolTest {
             "LP token amount received:",
             IERC20(crvUSD_USDT_Pool).balanceOf(address(curveAdaptor))
         );
+         */
     }
 
     function testBalancedWithdraw() public {
@@ -127,7 +135,6 @@ contract CurveAdaptorTest is PoolTest {
         });
 
         bytes memory payloadEncoded = abi.encode(payload);
-
         vm.startPrank(user);
         /// @dev We don't need to transfer the LP tokens to the CurveAdaptor as during the deposit, LP tokens were received by the CurveAdaptor itself.
         (uint24[] memory outAssetIds, uint256[] memory outValues) = IAdaptor(
@@ -264,6 +271,8 @@ contract CurveAdaptorTest is PoolTest {
         });
 
         bytes memory payloadEncoded = abi.encode(payload);
+        console.log("Test payload:");
+        console.logBytes(payloadEncoded);
 
         vm.startPrank(user);
         SafeERC20.safeTransfer(

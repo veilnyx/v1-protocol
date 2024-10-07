@@ -54,7 +54,9 @@
     "testnetCrvUsd": 65546,
     "testnetCurveLPToken": 65547,
     "testnetUsde": 65548,
-    "testnetsUsde": 65549
+    "testnetsUsde": 65549,
+    "beefyWantToken": 65550,
+    "beefyMooToken": 65551
   },
   "leavesQueue1": [
     "19014214495641488759237505126948346942972912379615652741039992445865937985820",

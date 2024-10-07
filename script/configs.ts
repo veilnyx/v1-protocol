@@ -20,6 +20,7 @@ export type AdaptorParams = {
   aave: Object;
   lido: Object;
   ethena: Object;
+  beefy: Object;
 }
 
 export type CommonParams = {
@@ -78,7 +79,8 @@ export function loadConfigs() {
       uniswap,
       aave,
       lido,
-      ethena
+      ethena,
+      beefy
     } = params;
 
     adpParams[Number(chainId)] = {
@@ -96,12 +98,19 @@ export function loadConfigs() {
       lido: {
         lido: getHex(lido.lido),
         withdrawalQueueERC721: getHex(lido.withdrawalQueueERC721),
+        wETH: getHex(lido.wETH),
         stETH: getHex(lido.stETH),
         wstETH: getHex(lido.wstETH),
       },
       ethena: {
         ethena: getHex(ethena.ethena),
         usde: getHex(ethena.usde),
+      },
+      beefy: {
+        assets: {
+          sUSDeCrvUSDWantToken: getHex(beefy.assets.sUSDeCrvUSDWantToken),
+          mooCurveCrvUSDsUSDe: getHex(beefy.assets.mooCurveCrvUSDsUSDe)
+        }
       }
     };
   }

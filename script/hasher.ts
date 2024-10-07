@@ -33,6 +33,7 @@ export const deployHasher = async (wallet, client, tenderlyDeployConfig) => {
 
   const poseidonT3 = receiptPT3.contractAddress;
   console.log("PoseidonT3 deployed:", poseidonT3);
+
   const poseidonT4 = receiptPT4.contractAddress;
   console.log("PoseidonT4 deployed:", poseidonT4);
 

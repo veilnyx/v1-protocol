@@ -5,8 +5,7 @@ import {Script} from "forge-std/Script.sol";
 import {AdaptorHandler} from "src/core/AdaptorHandler.sol";
 import {console2} from "forge-std/console2.sol";
 import {Pool} from "src/core/Pool.sol";
-import {IStableSwapFactory} from "src/adaptors/curveNG/IStableSwapFactory.sol";
-import {ICurvePool} from "src/adaptors/curveNG/ICurvePool.sol";
+import {Payload} from "src/adaptors/curveNG/CurveNGAdaptor.sol";
 struct AddressInfo {
     address addr;
     string description;

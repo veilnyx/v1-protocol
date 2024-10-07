@@ -42,7 +42,9 @@ const assets = {
   testnetUsdc: config.assets.testnetUsdc,
   testnetUsdt: config.assets.testnetUsdt,
   testnetCrvUsd: config.assets.testnetCrvUsd,
-  testnetUsde: config.assets.testnetUsde
+  testnetUsde: config.assets.testnetUsde,
+  beefyWantToken: config.assets.beefyWantToken,
+  beefyMooToken: config.assets.beefyMooToken,
 };
 
 const revokerPublicKey = Point.fromArray([
@@ -114,6 +116,7 @@ export const generateTestTransaction = async (
   const tx = await sdk.createTransaction(req, opts);
   const signedTx = await sdk.signTransaction(tx);
   const ztx = await sdk.proveTransaction(signedTx);
+  console.log("ZTX:", ztx);
   const encoded = ztx.encode();
   writeFileSync(`${dirFixtureData}/${name}.txt`, encoded);
 };
@@ -206,10 +209,13 @@ export async function mockNotes(depositName: string, sdk: Core) {
   // );
 
   // Decrypt notes
-  const encryptedNotesHex = sliceHex(ztx.notesMemo, 7 * 32); // ignoring first 3 (encrypted key seed) and 4 (encrypted refund data) chunks. The balance notesMemo are encrypted notes of (4 * 32) bytes each
-  const encryptedNotes = splitToChunks(encryptedNotesHex, SIZE_FULLY_ENCRYPTED_NOTE_DATA);
+  // ignoring/slicing the first 3 (encrypted key seed) and 4 (encrypted refund data) chunks. The balance notesMemo are encrypted notes of (4 * 32) = 128 bytes each
+  const encryptedNotesHex = sliceHex(ztx.notesMemo, 7 * 32);
+  const encryptedNotes = splitToChunks(encryptedNotesHex, SIZE_FULLY_ENCRYPTED_NOTE_DATA); // 128 bytes = each note
+  console.log("Encrypted notes length:", encryptedNotes.length);
   const notes = [];
   for (let i = 0; i < encryptedNotes.length; i++) {
+    console.log("Encrypted note:", encryptedNotes[i]);
     const n = Note.decrypt(0, encryptedNotesKeys[i], encryptedNotes[i], {
       account: senderAccount,
       revoker: revokerPublicKey,
