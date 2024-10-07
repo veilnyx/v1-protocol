@@ -5,7 +5,7 @@ import { fixture, generateTestTransactions } from "./fixture";
 import { parse } from 'path';
 
 const {
-  assets: { testnetWeth, testnetUsdt, testnetCrvUsd, beefyWantToken, beefyMooToken },
+  assets: { weth, usdc },
   sender: { account: senderAccount },
 } = fixture;
 
@@ -71,7 +71,6 @@ export const reqs = {
     paymaster: zeroAddress,
     revokerId: 0,
   },
-  */
   deposit_2_wantLPToken: {
     type: TransactionType.DEPOSIT,
     assetIds: [beefyWantToken],
@@ -92,6 +91,7 @@ export const reqs = {
     paymaster: zeroAddress,
     revokerId: 0,
   }
+    */
 };
 
 export const genTestDeposits = async (sdk: Core) => {

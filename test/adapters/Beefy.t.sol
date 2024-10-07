@@ -17,11 +17,11 @@ contract BeefyAdaptorTest is PoolTest {
 
     BeefyAdp beefyAdp;
     address public constant wantLPToken =
-        0xb819feeF8F0fcDC268AfE14162983A69f6BF179E;
+        0x57064F49Ad7123C92560882a45518374ad982e85;
     address public constant mooToken =
-        0x92A14518434a46E88CB4C3918AD33B3344099E02;
+        0xBF7fc2A3d96d80f47b3b89BE84afe10376CE96A5;
     address public constant beefyVault =
-        0x92A14518434a46E88CB4C3918AD33B3344099E02;
+        0xBF7fc2A3d96d80f47b3b89BE84afe10376CE96A5;
     address public user = 0x689EcF264657302052c3dfBD631e4c20d3ED0baB;
     uint256 public constant INITIAL_SUPPLY = 2 ether;
 
@@ -37,8 +37,14 @@ contract BeefyAdaptorTest is PoolTest {
 
         // Adaptor support on Labyrinth Protocol
         address poolOwner = pool.owner();
-        vm.prank(poolOwner);
+        vm.startPrank(poolOwner);
         pool.addAdaptorSupport(address(beefyAdp), true);
+        AssetType assetType = AssetType.ERC20;
+        address[] memory assetAddresses = new address[](2);
+        assetAddresses[0] = wantLPToken;
+        assetAddresses[1] = mooToken;
+        pool.addAssets(assetType, assetAddresses);
+        vm.stopPrank();
     }
 
     function testBeefyAdaptorDeploy() external view {

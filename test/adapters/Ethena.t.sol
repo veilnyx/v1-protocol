@@ -35,6 +35,13 @@ contract EthenaAdaptorTest is PoolTest {
         address poolOwner = pool.owner();
         vm.startPrank(poolOwner);
         pool.addAdaptorSupport(address(ethenaAdaptor), true);
+
+        AssetType assetType = AssetType.ERC20;
+        address[] memory assetAddresses = new address[](2);
+        assetAddresses[0] = USDe;
+        assetAddresses[1] = ETHENA;
+        pool.addAssets(assetType, assetAddresses);
+        
         vm.stopPrank();
     }
 

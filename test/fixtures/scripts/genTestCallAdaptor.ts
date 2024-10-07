@@ -4,7 +4,7 @@ import { TransactionType } from "@zkfi-tech/shared-types";
 import { fixture, generateTestTransactions, mockNotes } from "./fixture";
 
 const {
-    assets: { testnetWeth, testnetUsdt, testnetCrvUsd, beefyWantToken, beefyMooToken },
+    assets: { weth, usdc },
     sender: { account: senderAccount, pubAddress: senderPubAddress },
     receiver: { account: receiverAccount },
 } = fixture;
@@ -99,8 +99,7 @@ export const reqs = {
         viaBundler: false,
         paymaster: zeroAddress,
         payload: "0x0000000000000000000000000000000000000000000000000000000000000000" as `0x${string}`
-    }
-        */
+    },
     supply_2_mooLPToken: {
         type: TransactionType.CALL_ADAPTER,
         assetIds: [beefyMooToken],
@@ -114,6 +113,7 @@ export const reqs = {
         viaBundler: false,
         paymaster: zeroAddress,
     }
+*/
 };
 
 export const genTestCallAdaptors = async (sdk: Core) => {

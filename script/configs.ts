@@ -19,6 +19,7 @@ export type AdaptorParams = {
   uniswap: Object;
   aave: Object;
   lido: Object;
+  curve: Object;
   ethena: Object;
   beefy: Object;
 }
@@ -79,6 +80,7 @@ export function loadConfigs() {
       uniswap,
       aave,
       lido,
+      curve,
       ethena,
       beefy
     } = params;
@@ -92,8 +94,10 @@ export function loadConfigs() {
         aaveStaticTokenFactory: getHex(aave.aaveStaticTokenFactory),
         aWETH: getHex(aave.aWETH),
         aUSDC: getHex(aave.aUSDC),
-        staticAWETH: getHex(aave.staticAWETH),
-        staticAUSDC: getHex(aave.staticAUSDC),
+        assets: {
+          staticAWeth: getHex(aave.assets.staticAWeth),
+          staticAUsdc: getHex(aave.assets.staticAUsdc),
+        }
       },
       lido: {
         lido: getHex(lido.lido),
@@ -101,14 +105,28 @@ export function loadConfigs() {
         wETH: getHex(lido.wETH),
         stETH: getHex(lido.stETH),
         wstETH: getHex(lido.wstETH),
+        assets: {
+          wstEth: getHex(lido.assets.wstEth)
+        }
+      },
+      curve: {
+        assets: {
+          usdt: getHex(curve.assets.usdt),
+          crvUsd: getHex(curve.assets.crvUsd),
+          crvUsdUsdtLPToken: getHex(curve.assets.crvUsdUsdtLPToken),
+          crvUsdSusdeLPToken: getHex(curve.assets.crvUsdSusdeLPToken)
+        }
       },
       ethena: {
         ethena: getHex(ethena.ethena),
         usde: getHex(ethena.usde),
+        assets: {
+          usde: getHex(ethena.assets.usde),
+          sUsde: getHex(ethena.assets.sUsde)
+        }
       },
       beefy: {
         assets: {
-          sUSDeCrvUSDWantToken: getHex(beefy.assets.sUSDeCrvUSDWantToken),
           mooCurveCrvUSDsUSDe: getHex(beefy.assets.mooCurveCrvUSDsUSDe)
         }
       }
