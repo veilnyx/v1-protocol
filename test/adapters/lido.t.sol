@@ -50,6 +50,11 @@ contract LidoAdaptorTest is PoolTest {
         vm.prank(poolOwner);
         pool.addAdaptorSupport(address(lidoAdaptor), true);
 
+        AssetType assetType = AssetType.ERC20;
+        address[] memory assetAddresses = new address[](1);
+        assetAddresses[0] = wstETH;
+        pool.addAssets(assetType, assetAddresses);
+        
         vm.deal(user, INITIAL_SUPPLY * 2);
         vm.startPrank(user);
         iWETH.deposit{value: INITIAL_SUPPLY}(); // wrapping eth to weth

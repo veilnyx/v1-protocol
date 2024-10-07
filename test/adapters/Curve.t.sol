@@ -39,6 +39,14 @@ contract CurveAdaptorTest is PoolTest {
         address poolOwner = pool.owner();
         vm.startPrank(poolOwner);
         pool.addAdaptorSupport(address(curveAdaptor), true);
+
+        AssetType assetType = AssetType.ERC20;
+        address[] memory assetAddresses = new address[](3);
+        assetAddresses[0] = USDT;
+        assetAddresses[1] = crvUSD;
+        assetAddresses[2] = crvUSD_USDT_Pool;
+        pool.addAssets(assetType, assetAddresses);
+        
         vm.stopPrank();
 
         deal(USDT, user, INITIAL_SUPPLY_USDT);

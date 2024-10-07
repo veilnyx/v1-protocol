@@ -82,6 +82,9 @@ const deployAave = async (aaveParams, pool, tenderlyDeployConfig, wallet, client
   ], tenderlyDeployConfig);
   console.log("AaveV3Adapter deployed:", aave.address);
   await addAdpatorSupport(pool, aave.address, true, client, wallet);
+
+  const assets = [aaveParams.assets.staticAWeth, aaveParams.assets.staticAUsdc];
+  await addAssets(assets, 1, pool, wallet, client);
 }
 
 const deployLido = async (lidoParams, pool, tenderlyDeployConfig, wallet, client) => {
@@ -95,14 +98,20 @@ const deployLido = async (lidoParams, pool, tenderlyDeployConfig, wallet, client
   ], tenderlyDeployConfig);
   console.log("LidoAdapter deployed:", lido.address);
   await addAdpatorSupport(pool, lido.address, true, client, wallet);
+
+  const assets = [lidoParams.assets.wstEth];
+  await addAssets(assets, 1, pool, wallet, client);
 }
 
-const deployCurve = async (pool, tenderlyDeployConfig, wallet, client) => {
+const deployCurve = async (curveParams, pool, tenderlyDeployConfig, wallet, client) => {
   const curve = await hre.viem.deployContract("CurveNGAdaptor", [
     pool
   ], tenderlyDeployConfig);
   console.log("CurveNGAdp deployed:", curve.address);
   await addAdpatorSupport(pool, curve.address, true, client, wallet);
+
+  const assets = [curveParams.assets.usdt, curveParams.assets.crvUsd, curveParams.assets.crvUsdUsdtLPToken, curveParams.assets.crvUsdSusdeLPToken];
+  await addAssets(assets, 1, pool, wallet, client);
 }
 
 const deployEthena = async (ethenaParams, pool, tenderlyDeployConfig, wallet, client) => {
@@ -113,6 +122,9 @@ const deployEthena = async (ethenaParams, pool, tenderlyDeployConfig, wallet, cl
   ], tenderlyDeployConfig);
   console.log("Ethena deployed:", ethena.address);
   await addAdpatorSupport(pool, ethena.address, true, client, wallet);
+
+  const assets = [ethenaParams.assets.usde, ethenaParams.assets.sUsde];
+  await addAssets(assets, 1, pool, wallet, client);
 }
 
 const deployBeefy = async (beefyParams, pool, tenderlyDeployConfig, wallet, client) => {
@@ -122,17 +134,17 @@ const deployBeefy = async (beefyParams, pool, tenderlyDeployConfig, wallet, clie
   console.log("Beefy deployed:", beefy.address);
   await addAdpatorSupport(pool, beefy.address, true, client, wallet);
 
-  const assets = [beefyParams.assets.sUSDeCrvUSDWantToken, beefyParams.assets.mooCurveCrvUSDsUSDe];
+  const assets = [beefyParams.assets.mooCurveCrvUSDsUSDe];
   await addAssets(assets, 1, pool, wallet, client);
 }
 
 const deployAdaptors = async (pool, adpParams, wallet, client, tenderlyDeployConfig) => {
-  const { uniswap: uniswapParams, aave: aaveParams, lido: lidoParams, ethena: ethenaParams, beefy: beefyParams } = adpParams;
+  const { uniswap: uniswapParams, aave: aaveParams, lido: lidoParams, curve: curveParams, ethena: ethenaParams, beefy: beefyParams } = adpParams;
 
   await deployUniswap(uniswapParams, pool, tenderlyDeployConfig, wallet, client);
   await deployAave(aaveParams, pool, tenderlyDeployConfig, wallet, client);
   await deployLido(lidoParams, pool, tenderlyDeployConfig, wallet, client);
-  await deployCurve(pool, tenderlyDeployConfig, wallet, client);
+  await deployCurve(curveParams, pool, tenderlyDeployConfig, wallet, client);
   await deployEthena(ethenaParams, pool, tenderlyDeployConfig, wallet, client);
   await deployBeefy(beefyParams, pool, tenderlyDeployConfig, wallet, client);
 }
@@ -175,6 +187,7 @@ const createTenderlyChain = (): Chain => {
 }
 
 const fundPaymaster = async (paymaster, amount, wallet, client) => {
+  let rct;
   try {
     //@ts-ignore
     const hash = await wallet.writeContract({
@@ -182,14 +195,15 @@ const fundPaymaster = async (paymaster, amount, wallet, client) => {
       abi: paymasterAbi,
       functionName: "depositToEntryPoint",
       args: [],
-      value: parseEther(amount),
+      value: parseEther('20'),
     });
 
-    const rct = await client.waitForTransactionReceipt({ hash });
+    rct = await client.waitForTransactionReceipt({ hash });
     console.log("rct:paymasterFunded", rct.status);
   } catch (error) {
     console.log("Error funding paymaster");
     console.log(error.message);
+    console.log("Error rct:", rct);
   }
 }
 
@@ -372,7 +386,9 @@ const main = async () => {
   ], tenderlyDeployConfig);
   console.log("Paymaster deployed:", paymaster.address);
 
-  await fundPaymaster(paymaster.address, "20", wallet, client);
+  // skipping funding of paymaster on Tenderly
+  /// @todo: uncomment for other networks
+  // await fundPaymaster(paymaster.address, "20", wallet, client);
 
   // Asset & Revoker Setup
   await addAssetsAndRevokers(poolProxy.address, chainParams, commonParams, client, wallet);

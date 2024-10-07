@@ -22,7 +22,6 @@ import { Core } from "@zkfi-tech/core";
 import { ZTransaction } from "@zkfi-tech/zk-prover";
 import { Note, SIZE_ENCRYPTED_DECRYPTION_KEY, SIZE_FULLY_ENCRYPTED_NOTE_DATA } from "@zkfi-tech/transaction";
 import config from "../config.json";
-import test from 'node:test';
 
 const senderSeed = BigInt(config.sender.seed);
 const receiverSeed = BigInt(config.receiver.seed);
@@ -37,14 +36,7 @@ const qmtBatchSize = Number(config.qmtBatchSize);
 const assets = {
   weth: config.assets.weth,
   usdc: config.assets.usdc,
-  reentrantToken: config.assets.reentrantToken,
-  testnetWeth: config.assets.testnetWeth,
-  testnetUsdc: config.assets.testnetUsdc,
-  testnetUsdt: config.assets.testnetUsdt,
-  testnetCrvUsd: config.assets.testnetCrvUsd,
-  testnetUsde: config.assets.testnetUsde,
-  beefyWantToken: config.assets.beefyWantToken,
-  beefyMooToken: config.assets.beefyMooToken,
+  reentrantToken: config.assets.reentrantToken
 };
 
 const revokerPublicKey = Point.fromArray([
