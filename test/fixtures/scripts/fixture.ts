@@ -36,7 +36,10 @@ const qmtBatchSize = Number(config.qmtBatchSize);
 const assets = {
   weth: config.assets.weth,
   usdc: config.assets.usdc,
-  reentrantToken: config.assets.reentrantToken
+  reentrantToken: config.assets.reentrantToken,
+  testnetWeth: config.assets.testnetWeth,
+  testnetUsdc: config.assets.testnetUsdc,
+  morphoVaultToken: config.assets.morphoVaultToken,
 };
 
 const revokerPublicKey = Point.fromArray([

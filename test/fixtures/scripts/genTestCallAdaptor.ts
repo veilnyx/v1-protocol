@@ -1,15 +1,42 @@
-import { parseEther, parseUnits, zeroAddress } from "viem";
+import { parseEther, parseUnits, zeroAddress, encodeAbiParameters } from "viem";
 import { Core } from "@zkfi-tech/core";
 import { TransactionType } from "@zkfi-tech/shared-types";
 import { fixture, generateTestTransactions, mockNotes } from "./fixture";
 
 const {
-    assets: { weth, usdc },
+    assets: { testnetWeth, morphoVaultToken },
     sender: { account: senderAccount, pubAddress: senderPubAddress },
     receiver: { account: receiverAccount },
 } = fixture;
 
+enum Action {
+    SUPPLY = 0,
+    WITHDRAW = 1
+}
+
 export const reqs = {
+    withdraw_2_morphoLoanToken: {
+        type: TransactionType.CALL_ADAPTER,
+        assetIds: [morphoVaultToken],
+        values: [parseEther("2")],
+        feeAssetId: 0,
+        // adaptor to which the ZkFi AdaptorHandler will call to execute swap
+        to: "0xbF71c5Ae43827387dAAF7358acAB5C81642b74b8",
+        // payload:: refund: pool address (address(0)), outToken: testnetUsdc
+        payload: encodeAbiParameters(
+            [{
+                type: "uint8",
+                name: "action"
+            }, {
+                type: "address",
+                name: "morphoVault"
+            }],
+            [Action.WITHDRAW, '0x2371e134e3455e0593363cBF89d3b6cf53740618']
+        ),
+        revokerId: 0,
+        viaBundler: false,
+        paymaster: zeroAddress
+    }
     /**,
     swap_1_testnet_weth_to_usdc: {
         type: TransactionType.CALL_ADAPTER,
@@ -117,6 +144,6 @@ export const reqs = {
 };
 
 export const genTestCallAdaptors = async (sdk: Core) => {
-    await mockNotes("deposit_2_mooLPToken", sdk);
+    await mockNotes("deposit_2_morphoVaultToken", sdk);
     await generateTestTransactions(reqs, sdk);
 };

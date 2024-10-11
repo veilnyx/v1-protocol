@@ -49,9 +49,6 @@ contract BeefyAdaptorTest is PoolTest {
 
     function testBeefyAdaptorDeploy() external view {
         assert(address(beefyAdp) != address(0));
-        bytes memory payload = abi.encode(uint8(0), beefyVault);
-        console.logString("Payload:");
-        console.logBytes(payload);
     }
 
     function testSupplyInBeefyVault() public {
