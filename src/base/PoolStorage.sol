@@ -28,6 +28,7 @@ abstract contract PoolStorage {
     mapping(address => bool) internal _adaptors;
 
     uint16 internal _revokerCount;
+    mapping(uint256 => bool) internal _revokerPublicKeys;
     mapping(uint256 => RevokerData) internal _revokers;
 
     uint256 public withdrawFeeBps; // 1 bip = 1% / 100

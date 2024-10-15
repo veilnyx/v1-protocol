@@ -112,6 +112,15 @@ contract Pool is
         bytes calldata revokerMetadata
     ) external onlyOwner {
         uint16 id = _revokerCount;
+        uint256 revokerPublicKeyHash = uint256(
+            keccak256((abi.encode(revokerPublicKey)))
+        );
+
+        if (_revokerPublicKeys[revokerPublicKeyHash]) {
+            revert DuplicateRevoker(revokerPublicKey);
+        }
+
+        _revokerPublicKeys[revokerPublicKeyHash] = true;
 
         RevokerData memory revokerData = RevokerData({
             id: id,
@@ -335,6 +344,8 @@ contract Pool is
             .getState();
     }
 
+    /// @todo commenting out the treeRoot func. for now to keep the contract within deployable size.
+    /**
     function isKnownCommitmentTreeRoot(
         uint256 root
     ) external view returns (bool) {
@@ -344,6 +355,7 @@ contract Pool is
     function isKnownAddressTreeRoot(uint256 root) external view returns (bool) {
         return _addressTree.isKnownRoot(root);
     }
+     */
 
     function _authorizeUpgrade(
         address newImplementation

@@ -6,13 +6,10 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {AdaptorBase} from "src/base/AdaptorBase.sol";
 import {Asset, AssetType} from "src/libraries/Asset.sol";
 import {ISwapRouter02} from "./ISwapRouter02.sol";
-import {console} from "forge-std/Test.sol";
 
 contract UniswapV3Adapter is AdaptorBase {
     // Errors //
-    error InactiveAsset(uint24 assetId);
     error MultiAssetSwap();
-    error ZeroValues();
 
     ISwapRouter02 public immutable swapRouter02;
     uint24 public constant feeTier = 3000;
@@ -39,16 +36,12 @@ contract UniswapV3Adapter is AdaptorBase {
         }
 
         if (inValues[0] == 0) {
-            revert ZeroValues();
+            revert ZeroValue();
         } else {
             inValue = inValues[0];
-            console.log("UniswapV3Adp:: inValue to swap:", inValue);
         }
 
         Asset memory inAsset = getAsset(inAssetIds[0]);
-        if (!inAsset.isActive) {
-            revert InactiveAsset(inAssetIds[0]);
-        }
 
         // decoding payload
         (uint24 outAssetId, address beneficiary, uint256 minOut) = abi.decode(
@@ -57,9 +50,6 @@ contract UniswapV3Adapter is AdaptorBase {
         );
 
         Asset memory outAsset = getAsset(outAssetId);
-        if (!outAsset.isActive) {
-            revert InactiveAsset(outAssetId);
-        }
 
         if (beneficiary == address(0)) {
             // means the out tokens will go to the ZKFI AdaptorHandler and have to be processed to the pool

@@ -1,0 +1,122 @@
+// SPDX-License-Identifier: MIT
+pragma solidity 0.8.24;
+pragma abicoder v2;
+
+import {PoolTest} from "test/fixtures/PoolTest.sol";
+import {Pool} from "src/core/Pool.sol";
+import {ShieldedTransaction} from "src/libraries/ShieldedTransaction.sol";
+import {MorphoVaultAdaptor as MorphoAdp} from "src/adaptors/morpho/MorphoVaultAdaptor.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {Asset, AssetType} from "src/libraries/Asset.sol";
+import {console} from "forge-std/Test.sol";
+
+contract MorphoAdaptorTest is PoolTest {
+    using SafeERC20 for IERC20;
+    error CheckChainConfig();
+
+    MorphoAdp morphoAdp;
+    address public constant loanToken =
+        0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2; // WETH (18 decimals)
+    address public constant vaultToken =
+        0x2371e134e3455e0593363cBF89d3b6cf53740618;
+    address public constant morphoVault =
+        0x2371e134e3455e0593363cBF89d3b6cf53740618; // Steakhouse USDC Vault
+    address public user = 0x689EcF264657302052c3dfBD631e4c20d3ED0baB;
+    uint256 public constant INITIAL_SUPPLY = 2 ether;
+
+    function setUp() external {
+        require(shouldTestRun(), "MorphoAdpTest: Chain not supported");
+        PoolTest._setUp();
+
+        // deploying Ethena adaptor
+        morphoAdp = new MorphoAdp(address(pool));
+
+        /// @dev update convert req fixture with this adaptor addr as `to`
+        console.log("Morpho adaptor deployed:", address(morphoAdp));
+
+        // Adaptor & asset support on Labyrinth Protocol
+        address poolOwner = pool.owner();
+        vm.startPrank(poolOwner);
+        pool.addAdaptorSupport(address(morphoAdp), true);
+        AssetType assetType = AssetType.ERC20;
+        address[] memory assetAddresses = new address[](1);
+        // assetAddresses[0] = loanToken;
+        assetAddresses[0] = vaultToken;
+        pool.addAssets(assetType, assetAddresses);
+        vm.stopPrank();
+    }
+
+    function testMorphoAdaptorDeploy() external view {
+        assert(address(morphoAdp) != address(0));
+    }
+
+    function testSupplyInMorphoVault() public {
+        console.log("Initiating supply on Beefy");
+        vm.startPrank(user);
+        deal(loanToken, user, INITIAL_SUPPLY);
+        IERC20(loanToken).forceApprove(address(pool), INITIAL_SUPPLY);
+
+        ShieldedTransaction memory depositStx = _loadShieldedTransaction(
+            "deposit_2_morphoLoanToken"
+        );
+        pool.transact(depositStx);
+        _processCommitmentTreeQueue();
+
+        ShieldedTransaction memory supplyStx = _loadShieldedTransaction(
+            "supply_2_morphoLoanToken"
+        );
+        pool.transact(supplyStx);
+        vm.stopPrank();
+
+        console.log("Supplying done!");
+        uint256 vaultTokenBal = IERC20(vaultToken).balanceOf(address(pool));
+        console.log("morpho vault tokens received:", vaultTokenBal);
+        assert(vaultTokenBal > 0);
+    }
+
+    function testWithdrawFromMorphoVault() public {
+        console.log("Initiating withdraw on Beefy");
+        vm.startPrank(user);
+        deal(vaultToken, user, INITIAL_SUPPLY);
+        IERC20(vaultToken).forceApprove(address(pool), INITIAL_SUPPLY);
+
+        ShieldedTransaction memory depositStx = _loadShieldedTransaction(
+            "deposit_2_morphoVaultToken"
+        );
+        pool.transact(depositStx);
+        _processCommitmentTreeQueue();
+
+        ShieldedTransaction memory withdrawStx = _loadShieldedTransaction(
+            "withdraw_2_morphoLoanToken"
+        );
+        pool.transact(withdrawStx);
+        vm.stopPrank();
+
+        console.log("Withdrawing done!");
+        uint256 loanTokenBal = IERC20(loanToken).balanceOf(address(pool));
+        console.log("loanTokens received:", loanTokenBal);
+        assert(loanTokenBal > 0);
+    }
+
+    function testConvertToShares() public view {
+        uint256 shares = morphoAdp.convertToShares(morphoVault, INITIAL_SUPPLY);
+        assert(shares > 0);
+    }
+
+    function testConvertToAssets() public view {
+        uint256 assets = morphoAdp.convertToAssets(morphoVault, INITIAL_SUPPLY);
+        assert(assets > 0);
+    }
+
+    /// @dev Only allowing Lido tests to run on Holesky testnet and ETH mainnet. More chains can be added.
+    function shouldTestRun() internal view returns (bool) {
+        if (block.chainid != 1) {
+            console.log(
+                "Skipping Morpho adaptor tests on the current chain as Beefy protocol may not be deployed. To run Morpho tests, kindly run the tests on the ETH Mainnet fork."
+            );
+            return false;
+        }
+        return true;
+    }
+}

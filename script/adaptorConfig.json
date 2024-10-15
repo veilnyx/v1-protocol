@@ -1,0 +1,94 @@
+{
+    "1": {
+        "uniswap": {
+            "uniswapSwapRouter02": "0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45"
+        },
+        "aave": {
+            "aave": "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2",
+            "aaveStaticTokenFactory": "0x411D79b8cC43384FDE66CaBf9b6a17180c842511",
+            "aWETH": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+            "aUSDC": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+            "assets": {
+                "staticAWeth": "0x252231882FB38481497f3C767469106297c8d93b",
+                "staticAUsdc": "0x73edDFa87C71ADdC275c2b9890f5c3a8480bC9E6"
+            }
+        },
+        "lido": {
+            "lido": "0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84",
+            "withdrawalQueueERC721": "0x889edC2eDab5f40e902b864aD4d7AdE8E412F9B1",
+            "wETH": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+            "stETH": "0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84",
+            "wstETH": "0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0",
+            "assets": {
+                "wstEth": "0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0"
+            }
+        },
+        "curve": {
+            "assets": {
+                "usdt": "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+                "crvUsd": "0xf939E0A03FB07F59A73314E73794Be0E57ac1b4E",
+                "crvUsdUsdtLPToken": "0x390f3595bCa2Df7d23783dFd126427CCeb997BF4",
+                "crvUsdSusdeLPToken": "0x57064F49Ad7123C92560882a45518374ad982e85"
+            }
+        },
+        "ethena": {
+            "ethena": "0x9D39A5DE30e57443BfF2A8307A4256c8797A3497",
+            "usde": "0x4c9EDD5852cd905f086C759E8383e09bff1E68B3",
+            "assets": {
+                "usde": "0x4c9EDD5852cd905f086C759E8383e09bff1E68B3",
+                "sUsde": "0x9D39A5DE30e57443BfF2A8307A4256c8797A3497"
+            }
+        },
+        "beefy": {
+            "assets": {
+                "mooCurveCrvUSDsUSDe": "0xBF7fc2A3d96d80f47b3b89BE84afe10376CE96A5"
+            }
+        }
+    },
+    "7800": {
+        "uniswap": {
+            "uniswapSwapRouter02": "0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45"
+        },
+        "aave": {
+            "aave": "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2",
+            "aaveStaticTokenFactory": "0x411D79b8cC43384FDE66CaBf9b6a17180c842511",
+            "aWETH": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+            "aUSDC": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+            "assets": {
+                "staticAWeth": "0x252231882FB38481497f3C767469106297c8d93b",
+                "staticAUsdc": "0x73edDFa87C71ADdC275c2b9890f5c3a8480bC9E6"
+            }
+        },
+        "lido": {
+            "lido": "0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84",
+            "withdrawalQueueERC721": "0x889edC2eDab5f40e902b864aD4d7AdE8E412F9B1",
+            "wETH": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+            "stETH": "0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84",
+            "wstETH": "0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0",
+            "assets": {
+                "wstEth": "0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0"
+            }
+        },
+        "curve": {
+            "assets": {
+                "usdt": "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+                "crvUsd": "0xf939E0A03FB07F59A73314E73794Be0E57ac1b4E",
+                "crvUsdUsdtLPToken": "0x390f3595bCa2Df7d23783dFd126427CCeb997BF4",
+                "crvUsdSusdeLPToken": "0x57064F49Ad7123C92560882a45518374ad982e85"
+            }
+        },
+        "ethena": {
+            "ethena": "0x9D39A5DE30e57443BfF2A8307A4256c8797A3497",
+            "usde": "0x4c9EDD5852cd905f086C759E8383e09bff1E68B3",
+            "assets": {
+                "usde": "0x4c9EDD5852cd905f086C759E8383e09bff1E68B3",
+                "sUsde": "0x9D39A5DE30e57443BfF2A8307A4256c8797A3497"
+            }
+        },
+        "beefy": {
+            "assets": {
+                "mooCurveCrvUSDsUSDe": "0xBF7fc2A3d96d80f47b3b89BE84afe10376CE96A5"
+            }
+        }
+    }
+}

@@ -9,14 +9,12 @@ import {IWithdrawQueueERC721} from "./IWithdrawQueueERC721.sol";
 import {IWstEthToken} from "./IWstEthToken.sol";
 import {IWToken} from "../../interfaces/IWToken.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {console} from "forge-std/Test.sol";
+
+error UnstakingNotSupportedForAsset(uint24 assetId);
+error ZeroValues();
+error ZeroAddress();
 
 contract LidoAdaptor is AdaptorBase {
-    error InactiveAsset(uint24 assetId);
-    error UnstakingNotSupportedForAsset(uint24 assetId);
-    error ZeroValues();
-    error ZeroAddress();
-
     ILido public immutable iLido;
     IWithdrawQueueERC721 public immutable iWithdrawQueueERC721;
     address public immutable weth;
@@ -52,10 +50,6 @@ contract LidoAdaptor is AdaptorBase {
         Asset memory inAsset = getAsset(inAssetIds[0]);
         uint256 stakeValue = inValues[0];
 
-        if (!inAsset.isActive) {
-            revert InactiveAsset(inAssetIds[0]);
-        }
-
         if (stakeValue == 0) {
             revert ZeroValues();
         }
@@ -73,9 +67,6 @@ contract LidoAdaptor is AdaptorBase {
 
             // initializing the out token arrays
             Asset memory outAsset = getAsset(wstEth);
-            if (!outAsset.isActive) {
-                revert InactiveAsset(outAsset.id);
-            }
 
             outValues = new uint256[](1);
             outAssetIds = new uint24[](1);
@@ -83,14 +74,14 @@ contract LidoAdaptor is AdaptorBase {
             outAssetIds[0] = outAsset.id;
             outValues[0] = wstEthTokens;
         } else {
-            // Unstaking request
+            // Unstaking request (NFT)
             if (inAsset.assetAddress != wstEth) {
-                revert UnstakingNotSupportedForAsset(inAsset.id); // If not wEth, only wstEth is supported for claiming `unstEth` NFTs from Lido
+                revert UnstakingNotSupportedForAsset(inAsset.id); // If not wEth, only wstEth is supported for unstaking. Lido returns `unstEth` NFTs as the withdrawal req. is queued on their end.
             }
 
             address withdrawalAddress = abi.decode(payload, (address));
             if (withdrawalAddress == address(0)) {
-                revert ZeroAddress();
+                revert ZeroAddress(); // Withdraw address cannot be a Pool's addr as Lido returns `unstEth` NFTs because the withdrawal req. is queued on their end.
             }
 
             uint256[] memory amounts = new uint256[](1);
@@ -109,14 +100,9 @@ contract LidoAdaptor is AdaptorBase {
             outAssetIds = new uint24[](0);
             outValues = new uint256[](0);
         }
-
-        console.log(
-            "Bal. of wstETH:",
-            IWstEthToken(wstEth).balanceOf(address(this))
-        );
     }
 
     /// @dev only for enabling `testWstEthUnstakingOnLido()` test. Pls comment this out for production use.
-    // Allow Lido adaptor to receive unwrapped Ether
+    // Allow Lido adaptor to receive unwrapped Ether, to send to Lido for staking
     // receive() external payable {}
 }

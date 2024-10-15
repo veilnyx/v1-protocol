@@ -22,10 +22,7 @@ contract Config is Script {
     address public immutable gateway;
     address public immutable paymaster;
     address public immutable wToken;
-    address public immutable uniswapSwapRouter02;
-    address public immutable lido;
-    address public immutable withdrawalQueueERC721;
-    address public immutable sanctionList;
+    address public immutable sanctionsList;
 
     AssetType public immutable initAssetType;
     address[] internal _initAssetAddresses;
@@ -38,15 +35,15 @@ contract Config is Script {
         string memory configJson = vm.readFile(path);
 
         // common config
-        _revokerPublicKey = [
-            vm.parseJsonUint(configJson, ".common.revokerPublicKey[0]"),
-            vm.parseJsonUint(configJson, ".common.revokerPublicKey[1]")
-        ];
+        // _revokerPublicKey = [
+        //     vm.parseJsonUint(configJson, ".common.revokerPublicKey[0]"),
+        //     vm.parseJsonUint(configJson, ".common.revokerPublicKey[1]")
+        // ];
 
-        _encryptionPublicKey = [
-            vm.parseJsonUint(configJson, ".common.encryptionPublicKey[0]"),
-            vm.parseJsonUint(configJson, ".common.encryptionPublicKey[1]")
-        ];
+        // _encryptionPublicKey = [
+        //     vm.parseJsonUint(configJson, ".common.encryptionPublicKey[0]"),
+        //     vm.parseJsonUint(configJson, ".common.encryptionPublicKey[1]")
+        // ];
 
         addressTreeDepth = uint8(
             vm.parseJsonUint(configJson, ".common.addressTreeDepth")
@@ -85,31 +82,9 @@ contract Config is Script {
             string.concat(chainPrefix, ".wToken")
         );
 
-        if (chainId == 11155111 || chainId == 1) {
-            uniswapSwapRouter02 = vm.parseJsonAddress(
-                configJson,
-                string.concat(chainPrefix, ".uniswapSwapRouter02")
-            );
-        } else {
-            uniswapSwapRouter02 = address(0);
-        }
-
-        if (chainId == 17000) {
-            lido = vm.parseJsonAddress(
-                configJson,
-                string.concat(chainPrefix, ".lido")
-            );
-            withdrawalQueueERC721 = vm.parseJsonAddress(
-                configJson,
-                string.concat(chainPrefix, ".withdrawalQueueERC721")
-            );
-        } else {
-            lido = address(0);
-        }
-
-        sanctionList = vm.parseJsonAddress(
+        sanctionsList = vm.parseJsonAddress(
             configJson,
-            string.concat(chainPrefix, ".sanctionList")
+            string.concat(chainPrefix, ".sanctionsList")
         );
 
         initAssetType = AssetType(

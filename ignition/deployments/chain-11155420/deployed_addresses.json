@@ -1,0 +1,18 @@
+{
+  "EIP712#EIP712": "0xAaa089F5530640121c9AfddEd30aD0F4791F87F0",
+  "adaptorHandler#AdaptorHandler": "0xC794C456b412A7aa46d3b46EE40805408205B754",
+  "assetLogic#AssetLogic": "0x03454577DB35922e5340Ee57d6C69285Fc77Fb2E",
+  "hasher#Hasher": "0x621FDFA08214E24374A3FbECEE1D63FACc50714D",
+  "merkleTreeLogic#MerkleTreeLogic": "0x83387e146bB23Dd76785F53F958cE0784152d10a",
+  "queuedMerkleTreeLogic#QueuedMerkleTreeLogic": "0x8189E6AF9DA844602ca5d457961ACC9CABcbB7d6",
+  "screener#Screener": "0x10db44ecf19140Fc368512c28C00e4E1e80A4d1D",
+  "verifierRegister#VerifierRegister": "0x9838117518dd9C9ac2ba7DF74Bf060aC0d6B8C75",
+  "verifierTransact#VerifierTransact21": "0x9B5Ceac5924e3B5c39E57052c9A49eC468F7f549",
+  "verifierTransact#VerifierTransact22": "0x4F5af5CFa73Aaabab7510fb375C8B28285001fe0",
+  "verifierTreeUpdate#VerifierTreeUpdate": "0xFcc411A9A6C4555f85EcC8f57fA8495D86d643d0",
+  "shieldedAddressLogic#ShieldedAddressLogic": "0x80B7f203Cd05C113aD0f4BD052838f6FA7834287",
+  "shieldedTransactionLogic#ShieldedTransactionLogic": "0x8059De272Fc086a073CcBAd5c78A22a2BDDc7907",
+  "verifier#Verifier": "0x290E995A0735e4Fc30879c1beB064d2402D0aB12",
+  "pool#Pool": "0x131a70F199fA492EA91BDF7043B7B89CD1Af9dE7",
+  "pool#PoolProxy": "0xa80E2A29153aAee5C8D4Ca187f8C06DCd3785672"
+}

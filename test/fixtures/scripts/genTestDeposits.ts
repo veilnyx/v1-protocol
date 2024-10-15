@@ -2,13 +2,35 @@ import { parseEther, parseUnits, zeroAddress } from "viem";
 import { Core } from "@zkfi-tech/core";
 import { TransactionType } from "@zkfi-tech/shared-types";
 import { fixture, generateTestTransactions } from "./fixture";
+import { parse } from 'path';
 
 const {
-  assets: { weth, usdc, reentrantToken },
+  assets: { testnetWeth, morphoVaultToken },
   sender: { account: senderAccount },
 } = fixture;
 
 export const reqs = {
+  deposit_2_morphoVaultToken: {
+    type: TransactionType.DEPOSIT,
+    assetIds: [morphoVaultToken],
+    values: [parseEther("2")],
+    feeAssetId: 0,
+    to: senderAccount.shieldedAddress.pack(),
+    viaBundler: false,
+    paymaster: zeroAddress,
+    revokerId: 0,
+  }
+  /**
+  deposit_2_testnet_weth: {
+    type: TransactionType.DEPOSIT,
+    assetIds: [testnetWeth],
+    values: [parseEther("2")],
+    feeAssetId: 0,
+    to: senderAccount.shieldedAddress.pack(),
+    viaBundler: false,
+    paymaster: zeroAddress,
+    revokerId: 0,
+  }, 
   deposit_pre_tx: {
     type: TransactionType.DEPOSIT,
     assetIds: [weth, usdc],
@@ -19,7 +41,6 @@ export const reqs = {
     paymaster: zeroAddress,
     revokerId: 0,
   },
-  /**
   deposit_1000_weth_without_fee: {
     type: TransactionType.DEPOSIT,
     assetIds: [weth],
@@ -50,9 +71,40 @@ export const reqs = {
     paymaster: zeroAddress,
     revokerId: 0,
   },
-   */
+  deposit_5_testnet_usdt_crvusd: {
+    type: TransactionType.DEPOSIT,
+    assetIds: [testnetUsdt, testnetCrvUsd],
+    values: [parseUnits("5", 6), parseUnits("5", 18)],
+    feeAssetId: 0,
+    to: senderAccount.shieldedAddress.pack(),
+    viaBundler: false,
+    paymaster: zeroAddress,
+    revokerId: 0,
+  },
+  deposit_2_wantLPToken: {
+    type: TransactionType.DEPOSIT,
+    assetIds: [beefyWantToken],
+    values: [parseEther("2")],
+    feeAssetId: 0,
+    to: senderAccount.shieldedAddress.pack(),
+    viaBundler: false,
+    paymaster: zeroAddress,
+    revokerId: 0,
+  },
+  deposit_2_mooLPToken: {
+    type: TransactionType.DEPOSIT,
+    assetIds: [beefyMooToken],
+    values: [parseEther("2")],
+    feeAssetId: 0,
+    to: senderAccount.shieldedAddress.pack(),
+    viaBundler: false,
+    paymaster: zeroAddress,
+    revokerId: 0,
+  }
+    */
 };
 
 export const genTestDeposits = async (sdk: Core) => {
+  console.log("depositing assets...");
   await generateTestTransactions(reqs, sdk);
 };

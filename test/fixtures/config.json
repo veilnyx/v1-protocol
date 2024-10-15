@@ -44,7 +44,10 @@
   "assets": {
     "weth": 65537,
     "usdc": 65538,
-    "reentrantToken": 65539
+    "reentrantToken": 65539,
+    "testnetWeth": 65540,
+    "testnetUsdc": 65541,
+    "morphoVaultToken": 65542
   },
   "leavesQueue1": [
     "19014214495641488759237505126948346942972912379615652741039992445865937985820",
