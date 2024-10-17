@@ -31,7 +31,7 @@ contract OneInchAdaptorTest is PoolTest {
 
         iWETH = IWToken(WETH);
 
-        // deploying Uniswap adaptor
+        // deploying 1Inch adaptor
         oneInchAdaptor = new OneInchAdaptor(address(pool));
 
         /// @dev update convert req fixture with this adaptor addr as `to`
@@ -40,8 +40,8 @@ contract OneInchAdaptorTest is PoolTest {
         address poolOwner = pool.owner();
         vm.prank(poolOwner);
         pool.addAdaptorSupport(address(oneInchAdaptor), true);
-        deal(WETH, user, INITIAL_SUPPLY * 2);
-        vm.startPrank(user);
+        deal(WETH, user, INITIAL_SUPPLY);
+
         // iWETH.approve(address(pool), INITIAL_SUPPLY); // depositing weth to pool
         // ShieldedTransaction memory stxWethDeposit = _loadShieldedTransaction(
         //     "deposit_2_testnet_weth"
@@ -56,12 +56,11 @@ contract OneInchAdaptorTest is PoolTest {
         assert(address(oneInchAdaptor) != address(0));
     }
 
-    function test1InchAdpDirectlyWithReturnAmt() public {
+    function test1InchAdpDirectly() public {
         // swap amount is 1 ether
+        // function sign (first 4 bytes of calldata) is 0x7b8e4e42 is trimmed.
         bytes
-            memory oneInchCalldata = hex"83800a8e000000000000000000000000c02aaa39b223fe8d0a0e5c4f27ead9083c756cc20000000000000000000000000000000000000000000000000de0b6b3a7640000000000000000000000000000000000000000000000000000000000004d47696e08000000000000003b6d0340b4e16d0168e52d35cacd2c6185b44281ec28c9dc06d4e6c5";
-
-        bytes memory payload = abi.encode(USDC, oneInchCalldata);
+            memory oneInchCalldata = hex"000000000000000000000000e37e799d5077682fa0a244d46e5649f71457bd09000000000000000000000000c02aaa39b223fe8d0a0e5c4f27ead9083c756cc2000000000000000000000000a0b86991c6218b36c1d19d4a2e9eb0ce3606eb48000000000000000000000000397ff1542f962076d0bfe58ea045ffa2d347aca0000000000000000000000000bf71c5ae43827387daaf7358acab5c81642b74b80000000000000000000000000000000000000000000000000de0b6b3a7640000000000000000000000000000000000000000000000000000000000007b4070cc00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000120000000000000000000000000000000000000000000000000000000000000009f00000000000000000000000000000000000000000000000000008100001a0020d6bdbf78c02aaa39b223fe8d0a0e5c4f27ead9083c756cc200206ae4071138002dc6c0397ff1542f962076d0bfe58ea045ffa2d347aca0111111125421ca6dc452d289314280a0f8842a650000000000000000000000000000000000000000000000000000000000000001c02aaa39b223fe8d0a0e5c4f27ead9083c756cc20006d4e6c5";
 
         uint24[] memory inAssetIds = new uint24[](1);
         inAssetIds[0] = pool.getAsset(WETH).id;
@@ -69,57 +68,21 @@ contract OneInchAdaptorTest is PoolTest {
         inValues[0] = SWAP_AMT;
 
         vm.startPrank(user);
-        // sending weth in excess. INITIAL_SUPPLY > SWAP_AMT (inValues[0]). Expecting a return amount (INITIAL_SUPPLY - SWAP_AMT).
-        iWETH.transfer(address(oneInchAdaptor), INITIAL_SUPPLY);
-
-        (
-            uint24[] memory outAssetIds,
-            uint256[] memory outAssetValues
-        ) = oneInchAdaptor.handleAssets(inAssetIds, inValues, payload);
-        vm.stopPrank();
-
-        // Asserts
-        assert(outAssetIds.length == 2);
-        assert(outAssetValues.length == 2);
-        assert(outAssetValues[0] == (INITIAL_SUPPLY - SWAP_AMT));
-        assert(outAssetValues[1] > 0);
-        assert(IERC20(USDC).balanceOf(address(oneInchAdaptor)) > 0);
-        assert(
-            IERC20(WETH).balanceOf(address(oneInchAdaptor)) ==
-                (INITIAL_SUPPLY - SWAP_AMT)
-        );
-    }
-
-    function test1InchAdpDirectlyWithoutReturnAmt() public {
-        // swap amount is 1 ether
-        bytes
-            memory oneInchCalldata = hex"83800a8e000000000000000000000000c02aaa39b223fe8d0a0e5c4f27ead9083c756cc20000000000000000000000000000000000000000000000000de0b6b3a7640000000000000000000000000000000000000000000000000000000000004d47696e08000000000000003b6d0340b4e16d0168e52d35cacd2c6185b44281ec28c9dc06d4e6c5";
-
-        bytes memory payload = abi.encode(USDC, oneInchCalldata);
-
-        uint24[] memory inAssetIds = new uint24[](1);
-        inAssetIds[0] = pool.getAsset(WETH).id;
-        uint256[] memory inValues = new uint256[](1);
-        inValues[0] = SWAP_AMT;
-
-        vm.startPrank(user);
-        // no excess input token being deposited. Hence no return amount expected.
         iWETH.transfer(address(oneInchAdaptor), SWAP_AMT);
+
         (
             uint24[] memory outAssetIds,
             uint256[] memory outAssetValues
-        ) = oneInchAdaptor.handleAssets(inAssetIds, inValues, payload);
+        ) = oneInchAdaptor.handleAssets(inAssetIds, inValues, oneInchCalldata);
         vm.stopPrank();
 
         // Asserts
-        assert(outAssetIds.length == 1);
-        assert(outAssetValues.length == 1);
         assert(outAssetValues[0] > 0);
         assert(IERC20(USDC).balanceOf(address(oneInchAdaptor)) > 0);
-        assert(IERC20(WETH).balanceOf(address(oneInchAdaptor)) == 0);
+        assertEq(IERC20(WETH).balanceOf(address(oneInchAdaptor)), 0);
     }
 
-    /// @dev Only allowing uniswap tests to run on Seplia testnet and ETH mainnet. More chains can be added.
+    /// @dev Only allowing 1Inch tests to run on Seplia testnet and ETH mainnet. More chains can be added.
     function shouldTestRun() internal view returns (bool) {
         if (block.chainid != 7800 && block.chainid != 1) {
             console.log(
