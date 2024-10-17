@@ -14,7 +14,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Asset, AssetType} from "src/libraries/Asset.sol";
 import {console} from "forge-std/Test.sol";
 
-contract UniswapV3AdaptorTest is PoolTest {
+contract OneInchAdaptorTest is PoolTest {
     error CheckChainConfig();
 
     OneInchAdaptor oneInchAdaptor;
@@ -56,79 +56,74 @@ contract UniswapV3AdaptorTest is PoolTest {
         assert(address(oneInchAdaptor) != address(0));
     }
 
-    function testWethToUSDCSwapToPool() public /* zkFiSetup */ {
-        console.log("Initiating WETH<>USDC swap");
-        uint256 poolUSDCBalBeforeConvert = IERC20(USDC).balanceOf(
-            address(pool)
-        );
-
-        ShieldedTransaction memory stxSwap = _loadShieldedTransaction(
-            "swap_1_testnet_weth_to_usdc"
-        );
-        pool.transact(stxSwap);
-
-        // Asserts
-        uint256 poolUSDCBalPostConvert = IERC20(USDC).balanceOf(address(pool));
-        console.log("Pool USDC bal before swap:", poolUSDCBalBeforeConvert);
-        console.log("Pool USDC bal after swap:", poolUSDCBalPostConvert);
-        assert(poolUSDCBalPostConvert > poolUSDCBalBeforeConvert);
-    }
-
-    function test1InchAdpDirectly() public {
+    function test1InchAdpDirectlyWithReturnAmt() public {
+        // swap amount is 1 ether
         bytes
             memory oneInchCalldata = hex"83800a8e000000000000000000000000c02aaa39b223fe8d0a0e5c4f27ead9083c756cc20000000000000000000000000000000000000000000000000de0b6b3a7640000000000000000000000000000000000000000000000000000000000004d47696e08000000000000003b6d0340b4e16d0168e52d35cacd2c6185b44281ec28c9dc06d4e6c5";
 
-        (
-            string memory functionSignature,
-            address executor,
-            SwapDescription memory swapDescription,
-            bytes memory data
-        ) = abi.decode(
-                oneInchCalldata,
-                (string, address, SwapDescription, bytes)
-            );
+        bytes memory payload = abi.encode(USDC, oneInchCalldata);
 
-        console.log("decoded calldata");
-        console.log("Function Signature:", functionSignature);
-        console.log("Executor:", executor);
-
-        /**
         uint24[] memory inAssetIds = new uint24[](1);
         inAssetIds[0] = pool.getAsset(WETH).id;
         uint256[] memory inValues = new uint256[](1);
         inValues[0] = SWAP_AMT;
 
         vm.startPrank(user);
-        iWETH.transfer(address(oneInchAdaptor), INITIAL_SUPPLY); // depositing weth to adaptor
+        // sending weth in excess. INITIAL_SUPPLY > SWAP_AMT (inValues[0]). Expecting a return amount (INITIAL_SUPPLY - SWAP_AMT).
+        iWETH.transfer(address(oneInchAdaptor), INITIAL_SUPPLY);
 
-        oneInchAdaptor.handleAssets(inAssetIds, inValues, oneInchCalldata);
+        (
+            uint24[] memory outAssetIds,
+            uint256[] memory outAssetValues
+        ) = oneInchAdaptor.handleAssets(inAssetIds, inValues, payload);
         vm.stopPrank();
-         */
-    }
-
-    function testSwapViaBundler() public {
-        console.log("Initiating WETH<>USDC swap");
-        uint256 poolUSDCBalBeforeConvert = IERC20(USDC).balanceOf(
-            address(pool)
-        );
-
-        ShieldedTransaction memory stxDeposit = _loadShieldedTransaction(
-            "swap_1_testnet_weth_to_usdc_via_bundler"
-        );
-        pool.transact(stxDeposit);
 
         // Asserts
-        uint256 poolUSDCBalPostConvert = IERC20(USDC).balanceOf(address(pool));
-        console.log("Pool USDC bal before swap:", poolUSDCBalBeforeConvert);
-        console.log("Pool USDC bal after swap:", poolUSDCBalPostConvert);
-        assert(poolUSDCBalPostConvert > poolUSDCBalBeforeConvert);
+        assert(outAssetIds.length == 2);
+        assert(outAssetValues.length == 2);
+        assert(outAssetValues[0] == (INITIAL_SUPPLY - SWAP_AMT));
+        assert(outAssetValues[1] > 0);
+        assert(IERC20(USDC).balanceOf(address(oneInchAdaptor)) > 0);
+        assert(
+            IERC20(WETH).balanceOf(address(oneInchAdaptor)) ==
+                (INITIAL_SUPPLY - SWAP_AMT)
+        );
+    }
+
+    function test1InchAdpDirectlyWithoutReturnAmt() public {
+        // swap amount is 1 ether
+        bytes
+            memory oneInchCalldata = hex"83800a8e000000000000000000000000c02aaa39b223fe8d0a0e5c4f27ead9083c756cc20000000000000000000000000000000000000000000000000de0b6b3a7640000000000000000000000000000000000000000000000000000000000004d47696e08000000000000003b6d0340b4e16d0168e52d35cacd2c6185b44281ec28c9dc06d4e6c5";
+
+        bytes memory payload = abi.encode(USDC, oneInchCalldata);
+
+        uint24[] memory inAssetIds = new uint24[](1);
+        inAssetIds[0] = pool.getAsset(WETH).id;
+        uint256[] memory inValues = new uint256[](1);
+        inValues[0] = SWAP_AMT;
+
+        vm.startPrank(user);
+        // no excess input token being deposited. Hence no return amount expected.
+        iWETH.transfer(address(oneInchAdaptor), SWAP_AMT);
+        (
+            uint24[] memory outAssetIds,
+            uint256[] memory outAssetValues
+        ) = oneInchAdaptor.handleAssets(inAssetIds, inValues, payload);
+        vm.stopPrank();
+
+        // Asserts
+        assert(outAssetIds.length == 1);
+        assert(outAssetValues.length == 1);
+        assert(outAssetValues[0] > 0);
+        assert(IERC20(USDC).balanceOf(address(oneInchAdaptor)) > 0);
+        assert(IERC20(WETH).balanceOf(address(oneInchAdaptor)) == 0);
     }
 
     /// @dev Only allowing uniswap tests to run on Seplia testnet and ETH mainnet. More chains can be added.
     function shouldTestRun() internal view returns (bool) {
-        if (block.chainid != 11155111 && block.chainid != 1) {
+        if (block.chainid != 7800 && block.chainid != 1) {
             console.log(
-                "Skipping Uniswap adaptor tests on the current chain as UniswapV3 protocol may not be deployed. To run Uniswap tests, kindly run the tests on one of the chain forks where UniswapV3 is deployed. Ref: https://docs.uniswap.org/contracts/v3/reference/deployments/"
+                "Skipping 1Inch adaptor tests on the current chain as 1Inch protocol may not be deployed. To run 1Inch tests, kindly run the tests on one of the chain forks where 1Inch is deployed."
             );
             return false;
         }
