@@ -112,31 +112,4 @@ contract MorphoVaultAdaptor is AdaptorBase {
         outValue = loanTokens;
         return (outAssetId, outValue);
     }
-
-    /////////////////////////////
-    //// View Functions /////////
-    //////////////////////////////
-
-    /// @notice This function returns the amount of shares that would be exchanged by the vault for the amount of assets provided.
-    function convertToShares(
-        address morphoVault,
-        uint256 assets
-    ) external view returns (uint256) {
-        uint256 shares = IMorphoVault(morphoVault).convertToShares(assets);
-        return shares;
-    }
-
-    /// @notice This function returns the amount of assets that would be exchanged by the vault for the amount of shares provided.
-    function convertToAssets(
-        address morphoVault,
-        uint256 shares
-    ) external view returns (uint256) {
-        uint256 assets = IMorphoVault(morphoVault).convertToAssets(shares);
-        return assets;
-    }
-
-    /// @notice Returns the address of the underlying token used for the vault for accounting, depositing, withdrawing.
-    function getLoanToken(address morphoVault) external view returns (address) {
-        return IMorphoVault(morphoVault).asset();
-    }
 }

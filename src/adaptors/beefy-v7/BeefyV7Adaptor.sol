@@ -70,11 +70,13 @@ contract BeefyV7Adaptor is AdaptorBase {
             revert UnsupportedAsset(inAsset.id);
         }
 
+        uint256 sharesBalBeforeDeposit = IERC20(vault).balanceOf(address(this));
         IERC20(inAsset.assetAddress).forceApprove(vault, inValue);
         IBeefyVault(vault).deposit(inValue);
+        uint256 sharesBalAfterDeposit = IERC20(vault).balanceOf(address(this));
 
         outAssetId = getAsset(vault).id;
-        outValue = IERC20(vault).balanceOf(address(this));
+        outValue = sharesBalAfterDeposit - sharesBalBeforeDeposit;
         return (outAssetId, outValue);
     }
 
