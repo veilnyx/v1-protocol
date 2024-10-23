@@ -8,8 +8,8 @@
     "test": "forge test",
     "coverage": "forge coverage --ir-minimum",
     "test:prepare": "ts-node test/fixtures/scripts/index.ts",
-    "deploy:test": "cross-env HARDHAT_FORK=true hardhat run script/deploy.ts --network hardhat",
     "genAdpPayload": "forge script script/setup/GenerateAdaptorPayload.s.sol:GenerateAdaptorPayload",
+    "deploy:test": "cross-env HARDHAT_FORK=true hardhat run script/deploy.ts --network hardhat",
     "deploy:tenderly": "hardhat run script/deployTenderly.ts --network tenderlyMainnetCustomId"
   },
   "keywords": [],

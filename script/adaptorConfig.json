@@ -43,6 +43,11 @@
             "assets": {
                 "mooCurveCrvUSDsUSDe": "0xBF7fc2A3d96d80f47b3b89BE84afe10376CE96A5"
             }
+        },
+        "morpho": {
+            "assets": {
+                "gauntletWETHPrimeVault": "0x2371e134e3455e0593363cBF89d3b6cf53740618"
+            }
         }
     },
     "7800": {
@@ -88,6 +93,11 @@
         "beefy": {
             "assets": {
                 "mooCurveCrvUSDsUSDe": "0xBF7fc2A3d96d80f47b3b89BE84afe10376CE96A5"
+            }
+        },
+        "morpho": {
+            "assets": {
+                "gauntletWETHPrimeVault": "0x2371e134e3455e0593363cBF89d3b6cf53740618"
             }
         }
     }

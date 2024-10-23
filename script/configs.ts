@@ -22,6 +22,7 @@ export type AdaptorParams = {
   curve: Object;
   ethena: Object;
   beefy: Object;
+  morpho: Object;
 }
 
 export type CommonParams = {
@@ -82,7 +83,8 @@ export function loadConfigs() {
       lido,
       curve,
       ethena,
-      beefy
+      beefy,
+      morpho
     } = params;
 
     adpParams[Number(chainId)] = {
@@ -128,6 +130,11 @@ export function loadConfigs() {
       beefy: {
         assets: {
           mooCurveCrvUSDsUSDe: getHex(beefy.assets.mooCurveCrvUSDsUSDe)
+        }
+      },
+      morpho: {
+        assets: {
+          gauntletWETHPrimeVault: getHex(morpho.assets.gauntletWETHPrimeVault)
         }
       }
     };
