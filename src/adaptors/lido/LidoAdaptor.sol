@@ -10,9 +10,12 @@ import {IWstEthToken} from "./IWstEthToken.sol";
 import {IWToken} from "../../interfaces/IWToken.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-error UnstakingNotSupportedForAsset(uint24 assetId);
-error ZeroValues();
 error ZeroAddress();
+
+enum Action {
+    STAKE,
+    UNSTAKE
+}
 
 contract LidoAdaptor is AdaptorBase {
     ILido public immutable iLido;
@@ -24,8 +27,10 @@ contract LidoAdaptor is AdaptorBase {
     constructor(
         address lido_,
         address weth_,
-        address stEth_, // represents the staked ETH token
-        address wstEth_, // represents the share of stETH tokens in Lido (wrapping stETH -> wstETH)
+        // represents the staked ETH token
+        address stEth_,
+        // represents the share of stETH tokens in Lido (wrapping stETH -> wstETH)
+        address wstEth_,
         address withdrawQueueERC721_,
         address pool_
     ) AdaptorBase(pool_) {
@@ -47,59 +52,92 @@ contract LidoAdaptor is AdaptorBase {
         override
         returns (uint24[] memory outAssetIds, uint256[] memory outValues)
     {
-        Asset memory inAsset = getAsset(inAssetIds[0]);
-        uint256 stakeValue = inValues[0];
+        (Action action, address withdrawAddress) = abi.decode(
+            payload,
+            (Action, address)
+        );
+
+        if (action == Action.STAKE) {
+            (outAssetIds, outValues) = _stake(inAssetIds[0], inValues[0]);
+        } else if (action == Action.UNSTAKE) {
+            (outAssetIds, outValues) = _unstake(
+                inAssetIds[0],
+                inValues[0],
+                withdrawAddress
+            );
+        } else {
+            revert InvalidAction();
+        }
+    }
+
+    function _stake(
+        uint24 inAssetId,
+        uint256 stakeValue
+    )
+        internal
+        returns (uint24[] memory outAssetIds, uint256[] memory outValues)
+    {
+        Asset memory inAsset = getAsset(inAssetId);
 
         if (stakeValue == 0) {
-            revert ZeroValues();
+            revert ZeroValue();
         }
 
-        if (inAsset.assetAddress == weth) {
-            // Staking request
-            // unwrapping weth
-            IWToken(weth).withdraw(stakeValue);
-
-            uint256 stEthShares = iLido.submit{value: stakeValue}(address(0)); // shares of stEth token in Lido. Shares do not change with rebasing.
-            uint256 stEthTokens = iLido.getPooledEthByShares(stEthShares); // converting shares to stEth tokens (rebasing token)
-            // wrapping into wstEth for keeping balances constant
-            IERC20(stEth).approve(wstEth, stEthTokens);
-            uint256 wstEthTokens = IWstEthToken(wstEth).wrap(stEthTokens);
-
-            // initializing the out token arrays
-            Asset memory outAsset = getAsset(wstEth);
-
-            outValues = new uint256[](1);
-            outAssetIds = new uint24[](1);
-
-            outAssetIds[0] = outAsset.id;
-            outValues[0] = wstEthTokens;
-        } else {
-            // Unstaking request (NFT)
-            if (inAsset.assetAddress != wstEth) {
-                revert UnstakingNotSupportedForAsset(inAsset.id); // If not wEth, only wstEth is supported for unstaking. Lido returns `unstEth` NFTs as the withdrawal req. is queued on their end.
-            }
-
-            address withdrawalAddress = abi.decode(payload, (address));
-            if (withdrawalAddress == address(0)) {
-                revert ZeroAddress(); // Withdraw address cannot be a Pool's addr as Lido returns `unstEth` NFTs because the withdrawal req. is queued on their end.
-            }
-
-            uint256[] memory amounts = new uint256[](1);
-            amounts[0] = stakeValue;
-
-            IWstEthToken(wstEth).approve(
-                address(iWithdrawQueueERC721),
-                stakeValue
-            ); // needed by `Lido::requestWithdrawalsWstETH()`
-
-            iWithdrawQueueERC721.requestWithdrawalsWstETH(
-                amounts,
-                withdrawalAddress
-            );
-
-            outAssetIds = new uint24[](0);
-            outValues = new uint256[](0);
+        if (inAsset.assetAddress != weth) {
+            revert UnsupportedAsset(inAssetId);
         }
+
+        // Staking request
+        // unwrapping weth
+        IWToken(weth).withdraw(stakeValue);
+
+        // will receive shares of stEth token in Lido. stETH will is a rebasing token.
+        uint256 stEthShares = iLido.submit{value: stakeValue}(address(0));
+        // converting shares to stEth tokens (rebasing token)
+        uint256 stEthTokens = iLido.getPooledEthByShares(stEthShares);
+
+        // wrapping into wstEth for keeping balances constant
+        IERC20(stEth).approve(wstEth, stEthTokens);
+        uint256 wstEthTokens = IWstEthToken(wstEth).wrap(stEthTokens);
+
+        outValues = new uint256[](1);
+        outAssetIds = new uint24[](1);
+
+        outAssetIds[0] = getAsset(wstEth).id;
+        outValues[0] = wstEthTokens;
+    }
+
+    function _unstake(
+        uint24 inAssetId,
+        uint256 unstakeValue,
+        address withdrawAddress
+    )
+        internal
+        returns (uint24[] memory outAssetIds, uint256[] memory outValues)
+    {
+        Asset memory inAsset = getAsset(inAssetId);
+
+        // Unstaking request (outputs an NFT)
+        if (inAsset.assetAddress != wstEth) {
+            revert UnsupportedAsset(inAsset.id);
+        }
+
+        // Withdraw address cannot be a Pool's addr as Lido returns `unstEth` NFTs because the withdrawal req. is queued on their end.
+        if (withdrawAddress == address(0)) {
+            revert ZeroAddress();
+        }
+
+        uint256[] memory amounts = new uint256[](1);
+        amounts[0] = unstakeValue;
+
+        IWstEthToken(wstEth).approve(
+            address(iWithdrawQueueERC721),
+            unstakeValue
+        );
+        iWithdrawQueueERC721.requestWithdrawalsWstETH(amounts, withdrawAddress);
+
+        outAssetIds = new uint24[](0);
+        outValues = new uint256[](0);
     }
 
     /// @dev only for enabling `testWstEthUnstakingOnLido()` test. Pls comment this out for production use.

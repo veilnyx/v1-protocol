@@ -80,7 +80,7 @@ contract LidoAdaptorTest is PoolTest {
         assert(address(rocketPoolAdp) != address(0));
     }
 
-    function testStakingDirectly() external {
+    function testStakingDirectlyOnRocketPool() external {
         vm.prank(user);
         IERC20(WETH).safeTransfer(address(rocketPoolAdp), STAKE_AMT);
 
@@ -107,7 +107,7 @@ contract LidoAdaptorTest is PoolTest {
         assertEq(outValues[0], rEthBal);
     }
 
-    function testUnStakingDirectly() external {
+    function testUnStakingDirectlyOnRocketPool() external {
         vm.prank(user);
         IERC20(rETH).safeTransfer(address(rocketPoolAdp), STAKE_AMT);
 

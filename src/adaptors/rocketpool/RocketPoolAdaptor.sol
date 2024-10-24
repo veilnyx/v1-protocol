@@ -9,10 +9,7 @@ import {IWToken} from "../../interfaces/IWToken.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-error UnsupportedAsset(uint24 assetId);
-error ZeroValues();
 error InsufficientStakingAmt(uint256 stakingAmt, uint256 minimumDeposit);
-error InvalidAction();
 
 enum Action {
     STAKE,
@@ -135,7 +132,7 @@ contract RocketPoolAdaptor is AdaptorBase {
     {
         Asset memory inAsset = getAsset(inAssetId);
         if (unstakeValue == 0) {
-            revert ZeroValues();
+            revert ZeroValue();
         }
 
         if (inAsset.assetAddress != rETH) {

@@ -8,7 +8,7 @@ import {IWToken} from "../../interfaces/IWToken.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 /// @notice Supports staking. User's will have to acquire USDe from external pools. Ref: https://ethena-labs.gitbook.io/ethena-labs/solution-design/key-addresses#liquidity-pool-contracts
-/// @notice Unstaking is not supported. User's will have to unstake from Ethena's UI after withdrawing their `sUSDe` from Labyrinth.
+/// @notice Unstaking is not supported. User's will have to unstake from Ethena's UI after withdrawing their `sUSDe` from Labyrinth. This is due to the cool down period required by Ethena before unstaking, making it a non-atomic tx.
 contract EthenaAdaptor is AdaptorBase {
     IEthena public immutable ethena;
     // Ethena's stable coin that will be staked
