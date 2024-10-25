@@ -10,8 +10,6 @@ import {IWstEthToken} from "./IWstEthToken.sol";
 import {IWToken} from "../../interfaces/IWToken.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-error ZeroAddress();
-
 enum Action {
     STAKE,
     UNSTAKE
@@ -23,6 +21,9 @@ contract LidoAdaptor is AdaptorBase {
     address public immutable weth;
     address public immutable stEth;
     address public immutable wstEth;
+
+    uint256 public constant HOLESKY_CHAINID = 17000;
+    uint256 public constant MAINNET_CHAINID = 1;
 
     constructor(
         address lido_,
@@ -115,6 +116,12 @@ contract LidoAdaptor is AdaptorBase {
         internal
         returns (uint24[] memory outAssetIds, uint256[] memory outValues)
     {
+        if (
+            block.chainid != MAINNET_CHAINID && block.chainid != HOLESKY_CHAINID
+        ) {
+            revert ILido.LidoWithdrawNotSupportedOnChain(block.chainid);
+        }
+
         Asset memory inAsset = getAsset(inAssetId);
 
         // Unstaking request (outputs an NFT)
@@ -124,7 +131,7 @@ contract LidoAdaptor is AdaptorBase {
 
         // Withdraw address cannot be a Pool's addr as Lido returns `unstEth` NFTs because the withdrawal req. is queued on their end.
         if (withdrawAddress == address(0)) {
-            revert ZeroAddress();
+            revert ILido.ZeroAddress();
         }
 
         uint256[] memory amounts = new uint256[](1);

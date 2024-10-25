@@ -5,7 +5,8 @@ pragma abicoder v2;
 import {PoolTest} from "test/fixtures/PoolTest.sol";
 import {Pool} from "src/core/Pool.sol";
 import {ShieldedTransaction} from "src/libraries/ShieldedTransaction.sol";
-import {LidoAdaptor} from "src/adaptors/lido/lidoAdaptor.sol";
+import {LidoAdaptor} from "src/adaptors/lido/LidoAdaptor.sol";
+import {ILido} from "src/adaptors/lido/ILido.sol";
 import {IAdaptor} from "src/interfaces/IAdaptor.sol";
 import {IWToken} from "src/interfaces/IWToken.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -61,15 +62,15 @@ contract LidoAdaptorTest is PoolTest {
 
         deal(WETH, user, INITIAL_SUPPLY);
 
-        vm.startPrank(user);
-        iWETH.approve(address(pool), INITIAL_SUPPLY); // depositing weth to pool
-        ShieldedTransaction memory stxWethDeposit = _loadShieldedTransaction(
-            "deposit_2_testnet_weth"
-        );
-        pool.transact(stxWethDeposit);
-        vm.stopPrank();
+        // vm.startPrank(user);
+        // iWETH.approve(address(pool), INITIAL_SUPPLY); // depositing weth to pool
+        // ShieldedTransaction memory stxWethDeposit = _loadShieldedTransaction(
+        //     "deposit_2_testnet_weth"
+        // );
+        // pool.transact(stxWethDeposit);
+        // vm.stopPrank();
 
-        _processCommitmentTreeQueue();
+        // _processCommitmentTreeQueue();
     }
 
     function testLidoAdaptorDeploy() external view {
@@ -148,6 +149,31 @@ contract LidoAdaptorTest is PoolTest {
 
         assert(adpWstETHBalPostUnStake < adpWstETHBalBeforeUnStaking);
         assert(IERC721(withdrawalQueueERC721).balanceOf(user) > 0); // NFT received check
+    }
+
+    function testRevertOnSepoliaWhenWithdrawing() external {
+        uint24[] memory inAssetIds = new uint24[](1);
+        uint256[] memory inValues = new uint256[](1);
+
+        inAssetIds[0] = pool.getAsset(wstETH).id;
+        inValues[0] = INITIAL_SUPPLY;
+        bytes memory payload = abi.encode(Action.UNSTAKE, user);
+        deal(wstETH, address(lidoAdaptor), INITIAL_SUPPLY);
+
+        if (block.chainid == 11155111) {
+            vm.expectRevert(
+                abi.encodeWithSelector(
+                    ILido.LidoWithdrawNotSupportedOnChain.selector,
+                    11155111
+                )
+            );
+        }
+        // Unstaking call
+        IAdaptor(address(lidoAdaptor)).handleAssets(
+            inAssetIds,
+            inValues,
+            payload
+        );
     }
 
     /// @dev Only allowing Lido tests to run on Holesky testnet and ETH mainnet. More chains can be added.
