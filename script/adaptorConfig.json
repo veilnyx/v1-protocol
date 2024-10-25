@@ -48,6 +48,13 @@
             "assets": {
                 "gauntletWETHPrimeVault": "0x2371e134e3455e0593363cBF89d3b6cf53740618"
             }
+        },
+        "rocketPool": {
+            "rocketSwapRouter": "0x16D5A408e807db8eF7c578279BEeEe6b228f1c1C",
+            "wETH": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+            "assets": {
+                "rETH": "0xae78736Cd615f374D3085123A210448E74Fc6393"
+            }
         }
     },
     "7800": {
@@ -98,6 +105,13 @@
         "morpho": {
             "assets": {
                 "gauntletWETHPrimeVault": "0x2371e134e3455e0593363cBF89d3b6cf53740618"
+            }
+        },
+        "rocketPool": {
+            "rocketSwapRouter": "0x16D5A408e807db8eF7c578279BEeEe6b228f1c1C",
+            "wETH": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+            "assets": {
+                "rETH": "0xae78736Cd615f374D3085123A210448E74Fc6393"
             }
         }
     }
