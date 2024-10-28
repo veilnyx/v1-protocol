@@ -81,6 +81,6 @@ contract AdaptorHandler is IAdaptorHandler {
         return outPubAssets;
     }
 
-    // Allow Lido adaptor to receive unwrapped Ether
+    // Allow Lido/RocketPool adaptor to receive unwrapped Ether for staking
     receive() external payable {}
 }

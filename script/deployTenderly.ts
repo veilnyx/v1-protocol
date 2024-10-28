@@ -150,8 +150,30 @@ const deployMorpho = async (morphoParams, pool, tenderlyDeployConfig) => {
   await addAssets(assets, 1, pool, tenderlyDeployConfig.client.wallet, tenderlyDeployConfig.client.public);
 }
 
+const deployOneInch = async (pool, tenderlyDeployConfig) => {
+  const oneInch = await hre.viem.deployContract("OneInchAdaptor", [
+    pool
+  ], tenderlyDeployConfig);
+  console.log("OneInch deployed:", oneInch.address);
+  await addAdpatorSupport(pool, oneInch.address, true, tenderlyDeployConfig.client.wallet, tenderlyDeployConfig.client.public);
+}
+
+const deployRocketPool = async (rocketPoolParams, pool, tenderlyDeployConfig) => {
+  const rocketPool = await hre.viem.deployContract("RocketPoolAdaptor", [
+    rocketPoolParams.rocketSwapRouter,
+    rocketPoolParams.assets.rETH,
+    rocketPoolParams.wETH,
+    pool
+  ], tenderlyDeployConfig);
+  console.log("RocketPool deployed:", rocketPool.address);
+  await addAdpatorSupport(pool, rocketPool.address, true, tenderlyDeployConfig.client.wallet, tenderlyDeployConfig.client.public);
+
+  const assets = [rocketPoolParams.assets.rETH];
+  await addAssets(assets, 1, pool, tenderlyDeployConfig.client.wallet, tenderlyDeployConfig.client.public);
+}
+
 const deployAdaptors = async (pool, adpParams, tenderlyDeployConfig) => {
-  const { uniswap: uniswapParams, aave: aaveParams, lido: lidoParams, curve: curveParams, ethena: ethenaParams, beefy: beefyParams, morpho: morphoParams } = adpParams;
+  const { uniswap: uniswapParams, aave: aaveParams, lido: lidoParams, curve: curveParams, ethena: ethenaParams, beefy: beefyParams, morpho: morphoParams, rocketPool: rocketPoolParams } = adpParams;
 
   await deployUniswap(uniswapParams, pool, tenderlyDeployConfig);
   await deployAave(aaveParams, pool, tenderlyDeployConfig);
@@ -160,6 +182,8 @@ const deployAdaptors = async (pool, adpParams, tenderlyDeployConfig) => {
   await deployEthena(ethenaParams, pool, tenderlyDeployConfig);
   await deployBeefy(beefyParams, pool, tenderlyDeployConfig);
   await deployMorpho(morphoParams, pool, tenderlyDeployConfig);
+  await deployOneInch(pool, tenderlyDeployConfig);
+  await deployRocketPool(rocketPoolParams, pool, tenderlyDeployConfig);
 }
 
 const addAdpatorSupport = async (pool, adpAddress, enable, wallet, client) => {
@@ -305,7 +329,7 @@ const main = async () => {
   // addAssets(["0x9AbD7F0782CDe1DBd1F0519C35c961b6A724c2a5" as Hex], 1, "0x9163043b553aDeF9fE44b088922560cfBFdEC51b" as Hex, wallet, client);
 
   // individual adp deployment
-  // deployBeefy(adpParams.beefy, "0x9163043b553aDeF9fE44b088922560cfBFdEC51b" as Hex, tenderlyDeployConfig);
+  // deployMorpho(adpParams.morpho, "0x9163043b553aDeF9fE44b088922560cfBFdEC51b" as Hex, tenderlyDeployConfig);
 
   const eip712 = await hre.viem.deployContract("EIP712", [], tenderlyDeployConfig);
   console.log("EIP712 deployed:", eip712.address);

@@ -23,6 +23,7 @@ export type AdaptorParams = {
   ethena: Object;
   beefy: Object;
   morpho: Object;
+  rocketPool: Object;
 }
 
 export type CommonParams = {
@@ -84,7 +85,8 @@ export function loadConfigs() {
       curve,
       ethena,
       beefy,
-      morpho
+      morpho,
+      rocketPool
     } = params;
 
     adpParams[Number(chainId)] = {
@@ -135,6 +137,13 @@ export function loadConfigs() {
       morpho: {
         assets: {
           gauntletWETHPrimeVault: getHex(morpho.assets.gauntletWETHPrimeVault)
+        }
+      },
+      rocketPool: {
+        rocketSwapRouter: getHex(rocketPool.rocketSwapRouter),
+        wETH: getHex(rocketPool.wETH),
+        assets: {
+          rETH: getHex(rocketPool.assets.rETH)
         }
       }
     };
