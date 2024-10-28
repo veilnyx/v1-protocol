@@ -5,11 +5,23 @@ import { fixture, generateTestTransactions } from "./fixture";
 import { parse } from 'path';
 
 const {
-  assets: { testnetWeth, morphoVaultToken },
-  sender: { account: senderAccount },
+  assets: { weth },
+  sender,
+  receiver
 } = fixture;
 
 export const reqs = {
+  batch_deposit: {
+    type: TransactionType.DEPOSIT,
+    assetIds: [weth, weth],
+    values: [parseEther("1"), parseEther("1")],
+    feeAssetId: 0,
+    to: [sender.account.shieldedAddress.pack(), receiver.account.shieldedAddress.pack()],
+    viaBundler: false,
+    paymaster: zeroAddress,
+    revokerId: 0,
+  }
+  /**,
   deposit_2_morphoVaultToken: {
     type: TransactionType.DEPOSIT,
     assetIds: [morphoVaultToken],
@@ -19,8 +31,7 @@ export const reqs = {
     viaBundler: false,
     paymaster: zeroAddress,
     revokerId: 0,
-  }
-  /**
+  },
   deposit_2_testnet_weth: {
     type: TransactionType.DEPOSIT,
     assetIds: [testnetWeth],
