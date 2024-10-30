@@ -29,6 +29,21 @@ contract PoolDepositTest is PoolTest {
         assertEq(token2.balanceOf(address(pool)), balance2 + deposit2);
     }
 
+    function test_batchDeposit() public {
+        uint256 depositAmt = 3 ether;
+        uint256 poolBalanceInitial = token1.balanceOf(address(pool));
+
+        ShieldedTransaction memory stx = _loadShieldedTransaction(
+            "batch_deposit"
+        );
+        _runExpectedTx(stx);
+
+        assertEq(
+            token1.balanceOf(address(pool)),
+            poolBalanceInitial + depositAmt
+        );
+    }
+
     function test_revertOnDoubleSpendDeposit() external {
         uint256 deposit1 = 1000 ether;
         uint256 deposit2 = 1000e6;

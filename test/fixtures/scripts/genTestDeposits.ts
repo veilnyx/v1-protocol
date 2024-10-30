@@ -1,7 +1,7 @@
 import { parseEther, parseUnits, zeroAddress } from "viem";
 import { Core } from "@zkfi-tech/core";
 import { TransactionType } from "@zkfi-tech/shared-types";
-import { fixture, generateTestTransactions } from "./fixture";
+import { fixture, generateTestTransactions, mockNotes } from "./fixture";
 import { parse } from 'path';
 
 const {
@@ -14,7 +14,7 @@ export const reqs = {
   batch_deposit: {
     type: TransactionType.DEPOSIT,
     assetIds: [weth, weth],
-    values: [parseEther("1"), parseEther("1")],
+    values: [parseEther("1"), parseEther("2")],
     feeAssetId: 0,
     to: [sender.account.shieldedAddress.pack(), receiver.account.shieldedAddress.pack()],
     viaBundler: false,
@@ -118,4 +118,5 @@ export const reqs = {
 export const genTestDeposits = async (sdk: Core) => {
   console.log("depositing assets...");
   await generateTestTransactions(reqs, sdk);
+  // await mockNotes("batch_deposit", sdk);
 };

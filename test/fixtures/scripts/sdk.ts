@@ -24,6 +24,7 @@ import { fixture } from "./fixture";
 
 const {
   sender: { account: senderAccount },
+  receiver: { account: receiverAccount },
   revokerPublicKey,
   encryptionPublicKey,
   addressTreeDepth,
@@ -55,11 +56,11 @@ export const getSDKInstance = () => {
   const addressResolver = new MockAddressResolver();
   const notesSource = new MockNotesSource();
 
-  addressTreeSource.insert(senderAccount.rootAddress);
+  addressTreeSource.insert(receiverAccount.rootAddress);
 
   const zkfi = new Core({
     chainId: foundry.id,
-    account: senderAccount,
+    account: receiverAccount,
     rpc: client as any,
     explorerApi: "",
     contracts: {} as any,

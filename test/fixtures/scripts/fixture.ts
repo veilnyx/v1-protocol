@@ -205,16 +205,21 @@ export async function mockNotes(depositName: string, sdk: Core) {
   //   2
   // );
 
+  for (let i = 0; i < ztx.commitments.length; i++) {
+    // @ts-ignore
+    sdk.commitmentTreeSource.insert(ztx.commitments[i]);
+  }
+
   // Decrypt notes
   // ignoring/slicing the first 3 (encrypted key seed) and 4 (encrypted refund data) chunks. The balance notesMemo are encrypted notes of (4 * 32) = 128 bytes each
+
   const encryptedNotesHex = sliceHex(ztx.notesMemo, 7 * 32);
   const encryptedNotes = splitToChunks(encryptedNotesHex, SIZE_FULLY_ENCRYPTED_NOTE_DATA); // 128 bytes = each note
   console.log("Encrypted notes length:", encryptedNotes.length);
   const notes = [];
   for (let i = 0; i < encryptedNotes.length; i++) {
-    console.log("Encrypted note:", encryptedNotes[i]);
     const n = Note.decrypt(0, encryptedNotesKeys[i], encryptedNotes[i], {
-      account: senderAccount,
+      account: receiverAccount,
       revoker: revokerPublicKey,
       leafIndex: i,
     });
@@ -222,12 +227,12 @@ export async function mockNotes(depositName: string, sdk: Core) {
       notes.push(n);
     }
   }
-  console.log("Fixture::Notes decrypted: ", notes);
+  console.log("Fixture::Receiver Notes decrypted: ", notes);
   const z = Fp.from(BigInt(keccak256(stringToBytes("zero")))).val;
   for (let i = 0; i < notes.length; i++) {
     //@ts-ignore
     sdk.notesSource.mockNotes(notes[i].assetId, [notes[i]]);
     //@ts-ignore
-    sdk.commitmentTreeSource.insert(notes[i].commitment);
+    // sdk.commitmentTreeSource.insert(notes[i].commitment);
   }
 }
