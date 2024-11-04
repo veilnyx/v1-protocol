@@ -11,6 +11,17 @@ const {
 } = fixture;
 
 export const reqs = {
+  deposit_10_weth_without_fee: {
+    type: TransactionType.DEPOSIT,
+    assetIds: [weth],
+    values: [parseEther("10")],
+    feeAssetId: 0,
+    to: [receiver.account.shieldedAddress.pack()],
+    viaBundler: false,
+    paymaster: zeroAddress,
+    revokerId: 0,
+  }
+  /**,
   batch_deposit: {
     type: TransactionType.DEPOSIT,
     assetIds: [weth, weth],
@@ -20,8 +31,7 @@ export const reqs = {
     viaBundler: false,
     paymaster: zeroAddress,
     revokerId: 0,
-  }
-  /**,
+  },
   deposit_2_morphoVaultToken: {
     type: TransactionType.DEPOSIT,
     assetIds: [morphoVaultToken],

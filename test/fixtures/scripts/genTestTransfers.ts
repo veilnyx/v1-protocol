@@ -2,6 +2,7 @@ import { parseEther, zeroAddress } from "viem";
 import { Core } from "@zkfi-tech/core";
 import { TransactionType } from "@zkfi-tech/shared-types";
 import { fixture, generateTestTransactions, mockNotes } from "./fixture";
+import { parse } from 'path';
 
 const {
   assets: { weth, usdc },
@@ -10,6 +11,17 @@ const {
 } = fixture;
 
 export const reqs = {
+  batch_transfer: {
+    type: TransactionType.TRANSFER,
+    assetIds: [weth, weth],
+    values: [parseEther("8"), parseEther("2")],
+    feeAssetId: 0,
+    to: [senderAccount.shieldedAddress.pack(), receiverAccount.shieldedAddress.pack()],
+    viaBundler: false,
+    paymaster: zeroAddress,
+    revokerId: 0,
+  }
+  /**,
   transfer_500_weth_without_fee: {
     type: TransactionType.TRANSFER,
     assetIds: [weth],
@@ -31,9 +43,10 @@ export const reqs = {
     feeAssetId: weth,
     revokerId: 0,
   },
+   */
 };
 
 export const genTestTransfers = async (sdk: Core) => {
-  await mockNotes("deposit_pre_tx", sdk);
+  await mockNotes("deposit_10_weth_without_fee", sdk);
   await generateTestTransactions(reqs, sdk);
 };

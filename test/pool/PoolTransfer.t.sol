@@ -12,7 +12,7 @@ import {MockERC20} from "test/mocks/MockERC20.sol";
 contract PoolTransferTest is PoolTest {
     function setUp() public {
         _setUp();
-        _makePreDeposit();
+        // _makePreDeposit();
     }
 
     function test_transferWithoutFee() external {
@@ -55,5 +55,22 @@ contract PoolTransferTest is PoolTest {
             )
         );
         pool.transact(stx);
+    }
+
+    function test_batchTransfer() public {
+        uint256 depositAmt = 10 ether;
+        _mintAsset(asset1, address(this), depositAmt);
+        _approveAsset(asset1, address(pool), depositAmt);
+
+        ShieldedTransaction memory stx = _loadShieldedTransaction(
+            "deposit_10_weth_without_fee"
+        );
+        _runExpectedTx(stx);
+        _processCommitmentTreeQueue();
+
+        ShieldedTransaction memory transferStx = _loadShieldedTransaction(
+            "batch_transfer"
+        );
+        _runExpectedTx(transferStx);
     }
 }
