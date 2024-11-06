@@ -14,7 +14,6 @@ contract MockMessageListener {
 
     function onMessage(
         Origin calldata origin,
-        bytes32 guid,
         bytes calldata payload,
         address executor,
         bytes calldata options
@@ -34,6 +33,15 @@ contract MessageSenderTest is TestHelperOz5 {
 
     uint32 public eidSender = 1;
     uint32 public eidReceiver = 2;
+
+    /**
+    address public constant ETH_MAINNET_ENDPOINT = 0x1a44076050125825900e736c501f859c50fE728c;
+    uint32 public constant ETH_MAINNET_ENDPOINT_ID = 30101;
+
+    address public constant OP_MAINNET_ENDPOINT = 0x1a44076050125825900e736c501f859c50fE728c;
+    uint32 public constant OP_MAINNET_ENDPOINT_ID = 30111;
+    uint8 public constant OP_MAINNET_CHAIN_ID = 10;
+     */
 
     function setUp() public virtual override {
         super.setUp();
@@ -59,14 +67,19 @@ contract MessageSenderTest is TestHelperOz5 {
 
     function test_send() public {
         bytes memory options = OptionsBuilder.newOptions().addExecutorLzReceiveOption(150_000, 0);
+        
         MessagingFee memory fee = messageSender.quote(eidReceiver, "test message", options, false);
 
         assertFalse(messageListener.flagReceived());
 
+        // will send msg to the endpoint of the receiver
         MessagingReceipt memory receipt =
             messageSender.send{ value: fee.nativeFee }(eidReceiver, "test message", options, fee, address(this));
+        
+        // DVN verifies the msg packet
         verifyPackets(eidReceiver, addressToBytes32(address(messageReceiver)));
 
+        // Receiver receives the msg and sets the `messageListener.flagReceived` to true. `messageListener` is a contract who's address is passed to the `MessageReceiver` contract during its deployment.
         assertTrue(messageListener.flagReceived());
     }
 }
