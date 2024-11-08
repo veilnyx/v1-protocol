@@ -122,6 +122,10 @@ interface IPool {
     /// @notice Can only be called by the owner.
     function setWithdrawFeeBips(uint256 feeBips) external;
 
+    /// @notice Sets the address of the address tree updator contract.
+    /// @notice Can only be called by the owner.
+    function setAddressTreeUpdator(address addressTreeUpdator) external;
+
     /////////////////////////////////////////
     //        PUBLIC WRITE METHODS         //
     ////////////////////////////////////////
@@ -149,6 +153,11 @@ interface IPool {
     /// @param assetId The id of the asset for which the paymaster wants to claim the fee.
     /// @param to The address to which the fee will be transferred.
     function withdrawPaymasterFee(uint24 assetId, address to) external;
+
+
+    /// @notice Will be called only by the MessageListener contract on destination chains to update the address tree state of the Pool.
+    /// @notice Can only be called by the MessageListener contract.
+    function updateAddressTree(uint256 updatedAddressTreeRoot, uint8 currentRootIndex) external;
 
     /////////////////////////////////////////
     //         READ METHODS                //

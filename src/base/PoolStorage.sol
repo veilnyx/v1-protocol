@@ -1,18 +1,25 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {MerkleTree} from "../libraries/MerkleTree.sol";
+// import {MerkleTree} from "../libraries/MerkleTree.sol";
+import {MerkleTreeStorage} from "../core/AddressRegistry.sol";
 import {QueuedMerkleTree} from "../libraries/QueuedMerkleTree.sol";
 import {Asset, AssetType} from "../libraries/Asset.sol";
 import {RevokerData} from "../libraries/ShieldedTransaction.sol";
 
-abstract contract PoolStorage {
-    address public verifier;
-    address public adaptorHandler;
-    address public hasher;
-    address public screener;
+struct ExternalContractAddresses {
+    address verifier;
+    address adaptorHandler;
+    address hasher;
+    address screener;
+    address payable addressRegistry;
+    address addressTreeUpdator;
+}
 
-    MerkleTree internal _addressTree;
+abstract contract PoolStorage {
+    ExternalContractAddresses public externalContracts;
+
+    MerkleTreeStorage internal _addressTree;
     mapping(uint256 => bool) internal _rootAddresses;
     mapping(address => uint256) internal _publicAddresses;
 

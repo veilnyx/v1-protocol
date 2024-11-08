@@ -14,16 +14,14 @@ import {MerkleTree} from "@openzeppelin/contracts/utils/structs/MerkleTree.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {MessageSender} from "./MessageSender.sol";
 import {MessageReceiver} from "./MessageReceiver.sol";
-import {ShieldedAddressRegistrationData} from "../libraries/ShieldedAddress.sol";
 import {IPool} from "../interfaces/IPool.sol";
 import {IVerifier} from "../interfaces/IVerifier.sol";
 import {IHasher} from "../interfaces/IHasher.sol";
 import {ZERO_LEAF, EIP712_DOMAIN_NAME, EIP712_DOMAIN_VERSION, EIP712_TYPEHASH_REGISTER_ADDRESS, MESSAGE_REGISTER_ADDRESS, FIELD_SIZE_DIV_2} from "../base/Constants.sol";
+import {ShieldedAddressRegistrationData} from "../libraries/ShieldedAddress.sol";
 import {console2} from "forge-std/console2.sol";
 
 struct MerkleTreeStorage {
-    MerkleTree.Bytes32PushTree tree;
-    uint256 nextLeafIndex;
     uint8 currentRootIndex;
     mapping(uint8 => uint256) roots;
 }
@@ -47,7 +45,7 @@ contract AddressRegistry is
         hex"8000000000000000000000000000000000000000000000000000000000000000";
 
     uint256 public constant SIZE_UNPACKED_SHIELDED_ADDRESS = 160;
-
+    uint8 public constant ROOT_HISTORY_SIZE = 100;
     uint256 public immutable SELF_CHAIN_ID = block.chainid;
     address public verifier;
     address public hasher;
@@ -55,8 +53,8 @@ contract AddressRegistry is
     mapping(address publicAddr => uint256 rootAddr) internal publicAddresses;
     mapping(uint256 rootAddr => bool isRegistered) internal rootAddresses;
 
-    MerkleTree.Bytes32PushTree internal _tree;
-    MerkleTreeStorage internal _addressTree;
+    MerkleTreeStorage public addressTreeStorage;
+    MerkleTree.Bytes32PushTree addressTree;
     EnumerableMap.UintToUintMap internal _lzEIds;
     MessageSenderInfo internal _messageSender;
 
@@ -67,10 +65,9 @@ contract AddressRegistry is
     ) external initializer {
         verifier = verifier_;
         hasher = hasher_;
-        _addressTree.nextLeafIndex = 0;
-        _addressTree.currentRootIndex = 0;
-        _addressTree.roots[_addressTree.currentRootIndex] = uint256(
-            _tree.setup(treeDepth_, bytes32(ZERO_LEAF), _hashLeaves)
+        addressTreeStorage.currentRootIndex = 0;
+        addressTreeStorage.roots[addressTreeStorage.currentRootIndex] = uint256(
+            addressTree.setup(treeDepth_, bytes32(ZERO_LEAF), _hashLeaves)
         );
         __Ownable_init(msg.sender);
         __UUPSUpgradeable_init();
@@ -118,7 +115,9 @@ contract AddressRegistry is
         return _syncTreeState();
     }
 
-    function register(ShieldedAddressRegistrationData calldata self) external {
+    function register(
+        ShieldedAddressRegistrationData calldata self
+    ) external returns (uint256 updatedRoot, uint8 currentRootIndex) {
         uint256 rootAddress = uint256(bytes32(self.shieldedAddress[0:32]));
 
         if (rootAddresses[rootAddress]) {
@@ -141,26 +140,50 @@ contract AddressRegistry is
             revert IPool.PublicAddressAlreadyRegistered(publicAddress);
         }
 
-        uint32 index = _insertAddress(rootAddress);
-        publicAddresses[publicAddress] = rootAddress;
+        uint32 insertedAtIndex = _insertAddress(rootAddress);
+
         rootAddresses[rootAddress] = true;
+        publicAddresses[publicAddress] = rootAddress;
 
         MessagingReceipt memory receipt = _syncTreeState();
 
         emit IPool.RegisterAddress(
             publicAddress,
             rootAddress,
-            index,
+            insertedAtIndex,
             _packShieldedAddress(self.shieldedAddress)
         );
+
+        currentRootIndex = addressTreeStorage.currentRootIndex;
+        return (addressTreeStorage.roots[currentRootIndex], currentRootIndex);
+    }
+
+    function isKnownRoot(uint256 _root) public view returns (bool) {
+        if (_root == 0) {
+            return false;
+        }
+
+        uint8 _currentRootIndex = addressTreeStorage.currentRootIndex;
+        uint8 i = _currentRootIndex; // currentRootIndex -> 0
+        do {
+            if (_root == addressTreeStorage.roots[i]) {
+                return true;
+            }
+            if (i == 0) {
+                // ROOT_HISTORY_SIZE -> currentRootIndex + 1
+                i = ROOT_HISTORY_SIZE;
+            }
+            i--;
+        } while (i != _currentRootIndex);
+        return false;
     }
 
     function getRegistrationFees(
         bytes memory _options
     ) public view returns (uint256[] memory, MessagingFee[] memory) {
         bytes memory message = abi.encode(
-            _addressTree.roots[_addressTree.currentRootIndex],
-            _addressTree.currentRootIndex
+            addressTreeStorage.roots[addressTreeStorage.currentRootIndex],
+            addressTreeStorage.currentRootIndex
         );
 
         uint256 nChains = _lzEIds.length();
@@ -189,13 +212,24 @@ contract AddressRegistry is
     }
 
     function getTreeRoot() external view returns (uint256) {
-        return _addressTree.roots[_addressTree.currentRootIndex];
+        return addressTreeStorage.roots[addressTreeStorage.currentRootIndex];
+    }
+
+    function getTreeState()
+        external
+        view
+        returns (uint256 lastRoot, uint8 currentRootIndex)
+    {
+        return (
+            addressTreeStorage.roots[addressTreeStorage.currentRootIndex],
+            addressTreeStorage.currentRootIndex
+        );
     }
 
     function _syncTreeState() internal returns (MessagingReceipt memory) {
         bytes memory message = abi.encode(
-            _addressTree.roots[_addressTree.currentRootIndex],
-            _addressTree.currentRootIndex
+            addressTreeStorage.roots[addressTreeStorage.currentRootIndex],
+            addressTreeStorage.currentRootIndex
         );
 
         bytes memory _options = OptionsBuilder
@@ -211,9 +245,17 @@ contract AddressRegistry is
             console2.log("AddressRegistry::eid", eid);
 
             // increasing message fee to pay for state changes on the destination chain
-            MessagingReceipt memory receipt = MessageSender(_messageSender.msgSender).send{
-                value: (dstChainFees[i].nativeFee)
-            }(uint32(eid), message, _options, dstChainFees[i], msg.sender);
+            MessagingReceipt memory receipt = MessageSender(
+                _messageSender.msgSender
+            ).send{value: (dstChainFees[i].nativeFee)}(
+                uint32(eid),
+                message,
+                _options,
+                dstChainFees[i],
+                msg.sender
+            );
+
+            return receipt;
         }
     }
 
@@ -240,13 +282,15 @@ contract AddressRegistry is
     }
 
     function _insertAddress(uint256 rootAddress) internal returns (uint32) {
-        (uint256 index, bytes32 root) = _tree.push(
+        (uint256 index, bytes32 root) = addressTree.push(
             bytes32(rootAddress),
             _hashLeaves
         );
-        _addressTree.nextLeafIndex = index;
-        _addressTree.currentRootIndex++;
-        _addressTree.roots[_addressTree.currentRootIndex] = uint256(root);
+
+        addressTreeStorage.currentRootIndex++;
+        addressTreeStorage.roots[addressTreeStorage.currentRootIndex] = uint256(
+            root
+        );
         return uint32(index);
     }
 

@@ -20,47 +20,6 @@ library ShieldedAddressLogic {
     bytes32 constant MASK_PACK =
         hex"8000000000000000000000000000000000000000000000000000000000000000";
 
-    function register(
-        ShieldedAddressRegistrationData calldata self,
-        MerkleTree storage addressTree,
-        mapping(address => uint256) storage publicAddresses,
-        mapping(uint256 => bool) storage rootAddresses,
-        address verifier,
-        bytes32 hashTypedData
-    ) external {
-        uint256 rootAddress = uint256(bytes32(self.shieldedAddress[0:32]));
-
-        if (rootAddresses[rootAddress]) {
-            revert IPool.RootAddressAlreadyRegistered(rootAddress);
-        }
-
-        /// @dev 160 bytes is the size of a shielded address in unpacked form. Verifier expects input in unpacked form.
-        if (self.shieldedAddress.length != 160) { 
-            revert IPool.BadArguments();
-        }
-        
-        if (!verifyProof(self, verifier)) {
-            revert IPool.InvalidAddressProof();
-        }
-
-        address publicAddress = ECDSA.recover(hashTypedData, self.signature);
-
-        if (publicAddresses[publicAddress] != 0) {
-            revert IPool.PublicAddressAlreadyRegistered(publicAddress);
-        }
-
-        uint32 nextIndex = addressTree.insert(rootAddress);
-        rootAddresses[rootAddress] = true;
-        publicAddresses[publicAddress] = rootAddress;
-
-        emit IPool.RegisterAddress(
-            publicAddress,
-            rootAddress,
-            nextIndex - 1,
-            pack(self.shieldedAddress)
-        );
-    }
-
     function verifyProof(
         ShieldedAddressRegistrationData calldata self,
         address verifier
