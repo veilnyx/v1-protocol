@@ -130,7 +130,7 @@ export const generateTestAddressRegistration = async (
   name: string,
   sdk: Core
 ) => {
-  const zaddrReg = await sdk.proveAddress("0x");
+  const zaddrReg = await sdk.proveAddress("0x"); // will be updated with actual signature in the Foundry test file.
   const encoded = zaddrReg.encode();
   writeFileSync(`${dirFixtureData}/${name}.txt`, encoded);
 };

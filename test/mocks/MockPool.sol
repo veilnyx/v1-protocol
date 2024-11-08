@@ -11,7 +11,7 @@ contract MockPool is Pool {
     using QueuedMerkleTreeLogic for QueuedMerkleTree;
 
     function mock_verifier(address verifier_) public {
-        verifier = verifier_;
+        externalContracts.verifier = verifier_;
         _commitmentTree.verifier = verifier_;
     }
 

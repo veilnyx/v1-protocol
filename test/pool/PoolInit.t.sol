@@ -7,7 +7,7 @@ import {IPool} from "src/interfaces/IPool.sol";
 import {AssetType, Asset} from "src/libraries/Asset.sol";
 import {MerkleTree} from "src/libraries/MerkleTree.sol";
 import {RevokerData} from "src/libraries/ShieldedTransaction.sol";
-import {PoolStorage} from "src/base/PoolStorage.sol";
+import {PoolStorage, ExternalContractAddresses} from "src/base/PoolStorage.sol";
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 
 contract PoolInitTest is PoolTest {
@@ -16,8 +16,11 @@ contract PoolInitTest is PoolTest {
     }
 
     function test_correctParameters() public view {
-        address verifier_ = pool.verifier();
-        address adaptorHandler_ = pool.adaptorHandler();
+        (address verifier, address adaptorHandler, , , , ) = pool
+            .externalContracts();
+
+        address verifier_ = verifier;
+        address adaptorHandler_ = adaptorHandler;
         assertEq(verifier_, address(verifier));
         assertEq(adaptorHandler_, address(adaptorHandler));
         assertEq(commitmentTreeDepth, fixture.commitmentTreeDepth);
