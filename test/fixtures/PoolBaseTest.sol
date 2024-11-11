@@ -31,9 +31,11 @@ contract PoolBaseTest is BaseTest {
     Verifier public verifier;
 
     AdaptorHandler public adaptorHandler;
-    ERC1967Proxy public addressRegistry;
+    AddressRegistry public addressRegistry;
     Hasher public hasher;
     MockPool public pool;
+    ERC1967Proxy messageListenerProxy;
+    ExternalContractAddresses externalContracts;
 
     uint256 public addressTreeDepth;
     uint256 public commitmentTreeDepth;
@@ -68,31 +70,36 @@ contract PoolBaseTest is BaseTest {
         adaptorHandler = new AdaptorHandler();
         hasher = _deployHasher();
 
-        // Deploying AddressRegistry (UUPS Proxy)
         AddressRegistry addressRegistryImpl = new AddressRegistry();
         bytes memory addressRegistryInitData = abi.encodeCall(
             addressRegistryImpl.initialize,
             (25, address(verifier), address(hasher))
         );
 
-        addressRegistry = new ERC1967Proxy(
+        ERC1967Proxy addressRegistryProxy = new ERC1967Proxy(
             address(addressRegistryImpl),
             addressRegistryInitData
         );
 
-        pool = new MockPool();
+        console2.log(
+            "AddressRegistryProxy deployed at:",
+            address(addressRegistryProxy)
+        );
+        addressRegistry = AddressRegistry(
+            payable(address(addressRegistryProxy))
+        );
 
+        pool = new MockPool();
         screener = new MockScreener();
 
-        ExternalContractAddresses
-            memory externalContracts = ExternalContractAddresses(
-                address(verifier),
-                address(adaptorHandler),
-                address(hasher),
-                address(screener),
-                payable(address(addressRegistry)),
-                address(0)
-            );
+        externalContracts = ExternalContractAddresses(
+            address(verifier),
+            address(adaptorHandler),
+            address(hasher),
+            address(screener),
+            payable(address(addressRegistry)),
+            address(0)
+        );
 
         bytes memory initData = abi.encodeCall(
             Pool.initialize,
@@ -107,19 +114,6 @@ contract PoolBaseTest is BaseTest {
 
         PoolProxy poolProxy = new PoolProxy(address(pool), initData);
         pool = MockPool(address(poolProxy));
-
-        MessageListener messageListenerImpl = new MessageListener();
-        bytes memory msgListenerInit = abi.encodeCall(
-            messageListenerImpl.initialize,
-            (address(pool))
-        );
-
-        ERC1967Proxy messageListenerProxy = new ERC1967Proxy(
-            address(messageListenerImpl),
-            msgListenerInit
-        );
-
-        IPool(pool).setAddressTreeUpdator(address(messageListenerProxy));
     }
 
     //////////////////////////////////////////////////////

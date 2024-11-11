@@ -98,6 +98,6 @@ contract PoolUserRegistration is PoolBaseTest {
                 rootAddress
             )
         );
-        pool.registerAddress(data);
+        pool.registerAddress(addressRegistrationData);
     }
 }

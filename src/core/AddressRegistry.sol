@@ -117,7 +117,7 @@ contract AddressRegistry is
 
     function register(
         ShieldedAddressRegistrationData calldata self
-    ) external returns (uint256 updatedRoot, uint8 currentRootIndex) {
+    ) payable external returns (uint256 updatedRoot, uint8 currentRootIndex, MessagingReceipt memory) {
         uint256 rootAddress = uint256(bytes32(self.shieldedAddress[0:32]));
 
         if (rootAddresses[rootAddress]) {
@@ -145,7 +145,7 @@ contract AddressRegistry is
         rootAddresses[rootAddress] = true;
         publicAddresses[publicAddress] = rootAddress;
 
-        MessagingReceipt memory receipt = _syncTreeState();
+        MessagingReceipt memory crossChainSyncReceipt = _syncTreeState();
 
         emit IPool.RegisterAddress(
             publicAddress,
@@ -155,7 +155,7 @@ contract AddressRegistry is
         );
 
         currentRootIndex = addressTreeStorage.currentRootIndex;
-        return (addressTreeStorage.roots[currentRootIndex], currentRootIndex);
+        return (addressTreeStorage.roots[currentRootIndex], currentRootIndex, crossChainSyncReceipt);
     }
 
     function isKnownRoot(uint256 _root) public view returns (bool) {
@@ -213,17 +213,6 @@ contract AddressRegistry is
 
     function getTreeRoot() external view returns (uint256) {
         return addressTreeStorage.roots[addressTreeStorage.currentRootIndex];
-    }
-
-    function getTreeState()
-        external
-        view
-        returns (uint256 lastRoot, uint8 currentRootIndex)
-    {
-        return (
-            addressTreeStorage.roots[addressTreeStorage.currentRootIndex],
-            addressTreeStorage.currentRootIndex
-        );
     }
 
     function _syncTreeState() internal returns (MessagingReceipt memory) {
