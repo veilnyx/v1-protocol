@@ -7,6 +7,7 @@ import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/U
 import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
+import {MessagingReceipt} from "@layerzerolabs/oapp-evm/contracts/oapp/OAppSender.sol";
 import {EIP712} from "../libraries/EIP712.sol";
 import {IVerifier} from "../interfaces/IVerifier.sol";
 import {IPool} from "../interfaces/IPool.sol";
@@ -171,7 +172,7 @@ contract Pool is
 
     function registerAddress(
         ShieldedAddressRegistrationData calldata addressRegData
-    ) external whenNotPaused {
+    ) external whenNotPaused returns (MessagingReceipt memory) {
         /**
         bytes32 hashStruct = ShieldedAddressLogic.hashRegsiterAddressStruct(
             addressRegData.shieldedAddress
@@ -186,19 +187,34 @@ contract Pool is
             hashTypedData: hashTypedData
         });
         */
-        
-        (uint256 updatedAddressTreeRoot, uint8 currentRootIndex) = AddressRegistry(externalContracts.addressRegistry).register(addressRegData);
+
+        /// @todo: Pool should send the estimated value to the addressRegistry for syncing the tree state cross-chain.
+        (
+            uint256 updatedAddressTreeRoot,
+            uint8 currentRootIndex,
+            MessagingReceipt memory crossChainSyncReceipt
+        ) = AddressRegistry(externalContracts.addressRegistry).register(addressRegData);
 
         _addressTree.currentRootIndex = currentRootIndex;
         _addressTree.roots[currentRootIndex] = updatedAddressTreeRoot;
+
+        return crossChainSyncReceipt;
     }
 
-    function setAddressTreeUpdator(address addressTreeUpdator) external onlyOwner {
+    function setAddressTreeUpdator(
+        address addressTreeUpdator
+    ) external onlyOwner {
         externalContracts.addressTreeUpdator = addressTreeUpdator;
     }
 
-    function updateAddressTree(uint256 updatedAddressTreeRoot, uint8 currentRootIndex) external whenNotPaused {
-        require(msg.sender == externalContracts.addressTreeUpdator, "Pool: Unauthorized");
+    function updateAddressTree(
+        uint256 updatedAddressTreeRoot,
+        uint8 currentRootIndex
+    ) external whenNotPaused {
+        require(
+            msg.sender == externalContracts.addressTreeUpdator,
+            "Pool: Unauthorized"
+        );
         _addressTree.currentRootIndex = currentRootIndex;
         _addressTree.roots[currentRootIndex] = updatedAddressTreeRoot;
     }
@@ -319,6 +335,17 @@ contract Pool is
         }
 
         return markedArr;
+    }
+
+    function getAddressTreeState()
+        external
+        view
+        returns (uint256 lastRoot, uint8 currentRootIndex)
+    {
+        return (
+            _addressTree.roots[_addressTree.currentRootIndex],
+            _addressTree.currentRootIndex
+        );
     }
 
     function getCommitmentTreeState()
