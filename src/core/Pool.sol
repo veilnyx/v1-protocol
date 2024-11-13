@@ -172,7 +172,7 @@ contract Pool is
 
     function registerAddress(
         ShieldedAddressRegistrationData calldata addressRegData
-    ) external whenNotPaused returns (MessagingReceipt memory) {
+    ) external whenNotPaused {
         /**
         bytes32 hashStruct = ShieldedAddressLogic.hashRegsiterAddressStruct(
             addressRegData.shieldedAddress
@@ -191,14 +191,13 @@ contract Pool is
         /// @todo: Pool should send the estimated value to the addressRegistry for syncing the tree state cross-chain.
         (
             uint256 updatedAddressTreeRoot,
-            uint8 currentRootIndex,
-            MessagingReceipt memory crossChainSyncReceipt
-        ) = AddressRegistry(externalContracts.addressRegistry).register(addressRegData);
+            uint8 currentRootIndex
+        ) = AddressRegistry(externalContracts.addressRegistry).register{
+                value: address(this).balance
+            }(addressRegData);
 
         _addressTree.currentRootIndex = currentRootIndex;
         _addressTree.roots[currentRootIndex] = updatedAddressTreeRoot;
-
-        return crossChainSyncReceipt;
     }
 
     function setAddressTreeUpdator(

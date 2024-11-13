@@ -3,6 +3,7 @@ pragma solidity ^0.8.24;
 
 import {TestHelperOz5} from "@layerzerolabs/test-devtools-evm-foundry/contracts/TestHelperOz5.sol";
 import {Packet} from "@layerzerolabs/lz-evm-protocol-v2/contracts/interfaces/ISendLib.sol";
+import {Errors} from "@layerzerolabs/lz-evm-protocol-v2/contracts/libs/Errors.sol";
 import {OptionsBuilder} from "@layerzerolabs/oapp-evm/contracts/oapp/libs/OptionsBuilder.sol";
 import {Origin, MessagingFee} from "@layerzerolabs/oapp-evm/contracts/oapp/OApp.sol";
 import {MessagingReceipt} from "@layerzerolabs/oapp-evm/contracts/oapp/OAppSender.sol";
@@ -61,6 +62,7 @@ contract AddressRegistryTest is TestHelperOz5, PoolBaseTest {
     uint256 public originChainId = 1;
     uint32 public eidReceiver = 2;
     uint256 public dstChainId = 2;
+    uint128 public estimatedGasFee = 0.0015 ether;
 
     function setUp() public override {
         console2.log("setUp");
@@ -115,6 +117,16 @@ contract AddressRegistryTest is TestHelperOz5, PoolBaseTest {
         );
     }
 
+    function test_registrationFeeEstimate() public {
+        (
+            MessagingFee[] memory dstChainFees,
+            uint256 totalNativeFee
+        ) = addressRegistry.getRegistrationFees();
+
+        assert(dstChainFees[0].nativeFee > 0);
+        assert(totalNativeFee > 0);
+    }
+
     // function test_constructor() public view {
     //     assertEq(messageSender.owner(), address(this));
     //     assertEq(messageReceiver.owner(), address(this));
@@ -131,10 +143,10 @@ contract AddressRegistryTest is TestHelperOz5, PoolBaseTest {
         // assertTrue(mockMessageListener.flagReceived());
 
         // sending native eth to addressRegistry for LZ fee
-        vm.deal(address(this), 5 ether);
+        vm.deal(address(this), estimatedGasFee);
         MessagingReceipt memory receipt = addressRegistry.syncTreeState{
-            value: 5 ether
-        }();
+            value: estimatedGasFee
+        }(address(this));
 
         // DVN verifies the msg packet
         verifyPackets(eidReceiver, addressToBytes32(address(messageReceiver)));
@@ -150,7 +162,7 @@ contract AddressRegistryTest is TestHelperOz5, PoolBaseTest {
             memory addressRegistrationData = _prepareShieldedAddrRegStruct();
 
         vm.deal(payable(address(addressRegistry)), 5 ether);
-        MessagingReceipt memory receipt = pool.registerAddress(
+        pool.registerAddress(
             addressRegistrationData
         );
 

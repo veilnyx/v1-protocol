@@ -113,9 +113,7 @@ contract AddressRegistryIntegrationTest is TestHelperOz5, PoolBaseTest {
             memory addressRegistrationData = _prepareShieldedAddrRegStruct();
 
         vm.deal(payable(address(addressRegistry)), 5 ether);
-        MessagingReceipt memory receipt = pool.registerAddress(
-            addressRegistrationData
-        );
+        pool.registerAddress(addressRegistrationData);
 
         verifyPackets(eidReceiver, addressToBytes32(address(messageReceiver)));
 

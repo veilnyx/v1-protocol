@@ -17,8 +17,8 @@ import {MessageReceiver} from "./MessageReceiver.sol";
 import {IPool} from "../interfaces/IPool.sol";
 import {IVerifier} from "../interfaces/IVerifier.sol";
 import {IHasher} from "../interfaces/IHasher.sol";
-import {ZERO_LEAF, EIP712_DOMAIN_NAME, EIP712_DOMAIN_VERSION, EIP712_TYPEHASH_REGISTER_ADDRESS, MESSAGE_REGISTER_ADDRESS, FIELD_SIZE_DIV_2} from "../base/Constants.sol";
-import {ShieldedAddressRegistrationData} from "../libraries/ShieldedAddress.sol";
+import {ZERO_LEAF, EIP712_DOMAIN_NAME, EIP712_DOMAIN_VERSION, EIP712_TYPEHASH_REGISTER_ADDRESS, MESSAGE_REGISTER_ADDRESS, FIELD_SIZE_DIV_2, SIZE_UNPACKED_SHIELDED_ADDRESS} from "../base/Constants.sol";
+import {ShieldedAddressRegistrationData, ShieldedAddressLogic} from "../libraries/ShieldedAddress.sol";
 import {console2} from "forge-std/console2.sol";
 
 struct MerkleTreeStorage {
@@ -27,7 +27,7 @@ struct MerkleTreeStorage {
 }
 
 struct MessageSenderInfo {
-    address payable msgSender;
+    address payable msgSenderAddr;
     uint32 msgSenderEid;
 }
 
@@ -41,12 +41,8 @@ contract AddressRegistry is
     using MerkleTree for MerkleTree.Bytes32PushTree;
     using EnumerableMap for EnumerableMap.UintToUintMap;
 
-    bytes32 public constant MASK_PACK =
-        hex"8000000000000000000000000000000000000000000000000000000000000000";
+    error NoEnoughEther();
 
-    uint256 public constant SIZE_UNPACKED_SHIELDED_ADDRESS = 160;
-    uint8 public constant ROOT_HISTORY_SIZE = 100;
-    uint256 public immutable SELF_CHAIN_ID = block.chainid;
     address public verifier;
     address public hasher;
 
@@ -57,6 +53,19 @@ contract AddressRegistry is
     MerkleTree.Bytes32PushTree addressTree;
     EnumerableMap.UintToUintMap internal _lzEIds;
     MessageSenderInfo internal _messageSender;
+
+    bytes internal _options =
+        OptionsBuilder.newOptions().addExecutorLzReceiveOption(
+            DST_CHAIN_ADDRESS_TREE_UPDATE_GAS,
+            0
+        );
+    // Gas profiling:
+    // decoding hash: 50_000
+    // changing from zero to non-zero: 20_000
+    // updating non-zero value: 3_000
+    // total = 73k = 75k (approx)
+    uint128 public constant DST_CHAIN_ADDRESS_TREE_UPDATE_GAS = 75_000;
+    uint8 public constant ROOT_HISTORY_SIZE = 100;
 
     function initialize(
         uint8 treeDepth_,
@@ -78,7 +87,7 @@ contract AddressRegistry is
         address payable newMessageSender,
         uint32 newMessageSenderEid
     ) external onlyOwner {
-        _messageSender.msgSender = newMessageSender;
+        _messageSender.msgSenderAddr = newMessageSender;
         _messageSender.msgSenderEid = newMessageSenderEid;
     }
 
@@ -87,15 +96,14 @@ contract AddressRegistry is
         uint32 eid,
         address payable peerAddress
     ) external onlyOwner {
-        /// @todo Check if we can send messages to the origin chain using Layer0
-        if (chainId == SELF_CHAIN_ID) {
+        if (chainId == block.chainid) {
             revert("AddressRegistry: cannot set lzEId for self chain");
         }
 
         _lzEIds.set(chainId, eid);
 
         // Setting peer for sender
-        MessageSender(_messageSender.msgSender).setPeer(
+        MessageSender(_messageSender.msgSenderAddr).setPeer(
             eid,
             _addressToBytes32(peerAddress)
         );
@@ -103,21 +111,22 @@ contract AddressRegistry is
         // Setting peer for receiver
         MessageReceiver(peerAddress).setPeer(
             _messageSender.msgSenderEid,
-            _addressToBytes32(_messageSender.msgSender)
+            _addressToBytes32(_messageSender.msgSenderAddr)
         );
     }
 
-    function syncTreeState()
-        external
-        payable
-        returns (MessagingReceipt memory)
-    {
-        return _syncTreeState();
+    function syncTreeState(
+        address refundAddress
+    ) external payable onlyOwner returns (MessagingReceipt memory) {
+        if (refundAddress == address(0)) {
+            refundAddress = address(this);
+        }
+        return _syncTreeState(refundAddress);
     }
 
     function register(
         ShieldedAddressRegistrationData calldata self
-    ) payable external returns (uint256 updatedRoot, uint8 currentRootIndex, MessagingReceipt memory) {
+    ) external payable returns (uint256 updatedRoot, uint8 currentRootIndex) {
         uint256 rootAddress = uint256(bytes32(self.shieldedAddress[0:32]));
 
         if (rootAddresses[rootAddress]) {
@@ -132,30 +141,43 @@ contract AddressRegistry is
             revert IPool.InvalidAddressProof();
         }
 
+        (, uint256 totalFeeNeeded) = getRegistrationFees();
+        if (totalFeeNeeded > address(this).balance) {
+            revert NoEnoughEther();
+        }
+
         bytes32 hashStruct = _hashRegsiterAddressStruct(self.shieldedAddress);
         bytes32 hashTypedData = _hashTypedDataV4(hashStruct);
         address publicAddress = ECDSA.recover(hashTypedData, self.signature);
+
+        // returning any excess fee
+        // in addition to this, if estimated fee > actual fee used by LZ, it will be refunded to the publicAddress being registered
+        uint256 feeDiff = address(this).balance - totalFeeNeeded;
+        if (feeDiff > 0) {
+            publicAddress.call{value: feeDiff}("");
+        }
 
         if (publicAddresses[publicAddress] != 0) {
             revert IPool.PublicAddressAlreadyRegistered(publicAddress);
         }
 
         uint32 insertedAtIndex = _insertAddress(rootAddress);
-
         rootAddresses[rootAddress] = true;
         publicAddresses[publicAddress] = rootAddress;
 
-        MessagingReceipt memory crossChainSyncReceipt = _syncTreeState();
+        /// @dev Any excess ETH (gas) will be refunded to the publicAddress of the user
+        _syncTreeState(publicAddress);
 
         emit IPool.RegisterAddress(
             publicAddress,
             rootAddress,
             insertedAtIndex,
-            _packShieldedAddress(self.shieldedAddress)
+            ShieldedAddressLogic.packShieldedAddress(self.shieldedAddress)
         );
 
         currentRootIndex = addressTreeStorage.currentRootIndex;
-        return (addressTreeStorage.roots[currentRootIndex], currentRootIndex, crossChainSyncReceipt);
+
+        return (addressTreeStorage.roots[currentRootIndex], currentRootIndex);
     }
 
     function isKnownRoot(uint256 _root) public view returns (bool) {
@@ -178,30 +200,33 @@ contract AddressRegistry is
         return false;
     }
 
-    function getRegistrationFees(
-        bytes memory _options
-    ) public view returns (uint256[] memory, MessagingFee[] memory) {
+    function getRegistrationFees()
+        public
+        view
+        returns (MessagingFee[] memory, uint256 totalNativeRegistrationFee)
+    {
         bytes memory message = abi.encode(
             addressTreeStorage.roots[addressTreeStorage.currentRootIndex],
             addressTreeStorage.currentRootIndex
         );
 
-        uint256 nChains = _lzEIds.length();
-        uint256[] memory chainIds = new uint256[](nChains);
-        MessagingFee[] memory fees = new MessagingFee[](nChains);
-
+        MessagingFee[] memory fees = new MessagingFee[](_lzEIds.length());
         uint256 eid;
-        for (uint8 i = 0; i < nChains; ++i) {
-            (chainIds[i], eid) = _lzEIds.at(i);
-            fees[i] = MessageSender(_messageSender.msgSender).quote(
+
+        // _lzEIds.length() = no. of chains
+        for (uint8 i = 0; i < _lzEIds.length(); ++i) {
+            (, eid) = _lzEIds.at(i);
+            fees[i] = MessageSender(_messageSender.msgSenderAddr).quote(
                 uint32(eid),
                 message,
                 _options,
                 false
             );
+
+            totalNativeRegistrationFee += fees[i].nativeFee;
         }
 
-        return (chainIds, fees);
+        return (fees, totalNativeRegistrationFee);
     }
 
     function verifyProof(
@@ -215,59 +240,34 @@ contract AddressRegistry is
         return addressTreeStorage.roots[addressTreeStorage.currentRootIndex];
     }
 
-    function _syncTreeState() internal returns (MessagingReceipt memory) {
+    function _syncTreeState(
+        address refundAddress
+    ) internal returns (MessagingReceipt memory) {
         bytes memory message = abi.encode(
             addressTreeStorage.roots[addressTreeStorage.currentRootIndex],
             addressTreeStorage.currentRootIndex
         );
 
-        bytes memory _options = OptionsBuilder
-            .newOptions()
-            .addExecutorLzReceiveOption(500_000, 0);
-
-        uint256 nChains = _lzEIds.length();
-        (, MessagingFee[] memory dstChainFees) = getRegistrationFees(_options);
+        (MessagingFee[] memory dstChainFees, ) = getRegistrationFees();
 
         uint256 eid;
-        for (uint8 i = 0; i < nChains; ++i) {
+        // _lzEIds.length() = no. of chains
+        for (uint8 i = 0; i < _lzEIds.length(); ++i) {
             (, eid) = _lzEIds.at(i);
             console2.log("AddressRegistry::eid", eid);
 
-            // increasing message fee to pay for state changes on the destination chain
             MessagingReceipt memory receipt = MessageSender(
-                _messageSender.msgSender
+                _messageSender.msgSenderAddr
             ).send{value: (dstChainFees[i].nativeFee)}(
                 uint32(eid),
                 message,
                 _options,
                 dstChainFees[i],
-                msg.sender
+                refundAddress
             );
 
             return receipt;
         }
-    }
-
-    function _packShieldedAddress(
-        bytes calldata shieldedAddress
-    ) internal pure returns (bytes memory) {
-        bytes32 vx = bytes32(shieldedAddress[32:64]);
-        bytes32 vy = bytes32(shieldedAddress[64:96]);
-        bytes32 sx = bytes32(shieldedAddress[96:128]);
-        bytes32 sy = bytes32(shieldedAddress[128:160]);
-        return
-            abi.encodePacked(
-                shieldedAddress[0:32],
-                _packPoint(vx, vy),
-                _packPoint(sx, sy)
-            );
-    }
-
-    function _packPoint(bytes32 x, bytes32 y) internal pure returns (bytes32) {
-        if (uint256(x) > FIELD_SIZE_DIV_2) {
-            return MASK_PACK | y;
-        }
-        return y;
     }
 
     function _insertAddress(uint256 rootAddress) internal returns (uint32) {

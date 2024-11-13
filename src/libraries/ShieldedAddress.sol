@@ -28,6 +28,21 @@ library ShieldedAddressLogic {
         return IVerifier(verifier).verifyAddressProof(vInp);
     }
 
+    function packShieldedAddress(
+        bytes calldata shieldedAddress
+    ) external pure returns (bytes memory) {
+        bytes32 vx = bytes32(shieldedAddress[32:64]);
+        bytes32 vy = bytes32(shieldedAddress[64:96]);
+        bytes32 sx = bytes32(shieldedAddress[96:128]);
+        bytes32 sy = bytes32(shieldedAddress[128:160]);
+        return
+            abi.encodePacked(
+                shieldedAddress[0:32],
+                _packPoint(vx, vy),
+                _packPoint(sx, sy)
+            );
+    }
+
     function pack(
         bytes calldata shieldedAddress
     ) public pure returns (bytes memory) {
