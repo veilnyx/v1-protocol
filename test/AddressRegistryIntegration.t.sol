@@ -108,11 +108,22 @@ contract AddressRegistryIntegrationTest is TestHelperOz5, PoolBaseTest {
         );
     }
 
+    function test_revertDueToLowGasValue() public {
+        ShieldedAddressRegistrationData
+            memory addressRegistrationData = _prepareShieldedAddrRegStruct();
+        (, uint256 totalNativeGas) = addressRegistry.getRegistrationFees();
+        vm.deal(payable(address(addressRegistry)), totalNativeGas / 2);
+
+        vm.expectRevert(abi.encodeWithSelector(AddressRegistry.NotEnoughEther.selector));
+        pool.registerAddress(addressRegistrationData);
+    }
+
     function test_registerAddressCallAndPropogationOfStateCrossChain() public {
         ShieldedAddressRegistrationData
             memory addressRegistrationData = _prepareShieldedAddrRegStruct();
 
-        vm.deal(payable(address(addressRegistry)), 5 ether);
+        (, uint256 totalNativeGas) = addressRegistry.getRegistrationFees();
+        vm.deal(payable(address(addressRegistry)), totalNativeGas);
         pool.registerAddress(addressRegistrationData);
 
         verifyPackets(eidReceiver, addressToBytes32(address(messageReceiver)));

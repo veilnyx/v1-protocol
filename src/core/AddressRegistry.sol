@@ -41,7 +41,7 @@ contract AddressRegistry is
     using MerkleTree for MerkleTree.Bytes32PushTree;
     using EnumerableMap for EnumerableMap.UintToUintMap;
 
-    error NoEnoughEther();
+    error NotEnoughEther();
 
     address public verifier;
     address public hasher;
@@ -54,17 +54,13 @@ contract AddressRegistry is
     EnumerableMap.UintToUintMap internal _lzEIds;
     MessageSenderInfo internal _messageSender;
 
-    bytes internal _options =
-        OptionsBuilder.newOptions().addExecutorLzReceiveOption(
-            DST_CHAIN_ADDRESS_TREE_UPDATE_GAS,
-            0
-        );
     // Gas profiling:
     // decoding hash: 50_000
     // changing from zero to non-zero: 20_000
     // updating non-zero value: 3_000
     // total = 73k = 75k (approx)
-    uint128 public constant DST_CHAIN_ADDRESS_TREE_UPDATE_GAS = 75_000;
+    uint128 public constant DST_CHAIN_ADDRESS_TREE_UPDATE_GAS = 100_000;
+    bytes public LZ_OPTIONS;
     uint8 public constant ROOT_HISTORY_SIZE = 100;
 
     function initialize(
@@ -77,6 +73,10 @@ contract AddressRegistry is
         addressTreeStorage.currentRootIndex = 0;
         addressTreeStorage.roots[addressTreeStorage.currentRootIndex] = uint256(
             addressTree.setup(treeDepth_, bytes32(ZERO_LEAF), _hashLeaves)
+        );
+        LZ_OPTIONS = OptionsBuilder.newOptions().addExecutorLzReceiveOption(
+            DST_CHAIN_ADDRESS_TREE_UPDATE_GAS,
+            0
         );
         __Ownable_init(msg.sender);
         __UUPSUpgradeable_init();
@@ -143,7 +143,7 @@ contract AddressRegistry is
 
         (, uint256 totalFeeNeeded) = getRegistrationFees();
         if (totalFeeNeeded > address(this).balance) {
-            revert NoEnoughEther();
+            revert NotEnoughEther();
         }
 
         bytes32 hashStruct = _hashRegsiterAddressStruct(self.shieldedAddress);
@@ -219,7 +219,7 @@ contract AddressRegistry is
             fees[i] = MessageSender(_messageSender.msgSenderAddr).quote(
                 uint32(eid),
                 message,
-                _options,
+                LZ_OPTIONS,
                 false
             );
 
@@ -261,7 +261,7 @@ contract AddressRegistry is
             ).send{value: (dstChainFees[i].nativeFee)}(
                 uint32(eid),
                 message,
-                _options,
+                LZ_OPTIONS,
                 dstChainFees[i],
                 refundAddress
             );
