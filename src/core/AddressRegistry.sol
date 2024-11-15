@@ -1,10 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {OAppSender, MessagingFee, MessagingReceipt} from "@layerzerolabs/oapp-evm/contracts/oapp/OAppSender.sol";
-import {OAppCore} from "@layerzerolabs/oapp-evm/contracts/oapp/OAppCore.sol";
+import {MessagingFee} from "@layerzerolabs/oapp-evm/contracts/oapp/OAppSender.sol";
 import {OptionsBuilder} from "@layerzerolabs/oapp-evm/contracts/oapp/libs/OptionsBuilder.sol";
-import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
@@ -12,14 +10,13 @@ import {EIP712Upgradeable} from "@openzeppelin/contracts-upgradeable/utils/crypt
 import {EnumerableMap} from "@openzeppelin/contracts/utils/structs/EnumerableMap.sol";
 import {MerkleTree} from "@openzeppelin/contracts/utils/structs/MerkleTree.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
-import {MessageSender} from "./MessageSender.sol";
-import {MessageReceiver} from "./MessageReceiver.sol";
+import {AddressTreeStateTransmitter} from "./AddressTreeStateTransmitter.sol";
+import {AddressTreeStateReceiver} from "./AddressTreeStateReceiver.sol";
 import {IPool} from "../interfaces/IPool.sol";
 import {IVerifier} from "../interfaces/IVerifier.sol";
 import {IHasher} from "../interfaces/IHasher.sol";
 import {ZERO_LEAF, EIP712_DOMAIN_NAME, EIP712_DOMAIN_VERSION, EIP712_TYPEHASH_REGISTER_ADDRESS, MESSAGE_REGISTER_ADDRESS, FIELD_SIZE_DIV_2, SIZE_UNPACKED_SHIELDED_ADDRESS} from "../base/Constants.sol";
 import {ShieldedAddressRegistrationData, ShieldedAddressLogic} from "../libraries/ShieldedAddress.sol";
-import {console2} from "forge-std/console2.sol";
 
 struct MerkleTreeStorage {
     uint8 currentRootIndex;
@@ -42,15 +39,16 @@ contract AddressRegistry is
     using EnumerableMap for EnumerableMap.UintToUintMap;
 
     error NotEnoughEther();
+    error ExcessEtherRefundFailed();
 
     address public verifier;
     address public hasher;
-
     mapping(address publicAddr => uint256 rootAddr) internal publicAddresses;
     mapping(uint256 rootAddr => bool isRegistered) internal rootAddresses;
+    bytes public lzOptions;
 
     MerkleTreeStorage public addressTreeStorage;
-    MerkleTree.Bytes32PushTree addressTree;
+    MerkleTree.Bytes32PushTree public addressTree;
     EnumerableMap.UintToUintMap internal _lzEIds;
     MessageSenderInfo internal _messageSender;
 
@@ -58,9 +56,8 @@ contract AddressRegistry is
     // decoding hash: 50_000
     // changing from zero to non-zero: 20_000
     // updating non-zero value: 3_000
-    // total = 73k = 75k (approx)
+    // total = 73k => 100k (approx)
     uint128 public constant DST_CHAIN_ADDRESS_TREE_UPDATE_GAS = 100_000;
-    bytes public LZ_OPTIONS;
     uint8 public constant ROOT_HISTORY_SIZE = 100;
 
     function initialize(
@@ -74,7 +71,7 @@ contract AddressRegistry is
         addressTreeStorage.roots[addressTreeStorage.currentRootIndex] = uint256(
             addressTree.setup(treeDepth_, bytes32(ZERO_LEAF), _hashLeaves)
         );
-        LZ_OPTIONS = OptionsBuilder.newOptions().addExecutorLzReceiveOption(
+        lzOptions = OptionsBuilder.newOptions().addExecutorLzReceiveOption(
             DST_CHAIN_ADDRESS_TREE_UPDATE_GAS,
             0
         );
@@ -103,25 +100,23 @@ contract AddressRegistry is
         _lzEIds.set(chainId, eid);
 
         // Setting peer for sender
-        MessageSender(_messageSender.msgSenderAddr).setPeer(
+        AddressTreeStateTransmitter(_messageSender.msgSenderAddr).setPeer(
             eid,
             _addressToBytes32(peerAddress)
         );
 
         // Setting peer for receiver
-        MessageReceiver(peerAddress).setPeer(
+        AddressTreeStateReceiver(peerAddress).setPeer(
             _messageSender.msgSenderEid,
             _addressToBytes32(_messageSender.msgSenderAddr)
         );
     }
 
-    function syncTreeState(
-        address refundAddress
-    ) external payable onlyOwner returns (MessagingReceipt memory) {
+    function syncTreeState(address refundAddress) external payable onlyOwner {
         if (refundAddress == address(0)) {
             refundAddress = address(this);
         }
-        return _syncTreeState(refundAddress);
+        _syncTreeState(refundAddress);
     }
 
     function register(
@@ -154,7 +149,10 @@ contract AddressRegistry is
         // in addition to this, if estimated fee > actual fee used by LZ, it will be refunded to the publicAddress being registered
         uint256 feeDiff = address(this).balance - totalFeeNeeded;
         if (feeDiff > 0) {
-            publicAddress.call{value: feeDiff}("");
+            (bool success, ) = publicAddress.call{value: feeDiff}("");
+            if(!success) {
+                revert ExcessEtherRefundFailed();
+            }
         }
 
         if (publicAddresses[publicAddress] != 0) {
@@ -165,7 +163,6 @@ contract AddressRegistry is
         rootAddresses[rootAddress] = true;
         publicAddresses[publicAddress] = rootAddress;
 
-        /// @dev Any excess ETH (gas) will be refunded to the publicAddress of the user
         _syncTreeState(publicAddress);
 
         emit IPool.RegisterAddress(
@@ -176,7 +173,6 @@ contract AddressRegistry is
         );
 
         currentRootIndex = addressTreeStorage.currentRootIndex;
-
         return (addressTreeStorage.roots[currentRootIndex], currentRootIndex);
     }
 
@@ -216,10 +212,10 @@ contract AddressRegistry is
         // _lzEIds.length() = no. of chains
         for (uint8 i = 0; i < _lzEIds.length(); ++i) {
             (, eid) = _lzEIds.at(i);
-            fees[i] = MessageSender(_messageSender.msgSenderAddr).quote(
+            fees[i] = AddressTreeStateTransmitter(_messageSender.msgSenderAddr).quote(
                 uint32(eid),
                 message,
-                LZ_OPTIONS,
+                lzOptions,
                 false
             );
 
@@ -240,9 +236,7 @@ contract AddressRegistry is
         return addressTreeStorage.roots[addressTreeStorage.currentRootIndex];
     }
 
-    function _syncTreeState(
-        address refundAddress
-    ) internal returns (MessagingReceipt memory) {
+    function _syncTreeState(address refundAddress) internal {
         bytes memory message = abi.encode(
             addressTreeStorage.roots[addressTreeStorage.currentRootIndex],
             addressTreeStorage.currentRootIndex
@@ -254,19 +248,10 @@ contract AddressRegistry is
         // _lzEIds.length() = no. of chains
         for (uint8 i = 0; i < _lzEIds.length(); ++i) {
             (, eid) = _lzEIds.at(i);
-            console2.log("AddressRegistry::eid", eid);
 
-            MessagingReceipt memory receipt = MessageSender(
-                _messageSender.msgSenderAddr
-            ).send{value: (dstChainFees[i].nativeFee)}(
-                uint32(eid),
-                message,
-                LZ_OPTIONS,
-                dstChainFees[i],
-                refundAddress
-            );
-
-            return receipt;
+            AddressTreeStateTransmitter(_messageSender.msgSenderAddr).send{
+                value: (dstChainFees[i].nativeFee)
+            }(uint32(eid), message, lzOptions, dstChainFees[i], refundAddress);
         }
     }
 

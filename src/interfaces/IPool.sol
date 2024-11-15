@@ -136,7 +136,7 @@ interface IPool {
     /// @param addressRegData The user's shielded address data including shieled address and proof.
     function registerAddress(
         ShieldedAddressRegistrationData calldata addressRegData
-    ) external;
+    ) external payable;
 
     /// @notice Updates the commitment tree with a queue of leaves. It uses zk proof under the hood to prove the `newRoot` and `newSubtrees` are valid.
     /// @param updatedCommitmentTreeInputs The inputs needed by the zk verifier to verify the authenticity of the queued merkle tree update.

@@ -1,17 +1,17 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity 0.8.24;
 
-import {IMessageListener} from "./MessageReceiver.sol";
+import {IAddressTreeStateUpdater} from "./AddressTreeStateReceiver.sol";
 import {IPool} from "../interfaces/IPool.sol";
 import {Origin, MessagingFee} from "@layerzerolabs/oapp-evm/contracts/oapp/OApp.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 
-contract MessageListener is
+contract AddressTreeStateUpdater is
     Initializable,
     UUPSUpgradeable,
-    IMessageListener,
+    IAddressTreeStateUpdater,
     OwnableUpgradeable
 {
     address public pool;
@@ -21,7 +21,7 @@ contract MessageListener is
         pool = pool_;
     }
 
-    function onMessage(
+    function updateAddressTreeState(
         Origin calldata origin,
         bytes calldata payload,
         address executor,

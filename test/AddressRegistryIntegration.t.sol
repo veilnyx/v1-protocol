@@ -8,9 +8,9 @@ import {Origin, MessagingFee} from "@layerzerolabs/oapp-evm/contracts/oapp/OApp.
 import {MessagingReceipt} from "@layerzerolabs/oapp-evm/contracts/oapp/OAppSender.sol";
 import {IExecutor} from "@layerzerolabs/lz-evm-messagelib-v2/contracts/interfaces/IExecutor.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
-import {MessageSender} from "src/core/MessageSender.sol";
-import {MessageReceiver, IMessageListener} from "src/core/MessageReceiver.sol";
-import {MessageListener} from "src/core/MessageListener.sol";
+import {AddressTreeStateTransmitter} from "src/core/AddressTreeStateTransmitter.sol";
+import {AddressTreeStateReceiver} from "src/core/AddressTreeStateReceiver.sol";
+import {AddressTreeStateUpdater} from "src/core/AddressTreeStateUpdater.sol";
 import {PoolProxy} from "src/core/PoolProxy.sol";
 import {AddressRegistry} from "src/core/AddressRegistry.sol";
 import {ShieldedAddressRegistrationData} from "src/libraries/ShieldedAddress.sol";
@@ -24,9 +24,9 @@ contract AddressRegistryIntegrationTest is TestHelperOz5, PoolBaseTest {
     using OptionsBuilder for bytes;
 
     MockPool public dstChainPool = new MockPool();
-    MessageSender public messageSender;
-    MessageReceiver public messageReceiver;
-    MessageListener public messageListener;
+    AddressTreeStateTransmitter public messageSender;
+    AddressTreeStateReceiver public messageReceiver;
+    AddressTreeStateUpdater public messageListener;
 
     uint32 public eidSender = 1;
     uint256 public originChainId = 1;
@@ -42,7 +42,6 @@ contract AddressRegistryIntegrationTest is TestHelperOz5, PoolBaseTest {
         bytes memory initData = abi.encodeCall(
             Pool.initialize,
             (
-                fixture.addressTreeDepth,
                 fixture.commitmentTreeDepth,
                 fixture.commitmentTreeQueueSize,
                 fixture.withdrawFeeBps,
@@ -57,14 +56,14 @@ contract AddressRegistryIntegrationTest is TestHelperOz5, PoolBaseTest {
         dstChainPool = MockPool(address(dstChainPoolProxy));
 
         // INFRA:
-        // origin chain side: AddressRegistry, MessageSender
-        // dst. chain side: MessageReceiver, MessageListener
+        // origin chain side: AddressRegistry, AddressTreeStateTransmitter
+        // dst. chain side: AddressTreeStateReceiver, AddressTreeStateUpdater
 
         // Initialize 2 endpoints, using UltraLightNode as the library type
         setUpEndpoints(2, LibraryType.UltraLightNode);
 
-        // MessageSender deployment
-        messageSender = new MessageSender(
+        // AddressTreeStateTransmitter deployment
+        messageSender = new AddressTreeStateTransmitter(
             endpoints[eidSender],
             address(addressRegistry)
         );
@@ -73,8 +72,8 @@ contract AddressRegistryIntegrationTest is TestHelperOz5, PoolBaseTest {
             eidSender
         );
 
-        // MessageListener deployment
-        MessageListener messageListenerImpl = new MessageListener();
+        // AddressTreeStateUpdater deployment
+        AddressTreeStateUpdater messageListenerImpl = new AddressTreeStateUpdater();
         bytes memory msgListenerInit = abi.encodeCall(
             messageListenerImpl.initialize,
             (address(dstChainPool))
@@ -91,8 +90,8 @@ contract AddressRegistryIntegrationTest is TestHelperOz5, PoolBaseTest {
         );
         console2.log("dstChainPool address tree updated set");
 
-        // MessageReceiver deployment
-        messageReceiver = new MessageReceiver(
+        // AddressTreeStateReceiver deployment
+        messageReceiver = new AddressTreeStateReceiver(
             endpoints[eidReceiver],
             address(this),
             address(messageListenerProxy)
@@ -112,10 +111,14 @@ contract AddressRegistryIntegrationTest is TestHelperOz5, PoolBaseTest {
         ShieldedAddressRegistrationData
             memory addressRegistrationData = _prepareShieldedAddrRegStruct();
         (, uint256 totalNativeGas) = addressRegistry.getRegistrationFees();
-        vm.deal(payable(address(addressRegistry)), totalNativeGas / 2);
+        vm.deal(address(this), totalNativeGas / 2);
 
-        vm.expectRevert(abi.encodeWithSelector(AddressRegistry.NotEnoughEther.selector));
-        pool.registerAddress(addressRegistrationData);
+        vm.expectRevert(
+            abi.encodeWithSelector(AddressRegistry.NotEnoughEther.selector)
+        );
+        pool.registerAddress{value: address(this).balance}(
+            addressRegistrationData
+        );
     }
 
     function test_registerAddressCallAndPropogationOfStateCrossChain() public {
@@ -123,8 +126,8 @@ contract AddressRegistryIntegrationTest is TestHelperOz5, PoolBaseTest {
             memory addressRegistrationData = _prepareShieldedAddrRegStruct();
 
         (, uint256 totalNativeGas) = addressRegistry.getRegistrationFees();
-        vm.deal(payable(address(addressRegistry)), totalNativeGas);
-        pool.registerAddress(addressRegistrationData);
+        vm.deal(address(this), totalNativeGas);
+        pool.registerAddress{value: totalNativeGas}(addressRegistrationData);
 
         verifyPackets(eidReceiver, addressToBytes32(address(messageReceiver)));
 

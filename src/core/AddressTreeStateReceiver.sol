@@ -5,10 +5,9 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {OAppCore} from "@layerzerolabs/oapp-evm/contracts/oapp/OAppCore.sol";
 import {Origin, MessagingFee} from "@layerzerolabs/oapp-evm/contracts/oapp/OApp.sol";
 import {OAppReceiver} from "@layerzerolabs/oapp-evm/contracts/oapp/OAppReceiver.sol";
-import {console2} from "forge-std/console2.sol";
 
-interface IMessageListener {
-    function onMessage(
+interface IAddressTreeStateUpdater {
+    function updateAddressTreeState(
         Origin calldata origin,
         bytes calldata payload,
         address executor,
@@ -16,15 +15,15 @@ interface IMessageListener {
     ) external;
 }
 
-contract MessageReceiver is OAppReceiver {
-    address public immutable messageListener;
+contract AddressTreeStateReceiver is OAppReceiver {
+    address public immutable treeStateUpdater;
 
     constructor(
         address endpoint_,
         address owner_,
-        address messageListener_
+        address treeStateUpdater_
     ) OAppCore(endpoint_, owner_) Ownable(owner_) {
-        messageListener = messageListener_;
+        treeStateUpdater = treeStateUpdater_;
     }
 
     function _lzReceive(
@@ -34,9 +33,7 @@ contract MessageReceiver is OAppReceiver {
         address executor,
         bytes calldata options
     ) internal override {
-        console2.log("Inside MessageReceiver._lzReceive()");
-        
-        IMessageListener(messageListener).onMessage(
+        IAddressTreeStateUpdater(treeStateUpdater).updateAddressTreeState(
             origin,
             payload,
             executor,

@@ -14,7 +14,6 @@ import {VerifierTreeUpdate} from "src/verifiers/VerifierTreeUpdate.sol";
 import {Verifier, TransactionVerifierInfo} from "src/core/Verifier.sol";
 import {AdaptorHandler} from "src/core/AdaptorHandler.sol";
 import {AddressRegistry} from "src/core/AddressRegistry.sol";
-import {MessageListener} from "src/core/MessageListener.sol";
 import {Hasher} from "src/core/Hasher.sol";
 import {MockPool} from "test/mocks/MockPool.sol";
 import {MockScreener} from "test/mocks/MockScreener.sol";
@@ -104,7 +103,6 @@ contract PoolBaseTest is BaseTest {
         bytes memory initData = abi.encodeCall(
             Pool.initialize,
             (
-                fixture.addressTreeDepth,
                 fixture.commitmentTreeDepth,
                 fixture.commitmentTreeQueueSize,
                 fixture.withdrawFeeBps,

@@ -16,7 +16,6 @@ import {IScreener} from "../interfaces/IScreener.sol";
 import {EIP712_DOMAIN_NAME, EIP712_DOMAIN_VERSION} from "../base/Constants.sol";
 import {PoolStorage, ExternalContractAddresses} from "../base/PoolStorage.sol";
 import {Asset, AssetType, AssetLogic} from "../libraries/Asset.sol";
-import {MerkleTree, MerkleTreeLogic} from "../libraries/MerkleTree.sol";
 import {QueuedMerkleTree, QueuedMerkleTreeLogic, TreeUpdateData} from "../libraries/QueuedMerkleTree.sol";
 import {ShieldedAddressRegistrationData} from "../libraries/ShieldedAddress.sol";
 import {AddressRegistry} from "./AddressRegistry.sol";
@@ -31,18 +30,14 @@ contract Pool is
     PausableUpgradeable,
     PoolStorage
 {
-    using MerkleTreeLogic for MerkleTree;
     using QueuedMerkleTreeLogic for QueuedMerkleTree;
-    // using ShieldedAddressLogic for ShieldedAddressRegistrationData;
     using ShieldedTransactionLogic for ShieldedTransaction;
 
     /// @notice Initializes the Pool contract with the given parameters.
     /// @dev Pool is an UUPSUpgradeable contract, so it needs to be initialized.
-    /// @param addressTreeDepth The depth of the address tree.
     /// @param commitmentTreeDepth The depth of the commitment tree.
     /// @param withdrawFeeBps_ The fee in basis points (1/10000) that is charged for withdrawing assets from the pool.
     function initialize(
-        uint8 addressTreeDepth,
         uint8 commitmentTreeDepth,
         uint8 commitmentTreeQueueSize,
         uint256 withdrawFeeBps_,
@@ -172,23 +167,7 @@ contract Pool is
 
     function registerAddress(
         ShieldedAddressRegistrationData calldata addressRegData
-    ) external whenNotPaused {
-        /**
-        bytes32 hashStruct = ShieldedAddressLogic.hashRegsiterAddressStruct(
-            addressRegData.shieldedAddress
-        );
-        bytes32 hashTypedData = EIP712.hashTypedDataV4(hashStruct);
-
-        addressRegData.register({
-            addressTree: _addressTree,
-            publicAddresses: _publicAddresses,
-            rootAddresses: _rootAddresses,
-            verifier: verifier,
-            hashTypedData: hashTypedData
-        });
-        */
-
-        /// @todo: Pool should send the estimated value to the addressRegistry for syncing the tree state cross-chain.
+    ) external payable whenNotPaused {
         (
             uint256 updatedAddressTreeRoot,
             uint8 currentRootIndex

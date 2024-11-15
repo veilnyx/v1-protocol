@@ -6,27 +6,25 @@ import {Packet} from "@layerzerolabs/lz-evm-protocol-v2/contracts/interfaces/ISe
 import {Errors} from "@layerzerolabs/lz-evm-protocol-v2/contracts/libs/Errors.sol";
 import {OptionsBuilder} from "@layerzerolabs/oapp-evm/contracts/oapp/libs/OptionsBuilder.sol";
 import {Origin, MessagingFee} from "@layerzerolabs/oapp-evm/contracts/oapp/OApp.sol";
-import {MessagingReceipt} from "@layerzerolabs/oapp-evm/contracts/oapp/OAppSender.sol";
 import {IExecutor} from "@layerzerolabs/lz-evm-messagelib-v2/contracts/interfaces/IExecutor.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {Pool} from "src/core/Pool.sol";
 import {IPool} from "../src/interfaces/IPool.sol";
 import {MockPool} from "test/mocks/MockPool.sol";
 import {PoolProxy} from "src/core/PoolProxy.sol";
-import {MessageSender} from "src/core/MessageSender.sol";
-import {MessageReceiver, IMessageListener} from "src/core/MessageReceiver.sol";
-import {MessageListener} from "src/core/MessageListener.sol";
+import {AddressTreeStateTransmitter} from "src/core/AddressTreeStateTransmitter.sol";
+import {AddressTreeStateReceiver, IAddressTreeStateUpdater} from "src/core/AddressTreeStateReceiver.sol";
 import {ShieldedAddressRegistrationData} from "src/libraries/ShieldedAddress.sol";
 import {AddressRegistry} from "src/core/AddressRegistry.sol";
 import {PoolBaseTest} from "./fixtures/PoolBaseTest.sol";
 import {console2} from "forge-std/console2.sol";
 
-contract MockMessageListener is IMessageListener {
+contract MockAddressTreeStateUpdater is IAddressTreeStateUpdater {
     uint32 public eidReceiver = 2;
     uint8 public currentRootIndex;
     mapping(uint8 => uint256) public roots;
 
-    function onMessage(
+    function updateAddressTreeState(
         Origin calldata origin,
         bytes calldata payload,
         address executor,
@@ -54,15 +52,14 @@ contract AddressRegistryTest is TestHelperOz5, PoolBaseTest {
     using OptionsBuilder for bytes;
 
     MockPool dstChainPool = new MockPool();
-    MessageSender public messageSender;
-    MessageReceiver public messageReceiver;
-    MockMessageListener public mockMessageListener;
+    AddressTreeStateTransmitter public messageSender;
+    AddressTreeStateReceiver public messageReceiver;
+    MockAddressTreeStateUpdater public mockMessageListener;
 
     uint32 public eidSender = 1;
     uint256 public originChainId = 1;
     uint32 public eidReceiver = 2;
     uint256 public dstChainId = 2;
-    uint128 public estimatedGasFee = 0.0015 ether;
 
     function setUp() public override {
         console2.log("setUp");
@@ -72,7 +69,7 @@ contract AddressRegistryTest is TestHelperOz5, PoolBaseTest {
         // Initialize 2 endpoints, using UltraLightNode as the library type
         setUpEndpoints(2, LibraryType.UltraLightNode);
 
-        messageSender = new MessageSender(
+        messageSender = new AddressTreeStateTransmitter(
             endpoints[eidSender],
             address(addressRegistry)
         );
@@ -82,8 +79,8 @@ contract AddressRegistryTest is TestHelperOz5, PoolBaseTest {
             eidSender
         );
 
-        mockMessageListener = new MockMessageListener();
-        messageReceiver = new MessageReceiver(
+        mockMessageListener = new MockAddressTreeStateUpdater();
+        messageReceiver = new AddressTreeStateReceiver(
             endpoints[eidReceiver],
             address(this),
             address(mockMessageListener)
@@ -96,7 +93,6 @@ contract AddressRegistryTest is TestHelperOz5, PoolBaseTest {
         bytes memory initData = abi.encodeCall(
             Pool.initialize,
             (
-                fixture.addressTreeDepth,
                 fixture.commitmentTreeDepth,
                 fixture.commitmentTreeQueueSize,
                 fixture.withdrawFeeBps,
@@ -143,10 +139,9 @@ contract AddressRegistryTest is TestHelperOz5, PoolBaseTest {
         // assertTrue(mockMessageListener.flagReceived());
 
         // sending native eth to addressRegistry for LZ fee
-        vm.deal(address(this), estimatedGasFee);
-        MessagingReceipt memory receipt = addressRegistry.syncTreeState{
-            value: estimatedGasFee
-        }(address(this));
+        (, uint256 totalNativeGas) = addressRegistry.getRegistrationFees();
+        vm.deal(address(this), totalNativeGas);
+        addressRegistry.syncTreeState{value: totalNativeGas}(address(this));
 
         // DVN verifies the msg packet
         verifyPackets(eidReceiver, addressToBytes32(address(messageReceiver)));
@@ -161,10 +156,9 @@ contract AddressRegistryTest is TestHelperOz5, PoolBaseTest {
         ShieldedAddressRegistrationData
             memory addressRegistrationData = _prepareShieldedAddrRegStruct();
 
-        vm.deal(payable(address(addressRegistry)), 5 ether);
-        pool.registerAddress(
-            addressRegistrationData
-        );
+        (, uint256 totalNativeGas) = addressRegistry.getRegistrationFees();
+        vm.deal(address(this), totalNativeGas);
+        pool.registerAddress{value: totalNativeGas}(addressRegistrationData);
 
         verifyPackets(eidReceiver, addressToBytes32(address(messageReceiver)));
 
