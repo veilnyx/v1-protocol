@@ -7,12 +7,7 @@ import {Origin, MessagingFee} from "@layerzerolabs/oapp-evm/contracts/oapp/OApp.
 import {OAppReceiver} from "@layerzerolabs/oapp-evm/contracts/oapp/OAppReceiver.sol";
 
 interface IAddressTreeStateUpdater {
-    function updateAddressTreeState(
-        Origin calldata origin,
-        bytes calldata payload,
-        address executor,
-        bytes calldata options
-    ) external;
+    function updateAddressTreeState(bytes calldata payload) external;
 }
 
 contract AddressTreeStateReceiver is OAppReceiver {
@@ -34,10 +29,7 @@ contract AddressTreeStateReceiver is OAppReceiver {
         bytes calldata options
     ) internal override {
         IAddressTreeStateUpdater(treeStateUpdater).updateAddressTreeState(
-            origin,
-            payload,
-            executor,
-            options
+            payload
         );
     }
 

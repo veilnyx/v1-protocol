@@ -24,17 +24,8 @@ contract MockAddressTreeStateUpdater is IAddressTreeStateUpdater {
     uint8 public currentRootIndex;
     mapping(uint8 => uint256) public roots;
 
-    function updateAddressTreeState(
-        Origin calldata origin,
-        bytes calldata payload,
-        address executor,
-        bytes calldata options
-    ) public {
+    function updateAddressTreeState(bytes calldata payload) public {
         console2.log("inside mockListener.onMessage");
-        console2.log("Executor used:");
-        console2.logAddress(executor);
-        // (, , , uint128 nativeCap, ) = IExecutor(executor).dstConfig(eidReceiver);
-        // console2.log("Executor gas cap:", nativeCap);
         console2.logBytes(payload);
         (uint256 root, uint8 index) = abi.decode(payload, (uint256, uint8));
         console2.log("Root decoded", root);
@@ -74,7 +65,7 @@ contract AddressRegistryTest is TestHelperOz5, PoolBaseTest {
             address(addressRegistry)
         );
 
-        addressRegistry.setMessageSender(
+        addressRegistry.setMsgTransmitter(
             payable(address(messageSender)),
             eidSender
         );

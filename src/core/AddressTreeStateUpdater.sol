@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity 0.8.24;
 
-import {IAddressTreeStateUpdater} from "./AddressTreeStateReceiver.sol";
 import {IPool} from "../interfaces/IPool.sol";
 import {Origin, MessagingFee} from "@layerzerolabs/oapp-evm/contracts/oapp/OApp.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
@@ -11,24 +10,22 @@ import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Own
 contract AddressTreeStateUpdater is
     Initializable,
     UUPSUpgradeable,
-    IAddressTreeStateUpdater,
     OwnableUpgradeable
 {
+    error UnauthorizedSender(address);
+
     address public pool;
+    address public stateReceiver;
 
     function initialize(address pool_) external initializer {
         __Ownable_init(msg.sender);
         pool = pool_;
     }
 
-    function updateAddressTreeState(
-        Origin calldata origin,
-        bytes calldata payload,
-        address executor,
-        bytes calldata options
-    ) public {
-        // @todo Check if origin of the msg is expected
-        // @todo Check if the `executor` is msg.sender
+    function updateAddressTreeState(bytes calldata payload) public {
+        if (msg.sender != stateReceiver) {
+            revert UnauthorizedSender(msg.sender);
+        }
 
         (uint256 root, uint8 currentRootIndex) = abi.decode(
             payload,
@@ -39,6 +36,10 @@ contract AddressTreeStateUpdater is
 
     function setPool(address pool_) external onlyOwner {
         pool = pool_;
+    }
+
+    function setReceiver(address addrTreeStateTransmitter) external onlyOwner {
+        stateReceiver = addrTreeStateTransmitter;
     }
 
     function _authorizeUpgrade(address) internal override onlyOwner {}

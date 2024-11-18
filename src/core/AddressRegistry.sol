@@ -23,9 +23,9 @@ struct MerkleTreeStorage {
     mapping(uint8 => uint256) roots;
 }
 
-struct MessageSenderInfo {
-    address payable msgSenderAddr;
-    uint32 msgSenderEid;
+struct MessageTransmitterInfo {
+    address payable transmitterAddr;
+    uint32 transmitterEid;
 }
 
 contract AddressRegistry is
@@ -50,7 +50,7 @@ contract AddressRegistry is
     MerkleTreeStorage public addressTreeStorage;
     MerkleTree.Bytes32PushTree public addressTree;
     EnumerableMap.UintToUintMap internal _lzEIds;
-    MessageSenderInfo internal _messageSender;
+    MessageTransmitterInfo internal _messageTransmitter;
 
     // Gas profiling:
     // decoding hash: 50_000
@@ -80,12 +80,12 @@ contract AddressRegistry is
         __EIP712_init(EIP712_DOMAIN_NAME, EIP712_DOMAIN_VERSION);
     }
 
-    function setMessageSender(
+    function setMsgTransmitter (
         address payable newMessageSender,
         uint32 newMessageSenderEid
     ) external onlyOwner {
-        _messageSender.msgSenderAddr = newMessageSender;
-        _messageSender.msgSenderEid = newMessageSenderEid;
+        _messageTransmitter.transmitterAddr = newMessageSender;
+        _messageTransmitter.transmitterEid = newMessageSenderEid;
     }
 
     function setChainAndPeer(
@@ -100,15 +100,15 @@ contract AddressRegistry is
         _lzEIds.set(chainId, eid);
 
         // Setting peer for sender
-        AddressTreeStateTransmitter(_messageSender.msgSenderAddr).setPeer(
+        AddressTreeStateTransmitter(_messageTransmitter.transmitterAddr).setPeer(
             eid,
             _addressToBytes32(peerAddress)
         );
 
         // Setting peer for receiver
         AddressTreeStateReceiver(peerAddress).setPeer(
-            _messageSender.msgSenderEid,
-            _addressToBytes32(_messageSender.msgSenderAddr)
+            _messageTransmitter.transmitterEid,
+            _addressToBytes32(_messageTransmitter.transmitterAddr)
         );
     }
 
@@ -212,7 +212,7 @@ contract AddressRegistry is
         // _lzEIds.length() = no. of chains
         for (uint8 i = 0; i < _lzEIds.length(); ++i) {
             (, eid) = _lzEIds.at(i);
-            fees[i] = AddressTreeStateTransmitter(_messageSender.msgSenderAddr).quote(
+            fees[i] = AddressTreeStateTransmitter(_messageTransmitter.transmitterAddr).quote(
                 uint32(eid),
                 message,
                 lzOptions,
@@ -249,7 +249,7 @@ contract AddressRegistry is
         for (uint8 i = 0; i < _lzEIds.length(); ++i) {
             (, eid) = _lzEIds.at(i);
 
-            AddressTreeStateTransmitter(_messageSender.msgSenderAddr).send{
+            AddressTreeStateTransmitter(_messageTransmitter.transmitterAddr).send{
                 value: (dstChainFees[i].nativeFee)
             }(uint32(eid), message, lzOptions, dstChainFees[i], refundAddress);
         }

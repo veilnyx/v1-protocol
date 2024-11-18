@@ -1,13 +1,24 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
+// LZ
 import {TestHelperOz5} from "@layerzerolabs/test-devtools-evm-foundry/contracts/TestHelperOz5.sol";
 import {Packet} from "@layerzerolabs/lz-evm-protocol-v2/contracts/interfaces/ISendLib.sol";
 import {OptionsBuilder} from "@layerzerolabs/oapp-evm/contracts/oapp/libs/OptionsBuilder.sol";
 import {Origin, MessagingFee} from "@layerzerolabs/oapp-evm/contracts/oapp/OApp.sol";
 import {MessagingReceipt} from "@layerzerolabs/oapp-evm/contracts/oapp/OAppSender.sol";
 import {IExecutor} from "@layerzerolabs/lz-evm-messagelib-v2/contracts/interfaces/IExecutor.sol";
+import {ExecutorOptions} from "@layerzerolabs/lz-evm-protocol-v2/contracts/messagelib/libs/ExecutorOptions.sol";
+import {PacketV1Codec} from "@layerzerolabs/lz-evm-protocol-v2/contracts/messagelib/libs/PacketV1Codec.sol";
+import {EndpointV2Mock as EndpointV2} from "@layerzerolabs/test-devtools-evm-foundry/contracts//mocks//EndpointV2Mock.sol";
+import {OptionsHelper} from "@layerzerolabs/test-devtools-evm-foundry/contracts/OptionsHelper.sol";
+
+
+// Oz
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
+import {DoubleEndedQueue} from "@openzeppelin/contracts/utils/structs/DoubleEndedQueue.sol";
+
+// Labyrinth
 import {AddressTreeStateTransmitter} from "src/core/AddressTreeStateTransmitter.sol";
 import {AddressTreeStateReceiver} from "src/core/AddressTreeStateReceiver.sol";
 import {AddressTreeStateUpdater} from "src/core/AddressTreeStateUpdater.sol";
@@ -22,11 +33,13 @@ import {console2} from "forge-std/console2.sol";
 
 contract AddressRegistryIntegrationTest is TestHelperOz5, PoolBaseTest {
     using OptionsBuilder for bytes;
+    using DoubleEndedQueue for DoubleEndedQueue.Bytes32Deque;
+    using PacketV1Codec for bytes;
 
     MockPool public dstChainPool = new MockPool();
-    AddressTreeStateTransmitter public messageSender;
-    AddressTreeStateReceiver public messageReceiver;
-    AddressTreeStateUpdater public messageListener;
+    AddressTreeStateTransmitter public stateTransmitter;
+    AddressTreeStateReceiver public stateReceiver;
+    AddressTreeStateUpdater public stateUpdator;
 
     uint32 public eidSender = 1;
     uint256 public originChainId = 1;
@@ -63,47 +76,47 @@ contract AddressRegistryIntegrationTest is TestHelperOz5, PoolBaseTest {
         setUpEndpoints(2, LibraryType.UltraLightNode);
 
         // AddressTreeStateTransmitter deployment
-        messageSender = new AddressTreeStateTransmitter(
+        stateTransmitter = new AddressTreeStateTransmitter(
             endpoints[eidSender],
             address(addressRegistry)
         );
-        addressRegistry.setMessageSender(
-            payable(address(messageSender)),
+        addressRegistry.setMsgTransmitter(
+            payable(address(stateTransmitter)),
             eidSender
         );
 
         // AddressTreeStateUpdater deployment
-        AddressTreeStateUpdater messageListenerImpl = new AddressTreeStateUpdater();
+        AddressTreeStateUpdater stateUpdaterImpl = new AddressTreeStateUpdater();
         bytes memory msgListenerInit = abi.encodeCall(
-            messageListenerImpl.initialize,
+            stateUpdaterImpl.initialize,
             (address(dstChainPool))
         );
 
-        messageListenerProxy = new ERC1967Proxy(
-            address(messageListenerImpl),
+        ERC1967Proxy stateUpdatorProxy = new ERC1967Proxy(
+            address(stateUpdaterImpl),
             msgListenerInit
         );
+        stateUpdator = AddressTreeStateUpdater(address(stateUpdatorProxy));
 
-        // messageReceiver --> messageListener --> dstPool
-        IPool(dstChainPool).setAddressTreeUpdator(
-            address(messageListenerProxy)
-        );
+        // stateReceiver --> stateUpdator --> dstPool
+        IPool(dstChainPool).setAddressTreeUpdator(address(stateUpdator));
         console2.log("dstChainPool address tree updated set");
 
         // AddressTreeStateReceiver deployment
-        messageReceiver = new AddressTreeStateReceiver(
+        stateReceiver = new AddressTreeStateReceiver(
             endpoints[eidReceiver],
             address(this),
-            address(messageListenerProxy)
+            address(stateUpdator)
         );
 
         // transferring ownership of msgReceiver to addressRegistry to call `setPeer()`
-        messageReceiver.transferOwnership(address(addressRegistry));
+        stateReceiver.transferOwnership(address(addressRegistry));
+        stateUpdator.setReceiver(address(stateReceiver));
 
         addressRegistry.setChainAndPeer(
             dstChainId,
             eidReceiver,
-            payable(address(messageReceiver))
+            payable(address(stateReceiver))
         );
     }
 
@@ -121,6 +134,20 @@ contract AddressRegistryIntegrationTest is TestHelperOz5, PoolBaseTest {
         );
     }
 
+    function test_revertWhenOldReceiverCallsUpdater() external {
+        address newReceiver = makeAddr("newReceiver");
+        stateUpdator.setReceiver(newReceiver);
+
+        ShieldedAddressRegistrationData
+            memory addressRegistrationData = _prepareShieldedAddrRegStruct();
+
+        (, uint256 totalNativeGas) = addressRegistry.getRegistrationFees();
+        vm.deal(address(this), totalNativeGas);
+        pool.registerAddress{value: totalNativeGas}(addressRegistrationData);
+        
+        _verifyPacketsWithRevertCheck(eidReceiver, addressToBytes32(address(stateReceiver)), 0, address(0x0), address(stateReceiver));
+    }
+
     function test_registerAddressCallAndPropogationOfStateCrossChain() public {
         ShieldedAddressRegistrationData
             memory addressRegistrationData = _prepareShieldedAddrRegStruct();
@@ -129,7 +156,7 @@ contract AddressRegistryIntegrationTest is TestHelperOz5, PoolBaseTest {
         vm.deal(address(this), totalNativeGas);
         pool.registerAddress{value: totalNativeGas}(addressRegistrationData);
 
-        verifyPackets(eidReceiver, addressToBytes32(address(messageReceiver)));
+        verifyPackets(eidReceiver, addressToBytes32(address(stateReceiver)));
 
         (uint256 originPoolLastRoot, uint8 originPoolCurrentRootIndex) = pool
             .getAddressTreeState();
@@ -167,5 +194,102 @@ contract AddressRegistryIntegrationTest is TestHelperOz5, PoolBaseTest {
             shieldedAddress
         );
         return addressRegistrationData;
+    }
+
+    function _verifyPacketsWithRevertCheck(
+        uint32 _dstEid,
+        bytes32 _dstAddress,
+        uint256 _packetAmount,
+        address _composer,
+        address oldStateReceiver
+    ) internal {
+        require(
+            endpoints[_dstEid] != address(0),
+            "endpoint not yet registered"
+        );
+
+        DoubleEndedQueue.Bytes32Deque storage queue = packetsQueue[_dstEid][
+            _dstAddress
+        ];
+        uint256 pendingPacketsSize = queue.length();
+        uint256 numberOfPackets;
+        if (_packetAmount == 0) {
+            numberOfPackets = queue.length();
+        } else {
+            numberOfPackets = pendingPacketsSize > _packetAmount
+                ? _packetAmount
+                : pendingPacketsSize;
+        }
+        while (numberOfPackets > 0) {
+            numberOfPackets--;
+            // front in, back out
+            bytes32 guid = queue.popBack();
+            bytes memory packetBytes = packets[guid];
+            this.assertGuid(packetBytes, guid);
+            this.validatePacket(packetBytes);
+
+            bytes memory options = optionsLookup[guid];
+            if (
+                _executorOptionExists(
+                    options,
+                    ExecutorOptions.OPTION_TYPE_NATIVE_DROP
+                )
+            ) {
+                (
+                    uint256 amount,
+                    bytes32 receiver
+                ) = _parseExecutorNativeDropOption(options);
+                address to = address(uint160(uint256(receiver)));
+                (bool sent, ) = to.call{value: amount}("");
+                require(sent, "Failed to send Ether");
+            }
+            if (
+                _executorOptionExists(
+                    options,
+                    ExecutorOptions.OPTION_TYPE_LZRECEIVE
+                )
+            ) {
+                this._lzReceiveWithRevertCheck(packetBytes, options, oldStateReceiver);
+            }
+            if (
+                _composer != address(0) &&
+                _executorOptionExists(
+                    options,
+                    ExecutorOptions.OPTION_TYPE_LZCOMPOSE
+                )
+            ) {
+                this.lzCompose(packetBytes, options, guid, _composer);
+            }
+        }
+    }
+
+    function _lzReceiveWithRevertCheck(
+        bytes calldata _packetBytes,
+        bytes memory _options,
+        address oldStateReceiver
+    ) public payable {
+        EndpointV2 endpoint = EndpointV2(endpoints[_packetBytes.dstEid()]);
+        (uint256 gas, uint256 value) = OptionsHelper
+            ._parseExecutorLzReceiveOption(_options);
+
+        Origin memory origin = Origin(
+            _packetBytes.srcEid(),
+            _packetBytes.sender(),
+            _packetBytes.nonce()
+        );
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                AddressTreeStateUpdater.UnauthorizedSender.selector,
+                payable(address(oldStateReceiver))
+            )
+        );
+        endpoint.lzReceive{value: value, gas: gas}(
+            origin,
+            _packetBytes.receiverB20(),
+            _packetBytes.guid(),
+            _packetBytes.message(),
+            bytes("")
+        );
     }
 }
