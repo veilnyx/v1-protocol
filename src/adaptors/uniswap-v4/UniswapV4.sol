@@ -33,32 +33,6 @@ contract UniswapV4 is IUnlockCallback {
     Currency currency0;
     Currency currency1;
 
-    /**
-    // ETH Sepolia Addresses
-    address poolManagerAddr = 0x8C4BcBE6b9eF47855f97E675296FA3F6fafa5F1A;
-    address quoter = 0xCd8716395D55aD17496448a4b2C42557001e9743;
-    address token0 = 0x3e622317f8C93f7328350cF0B56d9eD4C620C5d6; // DAI
-    address token1 = 0xf08A50178dfcDe18524640EA6618a1f965821715; // USDC
-    address hookAddr = address(0);
-   
-    function getQuote(
-        PoolKey memory poolKey,
-        bool zeroForOne
-    ) external returns (uint256 amountOut, uint256 gasEstimate) {
-        IV4Quoter.QuoteExactSingleParams memory quoteParams = IV4Quoter
-            .QuoteExactSingleParams({
-                poolKey: poolKey,
-                zeroForOne: zeroForOne,
-                exactAmount: uint128(1e18),
-                hookData: hookData
-            });
-
-        (amountOut, gasEstimate) = IV4Quoter(quoter).quoteExactInputSingle(
-            quoteParams
-        );
-    }
-    */
-
     ////////////////////////////
     //// Ext. Functions ////////
     ////////////////////////////
@@ -95,10 +69,7 @@ contract UniswapV4 is IUnlockCallback {
             hookData
         );
 
-        // if (!poolManager.isUnlocked()) {
         bytes memory encodedBalDelta = poolManager.unlock(swapParamsCalldata);
-        // }
-
         BalanceDelta returnedBalDelta = abi.decode(
             encodedBalDelta,
             (BalanceDelta)
