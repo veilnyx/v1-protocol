@@ -1,5 +1,6 @@
 @openzeppelin/contracts/=node_modules/@openzeppelin/contracts/
 @openzeppelin/contracts-upgradeable/=node_modules/@openzeppelin/contracts-upgradeable/
+@uniswapV4/=node_modules/v4-core/
 @account-abstraction/contracts/=node_modules/@account-abstraction/contracts/
 @zk-kit/imt=node_modules/@zk-kit/imt.sol/
 forge-std/=node_modules/forge-std/src/
