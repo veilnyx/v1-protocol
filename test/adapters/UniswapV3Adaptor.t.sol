@@ -17,9 +17,13 @@ contract UniswapV3AdaptorTest is PoolTest {
     error CheckChainConfig();
 
     UniswapV3Adapter uniswapV3Adapter;
-    address uniswapSwapRouter02 = 0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45;
-    address public WETH = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
-    address public USDC = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48;
+    address uniswapSwapRouter02 = 0x3bFA4769FB09eefC5a80d6E87c3B9C650f7Ae48E;
+    address public WETH = 0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14;
+    address public USDC = 0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238;
+
+    // address uniswapSwapRouter02 = 0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45;
+    // address public WETH = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
+    // address public USDC = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48;
     IWToken public iWETH;
     uint256 public constant INITIAL_SUPPLY = 2 ether;
     uint256 public constant SWAP_AMT = 1 ether;
@@ -38,14 +42,19 @@ contract UniswapV3AdaptorTest is PoolTest {
         );
 
         // uniswapV3Adapter = 0x14992438240Be80bE2077DCb6615805C2E72362d;
-        
         /// @dev update convert req fixture with this adaptor addr as `to`
         console.log("Uniswap adaptor:", address(uniswapV3Adapter));
 
         address poolOwner = pool.owner();
         vm.prank(poolOwner);
         pool.addAdaptorSupport(address(uniswapV3Adapter), true);
+    }
 
+    function testUniswapZkFiAdaptorDeploy() external view {
+        assert(address(uniswapV3Adapter) != address(0));
+    }
+    
+    function testWethToUSDCSwapToPool() public /* zkFiSetup */ {
         vm.deal(user, INITIAL_SUPPLY * 2);
         vm.startPrank(user);
         iWETH.deposit{value: INITIAL_SUPPLY}(); // wrapping eth to weth
@@ -57,13 +66,7 @@ contract UniswapV3AdaptorTest is PoolTest {
         vm.stopPrank();
 
         _processCommitmentTreeQueue();
-    }
 
-    function testUniswapZkFiAdaptorDeploy() external view {
-        assert(address(uniswapV3Adapter) != address(0));
-    }
-
-    function testWethToUSDCSwapToPool() public /* zkFiSetup */ {
         console.log("Initiating WETH<>USDC swap");
         uint256 poolUSDCBalBeforeConvert = IERC20(USDC).balanceOf(
             address(pool)
@@ -97,6 +100,43 @@ contract UniswapV3AdaptorTest is PoolTest {
         console.log("Pool USDC bal before swap:", poolUSDCBalBeforeConvert);
         console.log("Pool USDC bal after swap:", poolUSDCBalPostConvert);
         assert(poolUSDCBalPostConvert > poolUSDCBalBeforeConvert);
+    }
+
+    function testSwapUsdcToWethViaBundler() public {
+        uint256 usdcInitialSupply = 200e6;
+        uint256 swapAmt = 10e6;
+        deal(USDC, user, usdcInitialSupply);
+
+        vm.startPrank(user);
+        IERC20(USDC).approve(address(pool), usdcInitialSupply); // depositing weth to pool
+        ShieldedTransaction memory stxUsdcDeposit = _loadShieldedTransaction(
+            "deposit_200_testnet_usdc"
+        );
+        pool.transact(stxUsdcDeposit);
+        vm.stopPrank();
+
+        _processCommitmentTreeQueue();
+
+        console.log("Initiating USDC<>WETH swap");
+        uint256 poolUSDCBalBeforeConvert = IERC20(USDC).balanceOf(
+            address(pool)
+        );
+
+        ShieldedTransaction
+            memory stxSwapUSDCForWeth = _loadShieldedTransaction(
+                "swap_10_testnet_usdc_to_weth_via_bundler"
+            );
+        pool.transact(stxSwapUSDCForWeth);
+
+        // Asserts
+        uint256 poolUSDCBalPostConvert = IERC20(USDC).balanceOf(address(pool));
+        console.log("Pool USDC bal before swap:", poolUSDCBalBeforeConvert);
+        console.log("Pool USDC bal after swap:", poolUSDCBalPostConvert);
+        console.log(
+            "Pool WETH Bal after swap:",
+            IERC20(WETH).balanceOf(address(pool))
+        );
+        assert(poolUSDCBalPostConvert == poolUSDCBalBeforeConvert - swapAmt);
     }
 
     /// @dev Only allowing uniswap tests to run on Seplia testnet and ETH mainnet. More chains can be added.

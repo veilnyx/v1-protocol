@@ -72,7 +72,7 @@ contract PoolBaseTest is BaseTest {
         AddressRegistry addressRegistryImpl = new AddressRegistry();
         bytes memory addressRegistryInitData = abi.encodeCall(
             addressRegistryImpl.initialize,
-            (25, address(verifier), address(hasher))
+            (uint8(addressTreeDepth), address(verifier), address(hasher))
         );
 
         ERC1967Proxy addressRegistryProxy = new ERC1967Proxy(
