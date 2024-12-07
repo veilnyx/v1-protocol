@@ -13,7 +13,6 @@ import {PacketV1Codec} from "@layerzerolabs/lz-evm-protocol-v2/contracts/message
 import {EndpointV2Mock as EndpointV2} from "@layerzerolabs/test-devtools-evm-foundry/contracts//mocks//EndpointV2Mock.sol";
 import {OptionsHelper} from "@layerzerolabs/test-devtools-evm-foundry/contracts/OptionsHelper.sol";
 
-
 // Oz
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {DoubleEndedQueue} from "@openzeppelin/contracts/utils/structs/DoubleEndedQueue.sol";
@@ -80,7 +79,7 @@ contract AddressRegistryIntegrationTest is TestHelperOz5, PoolBaseTest {
             endpoints[eidSender],
             address(addressRegistry)
         );
-        addressRegistry.setMsgTransmitter(
+        addressRegistry.setAddrTreeStateTransmitter(
             payable(address(stateTransmitter)),
             eidSender
         );
@@ -121,8 +120,10 @@ contract AddressRegistryIntegrationTest is TestHelperOz5, PoolBaseTest {
     }
 
     function test_revertDueToLowGasValue() public {
-        ShieldedAddressRegistrationData
-            memory addressRegistrationData = _prepareShieldedAddrRegStruct();
+        (
+            ShieldedAddressRegistrationData memory addressRegistrationData,
+
+        ) = _prepareShieldedAddrRegStruct();
         (, uint256 totalNativeGas) = addressRegistry.getRegistrationFees();
         vm.deal(address(this), totalNativeGas / 2);
 
@@ -138,24 +139,41 @@ contract AddressRegistryIntegrationTest is TestHelperOz5, PoolBaseTest {
         address newReceiver = makeAddr("newReceiver");
         stateUpdator.setReceiver(newReceiver);
 
-        ShieldedAddressRegistrationData
-            memory addressRegistrationData = _prepareShieldedAddrRegStruct();
+        (
+            ShieldedAddressRegistrationData memory addressRegistrationData,
+
+        ) = _prepareShieldedAddrRegStruct();
 
         (, uint256 totalNativeGas) = addressRegistry.getRegistrationFees();
         vm.deal(address(this), totalNativeGas);
         pool.registerAddress{value: totalNativeGas}(addressRegistrationData);
-        
-        _verifyPacketsWithRevertCheck(eidReceiver, addressToBytes32(address(stateReceiver)), 0, address(0x0), address(stateReceiver));
+
+        _verifyPacketsWithRevertCheck(
+            eidReceiver,
+            addressToBytes32(address(stateReceiver)),
+            0,
+            address(0x0),
+            address(stateReceiver)
+        );
     }
 
     function test_registerAddressCallAndPropogationOfStateCrossChain() public {
-        ShieldedAddressRegistrationData
-            memory addressRegistrationData = _prepareShieldedAddrRegStruct();
+        (
+            ShieldedAddressRegistrationData memory addressRegistrationData,
+            address senderAddr
+        ) = _prepareShieldedAddrRegStruct();
 
         (, uint256 totalNativeGas) = addressRegistry.getRegistrationFees();
-        vm.deal(address(this), totalNativeGas);
+        vm.deal(senderAddr, totalNativeGas);
+        console2.log(
+            "Sender native bal before registration:",
+            senderAddr.balance
+        );
+
+        vm.prank(senderAddr);
         pool.registerAddress{value: totalNativeGas}(addressRegistrationData);
 
+        console2.log("Sender bal after initiating call:", senderAddr.balance);
         verifyPackets(eidReceiver, addressToBytes32(address(stateReceiver)));
 
         (uint256 originPoolLastRoot, uint8 originPoolCurrentRootIndex) = pool
@@ -166,11 +184,15 @@ contract AddressRegistryIntegrationTest is TestHelperOz5, PoolBaseTest {
 
         assertEq(originPoolLastRoot, dstPoolLastRoot);
         assertEq(originPoolCurrentRootIndex, dstPoolCurrentRootIndex);
+        console2.log(
+            "Sender native bal after registration (refund?):",
+            senderAddr.balance
+        );
     }
 
     function _prepareShieldedAddrRegStruct()
         internal
-        returns (ShieldedAddressRegistrationData memory)
+        returns (ShieldedAddressRegistrationData memory, address)
     {
         address senderAddr;
         uint256 senderPK;
@@ -193,7 +215,7 @@ contract AddressRegistryIntegrationTest is TestHelperOz5, PoolBaseTest {
             senderPK,
             shieldedAddress
         );
-        return addressRegistrationData;
+        return (addressRegistrationData, senderAddr);
     }
 
     function _verifyPacketsWithRevertCheck(
@@ -249,7 +271,11 @@ contract AddressRegistryIntegrationTest is TestHelperOz5, PoolBaseTest {
                     ExecutorOptions.OPTION_TYPE_LZRECEIVE
                 )
             ) {
-                this._lzReceiveWithRevertCheck(packetBytes, options, oldStateReceiver);
+                this._lzReceiveWithRevertCheck(
+                    packetBytes,
+                    options,
+                    oldStateReceiver
+                );
             }
             if (
                 _composer != address(0) &&

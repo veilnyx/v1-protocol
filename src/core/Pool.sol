@@ -168,6 +168,7 @@ contract Pool is
     function registerAddress(
         ShieldedAddressRegistrationData calldata addressRegData
     ) external payable whenNotPaused {
+        /// @todo don't forward the entire value to the address registry
         (
             uint256 updatedAddressTreeRoot,
             uint8 currentRootIndex

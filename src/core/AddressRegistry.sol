@@ -15,7 +15,7 @@ import {AddressTreeStateReceiver} from "./AddressTreeStateReceiver.sol";
 import {IPool} from "../interfaces/IPool.sol";
 import {IVerifier} from "../interfaces/IVerifier.sol";
 import {IHasher} from "../interfaces/IHasher.sol";
-import {ZERO_LEAF, EIP712_DOMAIN_NAME, EIP712_DOMAIN_VERSION, EIP712_TYPEHASH_REGISTER_ADDRESS, MESSAGE_REGISTER_ADDRESS, FIELD_SIZE_DIV_2, SIZE_UNPACKED_SHIELDED_ADDRESS} from "../base/Constants.sol";
+import {ZERO_LEAF, EIP712_DOMAIN_NAME, EIP712_DOMAIN_VERSION, EIP712_TYPEHASH_REGISTER_ADDRESS, MESSAGE_REGISTER_ADDRESS, SIZE_UNPACKED_SHIELDED_ADDRESS} from "../base/Constants.sol";
 import {ShieldedAddressRegistrationData, ShieldedAddressLogic} from "../libraries/ShieldedAddress.sol";
 
 struct MerkleTreeStorage {
@@ -23,11 +23,21 @@ struct MerkleTreeStorage {
     mapping(uint8 => uint256) roots;
 }
 
-struct MessageTransmitterInfo {
+struct TreeTransmitterInfo {
     address payable transmitterAddr;
     uint32 transmitterEid;
 }
 
+/**
+ * @dev The cross-chain address registration system comprises of the following contracts:
+ * 1. AddressRegistry: The contract that manages the address registration process.
+ * 2. AddressTreeStateTransmitter: The contract that sends the address registration
+ * message to the destination chain.
+ * 3. AddressTreeStateReceiver: The contract that receives the address registration
+ * message from the source chain.
+ * 4. AddressTreeStateUpdater: The contract that updates the address tree state on the
+ * destination chain.
+ */
 contract AddressRegistry is
     Initializable,
     UUPSUpgradeable,
@@ -37,6 +47,7 @@ contract AddressRegistry is
     using OptionsBuilder for bytes;
     using MerkleTree for MerkleTree.Bytes32PushTree;
     using EnumerableMap for EnumerableMap.UintToUintMap;
+    using EnumerableMap for EnumerableMap.UintToBytes32Map;
 
     error NotEnoughEther();
     error ExcessEtherRefundFailed();
@@ -45,19 +56,21 @@ contract AddressRegistry is
     address public hasher;
     mapping(address publicAddr => uint256 rootAddr) internal publicAddresses;
     mapping(uint256 rootAddr => bool isRegistered) internal rootAddresses;
-    bytes public lzOptions;
-
+    bytes internal _lzOptions;
     MerkleTreeStorage public addressTreeStorage;
     MerkleTree.Bytes32PushTree public addressTree;
     EnumerableMap.UintToUintMap internal _lzEIds;
-    MessageTransmitterInfo internal _messageTransmitter;
+    EnumerableMap.UintToBytes32Map internal _chainIdToPeerAddrInBytes32;
+    TreeTransmitterInfo internal _treeStateTransmitter;
 
-    // Gas profiling:
-    // decoding hash: 50_000
-    // changing from zero to non-zero: 20_000
-    // updating non-zero value: 3_000
-    // total = 73k => 100k (approx)
-    uint128 public constant DST_CHAIN_ADDRESS_TREE_UPDATE_GAS = 100_000;
+    /**
+     * Gas profiling:
+     * decoding hash: 50_000
+     * changing state from zero to non-zero values: 20_000
+     * updating non-zero value: 3_000
+     * total = 73k => 100k (approx)
+     */
+    uint128 public constant DST_CHAIN_ADDRESS_TREE_UPDATE_GAS = 200_000;
     uint8 public constant ROOT_HISTORY_SIZE = 100;
 
     function initialize(
@@ -71,21 +84,17 @@ contract AddressRegistry is
         addressTreeStorage.roots[addressTreeStorage.currentRootIndex] = uint256(
             addressTree.setup(treeDepth_, bytes32(ZERO_LEAF), _hashLeaves)
         );
-        lzOptions = OptionsBuilder.newOptions().addExecutorLzReceiveOption(
-            DST_CHAIN_ADDRESS_TREE_UPDATE_GAS,
-            0
-        );
         __Ownable_init(msg.sender);
         __UUPSUpgradeable_init();
         __EIP712_init(EIP712_DOMAIN_NAME, EIP712_DOMAIN_VERSION);
     }
 
-    function setMsgTransmitter (
+    function setAddrTreeStateTransmitter(
         address payable newMessageSender,
         uint32 newMessageSenderEid
     ) external onlyOwner {
-        _messageTransmitter.transmitterAddr = newMessageSender;
-        _messageTransmitter.transmitterEid = newMessageSenderEid;
+        _treeStateTransmitter.transmitterAddr = newMessageSender;
+        _treeStateTransmitter.transmitterEid = newMessageSenderEid;
     }
 
     function setChainAndPeer(
@@ -98,17 +107,19 @@ contract AddressRegistry is
         }
 
         _lzEIds.set(chainId, eid);
-
-        // Setting peer for sender
-        AddressTreeStateTransmitter(_messageTransmitter.transmitterAddr).setPeer(
-            eid,
+        _chainIdToPeerAddrInBytes32.set(
+            chainId,
             _addressToBytes32(peerAddress)
         );
 
+        // Setting peer for sender
+        AddressTreeStateTransmitter(_treeStateTransmitter.transmitterAddr)
+            .setPeer(eid, _addressToBytes32(peerAddress));
+
         // Setting peer for receiver
         AddressTreeStateReceiver(peerAddress).setPeer(
-            _messageTransmitter.transmitterEid,
-            _addressToBytes32(_messageTransmitter.transmitterAddr)
+            _treeStateTransmitter.transmitterEid,
+            _addressToBytes32(_treeStateTransmitter.transmitterAddr)
         );
     }
 
@@ -145,18 +156,18 @@ contract AddressRegistry is
         bytes32 hashTypedData = _hashTypedDataV4(hashStruct);
         address publicAddress = ECDSA.recover(hashTypedData, self.signature);
 
+        if (publicAddresses[publicAddress] != 0) {
+            revert IPool.PublicAddressAlreadyRegistered(publicAddress);
+        }
+
         // returning any excess fee
         // in addition to this, if estimated fee > actual fee used by LZ, it will be refunded to the publicAddress being registered
         uint256 feeDiff = address(this).balance - totalFeeNeeded;
         if (feeDiff > 0) {
             (bool success, ) = publicAddress.call{value: feeDiff}("");
-            if(!success) {
+            if (!success) {
                 revert ExcessEtherRefundFailed();
             }
-        }
-
-        if (publicAddresses[publicAddress] != 0) {
-            revert IPool.PublicAddressAlreadyRegistered(publicAddress);
         }
 
         uint32 insertedAtIndex = _insertAddress(rootAddress);
@@ -212,12 +223,19 @@ contract AddressRegistry is
         // _lzEIds.length() = no. of chains
         for (uint8 i = 0; i < _lzEIds.length(); ++i) {
             (, eid) = _lzEIds.at(i);
-            fees[i] = AddressTreeStateTransmitter(_messageTransmitter.transmitterAddr).quote(
-                uint32(eid),
-                message,
-                lzOptions,
-                false
-            );
+            (, bytes32 peerAddrInBytes32) = _chainIdToPeerAddrInBytes32.at(i);
+            // q should the gas param to addExecutorLzReceiveOption be non-zero?
+            bytes memory _lzOptions = OptionsBuilder
+                .newOptions()
+                .addExecutorLzReceiveOption(
+                    DST_CHAIN_ADDRESS_TREE_UPDATE_GAS,
+                    0
+                );
+            // .addExecutorNativeDropOption(0.0001 ether, peerAddrInBytes32);
+
+            fees[i] = AddressTreeStateTransmitter(
+                _treeStateTransmitter.transmitterAddr
+            ).quote(uint32(eid), message, _lzOptions, false);
 
             totalNativeRegistrationFee += fees[i].nativeFee;
         }
@@ -248,10 +266,23 @@ contract AddressRegistry is
         // _lzEIds.length() = no. of chains
         for (uint8 i = 0; i < _lzEIds.length(); ++i) {
             (, eid) = _lzEIds.at(i);
+            (, bytes32 peerAddrInBytes32) = _chainIdToPeerAddrInBytes32.at(i);
+            bytes memory _lzOptions = OptionsBuilder
+                .newOptions()
+                .addExecutorLzReceiveOption(
+                    DST_CHAIN_ADDRESS_TREE_UPDATE_GAS,
+                    0
+                );
+            // .addExecutorNativeDropOption(0.0001 ether, peerAddrInBytes32);
 
-            AddressTreeStateTransmitter(_messageTransmitter.transmitterAddr).send{
-                value: (dstChainFees[i].nativeFee)
-            }(uint32(eid), message, lzOptions, dstChainFees[i], refundAddress);
+            AddressTreeStateTransmitter(_treeStateTransmitter.transmitterAddr)
+                .send{value: (dstChainFees[i].nativeFee)}(
+                uint32(eid),
+                message,
+                _lzOptions,
+                dstChainFees[i],
+                refundAddress
+            );
         }
     }
 
@@ -295,6 +326,4 @@ contract AddressRegistry is
     function _authorizeUpgrade(
         address newImplementation
     ) internal override onlyOwner {}
-
-    receive() external payable {}
 }

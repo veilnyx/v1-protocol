@@ -45,7 +45,7 @@ contract AddressRegistryTest is TestHelperOz5, PoolBaseTest {
     MockPool dstChainPool = new MockPool();
     AddressTreeStateTransmitter public messageSender;
     AddressTreeStateReceiver public messageReceiver;
-    MockAddressTreeStateUpdater public mockMessageListener;
+    MockAddressTreeStateUpdater public mockUpdater;
 
     uint32 public eidSender = 1;
     uint256 public originChainId = 1;
@@ -65,16 +65,16 @@ contract AddressRegistryTest is TestHelperOz5, PoolBaseTest {
             address(addressRegistry)
         );
 
-        addressRegistry.setMsgTransmitter(
+        addressRegistry.setAddrTreeStateTransmitter(
             payable(address(messageSender)),
             eidSender
         );
 
-        mockMessageListener = new MockAddressTreeStateUpdater();
+        mockUpdater = new MockAddressTreeStateUpdater();
         messageReceiver = new AddressTreeStateReceiver(
             endpoints[eidReceiver],
             address(this),
-            address(mockMessageListener)
+            address(mockUpdater)
         );
 
         // transferring ownership of msgReceiver to addressRegistry to call `setPeer()`
@@ -110,8 +110,16 @@ contract AddressRegistryTest is TestHelperOz5, PoolBaseTest {
             uint256 totalNativeFee
         ) = addressRegistry.getRegistrationFees();
 
+        console2.log("native fee:", dstChainFees[0].nativeFee);
+        // 120000000110516 = 1.2e14
         assert(dstChainFees[0].nativeFee > 0);
         assert(totalNativeFee > 0);
+        // q when sending 0.01 ether as the `value` attr. in the LZ Options, the actual value sent increases by 0.02 ether!
+        // native fee returned when LZ Option value param is 0 = 110516
+        // native fee returned when LZ Option value param is 0.01 ether = 12000000000110516
+        // Expected: 10000000000000000 + 110516 = 10000000000110516
+        // Received:12000000000110516
+        // Diff: 12000000000110516 - 10000000000110516 = 20000000000000000 (2e16 = 0.02e18)?
     }
 
     // function test_constructor() public view {
@@ -127,7 +135,7 @@ contract AddressRegistryTest is TestHelperOz5, PoolBaseTest {
         //     messageSender.send{ value: fee.nativeFee }(eidReceiver, "test message", options, fee, address(this));
         // verifyPackets(eidReceiver, addressToBytes32(address(messageReceiver)));
 
-        // assertTrue(mockMessageListener.flagReceived());
+        // assertTrue(mockUpdater.flagReceived());
 
         // sending native eth to addressRegistry for LZ fee
         (, uint256 totalNativeGas) = addressRegistry.getRegistrationFees();
@@ -137,10 +145,7 @@ contract AddressRegistryTest is TestHelperOz5, PoolBaseTest {
         // DVN verifies the msg packet
         verifyPackets(eidReceiver, addressToBytes32(address(messageReceiver)));
 
-        assertEq(
-            addressRegistry.getTreeRoot(),
-            mockMessageListener.getTreeRoot()
-        );
+        assertEq(addressRegistry.getTreeRoot(), mockUpdater.getTreeRoot());
     }
 
     function test_registerAddressAndAddressTreeUpdate() public {
@@ -156,8 +161,8 @@ contract AddressRegistryTest is TestHelperOz5, PoolBaseTest {
         (uint256 originPoolLastRoot, uint8 originPoolCurrentRootIndex) = pool
             .getAddressTreeState();
 
-        uint8 dstCurrentRootIndex = mockMessageListener.currentRootIndex();
-        uint256 dstLastRoot = mockMessageListener.getTreeRoot();
+        uint8 dstCurrentRootIndex = mockUpdater.currentRootIndex();
+        uint256 dstLastRoot = mockUpdater.getTreeRoot();
 
         assertEq(originPoolLastRoot, dstLastRoot);
         assertEq(originPoolCurrentRootIndex, dstCurrentRootIndex);
