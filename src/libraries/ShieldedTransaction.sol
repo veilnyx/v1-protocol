@@ -9,13 +9,15 @@ import {IPool} from "../interfaces/IPool.sol";
 import {IVerifier} from "../interfaces/IVerifier.sol";
 import {IHasher} from "../interfaces/IHasher.sol";
 import {IAdaptorHandler} from "../interfaces/IAdaptorHandler.sol";
+import {console2} from "forge-std/console2.sol";
 
 /// @title ShieldedTransactionType enum representing types of shielded transactions
 enum ShieldedTransactionType {
     DEPOSIT,
     TRANSFER,
     WITHDRAW,
-    CALL_ADAPTOR
+    CALL_ADAPTOR,
+    NON_ATOMIC
 }
 
 /// @title MemoType enum representing memo types for output notes
@@ -53,7 +55,7 @@ struct RevokerData {
 /// @param assetsMemo           This is empty for non-TRANSFER transactions. For TRANSFER transactions,
 ///                             this is encrypted assets using sender's key that were transferred to receiver.
 /// @param keysMemo             Encrypted keys with wich notesMemo is encrypted
-/// @param notesMemo            Memos for output notes. This is list of encrypted notes' fields and sender data.
+/// @param notesMemo            Memos for output/refunded notes. This is list of encrypted notes' fields and sender data.
 /// @param targetData           Target address (first 20-bytes) for withdraw/adapter concatenated with payload
 struct ShieldedTransaction {
     ShieldedTransactionType txType;
@@ -82,6 +84,7 @@ struct PubAsset {
 
 struct Params {
     ShieldedTransactionType txType;
+    uint256 txHash;
     uint16 revokerId;
     uint24 feeAssetId;
     uint96 feeValue;
@@ -97,7 +100,7 @@ struct MemoParams {
     bytes keysMemo;
     bytes assetsMemo;
     bytes notesMemo;
-    bytes refundMemo;
+    bytes convertedAssetsMemo;
 }
 
 /// @title ShieldedTransactionLogic library for shielded transaction logic
@@ -162,8 +165,9 @@ library ShieldedTransactionLogic {
         }
 
         if (
-            stx.txType == ShieldedTransactionType.CALL_ADAPTOR &&
-            !supportedAdaptors[address(bytes20(stx.targetData))]
+            stx.txType == ShieldedTransactionType.CALL_ADAPTOR ||
+            (stx.txType == ShieldedTransactionType.NON_ATOMIC &&
+                !supportedAdaptors[address(bytes20(stx.targetData))])
         ) {
             revert IPool.UnsupportedAdaptor();
         }
@@ -210,6 +214,16 @@ library ShieldedTransactionLogic {
                 params.pubAssets,
                 params.target,
                 withdrawFeeBps
+            );
+        }
+
+        if (stx.txType == ShieldedTransactionType.NON_ATOMIC) {
+            _transferPubAssets(
+                assets,
+                withdrawFees,
+                params.pubAssets,
+                params.target,
+                0
             );
         }
 
@@ -295,6 +309,47 @@ library ShieldedTransactionLogic {
         return verifierParams;
     }
 
+    function receiveAssetsFromNonAtomicCall(
+        mapping(uint24 => Asset) storage assets,
+        PubAsset[] memory receivedAssets,
+        uint256 refundAddress,
+        QueuedMerkleTree storage commitmentTree,
+        address hasher,
+        address adaptorHandler,
+        Params memory params,
+        MemoParams memory memoParams
+    ) external {
+        if (msg.sender != adaptorHandler) {
+            revert IPool.InvalidCaller(msg.sender);
+        }
+
+        _receivePubAssets(assets, receivedAssets, adaptorHandler);
+
+        // q can memory array just be deleted?
+        // delete memoParams.commitments;
+
+        uint256[] memory convertedAssetsCms = new uint256[](
+            receivedAssets.length
+        );
+        // create commitments
+        for (uint8 i; i < receivedAssets.length; i++) {
+            convertedAssetsCms[i] = IHasher(hasher).hash(
+                [receivedAssets[i].id, refundAddress, receivedAssets[i].value]
+            );
+
+            memoParams.convertedAssetsMemo = abi.encodePacked(
+                memoParams.convertedAssetsMemo,
+                receivedAssets[i].id,
+                receivedAssets[i].value
+            );
+        }
+        // reinitializing `commitments` array to remove older commitments since they are already emitted and inserted in the initial phase of the Non-atomic tx
+        memoParams.commitments = new uint256[](convertedAssetsCms.length);
+        memoParams.commitments = convertedAssetsCms;
+
+        _printNotes(commitmentTree, params, memoParams);
+    }
+
     function _handleAdaptorCall(
         mapping(uint24 => Asset) storage assets,
         address hasher,
@@ -311,9 +366,8 @@ library ShieldedTransactionLogic {
 
         _receivePubAssets(assets, outPubAssets, adaptorHandler);
 
-        /// @dev Creating commitments and output noteMemos for received tokens. This is done on the protocol side for CALL_ADAPTOR txns because the exact value of converted tokens can only be determined after executing the tx.
-        /// @dev `refundAddress` is used as the recipient's blinded address.
-        /// @dev `refundAddressMemo` contains the encrypted blinding factor which can only be decrypted by the owner of `refundAddress`. This blinding needs to be submitted as a proof to prove ownership over the refund notes.
+        /// Creating commitments and convertedAssetsMemo for received tokens. This is done on the protocol side for CALL_ADAPTOR/Non-Atomic txns because the exact value of converted assets can only be determined after executing the tx.
+        /// `refundAddress` is used as the recipient's blinded address.
         uint256 outLen = outPubAssets.length;
         uint256[] memory pubCms = new uint256[](outLen);
 
@@ -325,8 +379,8 @@ library ShieldedTransactionLogic {
                     outPubAssets[i].value
                 ]
             );
-            memoParams.refundMemo = abi.encodePacked(
-                memoParams.refundMemo,
+            memoParams.convertedAssetsMemo = abi.encodePacked(
+                memoParams.convertedAssetsMemo,
                 outPubAssets[i].id,
                 outPubAssets[i].value
             );
@@ -456,6 +510,7 @@ library ShieldedTransactionLogic {
             1;
 
         emit IPool.Receipt(
+            params.txHash,
             params.txType,
             params.revokerId,
             lastLeafIndex,
@@ -466,16 +521,18 @@ library ShieldedTransactionLogic {
             memoParams.keysMemo,
             memoParams.assetsMemo,
             memoParams.notesMemo,
-            memoParams.refundMemo
+            memoParams.convertedAssetsMemo
         );
     }
 
+    /// @dev This function extracts data from `ShieldedTransaction` struct properties into `Params` struct properties. Also copies the data from calldata to memory, which is more gas efficient.
     function _copyParamsToMemory(
         ShieldedTransaction calldata stx
     ) internal pure returns (Params memory) {
         Params memory params;
-        uint256 pubLen = stx.pubAssets.length;
 
+        params.txHash = hash(stx);
+        uint256 pubLen = stx.pubAssets.length;
         params.pubAssets = new PubAsset[](pubLen);
         for (uint8 i = 0; i < pubLen; ++i) {
             // Extract first 3 bytes assetId
@@ -508,6 +565,8 @@ library ShieldedTransactionLogic {
         return params;
     }
 
+    /// @notice This function extracts data from `ShieldedTransaction` struct properties into `MemoParams` struct properties.
+    /// @dev `convertedAssetsMemo` is empty for Deposit/Withdraw/Transfer txs. For Call Adaptor tx, it will be updated in the `_handleAdaptorCall()` when the output notes are known. For Non-atomic tx it will remain empty in initial phase of tx. It will be updated in the second phase of the tx when the output notes are known.
     function _copyMemoParamsToMemory(
         ShieldedTransaction calldata stx
     ) internal pure returns (MemoParams memory) {

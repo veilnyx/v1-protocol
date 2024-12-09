@@ -33,6 +33,7 @@ interface IPool {
     event Commitment(uint256 indexed leafIndex, uint256 indexed commitment);
 
     event Receipt(
+        uint256 indexed txHash,
         ShieldedTransactionType indexed txType,
         uint16 indexed revokerId,
         uint32 lastLeafIndex,
@@ -43,7 +44,7 @@ interface IPool {
         bytes keysMemo,
         bytes assetsMemo, // sent memo in case of transfer or calc from pub assets
         bytes notesMemo,
-        bytes refundMemo
+        bytes convertedAssetsMemo
     );
 
     /////////////////////////////////////////
@@ -56,6 +57,7 @@ interface IPool {
     error InvalidAddressProof();
     error InvalidSubtreeUpdateProof();
     error InvalidTransactionProof();
+    error InvalidCaller(address caller);
     error UnknownCommitmentTreeRoot();
     error UnknownAddressTreeRoot();
     error DoubleSpend(uint256 markedNullifier);
