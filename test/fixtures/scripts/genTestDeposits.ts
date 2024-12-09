@@ -5,14 +5,14 @@ import { fixture, generateTestTransactions } from "./fixture";
 import { parse } from 'path';
 
 const {
-  assets: { testnetWeth, morphoVaultToken },
+  assets: { weth, testnetWeth, morphoVaultToken },
   sender: { account: senderAccount },
 } = fixture;
 
 export const reqs = {
-  deposit_2_morphoVaultToken: {
+  deposit_2_weth: {
     type: TransactionType.DEPOSIT,
-    assetIds: [morphoVaultToken],
+    assetIds: [weth],
     values: [parseEther("2")],
     feeAssetId: 0,
     to: senderAccount.shieldedAddress.pack(),
@@ -21,16 +21,6 @@ export const reqs = {
     revokerId: 0,
   }
   /**
-  deposit_2_testnet_weth: {
-    type: TransactionType.DEPOSIT,
-    assetIds: [testnetWeth],
-    values: [parseEther("2")],
-    feeAssetId: 0,
-    to: senderAccount.shieldedAddress.pack(),
-    viaBundler: false,
-    paymaster: zeroAddress,
-    revokerId: 0,
-  }, 
   deposit_pre_tx: {
     type: TransactionType.DEPOSIT,
     assetIds: [weth, usdc],
@@ -94,6 +84,16 @@ export const reqs = {
   deposit_2_mooLPToken: {
     type: TransactionType.DEPOSIT,
     assetIds: [beefyMooToken],
+    values: [parseEther("2")],
+    feeAssetId: 0,
+    to: senderAccount.shieldedAddress.pack(),
+    viaBundler: false,
+    paymaster: zeroAddress,
+    revokerId: 0,
+  },
+  deposit_2_morphoVaultToken: {
+    type: TransactionType.DEPOSIT,
+    assetIds: [morphoVaultToken],
     values: [parseEther("2")],
     feeAssetId: 0,
     to: senderAccount.shieldedAddress.pack(),

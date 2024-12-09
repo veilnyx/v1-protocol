@@ -9,7 +9,7 @@ import {VerifierTransact21} from "src/verifiers/VerifierTransact21.sol";
 import {VerifierTransact22} from "src/verifiers/VerifierTransact22.sol";
 import {VerifierRegister} from "src/verifiers/VerifierRegister.sol";
 import {Asset, AssetType} from "src/libraries/Asset.sol";
-import {ShieldedTransaction, ShieldedTransactionType, RevokerData} from "src/libraries/ShieldedTransaction.sol";
+import {ShieldedTransaction, ShieldedTransactionType, RevokerData, ShieldedTransactionLogic} from "src/libraries/ShieldedTransaction.sol";
 import {MerkleTree, MerkleTreeLogic} from "src/libraries/MerkleTree.sol";
 import {TreeUpdateData} from "src/libraries/QueuedMerkleTree.sol";
 import {ShieldedAddressRegistrationData, ShieldedAddressLogic} from "src/libraries/ShieldedAddress.sol";
@@ -23,6 +23,7 @@ import {BaseScript} from "script/BaseScript.sol";
 
 contract PoolTest is PoolBaseTest, BaseScript {
     using MerkleTreeLogic for MerkleTree;
+    using ShieldedTransactionLogic for ShieldedTransaction;
 
     MockVerifier internal _mockVerifier = new MockVerifier();
 
@@ -31,18 +32,14 @@ contract PoolTest is PoolBaseTest, BaseScript {
 
     MerkleTree internal _helperTree;
 
-    bytes revokerMetaData = abi.encode("Revoker 1", "Organization 1");
+    bytes revokerMetaData;
 
     modifier expectNullifiersMarked(ShieldedTransaction memory stx_) {
         (, , , , uint32 nextLeafIndex) = pool.getCommitmentTreeState();
-        uint32 nullifierMarkLeafIndex = nextLeafIndex + 1;
 
         for (uint256 i = 0; i < stx_.nullifiers.length; i++) {
             vm.expectEmit(true, true, true, true);
-            emit IPool.NullifierMarked(
-                stx_.nullifiers[i],
-                nullifierMarkLeafIndex
-            );
+            emit IPool.NullifierMarked(stx_.nullifiers[i], nextLeafIndex + 1);
         }
 
         _;
@@ -80,15 +77,12 @@ contract PoolTest is PoolBaseTest, BaseScript {
     modifier expectReceipt(ShieldedTransaction memory stx) {
         (, , , , uint32 nextLeafIndex) = pool.getCommitmentTreeState();
         uint24 feeAssetId = 0;
-        uint96 feeValue = 0;
-        address paymaster = address(0);
         bytes memory assetsMemo;
 
         // non transfer tx & transfer tx with fee
         if (stx.pubAssets.length != 0) {
+            // todo: check if feeAssetId is being correctly extracted
             feeAssetId = uint24(bytes3(bytes31(stx.pubAssets[0])));
-            feeValue = uint96(stx.feeData);
-            paymaster = address(bytes20(bytes32(stx.feeData)));
         }
 
         if (stx.txType != ShieldedTransactionType.TRANSFER) {
@@ -99,13 +93,14 @@ contract PoolTest is PoolBaseTest, BaseScript {
 
         vm.expectEmit(true, true, true, true);
         emit IPool.Receipt(
+            stx.hash(),
             stx.txType,
             stx.revokerId,
-            (nextLeafIndex + uint32(stx.commitments.length) - 1),
+            (nextLeafIndex - 1 + uint32(stx.commitments.length)),
             address(bytes20(stx.targetData)),
             feeAssetId,
-            feeValue,
-            paymaster,
+            uint96(stx.feeData),
+            address(bytes20(bytes32(stx.feeData))),
             stx.keysMemo,
             assetsMemo,
             stx.notesMemo,
@@ -138,6 +133,7 @@ contract PoolTest is PoolBaseTest, BaseScript {
         asset2 = pool.getAsset(assetAddresses[1]);
 
         // Register revoker
+        revokerMetaData = abi.encode("Revoker 1", "Organization 1");
         pool.registerRevoker(
             fixture.revokerPublicKey,
             fixture.encryptionPublicKey,
@@ -214,9 +210,9 @@ contract PoolTest is PoolBaseTest, BaseScript {
         // Process the batch
         uint8 depth = fixture.commitmentTreeDepth;
         _helperTree.init(depth, address(hasher));
-        (uint256[] memory leaves, , , , ) = pool.getCommitmentTreeState();
-        for (uint256 i = 0; i < leaves.length; ++i) {
-            _helperTree.insert(leaves[i]);
+        (uint256[] memory queuedLeaves, , , , ) = pool.getCommitmentTreeState();
+        for (uint256 i = 0; i < queuedLeaves.length; ++i) {
+            _helperTree.insert(queuedLeaves[i]);
         }
 
         (uint256[] memory lastSubtrees, uint256 lastRoot, , ) = _helperTree
