@@ -18,7 +18,7 @@ import {Asset, AssetType, AssetLogic} from "../libraries/Asset.sol";
 import {MerkleTree, MerkleTreeLogic} from "../libraries/MerkleTree.sol";
 import {QueuedMerkleTree, QueuedMerkleTreeLogic, TreeUpdateData} from "../libraries/QueuedMerkleTree.sol";
 import {ShieldedAddressRegistrationData, ShieldedAddressLogic} from "../libraries/ShieldedAddress.sol";
-import {ShieldedTransaction, ShieldedTransactionLogic, RevokerData} from "../libraries/ShieldedTransaction.sol";
+import {ShieldedTransaction, ShieldedTransactionLogic, RevokerData, PubAsset, Params, MemoParams} from "../libraries/ShieldedTransaction.sol";
 
 contract Pool is
     IPool,
@@ -238,6 +238,19 @@ contract Pool is
             assetId: assetId,
             value: fee
         });
+    }
+
+    function completeNonAtomicTx(
+        ShieldedTransaction memory stx,
+        PubAsset[] memory refundedAssets
+    ) external {
+        stx.receiveAssetsFromNonAtomicTx(
+            refundedAssets,
+            adaptorHandler,
+            hasher,
+            _assets,
+            _commitmentTree
+        );
     }
 
     /////////////////////////////////////////

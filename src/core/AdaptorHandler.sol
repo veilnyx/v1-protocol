@@ -3,16 +3,38 @@ pragma solidity ^0.8.24;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {IAdaptorHandler} from "../interfaces/IAdaptorHandler.sol";
 import {IAdaptor} from "../interfaces/IAdaptor.sol";
 import {IPool} from "../interfaces/IPool.sol";
+import {Params, MemoParams, ShieldedTransaction, ShieldedTransactionType} from "../libraries/ShieldedTransaction.sol";
 import {Asset, AssetType} from "../libraries/Asset.sol";
 import {PubAsset} from "../libraries/ShieldedTransaction.sol";
 
-contract AdaptorHandler is IAdaptorHandler {
+// @todo: Make the contract UUPSUpgradeable?
+contract AdaptorHandler is IAdaptorHandler, Ownable {
     using SafeERC20 for IERC20;
 
+    // struct NonAtomicTx {
+    //     uint256 refundAddress;
+    //     Params params;
+    //     MemoParams memoParams;
+    //     PubAssets refundedAssets;
+    // }
+    // mapping(uint256 txHash => NonAtomicTx) public nonAtomicTxs;
+
+    mapping(uint256 txHash => ShieldedTransaction) public nonAtomicTxs;
+    address labyrinthPool;
+
+    constructor() Ownable(msg.sender) {}
+
+    function setPool(address pool) external onlyOwner {
+        labyrinthPool = pool;
+    }
+
     function handleAdaptor(
+        ShieldedTransaction calldata stx,
+        uint256 txHash,
         address target,
         PubAsset[] calldata pubAssets,
         bytes calldata targetPayload
@@ -41,6 +63,22 @@ contract AdaptorHandler is IAdaptorHandler {
             res,
             (uint24[], uint256[])
         );
+
+        // non-atomic tx
+        if (outAssetIds.length == 0) {
+            /**
+            NonAtomicTx memory nonAtomicTxData = NonAtomicTx({
+                refundAddress: refundAddress,
+                params: stxParams,
+                memoParams: stxMemoParams,
+                refundedAssets: new PubAssets[](0)
+            });
+            nonAtomicTxs[txHash] = nonAtomicTxData;
+             */
+
+            nonAtomicTxs[txHash] = stx;
+            return (new PubAsset[](0));
+        }
 
         Asset memory asset;
         uint256 assetBalance;
@@ -79,6 +117,61 @@ contract AdaptorHandler is IAdaptorHandler {
         }
 
         return outPubAssets;
+    }
+
+    function completeNonAtomicTx(
+        uint256 txHash,
+        uint24[] memory outAssetIds,
+        uint256[] memory outValues
+    ) external payable {
+        Asset memory asset;
+        uint256 assetBalance;
+        ShieldedTransaction memory stx = nonAtomicTxs[txHash];
+        // q Is this txHash unique? 
+        // ans Yes cuz each stx has a unique `keysMemo` which is part of txHash.
+        // q does this step provide any sort of security over directly using txHash?
+        // ans I dont think so, cuz the sender can save their stx obj, gen txHash and call this fn. It does prevent processing if new stx's hash is sent by other users.
+        // uint256 stxHash = stx.hash();
+
+        if (stx.txType == ShieldedTransactionType.NON_ATOMIC) {
+            revert IAdaptorHandler.NonAtomicTxNotFound(txHash);
+        }
+
+        // Approve the pool of output assets
+        PubAsset[] memory outPubAssets = new PubAsset[](outAssetIds.length);
+        for (uint8 i = 0; i < outAssetIds.length; ) {
+            asset = IPool(labyrinthPool).getAsset(outAssetIds[i]);
+
+            if (!asset.isActive) {
+                revert IPool.InactiveAsset(asset.id);
+            }
+
+            assetBalance = IERC20(asset.assetAddress).balanceOf(address(this));
+            if (assetBalance < outValues[i]) {
+                revert InvalidOutputValue();
+            }
+
+            IERC20(asset.assetAddress).forceApprove(
+                labyrinthPool,
+                outValues[i]
+            );
+            outPubAssets[i] = PubAsset(outAssetIds[i], uint224(outValues[i]));
+
+            // uint248(
+            //     bytes31(
+            //         bytes.concat(bytes3(outAssetIds[i]), bytes28(outValues[i]))
+            //     )
+            // );
+
+            unchecked {
+                ++i;
+            }
+        }
+
+        IPool(labyrinthPool).completeNonAtomicTx(
+            nonAtomicTxs[txHash],
+            outPubAssets
+        );
     }
 
     // Allow Lido/RocketPool adaptor to receive unwrapped Ether for staking
