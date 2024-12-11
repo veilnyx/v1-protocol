@@ -70,7 +70,7 @@ contract AddressRegistry is
      * updating non-zero value: 3_000
      * total = 73k => 100k (approx)
      */
-    uint128 public constant DST_CHAIN_ADDRESS_TREE_UPDATE_GAS = 200_000;
+    uint128 public constant DST_CHAIN_ADDRESS_TREE_UPDATE_GAS = 150_000;
     uint8 public constant ROOT_HISTORY_SIZE = 100;
 
     function initialize(

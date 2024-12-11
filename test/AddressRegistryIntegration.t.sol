@@ -164,14 +164,15 @@ contract AddressRegistryIntegrationTest is TestHelperOz5, PoolBaseTest {
         ) = _prepareShieldedAddrRegStruct();
 
         (, uint256 totalNativeGas) = addressRegistry.getRegistrationFees();
-        vm.deal(senderAddr, totalNativeGas);
+        uint256 extraGas = 0.25 ether;
+        vm.deal(senderAddr, (totalNativeGas + extraGas));
         console2.log(
             "Sender native bal before registration:",
             senderAddr.balance
         );
 
         vm.prank(senderAddr);
-        pool.registerAddress{value: totalNativeGas}(addressRegistrationData);
+        pool.registerAddress{value: totalNativeGas + extraGas}(addressRegistrationData);
 
         console2.log("Sender bal after initiating call:", senderAddr.balance);
         verifyPackets(eidReceiver, addressToBytes32(address(stateReceiver)));
@@ -184,6 +185,7 @@ contract AddressRegistryIntegrationTest is TestHelperOz5, PoolBaseTest {
 
         assertEq(originPoolLastRoot, dstPoolLastRoot);
         assertEq(originPoolCurrentRootIndex, dstPoolCurrentRootIndex);
+        assertEq(senderAddr.balance, extraGas);
         console2.log(
             "Sender native bal after registration (refund?):",
             senderAddr.balance
