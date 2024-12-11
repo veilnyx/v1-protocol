@@ -33,7 +33,7 @@ contract AdaptorHandler is IAdaptorHandler, Ownable {
     }
 
     function handleAdaptor(
-        ShieldedTransaction calldata stx,
+        ShieldedTransaction memory stx,
         uint256 txHash,
         address target,
         PubAsset[] calldata pubAssets,
@@ -59,6 +59,7 @@ contract AdaptorHandler is IAdaptorHandler, Ownable {
 
         require(success, string(res));
 
+        /// @todo rename outAssetIds, outValues => refundedAssetIds, refundedValues
         (uint24[] memory outAssetIds, uint256[] memory outValues) = abi.decode(
             res,
             (uint24[], uint256[])
@@ -127,13 +128,13 @@ contract AdaptorHandler is IAdaptorHandler, Ownable {
         Asset memory asset;
         uint256 assetBalance;
         ShieldedTransaction memory stx = nonAtomicTxs[txHash];
-        // q Is this txHash unique? 
+        // q Is this txHash unique?
         // ans Yes cuz each stx has a unique `keysMemo` which is part of txHash.
         // q does this step provide any sort of security over directly using txHash?
         // ans I dont think so, cuz the sender can save their stx obj, gen txHash and call this fn. It does prevent processing if new stx's hash is sent by other users.
         // uint256 stxHash = stx.hash();
 
-        if (stx.txType == ShieldedTransactionType.NON_ATOMIC) {
+        if (stx.txType != ShieldedTransactionType.NON_ATOMIC) {
             revert IAdaptorHandler.NonAtomicTxNotFound(txHash);
         }
 
@@ -172,6 +173,15 @@ contract AdaptorHandler is IAdaptorHandler, Ownable {
             nonAtomicTxs[txHash],
             outPubAssets
         );
+
+        delete nonAtomicTxs[txHash];
+    }
+
+    function nonAtomicTxStatus(uint256 txHash) external view returns (bool) {
+        if (nonAtomicTxs[txHash].txType == ShieldedTransactionType.NON_ATOMIC) {
+            return true;
+        }
+        return false;
     }
 
     // Allow Lido/RocketPool adaptor to receive unwrapped Ether for staking

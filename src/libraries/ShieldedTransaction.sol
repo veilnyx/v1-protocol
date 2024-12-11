@@ -313,6 +313,10 @@ library ShieldedTransactionLogic {
         mapping(uint24 => Asset) storage assets,
         QueuedMerkleTree storage commitmentTree
     ) external {
+        console2.log(
+            "ShieldedTransaction:: receiveAssetsFromNonAtomicTx called"
+        );
+
         // q validate stx again?
         Params memory params = _copyParamsToMemory(stx);
         MemoParams memory memoParams = _copyMemoParamsToMemory(stx);
@@ -340,14 +344,8 @@ library ShieldedTransactionLogic {
         }
 
         // reinitializing `commitments` array to remove older commitments since they are already emitted and inserted in the initial phase of the Non-atomic tx
-        // stx.memoParams.commitments = new uint256[](refundedAssetsCms.length);
-        // stx.memoParams.commitments = refundedAssetsCms;
-
-        // q should we only emit new commitments as above or append to the existing commitments?
-        memoParams.commitments = _concat(
-            memoParams.commitments,
-            refundedAssetsCms
-        );
+        memoParams.commitments = new uint256[](refundedAssetsCms.length);
+        memoParams.commitments = refundedAssetsCms;
 
         _printNotes(commitmentTree, params, memoParams);
     }

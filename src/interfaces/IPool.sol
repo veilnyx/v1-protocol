@@ -44,7 +44,7 @@ interface IPool {
         bytes keysMemo,
         bytes assetsMemo, // sent memo in case of transfer or calc from pub assets
         bytes notesMemo,
-        bytes convertedAssetsMemo
+        bytes refundMemo
     );
 
     /////////////////////////////////////////
