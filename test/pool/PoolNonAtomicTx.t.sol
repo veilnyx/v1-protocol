@@ -52,6 +52,7 @@ contract PoolNonAtomicTxTest is PoolTest {
 
     uint256 constant DEPOSIT_AMOUNT = 2 ether;
     MockNonAtomicTxAdaptor mockAdaptor;
+    ShieldedTransaction stxNonAtomic = _loadShieldedTransaction("use_2_weth");
 
     function setUp() public {
         PoolTest._setUp();
@@ -73,29 +74,17 @@ contract PoolNonAtomicTxTest is PoolTest {
     }
 
     function test_nonAtomicTx() public {
-        ShieldedTransaction memory stxNonAtomic = _loadShieldedTransaction(
-            "use_2_weth"
-        );
-
-        _runExpectedTx(stxNonAtomic);
+        _checkEventEmits(stxNonAtomic);
     }
 
     function test_AdaptorHandlerStorageForNonAtomicTx() public {
-        ShieldedTransaction memory stxNonAtomic = _loadShieldedTransaction(
-            "use_2_weth"
-        );
-
         pool.transact(stxNonAtomic);
 
         assertEq(adaptorHandler.nonAtomicTxStatus(stxNonAtomic.hash()), true);
     }
 
-    function test_completeNonAtomicTx() public {
-        ShieldedTransaction memory stxNonAtomic = _loadShieldedTransaction(
-            "use_2_weth"
-        );
+    function test_completeNonAtomicTxFlow() public {
         uint256 txHash = stxNonAtomic.hash();
-
         pool.transact(stxNonAtomic);
         assertEq(adaptorHandler.nonAtomicTxStatus(txHash), true);
 

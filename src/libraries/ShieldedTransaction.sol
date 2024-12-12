@@ -166,9 +166,9 @@ library ShieldedTransactionLogic {
         }
 
         if (
-            stx.txType == ShieldedTransactionType.CALL_ADAPTOR ||
-            (stx.txType == ShieldedTransactionType.NON_ATOMIC &&
-                !supportedAdaptors[address(bytes20(stx.targetData))])
+            (stx.txType == ShieldedTransactionType.CALL_ADAPTOR ||
+                stx.txType == ShieldedTransactionType.NON_ATOMIC) &&
+            !supportedAdaptors[address(bytes20(stx.targetData))]
         ) {
             revert IPool.UnsupportedAdaptor();
         }

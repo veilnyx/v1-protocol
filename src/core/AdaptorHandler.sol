@@ -81,41 +81,7 @@ contract AdaptorHandler is IAdaptorHandler, Ownable {
             return (new PubAsset[](0));
         }
 
-        Asset memory asset;
-        uint256 assetBalance;
-
-        PubAsset[] memory outPubAssets = new PubAsset[](outAssetIds.length);
-
-        for (uint8 i = 0; i < outAssetIds.length; ) {
-            asset = IPool(msg.sender).getAsset(outAssetIds[i]);
-
-            if (!asset.isActive) {
-                revert IPool.InactiveAsset(asset.id);
-            }
-
-            assetBalance = IERC20(asset.assetAddress).balanceOf(address(this));
-
-            // Not checking for equality because of it might fail if somehow this contract
-            // is sent tokens from other sources apart from doing shielded transactions. In that case,
-            // balance will be greater than outValues[i] and revert will be called.
-            if (assetBalance < outValues[i]) {
-                revert InvalidOutputValue();
-            }
-
-            IERC20(asset.assetAddress).forceApprove(msg.sender, outValues[i]);
-
-            outPubAssets[i] = PubAsset(outAssetIds[i], uint224(outValues[i]));
-
-            // uint248(
-            //     bytes31(
-            //         bytes.concat(bytes3(outAssetIds[i]), bytes28(outValues[i]))
-            //     )
-            // );
-
-            unchecked {
-                ++i;
-            }
-        }
+        PubAsset[] memory outPubAssets = _approveAndReturnPubAssets(outAssetIds, outValues);
 
         return outPubAssets;
     }
@@ -125,8 +91,6 @@ contract AdaptorHandler is IAdaptorHandler, Ownable {
         uint24[] memory outAssetIds,
         uint256[] memory outValues
     ) external payable {
-        Asset memory asset;
-        uint256 assetBalance;
         ShieldedTransaction memory stx = nonAtomicTxs[txHash];
         // q Is this txHash unique?
         // ans Yes cuz each stx has a unique `keysMemo` which is part of txHash.
@@ -139,35 +103,7 @@ contract AdaptorHandler is IAdaptorHandler, Ownable {
         }
 
         // Approve the pool of output assets
-        PubAsset[] memory outPubAssets = new PubAsset[](outAssetIds.length);
-        for (uint8 i = 0; i < outAssetIds.length; ) {
-            asset = IPool(labyrinthPool).getAsset(outAssetIds[i]);
-
-            if (!asset.isActive) {
-                revert IPool.InactiveAsset(asset.id);
-            }
-
-            assetBalance = IERC20(asset.assetAddress).balanceOf(address(this));
-            if (assetBalance < outValues[i]) {
-                revert InvalidOutputValue();
-            }
-
-            IERC20(asset.assetAddress).forceApprove(
-                labyrinthPool,
-                outValues[i]
-            );
-            outPubAssets[i] = PubAsset(outAssetIds[i], uint224(outValues[i]));
-
-            // uint248(
-            //     bytes31(
-            //         bytes.concat(bytes3(outAssetIds[i]), bytes28(outValues[i]))
-            //     )
-            // );
-
-            unchecked {
-                ++i;
-            }
-        }
+        PubAsset[] memory outPubAssets = _approveAndReturnPubAssets(outAssetIds, outValues);
 
         IPool(labyrinthPool).completeNonAtomicTx(
             nonAtomicTxs[txHash],
@@ -182,6 +118,41 @@ contract AdaptorHandler is IAdaptorHandler, Ownable {
             return true;
         }
         return false;
+    }
+
+    function _approveAndReturnPubAssets(uint24[] memory outAssetIds, uint256[] memory outValues) internal returns (PubAsset[] memory) {
+        Asset memory asset;
+        uint256 assetBalance;
+
+        PubAsset[] memory outPubAssets = new PubAsset[](outAssetIds.length);
+        for (uint8 i = 0; i < outAssetIds.length; ) {
+            asset = IPool(labyrinthPool).getAsset(outAssetIds[i]);
+
+            if (!asset.isActive) {
+                revert IPool.InactiveAsset(asset.id);
+            }
+
+            if(outValues[i] > type(uint224).max) {
+                revert OutputValueExceedsUint224();
+            }
+
+            assetBalance = IERC20(asset.assetAddress).balanceOf(address(this));
+
+            // Not checking for equality because of it might fail if somehow this contract is sent tokens from other sources apart from doing shielded transactions.
+            if (assetBalance < outValues[i]) {
+                revert InvalidOutputValue();
+            }
+
+            IERC20(asset.assetAddress).forceApprove(labyrinthPool, outValues[i]);
+
+            outPubAssets[i] = PubAsset(outAssetIds[i], uint224(outValues[i]));
+
+            unchecked {
+                ++i;
+            }
+        }
+
+        return outPubAssets;
     }
 
     // Allow Lido/RocketPool adaptor to receive unwrapped Ether for staking

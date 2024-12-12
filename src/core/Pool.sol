@@ -242,7 +242,7 @@ contract Pool is
     }
 
     function completeNonAtomicTx(
-        ShieldedTransaction memory stx,
+        ShieldedTransaction calldata stx,
         PubAsset[] memory refundedAssets
     ) external {
         console2.log("Pool: completeNonAtomicTx called");

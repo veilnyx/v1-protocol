@@ -79,18 +79,18 @@ contract PoolTest is PoolBaseTest, BaseScript {
         (, , , , uint32 nextLeafIndex) = pool.getCommitmentTreeState();
         uint24 feeAssetId = 0;
         uint256 txHash = stx.hash();
-        bytes memory assetsMemo;
-
-        // non transfer tx & transfer tx with fee
-        if (stx.pubAssets.length != 0) {
-            // todo: check if feeAssetId is being correctly extracted
-            feeAssetId = uint24(bytes3(bytes31(stx.pubAssets[0])));
-        }
+        bytes memory assetsMemo = bytes("");
 
         if (stx.txType != ShieldedTransactionType.TRANSFER) {
             assetsMemo = abi.encodePacked(stx.pubAssets);
         } else {
             assetsMemo = stx.assetsMemo;
+        }
+
+        // non transfer tx & transfer tx with fee
+        if (stx.pubAssets.length != 0) {
+            // todo: check if feeAssetId is being correctly extracted
+            feeAssetId = uint24(bytes3(bytes31(stx.pubAssets[0])));
         }
 
         vm.expectEmit(true, true, true, true);
@@ -161,7 +161,10 @@ contract PoolTest is PoolBaseTest, BaseScript {
         pool.registerAddress(addressRegData);
     }
 
-    function _runExpectedTx(
+    /// @notice Checks if the expect events: NullifierMarked, Commitment, Receipt are emitted.
+    /// @dev Activating all 3 checks at the same time causes a revert of the test execution. Maybe due to gas limit. Root cause yet to be found!
+    /// @dev Since expectReceipt involves hashing ops, activate it separately.
+    function _checkEventEmits(
         ShieldedTransaction memory stx
     )
         internal

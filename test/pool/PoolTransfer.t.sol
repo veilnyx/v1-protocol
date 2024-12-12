@@ -20,7 +20,7 @@ contract PoolTransferTest is PoolTest {
         ShieldedTransaction memory stx = _loadShieldedTransaction(
             "transfer_500_weth_without_fee"
         );
-        _runExpectedTx(stx);
+        _checkEventEmits(stx);
         assertEq(token1.balanceOf(address(pool)), balance1);
     }
 
@@ -32,7 +32,7 @@ contract PoolTransferTest is PoolTest {
 
         uint96 feeValue = uint96(stx.feeData);
         address paymaster = address(bytes20(bytes32(stx.feeData)));
-        _runExpectedTx(stx);
+        _checkEventEmits(stx);
 
         vm.prank(paymaster);
         uint256 paymasterFee = pool.getCollectedPaymasterFee(
