@@ -81,7 +81,10 @@ contract AdaptorHandler is IAdaptorHandler, Ownable {
             return (new PubAsset[](0));
         }
 
-        PubAsset[] memory outPubAssets = _approveAndReturnPubAssets(outAssetIds, outValues);
+        PubAsset[] memory outPubAssets = _approveAndReturnPubAssets(
+            outAssetIds,
+            outValues
+        );
 
         return outPubAssets;
     }
@@ -91,19 +94,10 @@ contract AdaptorHandler is IAdaptorHandler, Ownable {
         uint24[] memory outAssetIds,
         uint256[] memory outValues
     ) external payable {
-        ShieldedTransaction memory stx = nonAtomicTxs[txHash];
-        // q Is this txHash unique?
-        // ans Yes cuz each stx has a unique `keysMemo` which is part of txHash.
-        // q does this step provide any sort of security over directly using txHash?
-        // ans I dont think so, cuz the sender can save their stx obj, gen txHash and call this fn. It does prevent processing if new stx's hash is sent by other users.
-        // uint256 stxHash = stx.hash();
-
-        if (stx.txType != ShieldedTransactionType.NON_ATOMIC) {
-            revert IAdaptorHandler.NonAtomicTxNotFound(txHash);
-        }
-
-        // Approve the pool of output assets
-        PubAsset[] memory outPubAssets = _approveAndReturnPubAssets(outAssetIds, outValues);
+        PubAsset[] memory outPubAssets = _approveAndReturnPubAssets(
+            outAssetIds,
+            outValues
+        );
 
         IPool(labyrinthPool).completeNonAtomicTx(
             nonAtomicTxs[txHash],
@@ -113,14 +107,19 @@ contract AdaptorHandler is IAdaptorHandler, Ownable {
         delete nonAtomicTxs[txHash];
     }
 
-    function nonAtomicTxStatus(uint256 txHash) external view returns (bool) {
-        if (nonAtomicTxs[txHash].txType == ShieldedTransactionType.NON_ATOMIC) {
+    function nonAtomicTxExists(uint256 txHash) external view returns (bool) {
+        if (
+            nonAtomicTxs[txHash].txType == ShieldedTransactionType.CALL_ADAPTOR
+        ) {
             return true;
         }
         return false;
     }
 
-    function _approveAndReturnPubAssets(uint24[] memory outAssetIds, uint256[] memory outValues) internal returns (PubAsset[] memory) {
+    function _approveAndReturnPubAssets(
+        uint24[] memory outAssetIds,
+        uint256[] memory outValues
+    ) internal returns (PubAsset[] memory) {
         Asset memory asset;
         uint256 assetBalance;
 
@@ -132,7 +131,7 @@ contract AdaptorHandler is IAdaptorHandler, Ownable {
                 revert IPool.InactiveAsset(asset.id);
             }
 
-            if(outValues[i] > type(uint224).max) {
+            if (outValues[i] > type(uint224).max) {
                 revert OutputValueExceedsUint224();
             }
 
@@ -143,7 +142,10 @@ contract AdaptorHandler is IAdaptorHandler, Ownable {
                 revert InvalidOutputValue();
             }
 
-            IERC20(asset.assetAddress).forceApprove(labyrinthPool, outValues[i]);
+            IERC20(asset.assetAddress).forceApprove(
+                labyrinthPool,
+                outValues[i]
+            );
 
             outPubAssets[i] = PubAsset(outAssetIds[i], uint224(outValues[i]));
 

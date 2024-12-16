@@ -80,13 +80,13 @@ contract PoolNonAtomicTxTest is PoolTest {
     function test_AdaptorHandlerStorageForNonAtomicTx() public {
         pool.transact(stxNonAtomic);
 
-        assertEq(adaptorHandler.nonAtomicTxStatus(stxNonAtomic.hash()), true);
+        assertEq(adaptorHandler.nonAtomicTxExists(stxNonAtomic.hash()), true);
     }
 
     function test_completeNonAtomicTxFlow() public {
         uint256 txHash = stxNonAtomic.hash();
         pool.transact(stxNonAtomic);
-        assertEq(adaptorHandler.nonAtomicTxStatus(txHash), true);
+        assertEq(adaptorHandler.nonAtomicTxExists(txHash), true);
 
         // enacting the external protocol to complete the non-atomic tx
         uint24 refundAssetId = asset1.id;
@@ -102,6 +102,6 @@ contract PoolNonAtomicTxTest is PoolTest {
             adaptorHandler
         );
 
-        assertEq(adaptorHandler.nonAtomicTxStatus(stxNonAtomic.hash()), false);
+        assertEq(adaptorHandler.nonAtomicTxExists(stxNonAtomic.hash()), false);
     }
 }

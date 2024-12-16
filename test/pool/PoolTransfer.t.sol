@@ -11,6 +11,10 @@ import {MockERC20} from "test/mocks/MockERC20.sol";
 
 contract PoolTransferTest is PoolTest {
     function setUp() public {
+        ShieldedTransaction memory stx = _loadShieldedTransaction(
+            "transfer_500_weth_with_weth_fee"
+        );
+
         _setUp();
         _makePreDeposit();
     }
@@ -27,16 +31,20 @@ contract PoolTransferTest is PoolTest {
     function test_transferWithFee() public {
         uint256 balance1 = token1.balanceOf(address(pool));
         ShieldedTransaction memory stx = _loadShieldedTransaction(
-            "transfer_500_weth_with_weth_fee"
+            "transfer_500_weth_with_usdc_fee"
         );
-
-        uint96 feeValue = uint96(stx.feeData);
+        uint24 feeAssetId = uint24(stx.feeData >> 72);
+        uint72 feeValue = uint72(stx.feeData);
         address paymaster = address(bytes20(bytes32(stx.feeData)));
+
+        // console2.log("FeeAssetId:", stx.feeAssetId);
+        // console2.log("FeeValue:", feeValue);
+        // console2.log("Paymaster:", paymaster);
         _checkEventEmits(stx);
 
         vm.prank(paymaster);
         uint256 paymasterFee = pool.getCollectedPaymasterFee(
-            asset1.id,
+            feeAssetId,
             paymaster
         );
         assertEq(token1.balanceOf(address(pool)), balance1);

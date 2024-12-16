@@ -6,7 +6,6 @@ import {ShieldedTransaction} from "../libraries/ShieldedTransaction.sol";
 
 interface IAdaptorHandler {
     error InvalidOutputValue();
-    error NonAtomicTxNotFound(uint256);
     error OutputValueExceedsUint224();
 
     function handleAdaptor(

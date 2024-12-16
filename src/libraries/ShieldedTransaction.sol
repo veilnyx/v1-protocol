@@ -166,8 +166,7 @@ library ShieldedTransactionLogic {
         }
 
         if (
-            (stx.txType == ShieldedTransactionType.CALL_ADAPTOR ||
-                stx.txType == ShieldedTransactionType.NON_ATOMIC) &&
+            stx.txType == ShieldedTransactionType.CALL_ADAPTOR &&
             !supportedAdaptors[address(bytes20(stx.targetData))]
         ) {
             revert IPool.UnsupportedAdaptor();
@@ -549,9 +548,18 @@ library ShieldedTransactionLogic {
 
         // non transfer tx & transfer tx with fee
         if (pubLen != 0) {
-            params.feeAssetId = params.pubAssets[0].id;
-            params.feeValue = uint96(stx.feeData);
-            params.paymaster = address(bytes20(bytes32(stx.feeData)));
+            // params.feeAssetId = uint24(stx.feeData);
+            // params.feeValue = uint72(stx.feeData);
+            // params.paymaster = address(bytes20(bytes32(stx.feeData)));
+
+            params.paymaster = address(uint160(stx.feeData >> (24 + 72)));
+
+            // Extract the feeAssetId (3 bytes)
+            params.feeAssetId = uint24(stx.feeData >> 72);
+
+            // Extract the feeValue (9 bytes)
+            params.feeValue = uint72(stx.feeData);
+
             params.pubAssets[0].value =
                 params.pubAssets[0].value -
                 params.feeValue;

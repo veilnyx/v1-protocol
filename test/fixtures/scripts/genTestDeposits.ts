@@ -5,26 +5,26 @@ import { fixture, generateTestTransactions } from "./fixture";
 import { parse } from 'path';
 
 const {
-  assets: { weth, testnetWeth, morphoVaultToken },
+  assets: { weth, usdc, testnetWeth, morphoVaultToken },
   sender: { account: senderAccount },
 } = fixture;
 
 export const reqs = {
-  deposit_2_weth: {
+  deposit_pre_tx: {
     type: TransactionType.DEPOSIT,
-    assetIds: [weth],
-    values: [parseEther("2")],
+    assetIds: [weth, usdc],
+    values: [parseEther("500"), parseUnits("10000", 6)],
     feeAssetId: 0,
     to: senderAccount.shieldedAddress.pack(),
     viaBundler: false,
     paymaster: zeroAddress,
     revokerId: 0,
-  }
+  },
   /**
-  deposit_pre_tx: {
+  deposit_2_weth: {
     type: TransactionType.DEPOSIT,
-    assetIds: [weth, usdc],
-    values: [parseEther("10000"), parseUnits("10000", 6)],
+    assetIds: [weth],
+    values: [parseEther("2")],
     feeAssetId: 0,
     to: senderAccount.shieldedAddress.pack(),
     viaBundler: false,

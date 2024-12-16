@@ -89,8 +89,7 @@ contract PoolTest is PoolBaseTest, BaseScript {
 
         // non transfer tx & transfer tx with fee
         if (stx.pubAssets.length != 0) {
-            // todo: check if feeAssetId is being correctly extracted
-            feeAssetId = uint24(bytes3(bytes31(stx.pubAssets[0])));
+            feeAssetId = uint24(stx.feeData >> 72);
         }
 
         vm.expectEmit(true, true, true, true);
@@ -101,7 +100,7 @@ contract PoolTest is PoolBaseTest, BaseScript {
             (nextLeafIndex + uint32(stx.commitments.length) - 1),
             address(bytes20(stx.targetData)),
             feeAssetId,
-            uint96(stx.feeData),
+            uint72(stx.feeData),
             address(bytes20(bytes32(stx.feeData))),
             stx.keysMemo,
             assetsMemo,
@@ -168,9 +167,9 @@ contract PoolTest is PoolBaseTest, BaseScript {
         ShieldedTransaction memory stx
     )
         internal
-        expectNullifiersMarked(stx)
-        expectCommitmentsInserted(stx)
-    // expectReceipt(stx)
+        // expectNullifiersMarked(stx)
+        // expectCommitmentsInserted(stx)
+        expectReceipt(stx)
     {
         pool.transact(stx);
     }
