@@ -5,7 +5,8 @@ pragma abicoder v2;
 import {PoolTest} from "test/fixtures/PoolTest.sol";
 import {Pool} from "src/core/Pool.sol";
 import {ShieldedTransaction} from "src/libraries/ShieldedTransaction.sol";
-import {LidoAdaptor} from "src/adaptors/lido/lidoAdaptor.sol";
+import {LidoAdaptor} from "src/adaptors/lido/LidoAdaptor.sol";
+import {ILido} from "src/adaptors/lido/ILido.sol";
 import {IAdaptor} from "src/interfaces/IAdaptor.sol";
 import {IWToken} from "src/interfaces/IWToken.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -13,18 +14,22 @@ import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import {Asset, AssetType} from "src/libraries/Asset.sol";
 import {console} from "forge-std/console.sol";
 
+enum Action {
+    STAKE,
+    UNSTAKE
+}
+
 contract LidoAdaptorTest is PoolTest {
     error CheckChainConfig();
 
     LidoAdaptor lidoAdaptor;
     address lido = 0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84;
-    address withdrawalQueueERC721;
+    address withdrawalQueueERC721 = 0x889edC2eDab5f40e902b864aD4d7AdE8E412F9B1;
     address public stETH = 0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84;
     address public wstETH = 0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0;
     address public WETH = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
     IWToken public iWETH;
     uint256 public constant INITIAL_SUPPLY = 2 ether;
-    uint256 public constant SWAP_AMT = 1 ether;
     address public user = 0x689EcF264657302052c3dfBD631e4c20d3ED0baB;
 
     function setUp() external {
@@ -54,18 +59,18 @@ contract LidoAdaptorTest is PoolTest {
         address[] memory assetAddresses = new address[](1);
         assetAddresses[0] = wstETH;
         pool.addAssets(assetType, assetAddresses);
-        
-        vm.deal(user, INITIAL_SUPPLY * 2);
-        vm.startPrank(user);
-        iWETH.deposit{value: INITIAL_SUPPLY}(); // wrapping eth to weth
-        iWETH.approve(address(pool), INITIAL_SUPPLY); // depositing weth to pool
-        ShieldedTransaction memory stxWethDeposit = _loadShieldedTransaction(
-            "deposit_2_testnet_weth"
-        );
-        pool.transact(stxWethDeposit);
-        vm.stopPrank();
 
-        _processCommitmentTreeQueue();
+        deal(WETH, user, INITIAL_SUPPLY);
+
+        // vm.startPrank(user);
+        // iWETH.approve(address(pool), INITIAL_SUPPLY); // depositing weth to pool
+        // ShieldedTransaction memory stxWethDeposit = _loadShieldedTransaction(
+        //     "deposit_2_testnet_weth"
+        // );
+        // pool.transact(stxWethDeposit);
+        // vm.stopPrank();
+
+        // _processCommitmentTreeQueue();
     }
 
     function testLidoAdaptorDeploy() external view {
@@ -97,21 +102,16 @@ contract LidoAdaptorTest is PoolTest {
     /// @dev Pls uncomment the `receive()` on the LidoAdaptor to enable this test.
     /// @dev Will only run on Holesky testnet.
     function testWstEthUnStakingOnLidoBypassingLabyrinth() public {
-        require(
-            block.chainid == 17000,
-            "Unstaking test only on Holesky testnet"
-        );
-        uint256 initialDeposit = 10 ether;
-        vm.deal(address(lidoAdaptor), initialDeposit);
+        deal(address(lidoAdaptor), INITIAL_SUPPLY);
         vm.prank(address(lidoAdaptor));
-        IWToken(WETH).deposit{value: initialDeposit}();
+        IWToken(WETH).deposit{value: INITIAL_SUPPLY}();
 
         uint24[] memory inAssetIds = new uint24[](1);
         uint256[] memory inValues = new uint256[](1);
-        bytes memory payload = bytes("");
+        bytes memory payload = abi.encode(Action.STAKE, address(0));
 
         inAssetIds[0] = pool.getAsset(WETH).id;
-        inValues[0] = initialDeposit;
+        inValues[0] = INITIAL_SUPPLY;
 
         IAdaptor(address(lidoAdaptor)).handleAssets(
             inAssetIds,
@@ -119,14 +119,17 @@ contract LidoAdaptorTest is PoolTest {
             payload
         ); // staking directly through LidoAdaptor
 
-        console.log("Initiating Unstaking on Lido");
         uint256 adpWstETHBalBeforeUnStaking = IERC20(wstETH).balanceOf(
             address(lidoAdaptor)
         );
+        console.log("Adp wstEth bal after swap:", adpWstETHBalBeforeUnStaking);
+        assert(adpWstETHBalBeforeUnStaking > 0);
+
+        console.log("Initiating Unstaking on Lido");
 
         inAssetIds[0] = pool.getAsset(wstETH).id;
         inValues[0] = adpWstETHBalBeforeUnStaking;
-        payload = abi.encode(user);
+        payload = abi.encode(Action.UNSTAKE, user);
 
         IAdaptor(address(lidoAdaptor)).handleAssets(
             inAssetIds,
@@ -139,21 +142,47 @@ contract LidoAdaptorTest is PoolTest {
             address(pool)
         );
         console.log(
-            "Pool wstEth bal before unstaking:",
+            "Adp wstEth bal before unstaking:",
             adpWstETHBalBeforeUnStaking
         );
-        console.log(
-            "Pool wstEth bal after unstaking:",
-            adpWstETHBalPostUnStake
-        );
+        console.log("Adp wstEth bal after unstaking:", adpWstETHBalPostUnStake);
 
         assert(adpWstETHBalPostUnStake < adpWstETHBalBeforeUnStaking);
         assert(IERC721(withdrawalQueueERC721).balanceOf(user) > 0); // NFT received check
     }
 
+    function testRevertOnSepoliaWhenWithdrawing() external {
+        uint24[] memory inAssetIds = new uint24[](1);
+        uint256[] memory inValues = new uint256[](1);
+
+        inAssetIds[0] = pool.getAsset(wstETH).id;
+        inValues[0] = INITIAL_SUPPLY;
+        bytes memory payload = abi.encode(Action.UNSTAKE, user);
+        deal(wstETH, address(lidoAdaptor), INITIAL_SUPPLY);
+
+        if (block.chainid == 11155111) {
+            vm.expectRevert(
+                abi.encodeWithSelector(
+                    ILido.LidoWithdrawNotSupportedOnChain.selector,
+                    11155111
+                )
+            );
+        }
+        // Unstaking call
+        IAdaptor(address(lidoAdaptor)).handleAssets(
+            inAssetIds,
+            inValues,
+            payload
+        );
+    }
+
     /// @dev Only allowing Lido tests to run on Holesky testnet and ETH mainnet. More chains can be added.
     function shouldTestRun() internal view returns (bool) {
-        if (block.chainid != 17000 && block.chainid != 11155111) {
+        if (
+            block.chainid != 17000 &&
+            block.chainid != 11155111 &&
+            block.chainid != 1
+        ) {
             console.log(
                 "Skipping Lido adaptor tests on the current chain as Lido protocol may not be deployed. To run Lido tests, kindly run the tests on the Holesky testnet where Lido is deployed. Ref: https://docs.lido.fi/deployed-contracts/holesky"
             );

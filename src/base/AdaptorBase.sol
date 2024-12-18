@@ -20,7 +20,11 @@ abstract contract AdaptorBase is IAdaptor {
     }
 
     function getAssetId(address assetAddress) public view returns (uint24) {
-        return _pool.getAsset(assetAddress).id;
+        Asset memory asset = _pool.getAsset(assetAddress);
+        if (!asset.isActive) {
+            revert InactiveAsset(asset.id);
+        }
+        return asset.id;
     }
 
     function getAsset(uint24 assetId) public view returns (Asset memory) {

@@ -999,7 +999,7 @@ packages:
     resolution: {integrity: sha512-51WIZJz251lndK7uQU4gBE0gBX+2ZNTgf+hemtJUEPCpHtkooBRFFMID3EPGMKXVqf872pU8K3Huu9PyYQu6bw==}
     dependencies:
       '@openzeppelin/defender-sdk-base-client': 1.14.3
-      axios: 1.7.4(debug@4.3.6)
+      axios: 1.7.7(debug@4.3.6)
       lodash: 4.17.21
     transitivePeerDependencies:
       - debug
@@ -1010,7 +1010,7 @@ packages:
     resolution: {integrity: sha512-qrJLs2ubKSwrhP0x4V2QOPhlc1q8TYnkAcvjvk34VXMS8lhY1cpXSGoxnTw3Mi+eCSE1xOzKWISLi1UAOQOJIw==}
     dependencies:
       '@openzeppelin/defender-sdk-base-client': 1.14.3
-      axios: 1.7.4(debug@4.3.6)
+      axios: 1.7.7(debug@4.3.6)
       lodash: 4.17.21
     transitivePeerDependencies:
       - debug
@@ -1197,7 +1197,7 @@ packages:
       '@nomicfoundation/hardhat-verify': 2.0.9(hardhat@2.22.8)
       '@openzeppelin/hardhat-upgrades': 3.2.1(@nomicfoundation/hardhat-ethers@3.0.8)(@nomicfoundation/hardhat-verify@2.0.9)(ethers@6.13.2)(hardhat@2.22.8)
       '@openzeppelin/upgrades-core': 1.37.0
-      axios: 1.7.4(debug@4.3.6)
+      axios: 1.7.7(debug@4.3.6)
       ethers: 6.13.2
       fs-extra: 10.1.0
       hardhat: 2.22.8(ts-node@10.9.2)(typescript@5.5.2)
@@ -1582,8 +1582,8 @@ packages:
       - debug
     dev: true
 
-  /axios@1.7.4(debug@4.3.6):
-    resolution: {integrity: sha512-DukmaFRnY6AzAALSH4J2M3k6PkaC+MfaAGdEERRWcC9q3/TWQwLpHR8ZRLKTdQ3aBDL64EdluRDjJqKw+BPZEw==}
+  /axios@1.7.7(debug@4.3.6):
+    resolution: {integrity: sha512-S4kL7XrjgBmvdGut0sN3yJxqYzrDOnivkBiN0OFs6hLiUam3UPvswUo0kqGyhqUZGEOytHyumEdXsAkgCOUf3Q==}
     dependencies:
       follow-redirects: 1.15.6(debug@4.3.6)
       form-data: 4.0.0
@@ -2259,7 +2259,7 @@ packages:
         optional: true
     dependencies:
       '@solidity-parser/parser': 0.14.5
-      axios: 1.7.4(debug@4.3.6)
+      axios: 1.7.7(debug@4.3.6)
       cli-table3: 0.5.1
       colors: 1.4.0
       ethereum-cryptography: 1.2.0

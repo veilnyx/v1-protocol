@@ -17,13 +17,15 @@ contract BeefyAdaptorTest is PoolTest {
 
     BeefyAdp beefyAdp;
     address public constant wantLPToken =
-        0x57064F49Ad7123C92560882a45518374ad982e85;
+        0xdAC17F958D2ee523a2206206994597C13D831ec7;
     address public constant mooToken =
-        0xBF7fc2A3d96d80f47b3b89BE84afe10376CE96A5;
+        0x9AbD7F0782CDe1DBd1F0519C35c961b6A724c2a5;
     address public constant beefyVault =
-        0xBF7fc2A3d96d80f47b3b89BE84afe10376CE96A5;
+        0x9AbD7F0782CDe1DBd1F0519C35c961b6A724c2a5;
     address public user = 0x689EcF264657302052c3dfBD631e4c20d3ED0baB;
     uint256 public constant INITIAL_SUPPLY = 2 ether;
+    uint256 public constant WITHDRAW_MOO_AMT = 989569;
+    uint256 public constant USDT_SUPPLY = 1e6;
 
     function setUp() external {
         require(shouldTestRun(), "BeefyAdpTest: Chain not supported");
@@ -103,38 +105,40 @@ contract BeefyAdaptorTest is PoolTest {
     function testDepositInBeefyVaultDirectly() public {
         console.log("Initiating supply on Beefy");
         vm.startPrank(user);
-        deal(wantLPToken, user, INITIAL_SUPPLY);
-        IERC20(wantLPToken).transfer(address(beefyAdp), INITIAL_SUPPLY);
+        deal(wantLPToken, user, USDT_SUPPLY);
+        IERC20(wantLPToken).safeTransfer(address(beefyAdp), USDT_SUPPLY);
 
         uint24[] memory inAssetIds = new uint24[](1);
         inAssetIds[0] = pool.getAsset(wantLPToken).id;
         uint256[] memory inValues = new uint256[](1);
-        inValues[0] = INITIAL_SUPPLY;
+        inValues[0] = USDT_SUPPLY;
         bytes memory payload = abi.encode(uint8(0), beefyVault);
 
         // Supplying
-        beefyAdp.handleAssets({
-            inAssetIds: inAssetIds,
-            inValues: inValues,
-            payload: payload
-        });
+        (
+            uint24[] memory outAssetIds,
+            uint256[] memory outAssetValues
+        ) = beefyAdp.handleAssets({
+                inAssetIds: inAssetIds,
+                inValues: inValues,
+                payload: payload
+            });
         vm.stopPrank();
         console.log("Staking done!");
-        uint256 mooTokenBal = IERC20(mooToken).balanceOf(address(beefyAdp));
-        console.log("mooTokens received:", mooTokenBal);
-        assert(mooTokenBal > 0);
+        console.log("mooTokens received:", outAssetValues[0]);
+        assert(outAssetValues[0] > 0);
     }
 
     function testWithdrawInBeefyVaultDirectly() public {
         console.log("Initiating withdraw on Beefy");
         vm.startPrank(user);
-        deal(mooToken, user, INITIAL_SUPPLY);
-        IERC20(mooToken).transfer(address(beefyAdp), INITIAL_SUPPLY);
+        deal(mooToken, user, WITHDRAW_MOO_AMT);
+        IERC20(mooToken).safeTransfer(address(beefyAdp), WITHDRAW_MOO_AMT);
 
         uint24[] memory inAssetIds = new uint24[](1);
         inAssetIds[0] = pool.getAsset(mooToken).id;
         uint256[] memory inValues = new uint256[](1);
-        inValues[0] = INITIAL_SUPPLY;
+        inValues[0] = WITHDRAW_MOO_AMT;
         bytes memory payload = abi.encode(uint8(1), beefyVault);
 
         // Supplying

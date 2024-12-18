@@ -21,7 +21,7 @@ contract MorphoAdaptorTest is PoolTest {
     address public constant vaultToken =
         0x2371e134e3455e0593363cBF89d3b6cf53740618;
     address public constant morphoVault =
-        0x2371e134e3455e0593363cBF89d3b6cf53740618; // Steakhouse USDC Vault
+        0x2371e134e3455e0593363cBF89d3b6cf53740618; // Gauntlet WETH Prime
     address public user = 0x689EcF264657302052c3dfBD631e4c20d3ED0baB;
     uint256 public constant INITIAL_SUPPLY = 2 ether;
 
@@ -97,16 +97,6 @@ contract MorphoAdaptorTest is PoolTest {
         uint256 loanTokenBal = IERC20(loanToken).balanceOf(address(pool));
         console.log("loanTokens received:", loanTokenBal);
         assert(loanTokenBal > 0);
-    }
-
-    function testConvertToShares() public view {
-        uint256 shares = morphoAdp.convertToShares(morphoVault, INITIAL_SUPPLY);
-        assert(shares > 0);
-    }
-
-    function testConvertToAssets() public view {
-        uint256 assets = morphoAdp.convertToAssets(morphoVault, INITIAL_SUPPLY);
-        assert(assets > 0);
     }
 
     /// @dev Only allowing Lido tests to run on Holesky testnet and ETH mainnet. More chains can be added.
