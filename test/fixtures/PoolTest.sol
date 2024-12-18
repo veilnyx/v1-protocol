@@ -33,7 +33,7 @@ contract PoolTest is PoolBaseTest, BaseScript {
 
     MerkleTree internal _helperTree;
 
-    bytes revokerMetaData;
+    bytes revokerMetaData = abi.encode("Revoker 1", "Organization 1");
 
     modifier expectNullifiersMarked(ShieldedTransaction memory stx_) {
         (, , , , uint32 nextLeafIndex) = pool.getCommitmentTreeState();
@@ -133,7 +133,6 @@ contract PoolTest is PoolBaseTest, BaseScript {
         asset2 = pool.getAsset(assetAddresses[1]);
 
         // Register revoker
-        revokerMetaData = abi.encode("Revoker 1", "Organization 1");
         pool.registerRevoker(
             fixture.revokerPublicKey,
             fixture.encryptionPublicKey,

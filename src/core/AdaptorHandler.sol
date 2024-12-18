@@ -58,16 +58,6 @@ contract AdaptorHandler is IAdaptorHandler, Ownable {
 
         // non-atomic tx
         if (outAssetIds.length == 0) {
-            /**
-            NonAtomicTx memory nonAtomicTxData = NonAtomicTx({
-                refundAddress: refundAddress,
-                params: stxParams,
-                memoParams: stxMemoParams,
-                refundedAssets: new PubAssets[](0)
-            });
-            nonAtomicTxs[txHash] = nonAtomicTxData;
-             */
-
             nonAtomicTxs[txHash] = stx;
             return (new PubAsset[](0));
         }
