@@ -19,7 +19,6 @@ import {MerkleTree, MerkleTreeLogic} from "../libraries/MerkleTree.sol";
 import {QueuedMerkleTree, QueuedMerkleTreeLogic, TreeUpdateData} from "../libraries/QueuedMerkleTree.sol";
 import {ShieldedAddressRegistrationData, ShieldedAddressLogic} from "../libraries/ShieldedAddress.sol";
 import {ShieldedTransaction, ShieldedTransactionLogic, RevokerData, PubAsset, Params, MemoParams} from "../libraries/ShieldedTransaction.sol";
-import {console2} from "forge-std/console2.sol";
 
 contract Pool is
     IPool,
@@ -243,10 +242,9 @@ contract Pool is
 
     function completeNonAtomicTx(
         ShieldedTransaction calldata stx,
-        PubAsset[] memory refundedAssets
+        PubAsset[] calldata refundedAssets
     ) external {
-        console2.log("Pool: completeNonAtomicTx called");
-        stx.receiveAssetsFromNonAtomicTx(
+        stx._receiveAssetsFromNonAtomicTx(
             refundedAssets,
             adaptorHandler,
             hasher,

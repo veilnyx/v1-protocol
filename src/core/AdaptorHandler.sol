@@ -11,17 +11,8 @@ import {Params, MemoParams, ShieldedTransaction, ShieldedTransactionType} from "
 import {Asset, AssetType} from "../libraries/Asset.sol";
 import {PubAsset} from "../libraries/ShieldedTransaction.sol";
 
-// @todo: Make the contract UUPSUpgradeable?
 contract AdaptorHandler is IAdaptorHandler, Ownable {
     using SafeERC20 for IERC20;
-
-    // struct NonAtomicTx {
-    //     uint256 refundAddress;
-    //     Params params;
-    //     MemoParams memoParams;
-    //     PubAssets refundedAssets;
-    // }
-    // mapping(uint256 txHash => NonAtomicTx) public nonAtomicTxs;
 
     mapping(uint256 txHash => ShieldedTransaction) public nonAtomicTxs;
     address labyrinthPool;
@@ -116,6 +107,7 @@ contract AdaptorHandler is IAdaptorHandler, Ownable {
         return false;
     }
 
+    /// @notice `outAssetIds` and `outValues` are approved to the Pool. Also `outAssetIds` and `outValues` are returned as struct PubAssets.
     function _approveAndReturnPubAssets(
         uint24[] memory outAssetIds,
         uint256[] memory outValues

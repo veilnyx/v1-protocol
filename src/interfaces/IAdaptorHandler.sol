@@ -15,4 +15,12 @@ interface IAdaptorHandler {
         PubAsset[] calldata inPubAssets,
         bytes calldata payload
     ) external payable returns (PubAsset[] memory outPubAssets);
+
+    function completeNonAtomicTx(
+        uint256 txHash,
+        uint24[] memory outAssetIds,
+        uint256[] memory outValues
+    ) external payable;
+
+    function nonAtomicTxExists(uint256 txHash) external view returns (bool);
 }

@@ -9,15 +9,13 @@ import {IPool} from "../interfaces/IPool.sol";
 import {IVerifier} from "../interfaces/IVerifier.sol";
 import {IHasher} from "../interfaces/IHasher.sol";
 import {IAdaptorHandler} from "../interfaces/IAdaptorHandler.sol";
-import {console2} from "forge-std/console2.sol";
 
 /// @title ShieldedTransactionType enum representing types of shielded transactions
 enum ShieldedTransactionType {
     DEPOSIT,
     TRANSFER,
     WITHDRAW,
-    CALL_ADAPTOR,
-    NON_ATOMIC
+    CALL_ADAPTOR
 }
 
 /// @title MemoType enum representing memo types for output notes
@@ -217,11 +215,7 @@ library ShieldedTransactionLogic {
             );
         }
 
-        // Perform any conversions
-        if (
-            stx.txType == ShieldedTransactionType.CALL_ADAPTOR ||
-            stx.txType == ShieldedTransactionType.NON_ATOMIC
-        ) {
+        if (stx.txType == ShieldedTransactionType.CALL_ADAPTOR) {
             _transferPubAssets(
                 assets,
                 withdrawFees,
@@ -304,19 +298,15 @@ library ShieldedTransactionLogic {
         return verifierParams;
     }
 
-    function receiveAssetsFromNonAtomicTx(
+    /// @notice Executes the second phase of a non-atomic transaction, which involves receiving the output assets from the adaptorHandler, inserting and emitting respective commitments and refundMemos.
+    function _receiveAssetsFromNonAtomicTx(
         ShieldedTransaction calldata stx,
         PubAsset[] calldata refundedAssets,
         address adaptorHandler,
         address hasher,
         mapping(uint24 => Asset) storage assets,
         QueuedMerkleTree storage commitmentTree
-    ) external {
-        console2.log(
-            "ShieldedTransaction:: receiveAssetsFromNonAtomicTx called"
-        );
-
-        // q validate stx again?
+    ) internal {
         Params memory params = _copyParamsToMemory(stx);
         MemoParams memory memoParams = _copyMemoParamsToMemory(stx);
 
@@ -494,6 +484,7 @@ library ShieldedTransactionLogic {
         }
     }
 
+    /// @notice Inserts commitments into the commitment tree and emits Commitment and Receipt events
     function _printNotes(
         QueuedMerkleTree storage tree,
         Params memory params,
