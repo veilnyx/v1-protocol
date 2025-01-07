@@ -1,15 +1,26 @@
-import { parseEther, parseUnits, zeroAddress } from "viem";
+import { parseEther, parseUnits, zeroAddress, size } from "viem";
 import { Core } from "@zkfi-tech/core";
 import { TransactionType } from "@zkfi-tech/shared-types";
 import { fixture, generateTestTransactions } from "./fixture";
 import { parse } from 'path';
 
 const {
-  assets: { weth, usdc, testnetWeth, morphoVaultToken },
+  assets: { weth, usdc, testnetWeth: aaveWeth, testnetUsdc },
   sender: { account: senderAccount },
 } = fixture;
 
 export const reqs = {
+  deposit_aaveWeth_testnetUsdc: {
+    type: TransactionType.DEPOSIT,
+    assetIds: [aaveWeth, testnetUsdc],
+    values: [parseEther("2"), parseUnits("2", 6)],
+    feeAssetId: 0,
+    to: senderAccount.shieldedAddress.pack(),
+    viaBundler: false,
+    paymaster: zeroAddress,
+    revokerId: 0,
+  }
+  /**,
   deposit_pre_tx: {
     type: TransactionType.DEPOSIT,
     assetIds: [weth, usdc],
@@ -20,7 +31,6 @@ export const reqs = {
     paymaster: zeroAddress,
     revokerId: 0,
   },
-  /**
   deposit_2_weth: {
     type: TransactionType.DEPOSIT,
     assetIds: [weth],

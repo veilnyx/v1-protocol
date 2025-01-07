@@ -427,8 +427,15 @@ library ShieldedTransactionLogic {
 
         uint256 fee;
         for (uint8 i = 0; i < count; ) {
+            if(pubAssets[i].value == 0) {
+                unchecked {
+                    ++i;
+                }
+                continue;
+            }
+            
             fee = feeBps == 0 ? 0 : (pubAssets[i].value * feeBps) / 10000;
-
+            
             AssetLogic.transferAsset({
                 assets: assets,
                 to: to,
@@ -529,20 +536,9 @@ library ShieldedTransactionLogic {
 
         params.txHash = hash(stx); // @todo do hashing only once!
         uint256 pubLen = stx.pubAssets.length;
-        params.pubAssets = new PubAsset[](pubLen);
-        for (uint8 i = 0; i < pubLen; ++i) {
-            // Extract first 3 bytes assetId
-            params.pubAssets[i].id = uint24(bytes3(bytes31(stx.pubAssets[i])));
-            // Extract last 28 bytes value
-            params.pubAssets[i].value = uint224(stx.pubAssets[i]);
-        }
-
+        
         // non transfer tx & transfer tx with fee
         if (pubLen != 0) {
-            // params.feeAssetId = uint24(stx.feeData);
-            // params.feeValue = uint72(stx.feeData);
-            // params.paymaster = address(bytes20(bytes32(stx.feeData)));
-
             params.paymaster = address(uint160(stx.feeData >> (24 + 72)));
 
             // Extract the feeAssetId (3 bytes)
@@ -550,10 +546,19 @@ library ShieldedTransactionLogic {
 
             // Extract the feeValue (9 bytes)
             params.feeValue = uint72(stx.feeData);
+        }
 
-            params.pubAssets[0].value =
-                params.pubAssets[0].value -
-                params.feeValue;
+        params.pubAssets = new PubAsset[](pubLen);
+        for (uint8 i = 0; i < pubLen; ++i) {
+            // Extract first 3 bytes assetId
+            params.pubAssets[i].id = uint24(bytes3(bytes31(stx.pubAssets[i])));
+            // Extract last 28 bytes value
+            params.pubAssets[i].value = uint224(stx.pubAssets[i]);
+
+            /// @dev for transfer tx and feeAsset pushed into pubAssets, the pubAssets value will become 0, but thats fine as pubAssets is not used in transfer tx. Only used in other types tx to move assets.
+            if(params.pubAssets[i].id == params.feeAssetId) {
+                params.pubAssets[i].value = params.pubAssets[i].value - params.feeValue;
+            }
         }
 
         params.txType = stx.txType;

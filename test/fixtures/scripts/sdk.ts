@@ -82,7 +82,7 @@ export const getSDKInstance = () => {
 		isActive: true,
 	});
 
-	zkfi.getPaymasterFee = async () => BigInt(parseUnits("5", 6));
+	zkfi.getPaymasterFee = async () => BigInt(parseUnits("1", 6));
 
 	return zkfi;
 };

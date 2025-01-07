@@ -38,7 +38,7 @@ contract LidoAdaptorTest is PoolTest {
 
         iWETH = IWToken(WETH);
 
-        // deploying Uniswap adaptor
+        // deploying Lido adaptor
         lidoAdaptor = new LidoAdaptor(
             lido,
             WETH,

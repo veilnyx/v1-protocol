@@ -38,8 +38,7 @@ const assets = {
   usdc: config.assets.usdc,
   reentrantToken: config.assets.reentrantToken,
   testnetWeth: config.assets.testnetWeth,
-  testnetUsdc: config.assets.testnetUsdc,
-  morphoVaultToken: config.assets.morphoVaultToken,
+  testnetUsdc: config.assets.testnetUsdc
 };
 
 const revokerPublicKey = Point.fromArray([
@@ -108,6 +107,7 @@ export const generateTestTransaction = async (
     paymaster: req.paymaster,
     revokerId: req.revokerId,
   };
+  
   const tx = await sdk.createTransaction(req, opts);
   const signedTx = await sdk.signTransaction(tx);
   const ztx = await sdk.proveTransaction(signedTx);

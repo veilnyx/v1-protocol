@@ -18,8 +18,8 @@ const main = async () => {
 	await genTestDeposits(sdk);
 	// await genTestWithdrawals(sdk);
 	// await genTestTransfers(sdk);
-	// await genTestCallAdaptors(sdk);
-	await genTestNonAtomicTxs(sdk);
+	await genTestCallAdaptors(sdk);
+	// await genTestNonAtomicTxs(sdk);
 	// await genTreeUpdateData(sdk);
 	// await genTreeUpdateDataWithPartialQueue(sdk);
 };
