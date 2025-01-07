@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {ShieldedTransaction, ShieldedTransactionType, RevokerData} from "../libraries/ShieldedTransaction.sol";
+import {ShieldedTransaction, ShieldedTransactionType, RevokerData, PubAsset} from "../libraries/ShieldedTransaction.sol";
 import {ShieldedAddressRegistrationData} from "../libraries/ShieldedAddress.sol";
 import {TreeUpdateData} from "../libraries/QueuedMerkleTree.sol";
 import {AssetType, Asset} from "../libraries/Asset.sol";
@@ -33,6 +33,7 @@ interface IPool {
     event Commitment(uint256 indexed leafIndex, uint256 indexed commitment);
 
     event Receipt(
+        uint256 indexed txHash,
         ShieldedTransactionType indexed txType,
         uint16 indexed revokerId,
         uint32 lastLeafIndex,
@@ -56,6 +57,7 @@ interface IPool {
     error InvalidAddressProof();
     error InvalidSubtreeUpdateProof();
     error InvalidTransactionProof();
+    error InvalidCaller(address caller);
     error UnknownCommitmentTreeRoot();
     error UnknownAddressTreeRoot();
     error DoubleSpend(uint256 markedNullifier);
@@ -149,6 +151,14 @@ interface IPool {
     /// @param assetId The id of the asset for which the paymaster wants to claim the fee.
     /// @param to The address to which the fee will be transferred.
     function withdrawPaymasterFee(uint24 assetId, address to) external;
+
+    /// @notice This function will be called by the adaptor handler contract to complete a non-atomic transaction.
+    /// @param stx The stx to be completed.
+    /// @param refundedAssets The output assets refunded from the tx.
+    function completeNonAtomicTx(
+        ShieldedTransaction memory stx,
+        PubAsset[] memory refundedAssets
+    ) external;
 
     /////////////////////////////////////////
     //         READ METHODS                //

@@ -1,40 +1,40 @@
-import { parseEther, parseUnits, zeroAddress } from "viem";
+import { parseEther, parseUnits, zeroAddress, size } from "viem";
 import { Core } from "@zkfi-tech/core";
 import { TransactionType } from "@zkfi-tech/shared-types";
 import { fixture, generateTestTransactions } from "./fixture";
 import { parse } from 'path';
 
 const {
-  assets: { testnetWeth, morphoVaultToken },
+  assets: { weth, usdc, testnetWeth: aaveWeth, testnetUsdc },
   sender: { account: senderAccount },
 } = fixture;
 
 export const reqs = {
-  deposit_2_morphoVaultToken: {
+  deposit_aaveWeth_testnetUsdc: {
     type: TransactionType.DEPOSIT,
-    assetIds: [morphoVaultToken],
-    values: [parseEther("2")],
+    assetIds: [aaveWeth, testnetUsdc],
+    values: [parseEther("2"), parseUnits("2", 6)],
     feeAssetId: 0,
     to: senderAccount.shieldedAddress.pack(),
     viaBundler: false,
     paymaster: zeroAddress,
     revokerId: 0,
   }
-  /**
-  deposit_2_testnet_weth: {
+  /**,
+  deposit_pre_tx: {
     type: TransactionType.DEPOSIT,
-    assetIds: [testnetWeth],
-    values: [parseEther("2")],
+    assetIds: [weth, usdc],
+    values: [parseEther("500"), parseUnits("10000", 6)],
     feeAssetId: 0,
     to: senderAccount.shieldedAddress.pack(),
     viaBundler: false,
     paymaster: zeroAddress,
     revokerId: 0,
-  }, 
-  deposit_pre_tx: {
+  },
+  deposit_2_weth: {
     type: TransactionType.DEPOSIT,
-    assetIds: [weth, usdc],
-    values: [parseEther("10000"), parseUnits("10000", 6)],
+    assetIds: [weth],
+    values: [parseEther("2")],
     feeAssetId: 0,
     to: senderAccount.shieldedAddress.pack(),
     viaBundler: false,
@@ -94,6 +94,16 @@ export const reqs = {
   deposit_2_mooLPToken: {
     type: TransactionType.DEPOSIT,
     assetIds: [beefyMooToken],
+    values: [parseEther("2")],
+    feeAssetId: 0,
+    to: senderAccount.shieldedAddress.pack(),
+    viaBundler: false,
+    paymaster: zeroAddress,
+    revokerId: 0,
+  },
+  deposit_2_morphoVaultToken: {
+    type: TransactionType.DEPOSIT,
+    assetIds: [morphoVaultToken],
     values: [parseEther("2")],
     feeAssetId: 0,
     to: senderAccount.shieldedAddress.pack(),

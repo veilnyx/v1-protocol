@@ -82,6 +82,7 @@ contract PoolBaseTest is BaseTest {
 
         ERC1967Proxy poolProxy = new ERC1967Proxy(address(pool), initData);
         pool = MockPool(address(poolProxy));
+        adaptorHandler.setPool(address(pool));
     }
 
     //////////////////////////////////////////////////////
