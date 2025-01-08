@@ -19,7 +19,6 @@ contract PoolUserRegistration is PoolBaseTest {
     function setUp() public {
         _setUp();
         (senderAddr, senderPK) = makeAddrAndKey("sender");
-
         addressRegistrationData = _loadShieldedAddressRegistrationData(
             "register_sender"
         );
@@ -32,6 +31,7 @@ contract PoolUserRegistration is PoolBaseTest {
             bytes32(fixture.sender.viewPublicKey[1])
         );
 
+        /// @dev using the same `senderPK` private key to sign the msg and update the fixture.
         addressRegistrationData.signature = _getRegisterAddressSignature(
             senderPK,
             shieldedAddress
@@ -88,6 +88,7 @@ contract PoolUserRegistration is PoolBaseTest {
 
     function test_revertWhenAlreadyRegistered() external {
         pool.registerAddress(addressRegistrationData);
+
         uint256 rootAddress = uint256(
             bytes32(addressRegistrationData.shieldedAddress)
         );
@@ -97,7 +98,6 @@ contract PoolUserRegistration is PoolBaseTest {
                 rootAddress
             )
         );
-
         pool.registerAddress(addressRegistrationData);
     }
 }

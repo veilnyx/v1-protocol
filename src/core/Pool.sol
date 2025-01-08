@@ -7,17 +7,18 @@ import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/U
 import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
+import {MessagingReceipt} from "@layerzerolabs/oapp-evm/contracts/oapp/OAppSender.sol";
 import {EIP712} from "../libraries/EIP712.sol";
 import {IVerifier} from "../interfaces/IVerifier.sol";
 import {IPool} from "../interfaces/IPool.sol";
 import {IAdaptorHandler} from "../interfaces/IAdaptorHandler.sol";
 import {IScreener} from "../interfaces/IScreener.sol";
 import {EIP712_DOMAIN_NAME, EIP712_DOMAIN_VERSION} from "../base/Constants.sol";
-import {PoolStorage} from "../base/PoolStorage.sol";
+import {PoolStorage, ExternalContractAddresses} from "../base/PoolStorage.sol";
 import {Asset, AssetType, AssetLogic} from "../libraries/Asset.sol";
-import {MerkleTree, MerkleTreeLogic} from "../libraries/MerkleTree.sol";
 import {QueuedMerkleTree, QueuedMerkleTreeLogic, TreeUpdateData} from "../libraries/QueuedMerkleTree.sol";
-import {ShieldedAddressRegistrationData, ShieldedAddressLogic} from "../libraries/ShieldedAddress.sol";
+import {ShieldedAddressRegistrationData} from "../libraries/ShieldedAddress.sol";
+import {AddressRegistry} from "./AddressRegistry.sol";
 import {ShieldedTransaction, ShieldedTransactionLogic, RevokerData} from "../libraries/ShieldedTransaction.sol";
 
 contract Pool is
@@ -29,29 +30,18 @@ contract Pool is
     PausableUpgradeable,
     PoolStorage
 {
-    using MerkleTreeLogic for MerkleTree;
     using QueuedMerkleTreeLogic for QueuedMerkleTree;
-    using ShieldedAddressLogic for ShieldedAddressRegistrationData;
     using ShieldedTransactionLogic for ShieldedTransaction;
 
     /// @notice Initializes the Pool contract with the given parameters.
     /// @dev Pool is an UUPSUpgradeable contract, so it needs to be initialized.
-    /// @param addressTreeDepth The depth of the address tree.
     /// @param commitmentTreeDepth The depth of the commitment tree.
-    /// @param verifier_ The address of the verifier contract. Verifier contract verifies the stx's zk proof, address proof and merkle tree queue proof.
-    /// @param adaptorHandler_ The address of the adaptor handler contract, responsible for delegate calling adaptors of external DeFi protocols.
-    /// @param screener_ The address of the screener contract, responsible for screening sanctioned addresseses.
-    /// @param hasher_ The address of the hasher contract. It provides a single interface to Poseidon hashing functions
     /// @param withdrawFeeBps_ The fee in basis points (1/10000) that is charged for withdrawing assets from the pool.
     function initialize(
-        uint8 addressTreeDepth,
         uint8 commitmentTreeDepth,
         uint8 commitmentTreeQueueSize,
-        address verifier_,
-        address adaptorHandler_,
-        address screener_,
-        address hasher_,
-        uint256 withdrawFeeBps_
+        uint256 withdrawFeeBps_,
+        ExternalContractAddresses calldata externalContracts_
     ) external initializer {
         __Ownable_init(msg.sender);
         __UUPSUpgradeable_init();
@@ -59,18 +49,18 @@ contract Pool is
         __Pausable_init();
         EIP712.init(EIP712_DOMAIN_NAME, EIP712_DOMAIN_VERSION);
 
-        verifier = verifier_;
-        adaptorHandler = adaptorHandler_;
-        hasher = hasher_;
-        screener = screener_;
+        externalContracts.verifier = externalContracts_.verifier;
+        externalContracts.adaptorHandler = externalContracts_.adaptorHandler;
+        externalContracts.hasher = externalContracts_.hasher;
+        externalContracts.screener = externalContracts_.screener;
+        externalContracts.addressRegistry = externalContracts_.addressRegistry;
         withdrawFeeBps = withdrawFeeBps_;
 
-        _addressTree.init(addressTreeDepth, hasher_);
         _commitmentTree.init(
             commitmentTreeDepth,
             commitmentTreeQueueSize,
-            hasher_,
-            verifier_
+            externalContracts_.hasher,
+            externalContracts_.verifier
         );
     }
 
@@ -164,7 +154,7 @@ contract Pool is
     }
 
     function setScreener(address screener_) external onlyOwner {
-        screener = screener_;
+        externalContracts.screener = screener_;
     }
 
     function setWithdrawFeeBips(uint256 feeBps) external onlyOwner {
@@ -177,19 +167,35 @@ contract Pool is
 
     function registerAddress(
         ShieldedAddressRegistrationData calldata addressRegData
-    ) external whenNotPaused {
-        bytes32 hashStruct = ShieldedAddressLogic.hashRegsiterAddressStruct(
-            addressRegData.shieldedAddress
-        );
-        bytes32 hashTypedData = EIP712.hashTypedDataV4(hashStruct);
+    ) external payable whenNotPaused {
+        /// @todo don't forward the entire value to the address registry
+        (
+            uint256 updatedAddressTreeRoot,
+            uint8 currentRootIndex
+        ) = AddressRegistry(externalContracts.addressRegistry).register{
+                value: address(this).balance
+            }(addressRegData);
 
-        addressRegData.register({
-            addressTree: _addressTree,
-            publicAddresses: _publicAddresses,
-            rootAddresses: _rootAddresses,
-            verifier: verifier,
-            hashTypedData: hashTypedData
-        });
+        _addressTree.currentRootIndex = currentRootIndex;
+        _addressTree.roots[currentRootIndex] = updatedAddressTreeRoot;
+    }
+
+    function setAddressTreeUpdator(
+        address addressTreeUpdator
+    ) external onlyOwner {
+        externalContracts.addressTreeUpdator = addressTreeUpdator;
+    }
+
+    function updateAddressTree(
+        uint256 updatedAddressTreeRoot,
+        uint8 currentRootIndex
+    ) external whenNotPaused {
+        require(
+            msg.sender == externalContracts.addressTreeUpdator,
+            "Pool: Unauthorized"
+        );
+        _addressTree.currentRootIndex = currentRootIndex;
+        _addressTree.roots[currentRootIndex] = updatedAddressTreeRoot;
     }
 
     function updateCommitmentTree(
@@ -202,12 +208,12 @@ contract Pool is
         ShieldedTransaction calldata stx
     ) external nonReentrant whenNotPaused {
         stx.validate({
-            addressTree: _addressTree,
+            addressRegistry: externalContracts.addressRegistry,
             commitmentTree: _commitmentTree,
             markedNullifiers: _markedNullifiers,
             supportedAdaptors: _adaptors,
             revokerDataMap: _revokers,
-            verifier: verifier
+            verifier: externalContracts.verifier
         });
 
         stx.execute({
@@ -215,8 +221,8 @@ contract Pool is
             assets: _assets,
             withdrawFees: _withdrawFees,
             paymasterFees: _paymasterFees,
-            adaptorHandler: adaptorHandler,
-            hasher: hasher,
+            adaptorHandler: externalContracts.adaptorHandler,
+            hasher: externalContracts.hasher,
             withdrawFeeBps: withdrawFeeBps
         });
     }
@@ -251,7 +257,7 @@ contract Pool is
 
         result = stx._verifyProof({
             revokerData: revokerData,
-            verifier: verifier
+            verifier: externalContracts.verifier
         });
     }
 
@@ -310,6 +316,17 @@ contract Pool is
         return markedArr;
     }
 
+    function getAddressTreeState()
+        external
+        view
+        returns (uint256 lastRoot, uint8 currentRootIndex)
+    {
+        return (
+            _addressTree.roots[_addressTree.currentRootIndex],
+            _addressTree.currentRootIndex
+        );
+    }
+
     function getCommitmentTreeState()
         external
         view
@@ -329,33 +346,6 @@ contract Pool is
             nextLeafIndex
         ) = _commitmentTree.getState();
     }
-
-    function getAddressTreeState()
-        external
-        view
-        returns (
-            uint256[] memory lastSubtrees,
-            uint256 lastRoot,
-            uint8 currentRootIndex,
-            uint32 nextLeafIndex
-        )
-    {
-        (lastSubtrees, lastRoot, currentRootIndex, nextLeafIndex) = _addressTree
-            .getState();
-    }
-
-    /// @todo commenting out the treeRoot func. for now to keep the contract within deployable size.
-    /**
-    function isKnownCommitmentTreeRoot(
-        uint256 root
-    ) external view returns (bool) {
-        return _commitmentTree.isKnownRoot(root);
-    }
-
-    function isKnownAddressTreeRoot(uint256 root) external view returns (bool) {
-        return _addressTree.isKnownRoot(root);
-    }
-     */
 
     function _authorizeUpgrade(
         address newImplementation

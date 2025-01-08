@@ -1,3 +1,6 @@
+@layerzerolabs/=node_modules/@layerzerolabs/
+@layerzerolabs/oapp-evm/=node_modules/@layerzerolabs/oapp-evm/
+@layerzerolabs/test-devtools-evm-foundry/=node_modules/@layerzerolabs/test-devtools-evm-foundry/
 @openzeppelin/contracts/=node_modules/@openzeppelin/contracts/
 @openzeppelin/contracts-upgradeable/=node_modules/@openzeppelin/contracts-upgradeable/
 @account-abstraction/contracts/=node_modules/@account-abstraction/contracts/

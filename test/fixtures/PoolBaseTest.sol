@@ -3,7 +3,9 @@ pragma solidity ^0.8.24;
 
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
-import {Pool} from "src/core/Pool.sol";
+import {Pool, ExternalContractAddresses} from "src/core/Pool.sol";
+import {IPool} from "src/interfaces/IPool.sol";
+import {PoolProxy} from "src/core/PoolProxy.sol";
 import {MESSAGE_REGISTER_ADDRESS, EIP712_DOMAIN_NAME, EIP712_DOMAIN_VERSION, EIP712_TYPEHASH_REGISTER_ADDRESS} from "src/base/Constants.sol";
 import {VerifierTransact21} from "src/verifiers/VerifierTransact21.sol";
 import {VerifierTransact22} from "src/verifiers/VerifierTransact22.sol";
@@ -11,11 +13,13 @@ import {VerifierRegister} from "src/verifiers/VerifierRegister.sol";
 import {VerifierTreeUpdate} from "src/verifiers/VerifierTreeUpdate.sol";
 import {Verifier, TransactionVerifierInfo} from "src/core/Verifier.sol";
 import {AdaptorHandler} from "src/core/AdaptorHandler.sol";
+import {AddressRegistry} from "src/core/AddressRegistry.sol";
 import {Hasher} from "src/core/Hasher.sol";
 import {MockPool} from "test/mocks/MockPool.sol";
 import {MockScreener} from "test/mocks/MockScreener.sol";
 import {MockERC20} from "test/mocks/MockERC20.sol";
 import {BaseTest} from "./BaseTest.sol";
+import {console2} from "forge-std/console2.sol";
 
 contract PoolBaseTest is BaseTest {
     bytes32 private constant TYPE_HASH =
@@ -26,8 +30,11 @@ contract PoolBaseTest is BaseTest {
     Verifier public verifier;
 
     AdaptorHandler public adaptorHandler;
+    AddressRegistry public addressRegistry;
     Hasher public hasher;
     MockPool public pool;
+    ERC1967Proxy messageListenerProxy;
+    ExternalContractAddresses externalContracts;
 
     uint256 public addressTreeDepth;
     uint256 public commitmentTreeDepth;
@@ -60,27 +67,50 @@ contract PoolBaseTest is BaseTest {
         });
         verifier = new Verifier(vInfos, address(vr), address(vTreeUpdate));
         adaptorHandler = new AdaptorHandler();
+        hasher = _deployHasher();
+
+        AddressRegistry addressRegistryImpl = new AddressRegistry();
+        bytes memory addressRegistryInitData = abi.encodeCall(
+            addressRegistryImpl.initialize,
+            (uint8(addressTreeDepth), address(verifier), address(hasher))
+        );
+
+        ERC1967Proxy addressRegistryProxy = new ERC1967Proxy(
+            address(addressRegistryImpl),
+            addressRegistryInitData
+        );
+
+        console2.log(
+            "AddressRegistryProxy deployed at:",
+            address(addressRegistryProxy)
+        );
+        addressRegistry = AddressRegistry(
+            payable(address(addressRegistryProxy))
+        );
 
         pool = new MockPool();
-
         screener = new MockScreener();
-        hasher = _deployHasher();
+
+        externalContracts = ExternalContractAddresses(
+            address(verifier),
+            address(adaptorHandler),
+            address(hasher),
+            address(screener),
+            payable(address(addressRegistry)),
+            address(0)
+        );
 
         bytes memory initData = abi.encodeCall(
             Pool.initialize,
             (
-                fixture.addressTreeDepth,
                 fixture.commitmentTreeDepth,
                 fixture.commitmentTreeQueueSize,
-                address(verifier),
-                address(adaptorHandler),
-                address(screener),
-                address(hasher),
-                fixture.withdrawFeeBps
+                fixture.withdrawFeeBps,
+                externalContracts
             )
         );
 
-        ERC1967Proxy poolProxy = new ERC1967Proxy(address(pool), initData);
+        PoolProxy poolProxy = new PoolProxy(address(pool), initData);
         pool = MockPool(address(poolProxy));
     }
 
@@ -95,6 +125,8 @@ contract PoolBaseTest is BaseTest {
         bytes32 hashTypedData = _getHashTypedRegisterAddressStruct(
             shieldedAddress
         );
+        console2.log("Msg signed off-chain:");
+        console2.logBytes32(hashTypedData);
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(userPK, hashTypedData);
         return abi.encodePacked(r, s, v);
     }
@@ -123,7 +155,7 @@ contract PoolBaseTest is BaseTest {
                     keccak256(bytes(EIP712_DOMAIN_NAME)),
                     keccak256(bytes(EIP712_DOMAIN_VERSION)),
                     block.chainid,
-                    address(pool)
+                    address(addressRegistry)
                 )
             );
     }

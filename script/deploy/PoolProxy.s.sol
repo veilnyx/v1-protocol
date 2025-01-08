@@ -25,7 +25,6 @@ contract PoolProxyDeploy is BaseScript {
         // bytes memory initializeData = abi.encodeCall(
         //     Pool.initialize,
         //     (
-        //         addressTreeDepth,
         //         commitmentTreeDepth,
         //         commitmentTreeQueueSize,
         //         verifier,

@@ -4,6 +4,7 @@ pragma solidity ^0.8.24;
 import {FIELD_SIZE} from "../base/Constants.sol";
 import {Asset, AssetLogic} from "./Asset.sol";
 import {MerkleTree, MerkleTreeLogic} from "./MerkleTree.sol";
+import {AddressRegistry} from "../core/AddressRegistry.sol";
 import {QueuedMerkleTree, QueuedMerkleTreeLogic} from "./QueuedMerkleTree.sol";
 import {IPool} from "../interfaces/IPool.sol";
 import {IVerifier} from "../interfaces/IVerifier.sol";
@@ -134,13 +135,13 @@ library ShieldedTransactionLogic {
 
     /// @notice Validates a shielded transaction
     /// @param stx ShieldedTransaction to be executed
-    /// @param addressTree Address `MerkleTree` state in this contract
+    /// @param addressRegistry Address of the address registry contract
     /// @param commitmentTree Commitment `MerkleTree` state in this contract
     /// @param markedNullifiers Mapping of nullifiers that are already marked
     /// @param supportedAdaptors Mapping of supported external adaptor addresses
     function validate(
         ShieldedTransaction calldata stx,
-        MerkleTree storage addressTree,
+        address payable addressRegistry,
         QueuedMerkleTree storage commitmentTree,
         mapping(uint256 => uint32) storage markedNullifiers,
         mapping(address => bool) storage supportedAdaptors,
@@ -153,7 +154,7 @@ library ShieldedTransactionLogic {
             revert IPool.InvalidRevoker(stx.revokerId);
         }
 
-        if (!addressTree.isKnownRoot(stx.addressTreeRoot)) {
+        if (!AddressRegistry(addressRegistry).isKnownRoot(stx.addressTreeRoot)) {
             revert IPool.UnknownAddressTreeRoot();
         }
 
