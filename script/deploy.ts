@@ -4,9 +4,12 @@ import {
   encodeFunctionData,
   parseAbiParameters,
 } from "viem";
+import { DeployContractConfig } from '@nomicfoundation/hardhat-viem/types';
 import poolModule from "../ignition/modules/pool";
 import { loadConfigs, ChainParams, CommonParams } from "./configs";
 import { deployHasher } from "./hasher";
+import { deployVerifier } from "./verifier";
+import { deployErc4337Infra } from "./erc4337Infra";
 import { addInitialAssets, registerRevokers } from "./setup";
 
 const config = loadConfigs();
@@ -21,15 +24,24 @@ const main1 = async () => {
   const wallets = await hre.viem.getWalletClients();
   const wallet = wallets[0];
   const [walletAddress] = await wallet.getAddresses();
+  const deployConfig: DeployContractConfig = {
+    client: {
+      public: client,
+      wallet: wallet
+    }
+  }
 
   const eip712 = await hre.viem.deployContract("EIP712");
+  console.log("EIP712 deployed:", eip712.address);
   const asset = await hre.viem.deployContract("AssetLogic");
+  console.log("AssetLogic deployed:", asset.address);
   const merkleTree = await hre.viem.deployContract("MerkleTreeLogic");
+  console.log("MerkleTreeLogic deployed:", merkleTree.address);
   const queuedMerkleTree = await hre.viem.deployContract(
     "QueuedMerkleTreeLogic"
   );
+  console.log("QueuedMerkleTreeLogic deployed:", queuedMerkleTree.address);
 
-  
   const shieldedAddress = await hre.viem.deployContract(
     "ShieldedAddressLogic",
     [],
@@ -39,6 +51,8 @@ const main1 = async () => {
       },
     }
   );
+  console.log("ShieldedAddressLogic deployed:", shieldedAddress.address);
+
   const shieldedTransaction = await hre.viem.deployContract(
     "ShieldedTransactionLogic",
     [],
@@ -50,6 +64,7 @@ const main1 = async () => {
       },
     }
   );
+  console.log("ShieldedTransactionLogic deployed:", shieldedTransaction.address);
 
   const zeroAddress = "0x0000000000000000000000000000000000000000";
   const poolImpl = await hre.viem.deployContract("Pool", [], {
@@ -62,16 +77,20 @@ const main1 = async () => {
       ShieldedTransactionLogic: shieldedTransaction.address,
     },
   });
+  console.log("Pool deployed:", poolImpl.address);
 
-  const { hasher } = await deployHasher();
+  const { hasher } = await deployHasher(wallet, client, deployConfig);
+  console.log("Hasher deployed:", hasher);
+
+  const verifier = await deployVerifier(deployConfig);
 
   const args = [
     commonParams.addressTreeDepth,
     commonParams.commitmentTreeDepth,
     commonParams.commitmentTreeQueueSize,
+    verifier,
     zeroAddress,
-    zeroAddress,
-    zeroAddress,
+    chainParams.sanctionsList,
     hasher,
     BigInt(commonParams.withdrawFeeBps),
   ];
@@ -86,6 +105,7 @@ const main1 = async () => {
     poolImpl.address,
     initData,
   ]);
+  console.log("PoolProxy deployed:", poolProxy.address);
 
   //@ts-ignore
   const owner = await client.readContract({
@@ -104,7 +124,7 @@ const main1 = async () => {
     });
 
     const rct = await client.waitForTransactionReceipt({ hash });
-    console.log("rct", rct.status);
+    console.log("rct:addAssets", rct.status);
 
     for (let i = 0; i < commonParams.revokers.length; i++) {
       const revokerPublicKey = commonParams.revokers[i].revokerPublicKey;
@@ -130,6 +150,9 @@ const main1 = async () => {
   } catch (error) {
     console.log(error.message);
   }
+
+  // ERC4337 infra
+  await deployErc4337Infra(chainParams, poolProxy.address, deployConfig);
 };
 
 const main = async () => {
@@ -162,10 +185,10 @@ const main = async () => {
   console.log("Pool deployed at:", poolAddress);
 
   // SETUP ASSETS
-  //   await addInitialAssets(poolAddress);
+  await addInitialAssets(poolAddress);
 
   // REGISTER REVOKERS
-  //   await registerRevokers(poolAddress);
+  await registerRevokers(poolAddress);
 };
 
-main().catch(console.error);
+main1().catch(console.error);

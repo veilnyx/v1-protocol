@@ -9,6 +9,18 @@ const {
 } = fixture;
 
 export const reqs = {
+  withdraw_10_weth_with_usdc_fee: {
+    type: TransactionType.WITHDRAW,
+    assetIds: [weth],
+    values: [parseEther("10")],
+    feeAssetId: usdc,
+    to: senderPubAddress,
+    viaBundler: true,
+    paymaster:
+      `0x${"6e1913f0B4118052AFAc74407B0C532659e6B198"}` as `0x${string}`,
+    revokerId: 0,
+  }
+  /**
   withdraw_500_weth_without_fee: {
     type: TransactionType.WITHDRAW,
     assetIds: [weth],
@@ -30,7 +42,6 @@ export const reqs = {
       `0x${"6e1913f0B4118052AFAc74407B0C532659e6B198"}` as `0x${string}`,
     revokerId: 0,
   },
-  /**
   withdraw_500_reentrantToken_to_attacker_contract: {
     type: TransactionType.WITHDRAW,
     assetIds: [reentrantToken],

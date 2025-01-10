@@ -19,10 +19,12 @@ contract AaveAdaptorTest is PoolTest {
     AaveV3Adaptor aaveAdaptor;
     address aave = 0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2;
     address public WETH = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
+    address public USDC = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48;
     address public constant WETH_AAVE_UNDERLYING =
         0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2; // Laby pool WETH contract is diff. than the one supported by Aave.
 
     uint256 public constant INITIAL_SUPPLY = 2 ether;
+    uint256 public constant INITIAL_SUPPLY_USDC = 10e6;
     address public user = 0x689EcF264657302052c3dfBD631e4c20d3ED0baB;
     address public constant STATIC_A_TOKEN_FACTORY =
         0x411D79b8cC43384FDE66CaBf9b6a17180c842511;
@@ -48,20 +50,22 @@ contract AaveAdaptorTest is PoolTest {
         pool.addAdaptorSupport(address(aaveAdaptor), true);
 
         AssetType assetType = AssetType.ERC20;
-        address[] memory assetAddresses = new address[](2);
+        address[] memory assetAddresses = new address[](1);
         // assetAddresses[0] = WETH_AAVE_UNDERLYING; // already added to the pool
         assetAddresses[0] = WETH_STATIC_A_TOKEN;
         pool.addAssets(assetType, assetAddresses);
         vm.stopPrank();
 
-        vm.deal(user, INITIAL_SUPPLY);
+        deal(WETH_AAVE_UNDERLYING, user, INITIAL_SUPPLY);
+        deal(USDC, user, INITIAL_SUPPLY_USDC);
+
         vm.startPrank(user);
-        IWToken(WETH_AAVE_UNDERLYING).deposit{value: INITIAL_SUPPLY}(); // wrapping eth to weth
-        IWToken(WETH_AAVE_UNDERLYING).approve(address(pool), INITIAL_SUPPLY); // depositing weth to pool
-        ShieldedTransaction memory ztxWethDeposit = _loadShieldedTransaction(
-            "deposit_2_aave_weth_underlying"
+        IWToken(WETH_AAVE_UNDERLYING).approve(address(pool), INITIAL_SUPPLY);
+        IERC20(USDC).approve(address(pool), INITIAL_SUPPLY_USDC);
+        ShieldedTransaction memory ztxDeposits = _loadShieldedTransaction(
+            "deposit_aaveWeth_testnetUsdc"
         );
-        pool.transact(ztxWethDeposit);
+        pool.transact(ztxDeposits);
         vm.stopPrank();
         _processCommitmentTreeQueue();
     }
@@ -71,7 +75,7 @@ contract AaveAdaptorTest is PoolTest {
     }
 
     /// @dev Make sure the `LidoAdaptor::receive()` is commented out for this test to work.
-    function testWethLendingOnAave() public {
+    function testWethLending() public {
         console.log("Initiating staking on aave");
         uint256 poolwETHStaticTokenBalBeforeLending = IERC20(
             WETH_STATIC_A_TOKEN
@@ -97,6 +101,44 @@ contract AaveAdaptorTest is PoolTest {
             poolwETHStaticTokenBalAfterLending >
                 poolwETHStaticTokenBalBeforeLending
         );
+    }
+
+    function testWethLendingThroughBundler() public {
+        console.log("Initiating staking on aave");
+        uint256 poolwETHStaticTokenBalBeforeLending = IERC20(
+            WETH_STATIC_A_TOKEN
+        ).balanceOf(address(pool));
+
+        ShieldedTransaction memory ztxLend = _loadShieldedTransaction(
+            "lend_1_aave_weth_through_bundler"
+        );
+        pool.transact(ztxLend);
+
+        // Asserts
+        uint256 poolwETHStaticTokenBalAfterLending = IERC20(WETH_STATIC_A_TOKEN)
+            .balanceOf(address(pool));
+        console.log(
+            "Pool static aToken bal before lending:",
+            poolwETHStaticTokenBalBeforeLending
+        );
+        console.log(
+            "Pool static aToken bal after lending:",
+            poolwETHStaticTokenBalAfterLending
+        );
+        assert(
+            poolwETHStaticTokenBalAfterLending >
+                poolwETHStaticTokenBalBeforeLending
+        );
+
+        uint24 feeAssetId = uint24(ztxLend.feeData >> 72);
+        uint72 feeValue = uint72(ztxLend.feeData);
+        address paymaster = address(bytes20(bytes32(ztxLend.feeData)));
+        uint256 paymasterFee = pool.getCollectedPaymasterFee(
+            feeAssetId,
+            paymaster
+        );
+        assertEq(paymasterFee, feeValue);
+        assertEq(IERC20(USDC).balanceOf(address(pool)), INITIAL_SUPPLY_USDC);
     }
 
     /// @dev This test bypasses the Labyrinth protocol and directly tests the Aave integration from the Aave adaptor.

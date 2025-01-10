@@ -165,9 +165,12 @@ contract Paymaster is IPaymaster, Ownable {
             (ShieldedTransaction)
         );
 
-        uint24 feeAssetId = uint24(bytes3(bytes31(stx.pubAssets[0])));
-        uint256 feeValue = uint256(uint96(stx.feeData));
-        address paymaster = address(bytes20(bytes32(stx.feeData)));
+        address paymaster = address(uint160(stx.feeData >> (24 + 72)));
+        // Extract the feeAssetId (3 bytes)
+        uint24 feeAssetId = uint24(stx.feeData >> 72);
+
+        // Extract the feeValue (9 bytes)
+        uint256 feeValue = uint256(uint72(stx.feeData));
 
         return (paymaster, feeAssetId, feeValue);
     }
