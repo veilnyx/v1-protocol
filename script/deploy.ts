@@ -66,6 +66,9 @@ const main1 = async () => {
   );
   console.log("ShieldedTransactionLogic deployed:", shieldedTransaction.address);
 
+  const adaptorHandler = await hre.viem.deployContract("AdaptorHandler", [], deployConfig);
+  console.log("AdaptorHandler deployed: ", adaptorHandler.address);
+
   const zeroAddress = "0x0000000000000000000000000000000000000000";
   const poolImpl = await hre.viem.deployContract("Pool", [], {
     libraries: {
@@ -89,7 +92,7 @@ const main1 = async () => {
     commonParams.commitmentTreeDepth,
     commonParams.commitmentTreeQueueSize,
     verifier,
-    zeroAddress,
+    adaptorHandler.address,
     chainParams.sanctionsList,
     hasher,
     BigInt(commonParams.withdrawFeeBps),
