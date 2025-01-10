@@ -9,6 +9,7 @@ import poolModule from "../ignition/modules/pool";
 import { loadConfigs, ChainParams, CommonParams } from "./configs";
 import { deployHasher } from "./hasher";
 import { deployVerifier } from "./verifier";
+import { deployErc4337Infra } from "./erc4337Infra";
 import { addInitialAssets, registerRevokers } from "./setup";
 
 const config = loadConfigs();
@@ -149,6 +150,9 @@ const main1 = async () => {
   } catch (error) {
     console.log(error.message);
   }
+
+  // ERC4337 infra
+  await deployErc4337Infra(chainParams, poolProxy.address, deployConfig);
 };
 
 const main = async () => {
