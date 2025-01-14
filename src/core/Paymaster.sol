@@ -30,6 +30,10 @@ contract Paymaster is IPaymaster, Ownable {
     error InsufficientFee(uint256 given, uint256 required);
     error UnsupportedFeeAsset(uint24 asset);
 
+    /**
+     * params entryPoint_: Address of the entry point contract.
+     * params sender_: Address of the gateway contract.
+     */
     constructor(address entryPoint_, address sender_) Ownable(msg.sender) {
         entryPoint = IEntryPoint(entryPoint_);
         sender = sender_;
@@ -45,7 +49,7 @@ contract Paymaster is IPaymaster, Ownable {
     }
 
     /**
-     * Withdraw value from the deposit.
+     * Withdraw deposited value from entrypoint contract.
      * @param withdrawAddress - Target to send to.
      * @param amount          - Amount to withdraw.
      */
@@ -120,10 +124,10 @@ contract Paymaster is IPaymaster, Ownable {
     }
 
     /// @dev The only requirements for validation are
-    ///     - sender is pool contract
+    ///     - sender should be the Gateway contract
     ///     - specified paymaster is this contract only (guarantee to receive fee to this contract)
     ///     - specified fee is sufficient
-    /// Since thispaymaster is only used by and meant for zkFi pool and the pool's `validateUserOp` already checks
+    /// Since this paymaster is only used by and meant for Labyrinth pool and the pool's `validateUserOp` already checks
     /// for validity of tx (so that it does not revert when called), we don't need to check those here.
     /// This paymaster must always maintain sufficient deposit in the `EntryPoint` contract to pay for gas.
     /// Note that it always reverts for invalid operations rather than returning.
@@ -165,9 +169,12 @@ contract Paymaster is IPaymaster, Ownable {
             (ShieldedTransaction)
         );
 
-        uint24 feeAssetId = uint24(bytes3(bytes31(stx.pubAssets[0])));
-        uint256 feeValue = uint256(uint96(stx.feeData));
-        address paymaster = address(bytes20(bytes32(stx.feeData)));
+        address paymaster = address(uint160(stx.feeData >> (24 + 72)));
+        // Extract the feeAssetId (3 bytes)
+        uint24 feeAssetId = uint24(stx.feeData >> 72);
+
+        // Extract the feeValue (9 bytes)
+        uint256 feeValue = uint256(uint72(stx.feeData));
 
         return (paymaster, feeAssetId, feeValue);
     }

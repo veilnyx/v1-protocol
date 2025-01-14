@@ -23,7 +23,7 @@ contract PoolDepositTest is PoolTest {
         ShieldedTransaction memory stx = _loadShieldedTransaction(
             "deposit_pre_tx"
         );
-        _runExpectedTx(stx);
+        _checkEventEmits(stx);
 
         assertEq(token1.balanceOf(address(pool)), balance1 + deposit1);
         assertEq(token2.balanceOf(address(pool)), balance2 + deposit2);

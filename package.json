@@ -10,7 +10,8 @@
     "test:prepare": "ts-node test/fixtures/scripts/index.ts",
     "genAdpPayload": "forge script script/setup/GenerateAdaptorPayload.s.sol:GenerateAdaptorPayload",
     "deploy:test": "cross-env HARDHAT_FORK=true hardhat run script/deploy.ts --network hardhat",
-    "deploy:tenderly": "hardhat run script/deployTenderly.ts --network tenderlyMainnetCustomId"
+    "deploy:tenderly": "hardhat run script/deployTenderly.ts --network tenderlyMainnetCustomId",
+    "deploy:sepolia": "hardhat run script/deploy.ts --network ethereumSepolia"
   },
   "keywords": [],
   "author": "zkFi Team",

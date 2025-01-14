@@ -6,6 +6,7 @@ import {
   keccak256,
   padHex,
   parseEther,
+  parseUnits,
   stringToBytes,
   toHex,
 } from "viem";
@@ -81,7 +82,7 @@ export const getSDKInstance = () => {
     isActive: true,
   });
 
-  zkfi.getPaymasterFee = async () => BigInt(parseEther("0.001"));
+  zkfi.getPaymasterFee = async () => BigInt(parseUnits("5", 6));
 
   return zkfi;
 };
