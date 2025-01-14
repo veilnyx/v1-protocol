@@ -74,8 +74,8 @@ devDependencies:
     specifier: ^0.7.3
     version: 0.7.3
   forge-std:
-    specifier: github:foundry-rs/forge-std#v1.8.2
-    version: github.com/foundry-rs/forge-std/978ac6fadb62f5f0b723c996f64be52eddba6801
+    specifier: github:foundry-rs/forge-std#v1.9.4
+    version: github.com/foundry-rs/forge-std/1eea5bae12ae557d589f9f0f0edae2faa47cb262
   hardhat:
     specifier: ^2.22.8
     version: 2.22.8(ts-node@10.9.2)(typescript@5.5.2)
@@ -85,12 +85,18 @@ devDependencies:
   snarkjs:
     specifier: ^0.7.4
     version: 0.7.4
+  solmate:
+    specifier: github:transmissions11/solmate
+    version: github.com/transmissions11/solmate/c93f7716c9909175d45f6ef80a34a650e2d24e56
   ts-node:
     specifier: ^10.9.2
     version: 10.9.2(@types/node@20.14.9)(typescript@5.5.2)
   typescript:
     specifier: ^5.3.3
     version: 5.5.2
+  v4-core:
+    specifier: github:Uniswap/v4-core
+    version: github.com/Uniswap/v4-core/b619b6718e31aa5b4fa0286520c455ceb950276d
   viem:
     specifier: ^2.19.7
     version: 2.19.7(typescript@5.5.2)
@@ -4672,8 +4678,20 @@ packages:
       ethers: 5.7.2
     dev: true
 
-  github.com/foundry-rs/forge-std/978ac6fadb62f5f0b723c996f64be52eddba6801:
-    resolution: {tarball: https://codeload.github.com/foundry-rs/forge-std/tar.gz/978ac6fadb62f5f0b723c996f64be52eddba6801}
+  github.com/Uniswap/v4-core/b619b6718e31aa5b4fa0286520c455ceb950276d:
+    resolution: {tarball: https://codeload.github.com/Uniswap/v4-core/tar.gz/b619b6718e31aa5b4fa0286520c455ceb950276d}
+    name: v4-core
+    version: 0.0.0
+    dev: true
+
+  github.com/foundry-rs/forge-std/1eea5bae12ae557d589f9f0f0edae2faa47cb262:
+    resolution: {tarball: https://codeload.github.com/foundry-rs/forge-std/tar.gz/1eea5bae12ae557d589f9f0f0edae2faa47cb262}
     name: forge-std
-    version: 1.8.2
+    version: 1.9.4
+    dev: true
+
+  github.com/transmissions11/solmate/c93f7716c9909175d45f6ef80a34a650e2d24e56:
+    resolution: {tarball: https://codeload.github.com/transmissions11/solmate/tar.gz/c93f7716c9909175d45f6ef80a34a650e2d24e56}
+    name: solmate
+    version: 6.8.0
     dev: true
