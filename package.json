@@ -10,8 +10,11 @@
     "test:prepare": "ts-node test/fixtures/scripts/index.ts",
     "genAdpPayload": "forge script script/setup/GenerateAdaptorPayload.s.sol:GenerateAdaptorPayload",
     "deploy:test": "cross-env HARDHAT_FORK=true hardhat run script/deploy.ts --network hardhat",
+    "upgrade:test": "cross-env HARDHAT_FORK=true HARDHAT_SHOW_STACK_TRACES=true HARDHAT_VERBOSE=true DEBUG=hardhat:* hardhat --verbose run script/upgrade.ts --network hardhat",
     "deploy:tenderly": "hardhat run script/deployTenderly.ts --network tenderlyMainnetCustomId",
-    "deploy:sepolia": "hardhat run script/deploy.ts --network ethereumSepolia"
+    "deploy:sepolia": "hardhat run script/deploy.ts --network ethereumSepolia",
+    "upgrade:opsepolia": "hardhat run script/upgrade.ts --network optimismSepolia",
+    "transferOwnership": "forge script script/setup/TransferOwnership.s.sol:TransferOwnership --broadcast"
   },
   "keywords": [],
   "author": "zkFi Team",
