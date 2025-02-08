@@ -207,7 +207,8 @@ contract Pool is
             markedNullifiers: _markedNullifiers,
             supportedAdaptors: _adaptors,
             revokerDataMap: _revokers,
-            verifier: verifier
+            verifier: verifier,
+            hasher: hasher
         });
 
         stx.execute({
@@ -251,6 +252,7 @@ contract Pool is
 
         result = stx._verifyProof({
             revokerData: revokerData,
+            hasher: hasher,
             verifier: verifier
         });
     }

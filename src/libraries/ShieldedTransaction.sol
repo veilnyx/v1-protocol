@@ -9,7 +9,7 @@ import {IPool} from "../interfaces/IPool.sol";
 import {IVerifier} from "../interfaces/IVerifier.sol";
 import {IHasher} from "../interfaces/IHasher.sol";
 import {IAdaptorHandler} from "../interfaces/IAdaptorHandler.sol";
-
+import {console} from "forge-std/console.sol";
 /// @title ShieldedTransactionType enum representing types of shielded transactions
 enum ShieldedTransactionType {
     DEPOSIT,
@@ -145,7 +145,8 @@ library ShieldedTransactionLogic {
         mapping(uint256 => uint32) storage markedNullifiers,
         mapping(address => bool) storage supportedAdaptors,
         mapping(uint256 => RevokerData) storage revokerDataMap,
-        address verifier
+        address verifier,
+        address hasher
     ) external {
         RevokerData memory revokerData = revokerDataMap[stx.revokerId];
 
@@ -170,7 +171,7 @@ library ShieldedTransactionLogic {
 
         _checkAndMarkNullifiers(stx, commitmentTree, markedNullifiers);
 
-        if (!_verifyProof(stx, revokerData, verifier)) {
+        if (!_verifyProof(stx, revokerData, hasher, verifier)) {
             revert IPool.InvalidTransactionProof();
         }
     }
@@ -238,13 +239,15 @@ library ShieldedTransactionLogic {
      *
      * @param self ShieldedTransaction to convert to a proper verifier input
      * @param revokerData The RevokerData used for this transaction
+     * @param hasher The address of the hasher contract
      * @return Calldata bytes for appropriate verifier contract
      * @dev We divide the public inputs into 2 chunks to avoid stack too deep error
      */
-    function toVerifierInput(
+    function _toVerifierInput(
         ShieldedTransaction calldata self,
-        RevokerData memory revokerData
-    ) public pure returns (bytes memory) {
+        RevokerData memory revokerData,
+        address hasher
+    ) internal view returns (bytes memory) {
         bytes memory pubDataChunk1;
         {
             uint256 nOuts = self.commitments.length;
@@ -281,15 +284,94 @@ library ShieldedTransactionLogic {
                 abi.encodePacked(self.commitments),
                 self.refundAddress,
                 revokerData.encryptionPublicKey[0],
-                revokerData.encryptionPublicKey[1],
-                self.notesMemo
+                revokerData.encryptionPublicKey[1]
+                // self.notesMemo
             );
+        }
+
+        // Performing sequential hashing of encrypted data derived from notesMemo
+        uint256 encryptedDataHash;
+        {
+            require(
+                self.notesMemo.length % 32 == 0,
+                "Invalid notesMemo length"
+            );
+
+            // 1. Split notesMemo into values array each 32 bytes
+            uint256[] memory values = new uint256[](self.notesMemo.length / 32);
+            for (uint256 i = 0; i < self.notesMemo.length / 32; i++) {
+                values[i] = uint256(
+                    bytes32(self.notesMemo[i * 32:(i + 1) * 32])
+                );
+            }
+
+            // 2. Hash encryptedDataEncryptionKeySeed (first 3 values)
+            uint256[] memory encryptedDataEncryptionKeySeed = new uint256[](3);
+            for (uint256 i = 0; i < 3; i++) {
+                encryptedDataEncryptionKeySeed[i] = values[i];
+            }
+            console.log("Encrypted DEK seed:");
+            console.logUint(encryptedDataEncryptionKeySeed[0]);
+            console.logUint(encryptedDataEncryptionKeySeed[1]);
+            console.logUint(encryptedDataEncryptionKeySeed[2]);
+            uint256 keySeedHash = IHasher(hasher).hash(
+                encryptedDataEncryptionKeySeed
+            ); // 3
+            console.log("Encrypted DEK seed hash:");
+            console.logUint(keySeedHash);
+
+            // 3. Hash encryptedRefundData (next 4 values)
+            uint256[] memory refundInputs = new uint256[](4);
+            for (uint256 i = 0; i < 4; i++) {
+                refundInputs[i] = values[i + 3];
+            }
+            console.log("Encrypted refund data:");
+            console.logUint(refundInputs[0]);
+            console.logUint(refundInputs[1]);
+            console.logUint(refundInputs[2]);
+            console.logUint(refundInputs[3]);
+            uint256 refundHash = IHasher(hasher).hash(refundInputs); // 4
+            console.log("Encrypted refund data hash:");
+            console.logUint(refundHash);
+            // 4. Hash each encryptedNote (4 values each)
+            uint256 nOuts = self.commitments.length;
+            uint256[] memory noteHashes = new uint256[](nOuts);
+            for (uint256 i = 0; i < nOuts; i++) {
+                uint256[] memory noteInputs = new uint256[](4);
+                for (uint256 j = 0; j < 4; j++) {
+                    noteInputs[j] = values[7 + (i * 4) + j];
+                }
+                console.log("Encrypted note data:");
+                console.logUint(noteInputs[0]);
+                console.logUint(noteInputs[1]);
+                console.logUint(noteInputs[2]);
+                console.logUint(noteInputs[3]);
+                noteHashes[i] = IHasher(hasher).hash(noteInputs); // 4
+            }
+
+            for (uint256 i = 0; i < nOuts; i++) {
+                console.log("Encrypted note hash:");
+                console.logUint(noteHashes[i]);
+            }
+
+            // 5. Final hash combining all hashes
+            uint256[] memory finalInputs = new uint256[](2 + nOuts);
+            finalInputs[0] = keySeedHash;
+            finalInputs[1] = refundHash;
+            for (uint256 i = 0; i < nOuts; i++) {
+                finalInputs[2 + i] = noteHashes[i];
+            }
+
+            encryptedDataHash = IHasher(hasher).hash(finalInputs); // 4
+            console.log("FINAL HASH (encryptedDataHash public signal):");
+            console.logUint(encryptedDataHash);
         }
 
         bytes memory verifierParams = abi.encodePacked(
             self.proof,
             pubDataChunk1,
-            pubDataChunk2
+            pubDataChunk2,
+            encryptedDataHash
         );
 
         return verifierParams;
@@ -406,13 +488,14 @@ library ShieldedTransactionLogic {
     function _verifyProof(
         ShieldedTransaction calldata stx,
         RevokerData memory revokerData,
+        address hasher,
         address verifier
     ) internal view returns (bool) {
         uint16 vId = IVerifier(verifier).getTransactionVerifierId(
             stx.nullifiers.length,
             stx.commitments.length
         );
-        bytes memory vInp = toVerifierInput(stx, revokerData);
+        bytes memory vInp = _toVerifierInput(stx, revokerData, hasher);
         return IVerifier(verifier).verifyTransactionProof(vId, vInp);
     }
 
