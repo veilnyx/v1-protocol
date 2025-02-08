@@ -58,20 +58,28 @@ abstract contract BaseTest is Test {
             vm.projectRoot(),
             "/src/poseidon/t4.txt"
         );
+        string memory t5Path = string.concat(
+            vm.projectRoot(),
+            "/src/poseidon/t5.txt"
+        );
 
         string memory t3BytecodeFile = vm.readFile(t3Path);
         string memory t4BytecodeFile = vm.readFile(t4Path);
+        string memory t5BytecodeFile = vm.readFile(t5Path);
         bytes memory t3Bytecode = vm.parseBytes(t3BytecodeFile);
         bytes memory t4Bytecode = vm.parseBytes(t4BytecodeFile);
+        bytes memory t5Bytecode = vm.parseBytes(t5BytecodeFile);
 
         address poseidonT3;
         address poseidonT4;
+        address poseidonT5;
         assembly {
             poseidonT3 := create(0, add(t3Bytecode, 0x20), mload(t3Bytecode))
             poseidonT4 := create(0, add(t4Bytecode, 0x20), mload(t4Bytecode))
+            poseidonT5 := create(0, add(t5Bytecode, 0x20), mload(t5Bytecode))
         }
 
-        Hasher hasher = new Hasher(poseidonT3, poseidonT4);
+        Hasher hasher = new Hasher(poseidonT3, poseidonT4, poseidonT5);
         return hasher;
     }
 }

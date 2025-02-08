@@ -17,8 +17,8 @@ async function main() {
     }
 
     fs.writeFileSync(
-        path.join(poseidonBasePath, `${contractName}.json`),
-        JSON.stringify({ abi, bytecode: code }, null, 2)
+        path.join(poseidonBasePath, `${contractName}.txt`),
+        code
     );
 }
 

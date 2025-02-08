@@ -93,7 +93,7 @@ export const getSDKInstance = async () => {
 
   const signer = wallet.connect(sepoliaProvider);
   console.log("Creating nebra client");
-  const nebraClientAndCircuitIds: NebraClientAndCircuitIds = await zkfi.createNebraClientAndRegisterAllCircuits(signer);
+  const nebraClientAndCircuitIds: NebraClientAndCircuitIds = await zkfi.createNebraClientAndGenerateCircuitIds(signer);
   const { nebraClient, circuitIds } = nebraClientAndCircuitIds;
 
   zkfi.getRevokerData = async () => ({
