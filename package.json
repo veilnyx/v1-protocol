@@ -13,8 +13,10 @@
     "upgrade:test": "cross-env HARDHAT_FORK=true HARDHAT_SHOW_STACK_TRACES=true HARDHAT_VERBOSE=true DEBUG=hardhat:* hardhat --verbose run script/upgrade.ts --network hardhat",
     "deploy:tenderly": "hardhat run script/deployTenderly.ts --network tenderlyMainnetCustomId",
     "deploy:sepolia": "hardhat run script/deploy.ts --network ethereumSepolia",
-    "upgrade:opsepolia": "hardhat run script/upgrade.ts --network optimismSepolia",
-    "transferOwnership": "forge script script/setup/TransferOwnership.s.sol:TransferOwnership --broadcast"
+    "upgrade:ethSepolia": "hardhat run script/upgrade.ts --network ethereumSepolia",
+    "upgrade:opSepolia": "hardhat run script/upgrade.ts --network optimismSepolia",
+    "transferOwnership": "forge script script/setup/TransferOwnership.s.sol:TransferOwnership --broadcast",
+    "genPoseidon": "npx tsx script/genPoseidon.ts"
   },
   "keywords": [],
   "author": "zkFi Team",
@@ -41,6 +43,7 @@
     "@zkfi-tech/transaction": "link:../v1-sdk/packages/transaction",
     "@zkfi-tech/utils": "link:../v1-sdk/packages/utils",
     "@zkfi-tech/zk-prover": "link:../v1-sdk/packages/zk-prover",
+    "circomlibjs": "^0.1.7",
     "cross-env": "^7.0.3",
     "dotenv": "^16.4.5",
     "ethers": "^6.13.5",

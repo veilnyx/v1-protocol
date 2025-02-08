@@ -83,10 +83,6 @@ const deployPoolImpl = async () => {
     );
     console.log("ShieldedTransactionLogic deployed:", shieldedTransaction.address);
 
-    const adaptorHandler = await hre.viem.deployContract("AdaptorHandler", [], deployConfig);
-    console.log("AdaptorHandler deployed: ", adaptorHandler.address);
-
-    const zeroAddress = "0x0000000000000000000000000000000000000000";
     const poolImpl = await hre.viem.deployContract("Pool", [], {
         libraries: {
             EIP712: eip712.address,
@@ -98,13 +94,14 @@ const deployPoolImpl = async () => {
         },
     });
     console.log("New Pool deployed:", poolImpl.address);
-
+    /// @dev we dont have to again add assets/revokers/adaptorHandler/adaptor support in an upgrade as the state is retained in PoolProxy itself.
     return poolImpl.address;
 };
 
 const upgradeProxy = async () => {
     const existingPoolProxy = "0x7E53C283730C0Fa9d38f263BD1f51cB6B4D68efE" as `0x${string}`;
-    const upgradedPoolImpl = await deployPoolImpl();
+    // const upgradedPoolImpl = await deployPoolImpl();
+    const stablePoolImpl = "0x78C07d948EBa9dAC7b3DbE431B274854BAB8374c" as `0x${string}`;
 
     // upgrade existing PoolProxy to point to the latest pool
     /// @notice the initData in the args should be 0x this time, because PoolProxy has already been initialised. The upgraded Pool will just continue to use the existing state of the PoolProxy as the state is managed there. Pool impl. is just a logic layer that functions in context of PoolProxy.
@@ -113,7 +110,7 @@ const upgradeProxy = async () => {
         address: existingPoolProxy,
         abi: poolAbi,
         functionName: "upgradeToAndCall",
-        args: [upgradedPoolImpl, "0x"]
+        args: [stablePoolImpl, "0x"]
     });
 
     const upgradeRct = await client.waitForTransactionReceipt({ hash: upgradeCallHash });
