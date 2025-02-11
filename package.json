@@ -16,7 +16,8 @@
     "upgrade:ethSepolia": "hardhat run script/upgrade.ts --network ethereumSepolia",
     "upgrade:opSepolia": "hardhat run script/upgrade.ts --network optimismSepolia",
     "transferOwnership": "forge script script/setup/TransferOwnership.s.sol:TransferOwnership --broadcast",
-    "genPoseidon": "npx tsx script/genPoseidon.ts"
+    "genPoseidon": "npx tsx script/genPoseidon.ts",
+    "registerCircuitNebra:ethSepolia": "hardhat run script/registerCircuitsOnNebra.ts --network ethereumSepolia"
   },
   "keywords": [],
   "author": "zkFi Team",

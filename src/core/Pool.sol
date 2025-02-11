@@ -250,7 +250,7 @@ contract Pool is
     ) external view returns (bool result) {
         RevokerData memory revokerData = _revokers[stx.revokerId];
 
-        result = stx._verifyProof({
+        result = stx.verifyProof({
             revokerData: revokerData,
             hasher: hasher,
             verifier: verifier

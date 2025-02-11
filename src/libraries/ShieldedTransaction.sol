@@ -171,7 +171,7 @@ library ShieldedTransactionLogic {
 
         _checkAndMarkNullifiers(stx, commitmentTree, markedNullifiers);
 
-        if (!_verifyProof(stx, revokerData, hasher, verifier)) {
+        if (!verifyProof(stx, revokerData, hasher, verifier)) {
             revert IPool.InvalidTransactionProof();
         }
     }
@@ -243,11 +243,11 @@ library ShieldedTransactionLogic {
      * @return Calldata bytes for appropriate verifier contract
      * @dev We divide the public inputs into 2 chunks to avoid stack too deep error
      */
-    function _toVerifierInput(
+    function toVerifierInput(
         ShieldedTransaction calldata self,
         RevokerData memory revokerData,
         address hasher
-    ) internal view returns (bytes memory) {
+    ) public view returns (bytes memory) {
         bytes memory pubDataChunk1;
         {
             uint256 nOuts = self.commitments.length;
@@ -485,17 +485,17 @@ library ShieldedTransactionLogic {
         }
     }
 
-    function _verifyProof(
+    function verifyProof(
         ShieldedTransaction calldata stx,
         RevokerData memory revokerData,
         address hasher,
         address verifier
-    ) internal view returns (bool) {
+    ) public view returns (bool) {
         uint16 vId = IVerifier(verifier).getTransactionVerifierId(
             stx.nullifiers.length,
             stx.commitments.length
         );
-        bytes memory vInp = _toVerifierInput(stx, revokerData, hasher);
+        bytes memory vInp = toVerifierInput(stx, revokerData, hasher);
         return IVerifier(verifier).verifyTransactionProof(vId, vInp);
     }
 
