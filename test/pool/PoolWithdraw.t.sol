@@ -16,7 +16,7 @@ contract PoolWithdrawTest is PoolTest {
     function test_withdrawWithoutFee() public {
         uint256 balance1 = token1.balanceOf(address(pool));
         ShieldedTransaction memory stx = _loadShieldedTransaction(
-            "withdraw_500_weth_without_fee"
+            "withdraw_100_weth_without_fee"
         );
 
         uint256 feeBps = pool.withdrawFeeBps();

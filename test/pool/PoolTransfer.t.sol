@@ -18,7 +18,7 @@ contract PoolTransferTest is PoolTest {
     function test_transferWithoutFee() external {
         uint256 balance1 = token1.balanceOf(address(pool));
         ShieldedTransaction memory stx = _loadShieldedTransaction(
-            "transfer_500_weth_without_fee"
+            "transfer_100_weth_without_fee"
         );
         _checkEventEmits(stx);
         assertEq(token1.balanceOf(address(pool)), balance1);

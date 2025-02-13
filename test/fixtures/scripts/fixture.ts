@@ -111,6 +111,7 @@ export const generateTestTransaction = async (
     revokerId: req.revokerId,
   };
   const tx = await sdk.createTransaction(req, opts);
+  console.log("TX: ", tx);
   const signedTx = await sdk.signTransaction(tx);
   const ztx = await sdk.proveTransaction(signedTx);
   console.log("ZTX:", ztx);

@@ -16,7 +16,7 @@ const main = async () => {
 	await genAddressRegistrations(sdk);
 	// await genAddrRegWithOutsourceProofVerification(sdk, nebraClient, circuitIds.register);
 	await genTestDeposits(sdk);
-	// await genTestWithdrawals(sdk);
+	await genTestWithdrawals(sdk);
 	// await genTestTransfers(sdk);
 	// await genTestCallAdaptors(sdk);
 	// await genTreeUpdateData(sdk);
