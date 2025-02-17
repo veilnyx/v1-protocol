@@ -9,6 +9,7 @@ import {IPool} from "../interfaces/IPool.sol";
 import {IVerifier} from "../interfaces/IVerifier.sol";
 import {IHasher} from "../interfaces/IHasher.sol";
 import {IAdaptorHandler} from "../interfaces/IAdaptorHandler.sol";
+import {INebraUpa} from "../interfaces/INebraUpa.sol";
 import {console} from "forge-std/console.sol";
 /// @title ShieldedTransactionType enum representing types of shielded transactions
 enum ShieldedTransactionType {
@@ -35,6 +36,13 @@ struct RevokerData {
     bool isActive;
     uint256[2] revokerPublicKey;
     uint256[2] encryptionPublicKey;
+}
+
+struct PreVerificationDetails {
+    bool isPreVerified;
+    bytes32 circuitId;
+    uint256[] publicInputs;
+    address verifierAddr;
 }
 
 /// @title ShieldedTransaction struct representing shielded transaction
@@ -134,19 +142,16 @@ library ShieldedTransactionLogic {
 
     /// @notice Validates a shielded transaction
     /// @param stx ShieldedTransaction to be executed
-    /// @param addressTree Address `MerkleTree` state in this contract
-    /// @param commitmentTree Commitment `MerkleTree` state in this contract
-    /// @param markedNullifiers Mapping of nullifiers that are already marked
-    /// @param supportedAdaptors Mapping of supported external adaptor addresses
     function validate(
         ShieldedTransaction calldata stx,
+        PreVerificationDetails calldata preVerificationDetails,
         MerkleTree storage addressTree,
         QueuedMerkleTree storage commitmentTree,
+        address hasher,
+        address verifier,
         mapping(uint256 => uint32) storage markedNullifiers,
         mapping(address => bool) storage supportedAdaptors,
-        mapping(uint256 => RevokerData) storage revokerDataMap,
-        address verifier,
-        address hasher
+        mapping(uint256 => RevokerData) storage revokerDataMap
     ) external {
         RevokerData memory revokerData = revokerDataMap[stx.revokerId];
 
@@ -171,9 +176,75 @@ library ShieldedTransactionLogic {
 
         _checkAndMarkNullifiers(stx, commitmentTree, markedNullifiers);
 
-        if (!verifyProof(stx, revokerData, hasher, verifier)) {
-            revert IPool.InvalidTransactionProof();
+        if (preVerificationDetails.isPreVerified) {
+            bool preVerifiedStatus = _checkNebraProofVerificationStatus(
+                stx,
+                preVerificationDetails
+            );
+
+            if (!preVerifiedStatus) {
+                revert IPool.NotPreVerified();
+            }
+        } else {
+            if (
+                !verifyProof(
+                    stx,
+                    revokerData,
+                    hasher,
+                    verifier
+                )
+            ) {
+                revert IPool.InvalidTransactionProof();
+            }
         }
+    }
+
+    function _checkNebraProofVerificationStatus(
+        ShieldedTransaction memory stx,
+        PreVerificationDetails memory preVerificationDetails
+    ) internal view returns (bool) {
+        // validate the public inputs
+        uint256 txHashPubInput = preVerificationDetails.publicInputs[2];
+        if (txHashPubInput != hash(stx)) {
+            revert IPool.STXHashMismatch();
+        }
+
+        // creating proof id using the validated `publicInputs`
+        bytes32 proofId = _genNebraProofId(preVerificationDetails);
+        bool isProofValid = INebraUpa(preVerificationDetails.verifierAddr)
+            .isProofVerified(proofId);
+
+        return isProofValid;
+    }
+
+    function _genNebraProofId(
+        PreVerificationDetails memory preVerificationDetails
+    ) internal pure returns (bytes32) {
+        // Pre-allocate memory for exact encoding pattern
+        bytes memory encoded = new bytes(512);
+
+        assembly {
+            let ptr := add(encoded, 32)
+
+            // Store circuitId with proper padding
+            mstore(ptr, mload(add(preVerificationDetails, 32)))
+            ptr := add(ptr, 32)
+
+            // Get pointer to publicInputs array
+            let inputsPtr := mload(add(preVerificationDetails, 64))
+
+            // Store each input with proper padding
+            for {
+                let i := 0
+            } lt(i, 15) {
+                i := add(i, 1)
+            } {
+                mstore(ptr, mload(add(inputsPtr, mul(i, 32))))
+                ptr := add(ptr, 32)
+            }
+        }
+
+        return keccak256(encoded);
     }
 
     /// @notice Executes a shielded transaction

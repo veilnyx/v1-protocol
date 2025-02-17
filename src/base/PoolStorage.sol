@@ -13,6 +13,8 @@ abstract contract PoolStorage {
     address public screener;
 
     MerkleTree internal _addressTree;
+    QueuedMerkleTree internal _commitmentTree;
+
     mapping(uint256 => bool) internal _rootAddresses;
     mapping(address => uint256) internal _publicAddresses;
 
@@ -21,7 +23,6 @@ abstract contract PoolStorage {
     mapping(address assetAddress => uint24 assetId) _assetIds;
     mapping(uint24 assetId => Asset asset) _assets;
 
-    QueuedMerkleTree internal _commitmentTree;
     mapping(uint256 nullifier => uint32 markLeafIndex)
         internal _markedNullifiers;
 

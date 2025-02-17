@@ -18,7 +18,7 @@ import {Asset, AssetType, AssetLogic} from "../libraries/Asset.sol";
 import {MerkleTree, MerkleTreeLogic} from "../libraries/MerkleTree.sol";
 import {QueuedMerkleTree, QueuedMerkleTreeLogic, TreeUpdateData} from "../libraries/QueuedMerkleTree.sol";
 import {ShieldedAddressRegistrationData, ShieldedAddressLogic} from "../libraries/ShieldedAddress.sol";
-import {ShieldedTransaction, ShieldedTransactionLogic, RevokerData} from "../libraries/ShieldedTransaction.sol";
+import {ShieldedTransaction, ShieldedTransactionLogic, PoolMerkleTrees, RevokerData, PreVerificationDetails} from "../libraries/ShieldedTransaction.sol";
 
 contract Pool is
     IPool,
@@ -201,14 +201,50 @@ contract Pool is
     function transact(
         ShieldedTransaction calldata stx
     ) external nonReentrant whenNotPaused {
+        // assumes proof verification is NOT outsourced
+        PreVerificationDetails
+            memory preVerificationDetails = PreVerificationDetails({
+                isPreVerified: false,
+                circuitId: keccak256(abi.encode(0)),
+                publicInputs: new uint256[](0),
+                verifierAddr: address(0)
+            });
+
         stx.validate({
+            preVerificationDetails: preVerificationDetails,
             addressTree: _addressTree,
             commitmentTree: _commitmentTree,
+            hasher: hasher,
+            verifier: verifier,
             markedNullifiers: _markedNullifiers,
             supportedAdaptors: _adaptors,
-            revokerDataMap: _revokers,
+            revokerDataMap: _revokers
+        });
+
+        stx.execute({
+            commitmentTree: _commitmentTree,
+            assets: _assets,
+            withdrawFees: _withdrawFees,
+            paymasterFees: _paymasterFees,
+            adaptorHandler: adaptorHandler,
+            hasher: hasher,
+            withdrawFeeBps: withdrawFeeBps
+        });
+    }
+
+    function transactWithPreVerification(
+        ShieldedTransaction calldata stx,
+        PreVerificationDetails calldata preVerificationDetails
+    ) external nonReentrant whenNotPaused {
+        stx.validate({
+            preVerificationDetails: preVerificationDetails,
+            addressTree: _addressTree,
+            commitmentTree: _commitmentTree,
+            hasher: hasher,
             verifier: verifier,
-            hasher: hasher
+            markedNullifiers: _markedNullifiers,
+            supportedAdaptors: _adaptors,
+            revokerDataMap: _revokers
         });
 
         stx.execute({

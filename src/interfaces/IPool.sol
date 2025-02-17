@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {ShieldedTransaction, ShieldedTransactionType, RevokerData} from "../libraries/ShieldedTransaction.sol";
+import {ShieldedTransaction,PreVerificationDetails, ShieldedTransactionType, RevokerData} from "../libraries/ShieldedTransaction.sol";
 import {ShieldedAddressRegistrationData} from "../libraries/ShieldedAddress.sol";
 import {TreeUpdateData} from "../libraries/QueuedMerkleTree.sol";
 import {AssetType, Asset} from "../libraries/Asset.sol";
@@ -67,6 +67,7 @@ interface IPool {
     error InvalidRevoker(uint256 id);
     error DuplicateRevoker(uint256[2] publicKey);
     error NoFeeToClaim(address paymaster, uint24 assetId);
+    error STXHashMismatch();
 
     /////////////////////////////////////////
     //         ADMIN WRITE METHODS         //
@@ -145,6 +146,12 @@ interface IPool {
     /// @notice Can only be called when the contract is not paused.
     /// @param stx The stx to be executed.
     function transact(ShieldedTransaction calldata stx) external;
+
+    /// @notice Validates and executes a stx.
+    /// @notice Can only be called when the contract is not paused.
+    /// @param stx The stx to be executed.
+    /// @param preVerificationDetails The struct containing the proof verification details of Nebra
+    function transactWithPreVerification(ShieldedTransaction calldata stx, PreVerificationDetails calldata preVerificationDetails) external;
 
     /// @notice A function to call by a paymaster contract to claim the asset wise fees collected for the ERC-4337 transactions they catered to.
     /// @notice Can only be called when the contract is not paused.

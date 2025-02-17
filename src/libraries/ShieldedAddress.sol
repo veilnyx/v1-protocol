@@ -51,6 +51,16 @@ library ShieldedAddressLogic {
         }
 
         if (self.isPreVerified) {
+            // ensure that rootAddr of the proof matches the rootAddr being registered
+            if (rootAddress != preVerificationDetailsDecoded.publicInputs[0]) {
+                revert IPool.RootAddrMismatch(
+                    preVerificationDetailsDecoded.publicInputs[0],
+                    rootAddress
+                );
+            }
+
+            // verifying with Nebra
+            // Step 1: create `proofId` using the validated `publicInputs`
             bytes32 proofId = keccak256(
                 abi.encode(
                     preVerificationDetailsDecoded.circuitId,
@@ -62,21 +72,13 @@ library ShieldedAddressLogic {
                 )
             );
 
-            // verify with Nebra
+            // Step 2: check the status of the validated `proofId` generated onchain
             bool preVerifiedStatus = INebraUpa(
                 preVerificationDetailsDecoded.verifierAddr
             ).isProofVerified(proofId);
 
             if (!preVerifiedStatus) {
                 revert IPool.NotPreVerified();
-            }
-
-            // ensure that rootAddr of the proof matches the rootAddr being registered
-            if (rootAddress != preVerificationDetailsDecoded.publicInputs[0]) {
-                revert IPool.RootAddrMismatch(
-                    preVerificationDetailsDecoded.publicInputs[0],
-                    rootAddress
-                );
             }
         } else {
             if (!verifyProof(self, verifier)) {
