@@ -58,7 +58,7 @@ contract PoolUserRegistration is PoolBaseTest {
         assertEq(compressed, compressed2);
     }
 
-    function test_registerAddress() public {
+    function test_registerAddressInstantly() public {
         vm.expectEmit(true, true, false, false);
         emit IPool.RegisterAddress(
             senderAddr,
