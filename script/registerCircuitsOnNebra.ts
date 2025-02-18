@@ -1,4 +1,4 @@
-import { Groth16VerifyingKey, UpaClient, UpaInstanceDescriptor } from '@nebrazkp/upa/sdk';
+import { Groth16VerifyingKey, UpaClient, utils } from '@nebrazkp/upa/sdk';
 import { SnarkJSVKey } from 'snarkjs';
 import * as path from "path";
 import dotenv from "dotenv";
@@ -36,6 +36,13 @@ export const registerCircuitsOnNebra = async () => {
     const transact21CircuitVKSnarkJs = JSON.parse(fs.readFileSync(circuits.transact21.vKey, "ascii"));
     const transact21VKNebraFormat: Groth16VerifyingKey = Groth16VerifyingKey.from_snarkjs(transact21CircuitVKSnarkJs as SnarkJSVKey);
     console.log("transact21 circuit Groth16VK created");
+
+    // Computing circuit Ids
+    const registerCircuitId = await utils.computeCircuitId(registerVKNebraFormat);
+    const transactCircuitId = await utils.computeCircuitId(transact21VKNebraFormat);
+
+    console.log("Register circuit ID:", registerCircuitId);
+    console.log("Transact circuit ID:", transactCircuitId);
 
     // On-chain call to Nebra's verifier contract to register the verification key
     const registerVKTxRes = await upaClient.upaInstance.verifier.registerVK(transact21VKNebraFormat, {

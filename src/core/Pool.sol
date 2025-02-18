@@ -18,7 +18,7 @@ import {Asset, AssetType, AssetLogic} from "../libraries/Asset.sol";
 import {MerkleTree, MerkleTreeLogic} from "../libraries/MerkleTree.sol";
 import {QueuedMerkleTree, QueuedMerkleTreeLogic, TreeUpdateData} from "../libraries/QueuedMerkleTree.sol";
 import {ShieldedAddressRegistrationData, ShieldedAddressLogic} from "../libraries/ShieldedAddress.sol";
-import {ShieldedTransaction, ShieldedTransactionLogic, PoolMerkleTrees, RevokerData, PreVerificationDetails} from "../libraries/ShieldedTransaction.sol";
+import {ShieldedTransaction, ShieldedTransactionLogic, RevokerData, PreVerificationDetails} from "../libraries/ShieldedTransaction.sol";
 
 contract Pool is
     IPool,
@@ -232,7 +232,7 @@ contract Pool is
         });
     }
 
-    function transactWithPreVerification(
+    function preVerifiedTransact(
         ShieldedTransaction calldata stx,
         PreVerificationDetails calldata preVerificationDetails
     ) external nonReentrant whenNotPaused {
