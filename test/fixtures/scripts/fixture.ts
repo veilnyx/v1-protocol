@@ -159,7 +159,7 @@ const generateTestAddrRegWithOutsourcedProofVerification = async (
   const zaddrReg = await sdk.proveAddressAndOutsourceVerification("0x", nebraClient, registerCircuitId);
   console.log("zaddrReg obj returned after proof gen & submission to Nebra:", zaddrReg);
   console.log("Encoding to gen fixture");
-  const encoded = zaddrReg.encode();
+  const encoded = zaddrReg.shieldedAddressRegistrationData.encode();
   writeFileSync(`${dirFixtureData}/${name}_proof_veri_outsourced.txt`, encoded);
 };
 

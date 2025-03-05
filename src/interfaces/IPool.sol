@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {ShieldedTransaction,PreVerificationDetails, ShieldedTransactionType, RevokerData} from "../libraries/ShieldedTransaction.sol";
+import {ShieldedTransaction, PreVerificationDetails, ShieldedTransactionType, RevokerData} from "../libraries/ShieldedTransaction.sol";
 import {ShieldedAddressRegistrationData} from "../libraries/ShieldedAddress.sol";
 import {TreeUpdateData} from "../libraries/QueuedMerkleTree.sol";
 import {AssetType, Asset} from "../libraries/Asset.sol";
@@ -55,7 +55,10 @@ interface IPool {
     error BadArguments();
     error InvalidAddressProof();
     error NotPreVerified();
-    error RootAddrMismatch(uint256 proofForRootAddr, uint256 rootAddrBeingRegisted);
+    error RootAddrMismatch(
+        uint256 proofForRootAddr,
+        uint256 rootAddrBeingRegisted
+    );
     error InvalidSubtreeUpdateProof();
     error InvalidTransactionProof();
     error UnknownCommitmentTreeRoot();
@@ -151,7 +154,7 @@ interface IPool {
     /// @notice Can only be called when the contract is not paused.
     /// @param stx The stx to be executed.
     /// @param preVerificationDetails The struct containing the proof verification details of Nebra
-    function transactWithPreVerification(ShieldedTransaction calldata stx, PreVerificationDetails calldata preVerificationDetails) external;
+    function preVerifiedTransact(ShieldedTransaction calldata stx, PreVerificationDetails calldata preVerificationDetails) external;
 
     /// @notice A function to call by a paymaster contract to claim the asset wise fees collected for the ERC-4337 transactions they catered to.
     /// @notice Can only be called when the contract is not paused.

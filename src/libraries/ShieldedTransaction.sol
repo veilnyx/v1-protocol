@@ -186,14 +186,7 @@ library ShieldedTransactionLogic {
                 revert IPool.NotPreVerified();
             }
         } else {
-            if (
-                !verifyProof(
-                    stx,
-                    revokerData,
-                    hasher,
-                    verifier
-                )
-            ) {
+            if (!verifyProof(stx, revokerData, hasher, verifier)) {
                 revert IPool.InvalidTransactionProof();
             }
         }
@@ -361,82 +354,10 @@ library ShieldedTransactionLogic {
         }
 
         // Performing sequential hashing of encrypted data derived from notesMemo
-        uint256 encryptedDataHash;
-        {
-            require(
-                self.notesMemo.length % 32 == 0,
-                "Invalid notesMemo length"
-            );
-
-            // 1. Split notesMemo into values array each 32 bytes
-            uint256[] memory values = new uint256[](self.notesMemo.length / 32);
-            for (uint256 i = 0; i < self.notesMemo.length / 32; i++) {
-                values[i] = uint256(
-                    bytes32(self.notesMemo[i * 32:(i + 1) * 32])
-                );
-            }
-
-            // 2. Hash encryptedDataEncryptionKeySeed (first 3 values)
-            uint256[] memory encryptedDataEncryptionKeySeed = new uint256[](3);
-            for (uint256 i = 0; i < 3; i++) {
-                encryptedDataEncryptionKeySeed[i] = values[i];
-            }
-            console.log("Encrypted DEK seed:");
-            console.logUint(encryptedDataEncryptionKeySeed[0]);
-            console.logUint(encryptedDataEncryptionKeySeed[1]);
-            console.logUint(encryptedDataEncryptionKeySeed[2]);
-            uint256 keySeedHash = IHasher(hasher).hash(
-                encryptedDataEncryptionKeySeed
-            ); // 3
-            console.log("Encrypted DEK seed hash:");
-            console.logUint(keySeedHash);
-
-            // 3. Hash encryptedRefundData (next 4 values)
-            uint256[] memory refundInputs = new uint256[](4);
-            for (uint256 i = 0; i < 4; i++) {
-                refundInputs[i] = values[i + 3];
-            }
-            console.log("Encrypted refund data:");
-            console.logUint(refundInputs[0]);
-            console.logUint(refundInputs[1]);
-            console.logUint(refundInputs[2]);
-            console.logUint(refundInputs[3]);
-            uint256 refundHash = IHasher(hasher).hash(refundInputs); // 4
-            console.log("Encrypted refund data hash:");
-            console.logUint(refundHash);
-            // 4. Hash each encryptedNote (4 values each)
-            uint256 nOuts = self.commitments.length;
-            uint256[] memory noteHashes = new uint256[](nOuts);
-            for (uint256 i = 0; i < nOuts; i++) {
-                uint256[] memory noteInputs = new uint256[](4);
-                for (uint256 j = 0; j < 4; j++) {
-                    noteInputs[j] = values[7 + (i * 4) + j];
-                }
-                console.log("Encrypted note data:");
-                console.logUint(noteInputs[0]);
-                console.logUint(noteInputs[1]);
-                console.logUint(noteInputs[2]);
-                console.logUint(noteInputs[3]);
-                noteHashes[i] = IHasher(hasher).hash(noteInputs); // 4
-            }
-
-            for (uint256 i = 0; i < nOuts; i++) {
-                console.log("Encrypted note hash:");
-                console.logUint(noteHashes[i]);
-            }
-
-            // 5. Final hash combining all hashes
-            uint256[] memory finalInputs = new uint256[](2 + nOuts);
-            finalInputs[0] = keySeedHash;
-            finalInputs[1] = refundHash;
-            for (uint256 i = 0; i < nOuts; i++) {
-                finalInputs[2 + i] = noteHashes[i];
-            }
-
-            encryptedDataHash = IHasher(hasher).hash(finalInputs); // 4
-            console.log("FINAL HASH (encryptedDataHash public signal):");
-            console.logUint(encryptedDataHash);
-        }
+        uint256 encryptedDataHash = genEncryptedDataHashUsingSha256(
+            self.notesMemo,
+            self.commitments.length
+        );
 
         bytes memory verifierParams = abi.encodePacked(
             self.proof,
@@ -446,6 +367,167 @@ library ShieldedTransactionLogic {
         );
 
         return verifierParams;
+    }
+
+    function decomposeNotesMemo(
+        bytes calldata notesMemo,
+        uint256 nOuts
+    )
+        public
+        view
+        returns (
+            uint256[] memory encryptedDataEncryptionKeySeed,
+            uint256[] memory refundInputs,
+            uint256[][] memory notes
+        )
+    {
+        require(notesMemo.length % 32 == 0, "Invalid notesMemo length");
+
+        // 1. Split notesMemo into values array each 32 bytes
+        uint256[] memory values = new uint256[](notesMemo.length / 32);
+        for (uint256 i = 0; i < notesMemo.length / 32; i++) {
+            values[i] = uint256(bytes32(notesMemo[i * 32:(i + 1) * 32]));
+        }
+
+        // 2. Hash encryptedDataEncryptionKeySeed (first 3 values)
+        encryptedDataEncryptionKeySeed = new uint256[](3);
+        for (uint256 i = 0; i < 3; i++) {
+            encryptedDataEncryptionKeySeed[i] = values[i];
+        }
+        console.log("Encrypted DEK seed:");
+        console.logUint(encryptedDataEncryptionKeySeed[0]);
+        console.logUint(encryptedDataEncryptionKeySeed[1]);
+        console.logUint(encryptedDataEncryptionKeySeed[2]);
+
+        // 3. Hash encryptedRefundData (next 4 values)
+        refundInputs = new uint256[](4);
+        for (uint256 i = 0; i < 4; i++) {
+            refundInputs[i] = values[i + 3];
+        }
+        console.log("Encrypted refund data:");
+        console.logUint(refundInputs[0]);
+        console.logUint(refundInputs[1]);
+        console.logUint(refundInputs[2]);
+        console.logUint(refundInputs[3]);
+
+        // 4. Hash each encryptedNote (4 values each)
+        notes = new uint256[][](nOuts);
+        for (uint256 i = 0; i < nOuts; i++) {
+            notes[i] = new uint256[](4);
+            for (uint256 j = 0; j < 4; j++) {
+                notes[i][j] = values[7 + (i * 4) + j];
+            }
+        }
+
+        console.log("Encrypted note data:");
+        for (uint256 i = 0; i < nOuts; i++) {
+            for (uint256 j = 0; j < 4; j++) {
+                notes[i][j] = values[7 + (i * 4) + j];
+                console.logUint(notes[i][j]);
+            }
+        }
+    }
+
+    // Hashes a chunk of data with a previous hash value
+    function hashChunkUsingSha256(
+        uint256 prev,
+        uint256[] memory nums
+    ) internal pure returns (uint256) {
+        // Convert to bytes
+        bytes memory data = abi.encodePacked(prev);
+        for (uint i = 0; i < nums.length; i++) {
+            data = abi.encodePacked(data, nums[i]);
+        }
+
+        bytes32 chunkHash = sha256(data);
+        uint256 hashWithinField = uint256(chunkHash) % FIELD_SIZE;
+        return hashWithinField;
+    }
+
+    function genEncryptDataHashUsingPoseidon(
+        bytes calldata notesMemo,
+        uint256 nOuts,
+        address hasher
+    ) public view returns (uint256) {
+        uint256 encryptedDataHash;
+
+        // Call decomposeNotesMemo() to get the arrays
+        (
+            uint256[] memory encryptedDataEncryptionKeySeed,
+            uint256[] memory refundInputs,
+            uint256[][] memory notes
+        ) = decomposeNotesMemo(notesMemo, nOuts);
+        // Hash encryptedDataEncryptionKeySeed (first 3 values)
+        uint256 keySeedHash = IHasher(hasher).hash(
+            encryptedDataEncryptionKeySeed
+        ); // 3
+        console.log("Encrypted DEK seed hash:");
+        console.logUint(keySeedHash);
+
+        // 3. Hash encryptedRefundData (next 4 values)
+        uint256 refundHash = IHasher(hasher).hash(refundInputs); // 4
+        console.log("Encrypted refund data hash:");
+        console.logUint(refundHash);
+
+        // 4. Hash each encryptedNote (4 values each)
+        uint256[] memory noteHashes = new uint256[](nOuts);
+        for (uint256 i = 0; i < nOuts; i++) {
+            uint256[] memory noteInputs = new uint256[](4);
+            for (uint256 j = 0; j < 4; j++) {
+                noteInputs[j] = notes[i][j];
+            }
+            noteHashes[i] = IHasher(hasher).hash(noteInputs); // 4
+        }
+
+        for (uint256 i = 0; i < nOuts; i++) {
+            console.log("Encrypted note hash:");
+            console.logUint(noteHashes[i]);
+        }
+
+        // 5. Final hash combining all hashes
+        uint256[] memory finalInputs = new uint256[](2 + nOuts);
+        finalInputs[0] = keySeedHash;
+        finalInputs[1] = refundHash;
+        for (uint256 i = 0; i < nOuts; i++) {
+            finalInputs[2 + i] = noteHashes[i];
+        }
+
+        encryptedDataHash = IHasher(hasher).hash(finalInputs); // 4
+        console.log("FINAL HASH (encryptedDataHash public signal):");
+        console.logUint(encryptedDataHash);
+        return encryptedDataHash;
+    }
+
+    function genEncryptedDataHashUsingSha256(
+        bytes calldata notesMemo,
+        uint256 nOuts
+    ) public view returns (uint256) {
+        // Call decomposeNotesMemo() to get the arrays
+        (
+            uint256[] memory encryptedDataEncryptionKeySeed,
+            uint256[] memory refundInputs,
+            uint256[][] memory notes
+        ) = decomposeNotesMemo(notesMemo, nOuts);
+
+        uint256 currentHash = hashChunkUsingSha256(
+            0,
+            encryptedDataEncryptionKeySeed
+        );
+        console.log("encryptedDEKSeedHash:");
+        console.log(currentHash);
+
+        currentHash = hashChunkUsingSha256(currentHash, refundInputs);
+        console.log("encryptedRefundDataHash:");
+        console.log(currentHash);
+
+        // Hash note data in chunks of 4
+        for (uint i = 0; i < notes.length; i++) {
+            require(notes[i].length == 4, "Invalid note data length");
+            currentHash = hashChunkUsingSha256(currentHash, notes[i]);
+        }
+        console.log("encryptedNoteDataHash (FINAL HASH):");
+        console.log(currentHash);
+        return currentHash;
     }
 
     function _handleAdaptorCall(
