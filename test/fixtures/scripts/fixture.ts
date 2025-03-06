@@ -1,5 +1,6 @@
 import { readFileSync, writeFileSync } from "fs";
 import path from "path";
+import * as ethers from "ethers";
 import {
   bytesToBigInt,
   Hex,
@@ -22,6 +23,7 @@ import { Core } from "@zkfi-tech/core";
 import { ZTransaction } from "@zkfi-tech/zk-prover";
 import { Note, SIZE_ENCRYPTED_DECRYPTION_KEY, SIZE_FULLY_ENCRYPTED_NOTE_DATA } from "@zkfi-tech/transaction";
 import config from "../config.json";
+import { register } from "module";
 
 const senderSeed = BigInt(config.sender.seed);
 const receiverSeed = BigInt(config.receiver.seed);
@@ -126,13 +128,38 @@ export const generateTestAddressRegistrations = async (
   }
 };
 
-export const generateTestAddressRegistration = async (
+export const generateTestAddrRegWithOutsourceProofVerifications = async (
+  reqs: Record<string, {}>,
+  sdk: Core,
+  nebraClient: any,
+  registerCircuitId: string
+) => {
+  const reqArr = Object.entries(reqs);
+  for (const [name, req] of reqArr) {
+    await generateTestAddrRegWithOutsourcedProofVerification(name, sdk, nebraClient, registerCircuitId);
+  }
+};
+
+const generateTestAddressRegistration = async (
   name: string,
   sdk: Core
 ) => {
   const zaddrReg = await sdk.proveAddress("0x");
   const encoded = zaddrReg.encode();
   writeFileSync(`${dirFixtureData}/${name}.txt`, encoded);
+};
+
+const generateTestAddrRegWithOutsourcedProofVerification = async (
+  name: string,
+  sdk: Core,
+  nebraClient: any,
+  registerCircuitId: string
+) => {
+  const zaddrReg = await sdk.proveAddressAndOutsourceVerification("0x", nebraClient, registerCircuitId);
+  console.log("zaddrReg obj returned after proof gen & submission to Nebra:", zaddrReg);
+  console.log("Encoding to gen fixture");
+  const encoded = zaddrReg.encode();
+  writeFileSync(`${dirFixtureData}/${name}_proof_veri_outsourced.txt`, encoded);
 };
 
 export const splitToChunks = (data: Hex, chunkSize: number) => {

@@ -10,6 +10,7 @@ import { loadConfigs, ChainParams, CommonParams } from "./configs";
 import { deployHasher } from "./hasher";
 import { deployVerifier } from "./verifier";
 import { deployErc4337Infra } from "./erc4337Infra";
+import { registerCircuitsOnNebra } from "./registerCircuitsOnNebra";
 import { addInitialAssets, registerRevokers } from "./setup";
 
 const config = loadConfigs();
@@ -110,13 +111,7 @@ const main1 = async () => {
   ]);
   console.log("PoolProxy deployed:", poolProxy.address);
 
-  //@ts-ignore
-  const owner = await client.readContract({
-    address: poolProxy.address,
-    abi: poolAbi,
-    functionName: "owner",
-  });
-
+  // Asset support and Revoker registrations
   try {
     //@ts-ignore
     const hash = await wallet.writeContract({
@@ -156,6 +151,9 @@ const main1 = async () => {
 
   // ERC4337 infra
   await deployErc4337Infra(chainParams, poolProxy.address, deployConfig);
+
+  // Register Labyrinth's circuits with Nebra
+  await registerCircuitsOnNebra();
 };
 
 const main = async () => {
