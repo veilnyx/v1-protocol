@@ -353,8 +353,8 @@ library ShieldedTransactionLogic {
             );
         }
 
-        // Performing sequential hashing of encrypted data derived from notesMemo
-        uint256 encryptedDataHash = genEncryptedDataHashUsingSha256(
+        // Performing sequential hashing (sha256) of encrypted data derived from notesMemo
+        (uint256 alpha, uint256 beta) = UHF(
             self.notesMemo,
             self.commitments.length
         );
@@ -363,7 +363,8 @@ library ShieldedTransactionLogic {
             self.proof,
             pubDataChunk1,
             pubDataChunk2,
-            encryptedDataHash
+            alpha,
+            beta
         );
 
         return verifierParams;
@@ -374,7 +375,7 @@ library ShieldedTransactionLogic {
         uint256 nOuts
     )
         public
-        view
+        pure
         returns (
             uint256[] memory encryptedDataEncryptionKeySeed,
             uint256[] memory refundInputs,
@@ -394,21 +395,12 @@ library ShieldedTransactionLogic {
         for (uint256 i = 0; i < 3; i++) {
             encryptedDataEncryptionKeySeed[i] = values[i];
         }
-        console.log("Encrypted DEK seed:");
-        console.logUint(encryptedDataEncryptionKeySeed[0]);
-        console.logUint(encryptedDataEncryptionKeySeed[1]);
-        console.logUint(encryptedDataEncryptionKeySeed[2]);
 
         // 3. Hash encryptedRefundData (next 4 values)
         refundInputs = new uint256[](4);
         for (uint256 i = 0; i < 4; i++) {
             refundInputs[i] = values[i + 3];
         }
-        console.log("Encrypted refund data:");
-        console.logUint(refundInputs[0]);
-        console.logUint(refundInputs[1]);
-        console.logUint(refundInputs[2]);
-        console.logUint(refundInputs[3]);
 
         // 4. Hash each encryptedNote (4 values each)
         notes = new uint256[][](nOuts);
@@ -419,11 +411,9 @@ library ShieldedTransactionLogic {
             }
         }
 
-        console.log("Encrypted note data:");
         for (uint256 i = 0; i < nOuts; i++) {
             for (uint256 j = 0; j < 4; j++) {
                 notes[i][j] = values[7 + (i * 4) + j];
-                console.logUint(notes[i][j]);
             }
         }
     }
@@ -528,6 +518,64 @@ library ShieldedTransactionLogic {
         console.log("encryptedNoteDataHash (FINAL HASH):");
         console.log(currentHash);
         return currentHash;
+    }
+
+    function UHF(
+        bytes calldata notesMemo,
+        uint256 nOuts
+    ) public view returns (uint256, uint256) {
+        uint256 alpha = genEncryptedDataHashUsingSha256(notesMemo, nOuts);
+
+        (
+            uint256[] memory encryptedDataEncryptionKeySeed,
+            uint256[] memory refundInputs,
+            uint256[][] memory notes
+        ) = decomposeNotesMemo(notesMemo, nOuts);
+
+        console.log("NoteMemos decomposed");
+        console.log("encryptedDataEncryptionKeySeed:");
+        console.log(encryptedDataEncryptionKeySeed.length);
+
+        uint256 alphaPow = 1;
+        uint256 accumulator = 0;
+
+        // Process encryptedDataEncryptionKeySeed
+        for (uint i = 0; i < encryptedDataEncryptionKeySeed.length; i++) {
+            uint256 product = mulmod(
+                encryptedDataEncryptionKeySeed[i],
+                alphaPow,
+                FIELD_SIZE
+            );
+            accumulator = addmod(accumulator, product, FIELD_SIZE);
+            alphaPow = mulmod(alphaPow, alpha, FIELD_SIZE);
+            console.logUint(product);
+            console.log("accumulator:");
+            console.logUint(accumulator);
+            console.log("alphaPow:");
+            console.logUint(alphaPow);
+        }
+
+        // Process refundInputs
+        for (uint i = 0; i < refundInputs.length; i++) {
+            uint256 product = mulmod(refundInputs[i], alphaPow, FIELD_SIZE);
+            accumulator = addmod(accumulator, product, FIELD_SIZE);
+            alphaPow = mulmod(alphaPow, alpha, FIELD_SIZE);
+        }
+
+        // Process notes
+        for (uint i = 0; i < nOuts; i++) {
+            for (uint j = 0; j < notes[i].length; j++) {
+                uint256 product = mulmod(notes[i][j], alphaPow, FIELD_SIZE);
+                accumulator = addmod(accumulator, product, FIELD_SIZE);
+                alphaPow = mulmod(alphaPow, alpha, FIELD_SIZE);
+            }
+        }
+
+        console.log("onchain::alpha:");
+        console.logUint(alpha);
+        console.log("onchain::beta:");
+        console.logUint(accumulator);
+        return (alpha, accumulator);
     }
 
     function _handleAdaptorCall(
