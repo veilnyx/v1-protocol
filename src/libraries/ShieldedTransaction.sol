@@ -203,18 +203,20 @@ library ShieldedTransactionLogic {
         }
 
         // creating proof id using the validated `publicInputs`
-        bytes32 proofId = _genNebraProofId(preVerificationDetails);
+        bytes32 proofId = genNebraProofId(preVerificationDetails);
         bool isProofValid = INebraUpa(preVerificationDetails.verifierAddr)
             .isProofVerified(proofId);
 
         return isProofValid;
     }
 
-    function _genNebraProofId(
+    /// @notice Generates a proof id for Nebra proof verification
+    /// @dev Written in assembly because abi.encodePacked was causing stack too deep error due to large number of inputs (public inputs)
+    function genNebraProofId(
         PreVerificationDetails memory preVerificationDetails
-    ) internal pure returns (bytes32) {
+    ) public pure returns (bytes32) {
         // Pre-allocate memory for exact encoding pattern
-        bytes memory encoded = new bytes(512);
+        bytes memory encoded = new bytes(546);
 
         assembly {
             let ptr := add(encoded, 32)
@@ -229,7 +231,7 @@ library ShieldedTransactionLogic {
             // Store each input with proper padding
             for {
                 let i := 0
-            } lt(i, 15) {
+            } lt(i, 16) {
                 i := add(i, 1)
             } {
                 mstore(ptr, mload(add(inputsPtr, mul(i, 32))))
@@ -768,6 +770,12 @@ library ShieldedTransactionLogic {
 
         // non transfer tx & transfer tx with fee, extracting the fee details from feeData
         if (pubLen != 0) {
+            // FeeData is packed as follows:
+            // 20 bytes - paymaster address
+            // 3 bytes - feeAssetId (24 bits)
+            // 9 bytes - feeValue (72 bits)
+
+            // Extracting the paymaster address (20 bytes)
             params.paymaster = address(uint160(stx.feeData >> (24 + 72)));
 
             // Extract the feeAssetId (3 bytes)
@@ -784,7 +792,7 @@ library ShieldedTransactionLogic {
             // Extract last 28 bytes value
             params.pubAssets[i].value = uint224(stx.pubAssets[i]);
 
-            /// @dev for transfer tx and feeAsset pushed into pubAssets, the pubAssets value will become 0, but thats fine as pubAssets is not used in transfer tx. Only used in other types tx to move assets.
+            /// @dev since feeAsset pushed into pubAssets, for transfer tx, the pubAssets value will become 0, but thats fine as pubAssets is not used in transfer tx. Only used in other types tx to move assets.
             if (params.pubAssets[i].id == params.feeAssetId) {
                 params.pubAssets[i].value =
                     params.pubAssets[i].value -
