@@ -10,13 +10,14 @@ import {INebraUpa} from "../interfaces/INebraUpa.sol";
 import {EIP712_TYPEHASH_REGISTER_ADDRESS, MESSAGE_REGISTER_ADDRESS} from "../base/Constants.sol";
 
 struct PreVerificationDetails {
+    bool isPreVerified;
     bytes32 circuitId;
     uint256[] publicInputs;
     address verifierAddr;
 }
 
+// @todo Refactor preVerification details outside of ShieldedAddressRegistrationData and create a seperate register function for outsourced verification having preVerificationDetails as an seperate argument.
 struct ShieldedAddressRegistrationData {
-    bool isPreVerified;
     bytes preVerificationDetails;
     bytes proof;
     bytes shieldedAddress; // In uncompressed form
@@ -50,7 +51,7 @@ library ShieldedAddressLogic {
             revert IPool.BadArguments();
         }
 
-        if (self.isPreVerified) {
+        if (preVerificationDetailsDecoded.isPreVerified) {
             // ensure that rootAddr of the proof matches the rootAddr being registered
             if (rootAddress != preVerificationDetailsDecoded.publicInputs[0]) {
                 revert IPool.RootAddrMismatch(

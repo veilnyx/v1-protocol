@@ -119,6 +119,45 @@ export const generateTestTransaction = async (
   writeFileSync(`${dirFixtureData}/${name}.txt`, encoded);
 };
 
+export const generateTestTransactionsWithOutsourcedProofVerification = async (
+  reqs: Record<string, TransactionRequest & TransactionOptions>,
+  sdk: Core,
+  nebraClient: any,
+  transactCircuitId: `0x${string}`
+) => {
+  const reqArr = Object.entries(reqs);
+  for (const [name, req] of reqArr) {
+    await generateTestTransactionWithOutsourcedProofVerification(name, req, sdk, nebraClient, transactCircuitId);
+  }
+};
+
+export const generateTestTransactionWithOutsourcedProofVerification = async (
+  name: string,
+  req: TransactionRequest & TransactionOptions,
+  sdk: Core,
+  nebraClient: any,
+  transactCircuitId: `0x${string}`
+) => {
+  const opts = {
+    viaBundler: req.viaBundler,
+    paymaster: req.paymaster,
+    revokerId: req.revokerId,
+  };
+  const tx = await sdk.createTransaction(req, opts);
+  console.log("TX: ", tx);
+  const signedTx = await sdk.signTransaction(tx);
+  const { provedTx, preVerification } = await sdk.proveTransactionAndOutsourceVerification(signedTx, nebraClient, transactCircuitId);
+
+  console.log("ZTX:", provedTx);
+  const encoded = provedTx.encode();
+  console.log("ZTX Encoded:", encoded);
+  writeFileSync(`${dirFixtureData}/${name}.txt`, encoded);
+
+  console.log("Pre-verification data:", preVerification);
+  const encodedPreVerification = preVerification.encode();
+  writeFileSync(`${dirFixtureData}/${name}_preVerificationEncodedStruct.txt`, encodedPreVerification);
+};
+
 export const generateTestAddressRegistrations = async (
   reqs: Record<string, {}>,
   sdk: Core
@@ -133,7 +172,7 @@ export const generateTestAddrRegWithOutsourceProofVerifications = async (
   reqs: Record<string, {}>,
   sdk: Core,
   nebraClient: any,
-  registerCircuitId: string
+  registerCircuitId: `0x${string}`
 ) => {
   const reqArr = Object.entries(reqs);
   for (const [name, req] of reqArr) {
@@ -154,7 +193,7 @@ const generateTestAddrRegWithOutsourcedProofVerification = async (
   name: string,
   sdk: Core,
   nebraClient: any,
-  registerCircuitId: string
+  registerCircuitId: `0x${string}`
 ) => {
   const zaddrReg = await sdk.proveAddressAndOutsourceVerification("0x", nebraClient, registerCircuitId);
   console.log("zaddrReg obj returned after proof gen & submission to Nebra:", zaddrReg);

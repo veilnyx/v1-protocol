@@ -1,5 +1,5 @@
 import { genAddressRegistrations, genAddrRegWithOutsourceProofVerification } from "./genTestAddressRegistration";
-import { genTestDeposits } from "./genTestDeposits";
+import { genTestDeposits, genTestDepositsWithOutsourceProofVerification } from "./genTestDeposits";
 import { genTestWithdrawals } from "./genTestWithdrawals";
 import { genTestTransfers } from "./genTestTransfers";
 import { genTestCallAdaptors } from './genTestCallAdaptor';
@@ -15,7 +15,8 @@ const main = async () => {
 	const { sdk, nebraClient, circuitIds } = await getSDKInstance();
 	// await genAddressRegistrations(sdk);
 	// await genAddrRegWithOutsourceProofVerification(sdk, nebraClient, circuitIds.register);
-	await genTestDeposits(sdk);
+	// await genTestDeposits(sdk);
+	await genTestDepositsWithOutsourceProofVerification(sdk, nebraClient, circuitIds.transact21);
 	// await genTestWithdrawals(sdk);
 	// await genTestTransfers(sdk);
 	// await genTestCallAdaptors(sdk);

@@ -1,7 +1,7 @@
 import { parseEther, parseUnits, zeroAddress } from "viem";
 import { Core } from "@zkfi-tech/core";
 import { TransactionType } from "@zkfi-tech/shared-types";
-import { fixture, generateTestTransactions } from "./fixture";
+import { fixture, generateTestTransactions, generateTestTransactionsWithOutsourcedProofVerification } from "./fixture";
 import { parse } from 'path';
 
 const {
@@ -128,3 +128,7 @@ export const genTestDeposits = async (sdk: Core) => {
   console.log("depositing assets...");
   await generateTestTransactions(reqs, sdk);
 };
+
+export const genTestDepositsWithOutsourceProofVerification = async (sdk: Core, nebraClient: any, transactCircuitId: `0x${string}`) => {
+  await generateTestTransactionsWithOutsourcedProofVerification(reqs, sdk, nebraClient, transactCircuitId);
+}
