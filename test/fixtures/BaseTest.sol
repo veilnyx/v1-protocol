@@ -2,13 +2,15 @@
 pragma solidity ^0.8.24;
 
 import {Test} from "forge-std/Test.sol";
-import {ShieldedTransactionType, ShieldedTransaction} from "src/libraries/ShieldedTransaction.sol";
+import {ShieldedTransactionType, ShieldedTransaction, PreVerificationDetails} from "src/libraries/ShieldedTransaction.sol";
 import {ShieldedAddressRegistrationData} from "src/libraries/ShieldedAddress.sol";
 import {TreeUpdateData} from "src/libraries/QueuedMerkleTree.sol";
 import {Hasher} from "src/core/Hasher.sol";
 import {Fixture, FixtureLib} from "test/fixtures/Fixture.sol";
 import {MockERC20} from "test/mocks/MockERC20.sol";
 import {MockERC20ForReentrancyTest} from "test/mocks/MockERC20ForReentrancyTest.sol";
+
+/// @dev BaseTest is the foundational contract of the test setup providing functions to read from pre-generated fixtures used in the tests. It also provides the ability to deploy the Poseidon hashers.
 
 abstract contract BaseTest is Test {
     Fixture public fixture;
@@ -35,6 +37,10 @@ abstract contract BaseTest is Test {
         string memory name
     ) internal view returns (ShieldedAddressRegistrationData memory) {
         return FixtureLib.loadShieldedAddressRegistrationData(name, vm);
+    }
+
+    function _loadPreVerificationDetails(string memory name) internal view returns (PreVerificationDetails memory) {
+        return FixtureLib.loadPreVerificationDetails(name, vm);
     }
 
     function _loadTreeUpdateData(

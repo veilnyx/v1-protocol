@@ -17,6 +17,7 @@ import {MockScreener} from "test/mocks/MockScreener.sol";
 import {MockERC20} from "test/mocks/MockERC20.sol";
 import {BaseTest} from "./BaseTest.sol";
 
+/// @dev PoolBaseTest is a test setup contract for Pool deployment.
 contract PoolBaseTest is BaseTest {
     bytes32 private constant TYPE_HASH =
         keccak256(

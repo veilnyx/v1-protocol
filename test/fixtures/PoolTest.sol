@@ -21,6 +21,12 @@ import {MockVerifier} from "test/mocks/MockVerifier.sol";
 import {PoolBaseTest} from "./PoolBaseTest.sol";
 import {BaseScript} from "script/BaseScript.sol";
 
+/// @dev PoolTest is a test setup contract providing the following functionalities:
+/// 1. Adding asset support to the pool.
+/// 2. Adding revoker to the pool.
+/// 3. Registering a user.
+/// 4. Commonly used modifiers and functions for testing pool ops.
+/// 5. Mocking the verifier contract.
 contract PoolTest is PoolBaseTest, BaseScript {
     using MerkleTreeLogic for MerkleTree;
 
