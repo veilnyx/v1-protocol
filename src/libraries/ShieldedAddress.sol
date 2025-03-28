@@ -9,6 +9,7 @@ import {IVerifier} from "../interfaces/IVerifier.sol";
 import {INebraUpa} from "../interfaces/INebraUpa.sol";
 import {EIP712_TYPEHASH_REGISTER_ADDRESS, MESSAGE_REGISTER_ADDRESS} from "../base/Constants.sol";
 
+// @todo Refactor PreVerificationDetails outside of ShieldedAddressRegistrationData
 struct PreVerificationDetails {
     bool isPreVerified;
     bytes32 circuitId;
@@ -23,6 +24,8 @@ struct ShieldedAddressRegistrationData {
     bytes shieldedAddress; // In uncompressed form
     bytes signature;
 }
+
+error NotPreVerified();
 
 library ShieldedAddressLogic {
     using MerkleTreeLogic for MerkleTree;
@@ -79,7 +82,7 @@ library ShieldedAddressLogic {
             ).isProofVerified(proofId);
 
             if (!preVerifiedStatus) {
-                revert IPool.NotPreVerified();
+                revert NotPreVerified();
             }
         } else {
             if (!verifyProof(self, verifier)) {

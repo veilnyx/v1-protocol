@@ -11,9 +11,16 @@ import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/Pau
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {IPool} from "src/interfaces/IPool.sol";
-import {ShieldedTransaction, ShieldedTransactionLogic, ShieldedTransactionType, PreVerificationDetails, PubAsset} from "src/libraries/ShieldedTransaction.sol";
+import {ShieldedTransaction, ShieldedTransactionLogic, ShieldedTransactionType, PubAsset} from "src/libraries/ShieldedTransaction.sol";
 import {Asset, AssetLogic, AssetType} from "src/libraries/Asset.sol";
 import {INebraUpa} from "../interfaces/INebraUpa.sol";
+
+struct PreVerificationDetails {
+    bool isPreVerified;
+    bytes32 circuitId;
+    uint256[] publicInputs;
+    address verifierAddr;
+}
 
 contract Mempool is
     Initializable,
@@ -28,7 +35,7 @@ contract Mempool is
     using SafeERC20 for IERC20;
 
     // @todo: Move storage outside of the upgradeable contract
-    IPool public _pool;
+    IPool public pool;
     EnumerableSet.UintSet internal _stxHashes;
     mapping(uint256 stxHash => bytes32) public stxToProofId;
     mapping(uint256 stxHash => ShieldedTransaction) public stxMap;
@@ -40,6 +47,7 @@ contract Mempool is
     address public verificationTrackerService;
     address public nebraVerifier;
 
+    error LabyrinthPoolAddrNotInitialized();
     error InvalidStx();
     error DuplicateStx(uint256 stxHash);
     error STXNotInMempool(uint256 stxHash);
@@ -48,6 +56,7 @@ contract Mempool is
     error UnsupportedAsset(uint24 assetId);
     error ZeroValue();
     error InsufficientFee(uint256 given, uint256 required);
+    error NotPreVerifiedYet(uint256 stxHash, bytes32 proofId);
     error STXNonRefundable(uint256 stxHash);
 
     event STXAddedToMempool(
@@ -70,7 +79,7 @@ contract Mempool is
     );
 
     function initialize(
-        address pool,
+        address pool_,
         uint256 mempoolExitFee_,
         address verificationTrackerService_,
         address nebraVerifier_
@@ -78,7 +87,7 @@ contract Mempool is
         __Ownable_init(msg.sender);
         __UUPSUpgradeable_init();
         __Pausable_init();
-        _pool = IPool(pool);
+        pool = IPool(pool_);
         mempoolExitFee = mempoolExitFee_;
         verificationTrackerService = verificationTrackerService_;
         nebraVerifier = nebraVerifier_;
@@ -90,7 +99,7 @@ contract Mempool is
     function _checkIfAssetValid(
         uint24 assetId
     ) internal view returns (Asset memory) {
-        Asset memory asset = _pool.getAsset(assetId);
+        Asset memory asset = pool.getAsset(assetId);
         if (!asset.isActive) {
             revert InactiveAsset(asset.id);
         }
@@ -111,6 +120,38 @@ contract Mempool is
         value = uint224(pubAsset);
     }
 
+    /// @notice Generates a proof id for Nebra proof verification
+    /// @dev Written in assembly because abi.encodePacked was causing stack too deep error due to large number of inputs (public inputs)
+    function genNebraProofId(
+        PreVerificationDetails memory preVerificationDetails
+    ) public pure returns (bytes32) {
+        // Pre-allocate memory for exact encoding pattern
+        bytes memory encoded = new bytes(546);
+
+        assembly {
+            let ptr := add(encoded, 32)
+
+            // Store circuitId with proper padding
+            mstore(ptr, mload(add(preVerificationDetails, 32)))
+            ptr := add(ptr, 32)
+
+            // Get pointer to publicInputs array
+            let inputsPtr := mload(add(preVerificationDetails, 64))
+
+            // Store each input with proper padding
+            for {
+                let i := 0
+            } lt(i, 16) {
+                i := add(i, 1)
+            } {
+                mstore(ptr, mload(add(inputsPtr, mul(i, 32))))
+                ptr := add(ptr, 32)
+            }
+        }
+
+        return keccak256(encoded);
+    }
+
     ///////////////////////////
     //// External Functions ///
     ///////////////////////////
@@ -123,6 +164,11 @@ contract Mempool is
         address stxSender = msg.sender;
         uint256 stxHashPI = preVerificationDetails.publicInputs[2];
 
+        if (address(pool) == address(0)) {
+            revert LabyrinthPoolAddrNotInitialized();
+        }
+
+        // validate the correlation btw the stx and public inputs
         if (stx.hash() != stxHashPI) {
             revert InvalidStx();
         }
@@ -158,9 +204,7 @@ contract Mempool is
             }
         }
 
-        bytes32 proofId = ShieldedTransactionLogic.genNebraProofId(
-            preVerificationDetails
-        );
+        bytes32 proofId = genNebraProofId(preVerificationDetails);
         stxToProofId[stxHashPI] = proofId;
         stxMap[stxHashPI] = stx;
         stxSenders[stxHashPI] = stxSender;
@@ -179,6 +223,12 @@ contract Mempool is
         ShieldedTransaction memory stx = stxMap[stxHash];
         bytes32 proofId = stxToProofId[stxHash];
 
+        // Onchain check with Nebra to ensure the proof is verified
+        bool isProofValid = INebraUpa(nebraVerifier).isProofVerified(proofId);
+        if (!isProofValid) {
+            revert NotPreVerifiedYet(stxHash, proofId);
+        }
+
         // Remove STX from mempool
         _stxHashes.remove(stxHash);
         delete stxMap[stxHash];
@@ -190,11 +240,11 @@ contract Mempool is
             (uint24 assetId, uint224 value) = _decodeAsset(stx.pubAssets[i]);
             Asset memory asset = _checkIfAssetValid(assetId);
 
-            IERC20(asset.assetAddress).forceApprove(address(_pool), value);
+            IERC20(asset.assetAddress).forceApprove(address(pool), value);
         }
 
         // Transact the STX
-        _pool.transact(stx);
+        pool.transact(stx, true);
         emit STXProcessed(stxHash, proofId, block.timestamp);
     }
 
@@ -256,5 +306,10 @@ contract Mempool is
         address newAddr
     ) external onlyOwner {
         verificationTrackerService = newAddr;
+    }
+
+    /// @notice Needs to be called immediately after the Labyrinth pool is deployed/upgraded, for the mempool to be able to interact with the pool
+    function updatePoolAddress(address newPool) external onlyOwner {
+        pool = IPool(newPool);
     }
 }

@@ -177,7 +177,7 @@ contract PoolTest is PoolBaseTest, BaseScript {
         // expectCommitmentsInserted(stx)
         expectReceipt(stx)
     {
-        pool.transact(stx);
+        pool.transact(stx, false);
     }
 
     function _mintAsset(
@@ -211,7 +211,7 @@ contract PoolTest is PoolBaseTest, BaseScript {
         ShieldedTransaction memory stx = _loadShieldedTransaction(
             "deposit_weth_tx"
         );
-        pool.transact(stx);
+        pool.transact(stx, false);
         _processCommitmentTreeQueue();
     }
 

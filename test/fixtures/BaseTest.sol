@@ -2,10 +2,14 @@
 pragma solidity ^0.8.24;
 
 import {Test} from "forge-std/Test.sol";
-import {ShieldedTransactionType, ShieldedTransaction, PreVerificationDetails} from "src/libraries/ShieldedTransaction.sol";
+import {Mempool} from "src/core/Mempool.sol";
+import {MempoolProxy} from "src/core/MempoolProxy.sol";
+import {ShieldedTransactionType, ShieldedTransaction} from "src/libraries/ShieldedTransaction.sol";
+import {PreVerificationDetails} from "src/core/Mempool.sol";
 import {ShieldedAddressRegistrationData} from "src/libraries/ShieldedAddress.sol";
 import {TreeUpdateData} from "src/libraries/QueuedMerkleTree.sol";
 import {Hasher} from "src/core/Hasher.sol";
+import {Config} from "script/Config.sol";
 import {Fixture, FixtureLib} from "test/fixtures/Fixture.sol";
 import {MockERC20} from "test/mocks/MockERC20.sol";
 import {MockERC20ForReentrancyTest} from "test/mocks/MockERC20ForReentrancyTest.sol";
@@ -18,6 +22,9 @@ abstract contract BaseTest is Test {
     MockERC20 public token1;
     MockERC20 public token2;
     MockERC20ForReentrancyTest public tokenReent;
+    Config public config;
+    uint256 MEMPOOL_EXIT_FEES = 45e13; // 500k gas @ 0.9 gwei = 0.00045 ETH
+    address VERIFICATION_TRACKER_SERVICE = makeAddr("tracker");
 
     function _setUp() internal virtual {
         fixture = FixtureLib.load(vm);
@@ -25,6 +32,7 @@ abstract contract BaseTest is Test {
         token2 = new MockERC20(address(this));
         // Deploying the ERC20 token for testing reentrancy attack
         tokenReent = new MockERC20ForReentrancyTest(address(this));
+        config = new Config();
     }
 
     function _loadShieldedTransaction(
@@ -39,7 +47,9 @@ abstract contract BaseTest is Test {
         return FixtureLib.loadShieldedAddressRegistrationData(name, vm);
     }
 
-    function _loadPreVerificationDetails(string memory name) internal view returns (PreVerificationDetails memory) {
+    function _loadPreVerificationDetails(
+        string memory name
+    ) internal view returns (PreVerificationDetails memory) {
         return FixtureLib.loadPreVerificationDetails(name, vm);
     }
 
@@ -87,5 +97,21 @@ abstract contract BaseTest is Test {
 
         Hasher hasher = new Hasher(poseidonT3, poseidonT4, poseidonT5);
         return hasher;
+    }
+
+    function _deployMempool() internal returns (Mempool) {
+        Mempool mempool = new Mempool();
+
+        bytes memory initializeData = abi.encodeWithSelector(
+            mempool.initialize.selector,
+            address(0),
+            MEMPOOL_EXIT_FEES,
+            VERIFICATION_TRACKER_SERVICE,
+            config.nebraVerifier()
+        );
+
+        MempoolProxy proxy = new MempoolProxy(address(mempool), initializeData);
+        mempool = Mempool(address(proxy));
+        return mempool;
     }
 }

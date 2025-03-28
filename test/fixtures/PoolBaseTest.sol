@@ -3,7 +3,8 @@ pragma solidity ^0.8.24;
 
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
-import {Pool} from "src/core/Pool.sol";
+import {Mempool} from "src/core/Mempool.sol";
+import {Pool, InitAddressParams} from "src/core/Pool.sol";
 import {MESSAGE_REGISTER_ADDRESS, EIP712_DOMAIN_NAME, EIP712_DOMAIN_VERSION, EIP712_TYPEHASH_REGISTER_ADDRESS} from "src/base/Constants.sol";
 import {VerifierTransact21} from "src/verifiers/VerifierTransact21.sol";
 import {VerifierTransact22} from "src/verifiers/VerifierTransact22.sol";
@@ -24,8 +25,8 @@ contract PoolBaseTest is BaseTest {
             "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
         );
 
+    Mempool public mempool;
     Verifier public verifier;
-
     AdaptorHandler public adaptorHandler;
     Hasher public hasher;
     MockPool public pool;
@@ -66,6 +67,15 @@ contract PoolBaseTest is BaseTest {
 
         screener = new MockScreener();
         hasher = _deployHasher();
+        mempool = _deployMempool();
+
+        InitAddressParams memory initAddrParams = InitAddressParams({
+            mempool: address(mempool),
+            verifier: address(verifier),
+            adaptorHandler: address(adaptorHandler),
+            screener: address(screener),
+            hasher: address(hasher)
+        });
 
         bytes memory initData = abi.encodeCall(
             Pool.initialize,
@@ -73,10 +83,7 @@ contract PoolBaseTest is BaseTest {
                 fixture.addressTreeDepth,
                 fixture.commitmentTreeDepth,
                 fixture.commitmentTreeQueueSize,
-                address(verifier),
-                address(adaptorHandler),
-                address(screener),
-                address(hasher),
+                initAddrParams,
                 fixture.withdrawFeeBps
             )
         );

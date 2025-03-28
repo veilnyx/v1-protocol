@@ -38,7 +38,7 @@ contract PaymasterTest is PoolTest {
         );
 
         userOp.sender = address(pool);
-        userOp.callData = abi.encodeCall(Pool.transact, (stx));
+        userOp.callData = abi.encodeCall(Pool.transact, (stx, false));
         _;
     }
 
@@ -129,7 +129,7 @@ contract PaymasterTest is PoolTest {
         );
 
         userOp.sender = address(pool);
-        userOp.callData = abi.encodeCall(Pool.transact, (stx));
+        userOp.callData = abi.encodeCall(Pool.transact, (stx, false));
 
         vm.prank(entryPoint);
         vm.expectRevert(
@@ -164,7 +164,7 @@ contract PaymasterTest is PoolTest {
         ShieldedTransaction memory stx = _loadShieldedTransaction(
             "withdraw_10_weth_with_weth_fee"
         );
-        pool.transact(stx);
+        pool.transact(stx, false);
 
         uint256 assetFeeByPaymaster = paymaster.getAssetFee(feeAssetId);
         vm.prank(address(paymaster));
@@ -184,7 +184,7 @@ contract PaymasterTest is PoolTest {
         ShieldedTransaction memory stx = _loadShieldedTransaction(
             "withdraw_10_weth_with_weth_fee"
         );
-        pool.transact(stx);
+        pool.transact(stx, false);
 
         vm.startPrank(address(paymaster));
         pool.withdrawPaymasterFee(feeAssetId, address(paymaster));

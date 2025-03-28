@@ -70,13 +70,13 @@ contract PoolTransferTest is PoolTest {
         ShieldedTransaction memory stx = _loadShieldedTransaction(
             "transfer_500_weth_without_fee"
         );
-        pool.transact(stx);
+        pool.transact(stx, false);
         vm.expectRevert(
             abi.encodeWithSelector(
                 IPool.DoubleSpend.selector,
                 stx.nullifiers[0]
             )
         );
-        pool.transact(stx);
+        pool.transact(stx, false);
     }
 }

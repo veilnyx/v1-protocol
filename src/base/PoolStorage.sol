@@ -7,6 +7,7 @@ import {Asset, AssetType} from "../libraries/Asset.sol";
 import {RevokerData} from "../libraries/ShieldedTransaction.sol";
 
 abstract contract PoolStorage {
+    address public mempool;
     address public verifier;
     address public adaptorHandler;
     address public hasher;

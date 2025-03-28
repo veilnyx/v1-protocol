@@ -50,7 +50,7 @@ contract Gateway is IGateway, Ownable {
     function handleUserOp(
         ShieldedTransaction calldata stx
     ) external onlyEntryPoint {
-        IPool(_pool).transact(stx);
+        IPool(_pool).transact(stx, false);
     }
 
     function handleWrapAndDeposit(
@@ -58,7 +58,7 @@ contract Gateway is IGateway, Ownable {
     ) external payable {
         IWToken(_wToken).deposit{value: msg.value}();
         IWToken(_wToken).approve(_pool, msg.value);
-        IPool(_pool).transact(stx);
+        IPool(_pool).transact(stx, false);
     }
 
     // This may not be needed as paymaster is always supposed to pay for gas

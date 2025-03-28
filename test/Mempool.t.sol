@@ -7,31 +7,17 @@ import {console} from "forge-std/console.sol";
 import {PoolTest} from "test/fixtures/PoolTest.sol";
 import {Mempool} from "src/core/Mempool.sol";
 import {MempoolProxy} from "src/core/MempoolProxy.sol";
-import {ShieldedTransaction, PreVerificationDetails} from "src/libraries/ShieldedTransaction.sol";
+import {ShieldedTransaction} from "src/libraries/ShieldedTransaction.sol";
+import {PreVerificationDetails} from "src/core/Mempool.sol";
 
 contract MempoolTest is PoolTest {
-    Mempool public mempool;
-    uint256 public constant MEMPOOL_EXIT_FEES = 45e13; // 500k gas @ 0.9 gwei = 0.00045 ETH
-    address public immutable VERIFICATION_TRACKER_SERVICE = makeAddr("tracker");
     uint256 public constant INITIAL_MINT_AMT = 10000 ether;
     uint256 public constant DEPOSIT_AMT = 100 ether;
-    address public nebraVerifier = makeAddr("nebra");
 
     function setUp() public {
         PoolTest._setUp();
-        mempool = new Mempool();
-
-        bytes memory initializeData = abi.encodeWithSelector(
-            mempool.initialize.selector,
-            address(pool),
-            MEMPOOL_EXIT_FEES,
-            VERIFICATION_TRACKER_SERVICE,
-            nebraVerifier
-        );
-
-        MempoolProxy proxy = new MempoolProxy(address(mempool), initializeData);
-        mempool = Mempool(address(proxy));
-        console.log("Mempool deployed ");
+        console.log("Mempool deployed: ", address(mempool));
+        mempool.updatePoolAddress(address(pool));
     }
 
     function testAddStxToMempool() public {

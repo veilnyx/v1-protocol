@@ -18,7 +18,20 @@ import {Asset, AssetType, AssetLogic} from "../libraries/Asset.sol";
 import {MerkleTree, MerkleTreeLogic} from "../libraries/MerkleTree.sol";
 import {QueuedMerkleTree, QueuedMerkleTreeLogic, TreeUpdateData} from "../libraries/QueuedMerkleTree.sol";
 import {ShieldedAddressRegistrationData, ShieldedAddressLogic} from "../libraries/ShieldedAddress.sol";
-import {ShieldedTransaction, ShieldedTransactionLogic, RevokerData, PreVerificationDetails} from "../libraries/ShieldedTransaction.sol";
+import {ShieldedTransaction, ShieldedTransactionLogic, RevokerData} from "../libraries/ShieldedTransaction.sol";
+
+/// @param verifier The address of the verifier contract. Verifier contract verifies the stx's zk proof, address proof and merkle tree queue proof.
+/// @param adaptorHandler The address of the adaptor handler contract, responsible for delegate calling adaptors of external DeFi protocols.
+/// @param screener The address of the screener contract, responsible for screening sanctioned addresseses.
+/// @param hasher The address of the hasher contract. It provides a single interface to Poseidon hashing functions
+/// @param withdrawFeeBps The fee in basis points (1/10000) that is charged for withdrawing assets from the pool.
+struct InitAddressParams {
+    address mempool;
+    address verifier;
+    address adaptorHandler;
+    address screener;
+    address hasher;
+}
 
 contract Pool is
     IPool,
@@ -38,19 +51,12 @@ contract Pool is
     /// @dev Pool is an UUPSUpgradeable contract, so it needs to be initialized.
     /// @param addressTreeDepth The depth of the address tree.
     /// @param commitmentTreeDepth The depth of the commitment tree.
-    /// @param verifier_ The address of the verifier contract. Verifier contract verifies the stx's zk proof, address proof and merkle tree queue proof.
-    /// @param adaptorHandler_ The address of the adaptor handler contract, responsible for delegate calling adaptors of external DeFi protocols.
-    /// @param screener_ The address of the screener contract, responsible for screening sanctioned addresseses.
-    /// @param hasher_ The address of the hasher contract. It provides a single interface to Poseidon hashing functions
-    /// @param withdrawFeeBps_ The fee in basis points (1/10000) that is charged for withdrawing assets from the pool.
+
     function initialize(
         uint8 addressTreeDepth,
         uint8 commitmentTreeDepth,
         uint8 commitmentTreeQueueSize,
-        address verifier_,
-        address adaptorHandler_,
-        address screener_,
-        address hasher_,
+        InitAddressParams calldata initAddressParams,
         uint256 withdrawFeeBps_
     ) external initializer {
         __Ownable_init(msg.sender);
@@ -59,18 +65,19 @@ contract Pool is
         __Pausable_init();
         EIP712.init(EIP712_DOMAIN_NAME, EIP712_DOMAIN_VERSION);
 
-        verifier = verifier_;
-        adaptorHandler = adaptorHandler_;
-        hasher = hasher_;
-        screener = screener_;
+        mempool = initAddressParams.mempool;
+        verifier = initAddressParams.verifier;
+        adaptorHandler = initAddressParams.adaptorHandler;
+        hasher = initAddressParams.hasher;
+        screener = initAddressParams.screener;
         withdrawFeeBps = withdrawFeeBps_;
 
-        _addressTree.init(addressTreeDepth, hasher_);
+        _addressTree.init(addressTreeDepth, hasher);
         _commitmentTree.init(
             commitmentTreeDepth,
             commitmentTreeQueueSize,
-            hasher_,
-            verifier_
+            hasher,
+            verifier
         );
     }
 
@@ -199,45 +206,20 @@ contract Pool is
     }
 
     function transact(
-        ShieldedTransaction calldata stx
-    ) external nonReentrant whenNotPaused {
-        // assumes proof verification is NOT outsourced
-        PreVerificationDetails
-            memory preVerificationDetails = PreVerificationDetails({
-                isPreVerified: false,
-                circuitId: keccak256(abi.encode(0)),
-                publicInputs: new uint256[](0),
-                verifierAddr: address(0)
-            });
-
-        stx.validate({
-            preVerificationDetails: preVerificationDetails,
-            addressTree: _addressTree,
-            commitmentTree: _commitmentTree,
-            hasher: hasher,
-            verifier: verifier,
-            markedNullifiers: _markedNullifiers,
-            supportedAdaptors: _adaptors,
-            revokerDataMap: _revokers
-        });
-
-        stx.execute({
-            commitmentTree: _commitmentTree,
-            assets: _assets,
-            withdrawFees: _withdrawFees,
-            paymasterFees: _paymasterFees,
-            adaptorHandler: adaptorHandler,
-            hasher: hasher,
-            withdrawFeeBps: withdrawFeeBps
-        });
-    }
-
-    function preVerifiedTransact(
         ShieldedTransaction calldata stx,
-        PreVerificationDetails calldata preVerificationDetails
+        bool isPreVerified
     ) external nonReentrant whenNotPaused {
+        if (isPreVerified) {
+            if (msg.sender != mempool) {
+                revert IPool.InvalidSenderForPreverifiedSTX(
+                    msg.sender,
+                    mempool
+                );
+            }
+        }
+
         stx.validate({
-            preVerificationDetails: preVerificationDetails,
+            isPreVerified: isPreVerified,
             addressTree: _addressTree,
             commitmentTree: _commitmentTree,
             hasher: hasher,

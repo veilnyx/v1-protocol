@@ -38,13 +38,6 @@ struct RevokerData {
     uint256[2] encryptionPublicKey;
 }
 
-struct PreVerificationDetails {
-    bool isPreVerified;
-    bytes32 circuitId;
-    uint256[] publicInputs;
-    address verifierAddr;
-}
-
 /// @title ShieldedTransaction struct representing shielded transaction
 ///
 /// @param txType               Type of transaction
@@ -144,7 +137,7 @@ library ShieldedTransactionLogic {
     /// @param stx ShieldedTransaction to be executed
     function validate(
         ShieldedTransaction calldata stx,
-        PreVerificationDetails calldata preVerificationDetails,
+        bool isPreVerified,
         MerkleTree storage addressTree,
         QueuedMerkleTree storage commitmentTree,
         address hasher,
@@ -176,70 +169,11 @@ library ShieldedTransactionLogic {
 
         _checkAndMarkNullifiers(stx, commitmentTree, markedNullifiers);
 
-        if (preVerificationDetails.isPreVerified) {
-            bool preVerifiedStatus = _checkNebraProofVerificationStatus(
-                stx,
-                preVerificationDetails
-            );
-
-            if (!preVerifiedStatus) {
-                revert IPool.NotPreVerified();
-            }
-        } else {
+        if (!isPreVerified) {
             if (!verifyProof(stx, revokerData, hasher, verifier)) {
                 revert IPool.InvalidTransactionProof();
             }
         }
-    }
-
-    function _checkNebraProofVerificationStatus(
-        ShieldedTransaction memory stx,
-        PreVerificationDetails memory preVerificationDetails
-    ) internal view returns (bool) {
-        // validate the public inputs
-        uint256 txHashPubInput = preVerificationDetails.publicInputs[2];
-        if (txHashPubInput != hash(stx)) {
-            revert IPool.STXHashMismatch();
-        }
-
-        // creating proof id using the validated `publicInputs`
-        bytes32 proofId = genNebraProofId(preVerificationDetails);
-        bool isProofValid = INebraUpa(preVerificationDetails.verifierAddr)
-            .isProofVerified(proofId);
-
-        return isProofValid;
-    }
-
-    /// @notice Generates a proof id for Nebra proof verification
-    /// @dev Written in assembly because abi.encodePacked was causing stack too deep error due to large number of inputs (public inputs)
-    function genNebraProofId(
-        PreVerificationDetails memory preVerificationDetails
-    ) public pure returns (bytes32) {
-        // Pre-allocate memory for exact encoding pattern
-        bytes memory encoded = new bytes(546);
-
-        assembly {
-            let ptr := add(encoded, 32)
-
-            // Store circuitId with proper padding
-            mstore(ptr, mload(add(preVerificationDetails, 32)))
-            ptr := add(ptr, 32)
-
-            // Get pointer to publicInputs array
-            let inputsPtr := mload(add(preVerificationDetails, 64))
-
-            // Store each input with proper padding
-            for {
-                let i := 0
-            } lt(i, 16) {
-                i := add(i, 1)
-            } {
-                mstore(ptr, mload(add(inputsPtr, mul(i, 32))))
-                ptr := add(ptr, 32)
-            }
-        }
-
-        return keccak256(encoded);
     }
 
     /// @notice Executes a shielded transaction
