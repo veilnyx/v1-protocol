@@ -14,6 +14,7 @@ import {IPool} from "src/interfaces/IPool.sol";
 import {ShieldedTransaction, ShieldedTransactionLogic, ShieldedTransactionType, PubAsset} from "src/libraries/ShieldedTransaction.sol";
 import {Asset, AssetLogic, AssetType} from "src/libraries/Asset.sol";
 import {INebraUpa} from "../interfaces/INebraUpa.sol";
+import {console} from "forge-std/console.sol";
 
 struct PreVerificationDetails {
     bool isPreVerified;
@@ -126,7 +127,7 @@ contract Mempool is
         PreVerificationDetails memory preVerificationDetails
     ) public pure returns (bytes32) {
         // Pre-allocate memory for exact encoding pattern
-        bytes memory encoded = new bytes(546);
+        bytes memory encoded = new bytes(544);
 
         assembly {
             let ptr := add(encoded, 32)
@@ -135,16 +136,24 @@ contract Mempool is
             mstore(ptr, mload(add(preVerificationDetails, 32)))
             ptr := add(ptr, 32)
 
-            // Get pointer to publicInputs array
-            let inputsPtr := mload(add(preVerificationDetails, 64))
+            // Get publicInputs array pointer
+            // Add 64 instead of 32 to skip over the bool field (32 bytes) and access circuitId
+            let publicInputsPtr := mload(add(preVerificationDetails, 64))
 
-            // Store each input with proper padding
+            // Check array length (first 32 bytes of array contain length)
+            let arrayLength := mload(publicInputsPtr)
+            if iszero(eq(arrayLength, 16)) {
+                revert(0, 0) // Revert if not exactly 16 inputs
+            }
+
+            // Skip array length prefix and copy inputs
+            publicInputsPtr := add(publicInputsPtr, 32)
             for {
                 let i := 0
             } lt(i, 16) {
                 i := add(i, 1)
             } {
-                mstore(ptr, mload(add(inputsPtr, mul(i, 32))))
+                mstore(ptr, mload(add(publicInputsPtr, mul(i, 32))))
                 ptr := add(ptr, 32)
             }
         }
@@ -205,6 +214,9 @@ contract Mempool is
         }
 
         bytes32 proofId = genNebraProofId(preVerificationDetails);
+        console.log("ProofId generated onchain: ");
+        console.logBytes32(proofId);
+
         stxToProofId[stxHashPI] = proofId;
         stxMap[stxHashPI] = stx;
         stxSenders[stxHashPI] = stxSender;
@@ -222,6 +234,9 @@ contract Mempool is
 
         ShieldedTransaction memory stx = stxMap[stxHash];
         bytes32 proofId = stxToProofId[stxHash];
+
+        console.log("ProofId being verified onchain: ");
+        console.logBytes32(proofId);
 
         // Onchain check with Nebra to ensure the proof is verified
         bool isProofValid = INebraUpa(nebraVerifier).isProofVerified(proofId);
