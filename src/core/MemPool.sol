@@ -57,7 +57,7 @@ contract Mempool is
     error UnsupportedAsset(uint24 assetId);
     error ZeroValue();
     error InsufficientFee(uint256 given, uint256 required);
-    error NotPreVerifiedYet(uint256 stxHash, bytes32 proofId);
+    error STXNotPreVerified(uint256 stxHash, bytes32 proofId);
     error STXNonRefundable(uint256 stxHash);
 
     event STXAddedToMempool(
@@ -241,7 +241,7 @@ contract Mempool is
         // Onchain check with Nebra to ensure the proof is verified
         bool isProofValid = INebraUpa(nebraVerifier).isProofVerified(proofId);
         if (!isProofValid) {
-            revert NotPreVerifiedYet(stxHash, proofId);
+            revert STXNotPreVerified(stxHash, proofId);
         }
 
         // Remove STX from mempool
@@ -263,10 +263,10 @@ contract Mempool is
         emit STXProcessed(stxHash, proofId, block.timestamp);
     }
 
-    /// @notice Refund the user their assets if their STX fails proof verification.
-    /// @notice This also allows users to refund their assets if they decide to exit the mempool before their STX is verified.
-    function refund(uint256 stxHash) external nonReentrant {
-        if (_stxHashes.contains(stxHash)) {
+    /// @notice Drops the STX from mempool if it's proof is not verified yet or has failed verification.
+    /// @notice Refunds the user their deposit assets.
+    function dropFromMempool(uint256 stxHash) external nonReentrant {
+        if (!_stxHashes.contains(stxHash)) {
             revert STXNotInMempool(stxHash);
         }
 
@@ -304,6 +304,22 @@ contract Mempool is
         uint256 feeCollected = mempoolExitFeeCollected;
         mempoolExitFeeCollected = 0;
         Address.sendValue(payable(verificationTrackerService), feeCollected);
+    }
+
+    ///////////////////////////
+    //// Read Functions //////
+    ///////////////////////////
+    function isSTXInMempool(uint256 stxHash) external view returns (bool) {
+        return _stxHashes.contains(stxHash);
+    }
+
+    function getProofId(uint256 stxHash) external view returns (bytes32) {
+        return stxToProofId[stxHash];
+    }
+
+    function isSTXProofVerified(uint256 stxHash) external view returns (bool) {
+        bytes32 proofId = stxToProofId[stxHash];
+        return INebraUpa(nebraVerifier).isProofVerified(proofId);
     }
 
     ///////////////////////////

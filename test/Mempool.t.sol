@@ -14,12 +14,33 @@ contract MempoolTest is PoolTest {
     uint256 public constant INITIAL_MINT_AMT = 10000 ether;
     uint256 public constant DEPOSIT_AMT = 100 ether;
 
+    modifier addSTXToMempool() {
+        ShieldedTransaction memory stx = _loadShieldedTransaction(
+            "deposit_weth_tx"
+        );
+        PreVerificationDetails
+            memory preVerificationDetails = _loadPreVerificationDetails(
+                "deposit_weth_tx_preVerificationEncodedStruct"
+            );
+
+        _mintAsset(asset1, address(this), INITIAL_MINT_AMT);
+        _approveAsset(asset1, address(mempool), INITIAL_MINT_AMT);
+        deal(address(this), MEMPOOL_EXIT_FEES);
+
+        mempool.addSTXToMempool{value: MEMPOOL_EXIT_FEES}(
+            stx,
+            preVerificationDetails
+        );
+        _;
+    }
+
     function setUp() public {
         PoolTest._setUp();
         console.log("Mempool deployed: ", address(mempool));
         mempool.updatePoolAddress(address(pool));
     }
 
+    ///////////// Add STX to Mempool Tests //////////////
     function testAddStxToMempool() public {
         ShieldedTransaction memory stx = _loadShieldedTransaction(
             "deposit_weth_tx"
@@ -104,5 +125,90 @@ contract MempoolTest is PoolTest {
             stx,
             preVerificationDetails
         );
+    }
+
+    ///////////// Exit Mempool Tests //////////////
+
+    function testExitMempool() public addSTXToMempool {
+        require(shouldTestRun(), "Mempool::testRefund(): Chain not supported");
+        uint256 stxHashPI = _loadPreVerificationDetails(
+            "deposit_weth_tx_preVerificationEncodedStruct"
+        ).publicInputs[2];
+
+        bytes32 proofId = mempool.getProofId(stxHashPI);
+
+        vm.expectEmit(true, true, true, true);
+        emit Mempool.STXProcessed(stxHashPI, proofId, block.timestamp);
+        mempool.exitSTXFromMempool(stxHashPI);
+
+        assertEq(IERC20(asset1.assetAddress).balanceOf(address(mempool)), 0);
+        assertEq(
+            IERC20(asset1.assetAddress).balanceOf(address(pool)),
+            DEPOSIT_AMT
+        );
+        assertEq(address(mempool).balance, MEMPOOL_EXIT_FEES);
+        assertEq(mempool.isSTXInMempool(stxHashPI), false);
+    }
+
+    function testRevertWhenExitingSTXThatDoesNotExistInMempool() public {
+        uint256 stxHashPI = _loadPreVerificationDetails(
+            "deposit_weth_tx_preVerificationEncodedStruct"
+        ).publicInputs[2];
+
+        vm.expectRevert(
+            abi.encodeWithSelector(Mempool.STXNotInMempool.selector, stxHashPI)
+        );
+        mempool.exitSTXFromMempool(stxHashPI);
+    }
+
+    function testRevertWhenExitingSTXThatIsNotVerifiedYet()
+        public
+        addSTXToMempool
+    {
+        require(
+            shouldTestRun(),
+            "Mempool::testRevertWhenExitingSTXThatIsNotVerifiedYet(): Chain not supported"
+        );
+        uint256 stxHashPI = _loadPreVerificationDetails(
+            "deposit_weth_tx_preVerificationEncodedStruct"
+        ).publicInputs[2];
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                Mempool.STXNotPreVerified.selector,
+                stxHashPI,
+                mempool.getProofId(stxHashPI)
+            )
+        );
+        mempool.exitSTXFromMempool(stxHashPI);
+    }
+
+    ///////////// Refund //////////////////
+    function testDropFromMempool() public addSTXToMempool {
+        require(shouldTestRun(), "Mempool::testRefund(): Chain not supported");
+        uint256 stxHashPI = _loadPreVerificationDetails(
+            "deposit_weth_tx_preVerificationEncodedStruct"
+        ).publicInputs[2];
+
+        mempool.dropFromMempool(stxHashPI);
+        assert(IERC20(token1).balanceOf(address(this)) == INITIAL_MINT_AMT);
+        assert(IERC20(token1).balanceOf(address(mempool)) == 0);
+        assert(address(this).balance == MEMPOOL_EXIT_FEES);
+        assert(address(mempool).balance == 0);
+    }
+
+    receive() external payable {
+        console.log("Received native eth:", msg.value);
+    }
+
+    /// @dev Only allowing uniswap tests to run on Seplia testnet and ETH mainnet. More chains can be added.
+    function shouldTestRun() internal view returns (bool) {
+        if (block.chainid != 11155111) {
+            console.log(
+                "Skipping certain Mempool tests on the current chain as Nebra protocol may not be deployed. To run all Mempool tests, kindly run the tests on Sepolia testnet."
+            );
+            return false;
+        }
+        return true;
     }
 }

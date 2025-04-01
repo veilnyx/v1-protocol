@@ -37,18 +37,18 @@ export const registerCircuitsOnNebra = async () => {
     const transact21VKNebraFormat: Groth16VerifyingKey = Groth16VerifyingKey.from_snarkjs(transact21CircuitVKSnarkJs as SnarkJSVKey);
     console.log("transact21 circuit Groth16VK created");
 
+    // On-chain call to Nebra's verifier contract to register the verification key
+    const registerVKTxRes = await upaClient.upaInstance.verifier.registerVK(transact21VKNebraFormat, {
+        gasLimit: 15_00_000
+    });
+    console.log("VK registration on Nebra tx res:", registerVKTxRes);
+
     // Computing circuit Ids
     const registerCircuitId = await utils.computeCircuitId(registerVKNebraFormat);
     const transactCircuitId = await utils.computeCircuitId(transact21VKNebraFormat);
 
     console.log("Register circuit ID:", registerCircuitId);
     console.log("Transact circuit ID:", transactCircuitId);
-
-    // On-chain call to Nebra's verifier contract to register the verification key
-    const registerVKTxRes = await upaClient.upaInstance.verifier.registerVK(transact21VKNebraFormat, {
-        gasLimit: 15_00_000
-    });
-    console.log("VK registration on Nebra tx res:", registerVKTxRes);
 }
 
 registerCircuitsOnNebra().catch(console.error);
