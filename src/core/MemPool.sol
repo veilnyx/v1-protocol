@@ -73,11 +73,14 @@ contract Mempool is
         uint256 timestamp
     );
 
-    event STXRefunded(
+    event STXDropped(
         uint256 indexed stxHash,
         address indexed sender,
         uint256 timestamp
     );
+
+    event LockNotes(uint256 indexed stxHash, uint256[] nullifiers);
+    event UnlockNotes(uint256 indexed stxHash, uint256[] nullifiers);
 
     function initialize(
         address pool_,
@@ -224,6 +227,7 @@ contract Mempool is
         mempoolExitFeeCollected += mempoolExitFee;
 
         emit STXAddedToMempool(stxHashPI, stxSender, proofId, block.timestamp);
+        emit LockNotes(stxHashPI, stx.nullifiers);
     }
 
     /// @notice Take STX out of the mempool and execute it
@@ -261,6 +265,7 @@ contract Mempool is
         // Transact the STX
         pool.transact(stx, true);
         emit STXProcessed(stxHash, proofId, block.timestamp);
+        emit UnlockNotes(stxHash, stx.nullifiers);
     }
 
     /// @notice Drops the STX from mempool if it's proof is not verified yet or has failed verification.
@@ -297,7 +302,8 @@ contract Mempool is
         // refund the mempool exit fee to the stx sender
         Address.sendValue(payable(stxSender), mempoolExitFee);
 
-        emit STXRefunded(stxHash, stxSender, block.timestamp);
+        emit STXDropped(stxHash, stxSender, block.timestamp);
+        emit UnlockNotes(stxHash, stx.nullifiers); 
     }
 
     function withdrawMempoolExitFee() external nonReentrant {
