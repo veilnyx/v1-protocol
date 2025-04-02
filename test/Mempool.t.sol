@@ -63,6 +63,8 @@ contract MempoolTest is PoolTest {
             keccak256(abi.encodePacked("random")),
             block.timestamp
         );
+        vm.expectEmit(true, true, true, false);
+        emit Mempool.LockNotes(stxHashPI, stx.nullifiers);
         mempool.addSTXToMempool{value: MEMPOOL_EXIT_FEES}(
             stx,
             preVerificationDetails
@@ -130,15 +132,20 @@ contract MempoolTest is PoolTest {
     ///////////// Exit Mempool Tests //////////////
 
     function testExitMempool() public addSTXToMempool {
-        require(shouldTestRun(), "Mempool::testRefund(): Chain not supported");
         uint256 stxHashPI = _loadPreVerificationDetails(
             "deposit_weth_tx_preVerificationEncodedStruct"
         ).publicInputs[2];
+
+        uint256[] memory noteNullifiers = _loadShieldedTransaction(
+            "deposit_weth_tx"
+        ).nullifiers;
 
         bytes32 proofId = mempool.getProofId(stxHashPI);
 
         vm.expectEmit(true, true, true, true);
         emit Mempool.STXProcessed(stxHashPI, proofId, block.timestamp);
+        vm.expectEmit(true, true, true, false);
+        emit Mempool.UnlockNotes(stxHashPI, noteNullifiers);
         mempool.exitSTXFromMempool(stxHashPI);
 
         assertEq(IERC20(asset1.assetAddress).balanceOf(address(mempool)), 0);
@@ -150,7 +157,7 @@ contract MempoolTest is PoolTest {
         assertEq(mempool.isSTXInMempool(stxHashPI), false);
     }
 
-    function testRevertWhenExitingSTXThatDoesNotExistInMempool() public {
+    function testRevertWhenExitingSTXTDoesNotExistInMempool() public {
         uint256 stxHashPI = _loadPreVerificationDetails(
             "deposit_weth_tx_preVerificationEncodedStruct"
         ).publicInputs[2];
@@ -161,17 +168,18 @@ contract MempoolTest is PoolTest {
         mempool.exitSTXFromMempool(stxHashPI);
     }
 
-    function testRevertWhenExitingSTXThatIsNotVerifiedYet()
+    function testRevertWhenExitingSTXTIsNotVerifiedYet()
         public
         addSTXToMempool
     {
-        require(
-            shouldTestRun(),
-            "Mempool::testRevertWhenExitingSTXThatIsNotVerifiedYet(): Chain not supported"
-        );
         uint256 stxHashPI = _loadPreVerificationDetails(
             "deposit_weth_tx_preVerificationEncodedStruct"
         ).publicInputs[2];
+
+        // Mocking the proof verification result to false when testing locally
+        if (block.chainid == 31337) {
+            mockNebraVerifier.setIsProofVerifiedResult(false);
+        }
 
         vm.expectRevert(
             abi.encodeWithSelector(
@@ -185,10 +193,23 @@ contract MempoolTest is PoolTest {
 
     ///////////// Refund //////////////////
     function testDropFromMempool() public addSTXToMempool {
-        require(shouldTestRun(), "Mempool::testRefund(): Chain not supported");
         uint256 stxHashPI = _loadPreVerificationDetails(
             "deposit_weth_tx_preVerificationEncodedStruct"
         ).publicInputs[2];
+
+        uint256[] memory noteNullifiers = _loadShieldedTransaction(
+            "deposit_weth_tx"
+        ).nullifiers;
+
+        // Mocking the proof verification result to false when testing locally
+        if (block.chainid == 31337) {
+            mockNebraVerifier.setIsProofVerifiedResult(false);
+        }
+
+        vm.expectEmit(true, true, true, true);
+        emit Mempool.STXDropped(stxHashPI, address(this), block.timestamp);
+        vm.expectEmit(true, true, true, true);
+        emit Mempool.UnlockNotes(stxHashPI, noteNullifiers);
 
         mempool.dropFromMempool(stxHashPI);
         assert(IERC20(token1).balanceOf(address(this)) == INITIAL_MINT_AMT);
@@ -199,16 +220,5 @@ contract MempoolTest is PoolTest {
 
     receive() external payable {
         console.log("Received native eth:", msg.value);
-    }
-
-    /// @dev Only allowing uniswap tests to run on Seplia testnet and ETH mainnet. More chains can be added.
-    function shouldTestRun() internal view returns (bool) {
-        if (block.chainid != 11155111) {
-            console.log(
-                "Skipping certain Mempool tests on the current chain as Nebra protocol may not be deployed. To run all Mempool tests, kindly run the tests on Sepolia testnet."
-            );
-            return false;
-        }
-        return true;
     }
 }
