@@ -5,6 +5,7 @@ pragma solidity 0.8.24;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {console} from "forge-std/console.sol";
 import {PoolTest} from "test/fixtures/PoolTest.sol";
+import {IMempool} from "src/interfaces/IMempool.sol";
 import {Mempool} from "src/core/Mempool.sol";
 import {MempoolProxy} from "src/core/MempoolProxy.sol";
 import {ShieldedTransaction} from "src/libraries/ShieldedTransaction.sol";
@@ -57,14 +58,14 @@ contract MempoolTest is PoolTest {
         deal(address(this), MEMPOOL_EXIT_FEES);
 
         vm.expectEmit(true, true, true, false);
-        emit Mempool.STXAddedToMempool(
+        emit IMempool.STXAddedToMempool(
             stxHashPI,
             address(this),
             keccak256(abi.encodePacked("random")),
             block.timestamp
         );
         vm.expectEmit(true, true, true, false);
-        emit Mempool.LockNotes(stxHashPI, stx.nullifiers);
+        emit IMempool.LockNotes(stxHashPI, stx.nullifiers);
         mempool.addSTXToMempool{value: MEMPOOL_EXIT_FEES}(
             stx,
             preVerificationDetails
@@ -93,7 +94,7 @@ contract MempoolTest is PoolTest {
         _approveAsset(asset1, address(mempool), INITIAL_MINT_AMT);
         deal(address(this), MEMPOOL_EXIT_FEES);
 
-        vm.expectRevert(Mempool.InvalidStx.selector);
+        vm.expectRevert(IMempool.InvalidStx.selector);
         mempool.addSTXToMempool{value: MEMPOOL_EXIT_FEES}(
             stx,
             preVerificationDetails
@@ -121,7 +122,7 @@ contract MempoolTest is PoolTest {
         );
 
         vm.expectRevert(
-            abi.encodeWithSelector(Mempool.DuplicateStx.selector, stxHashPI)
+            abi.encodeWithSelector(IMempool.DuplicateStx.selector, stxHashPI)
         );
         mempool.addSTXToMempool{value: MEMPOOL_EXIT_FEES}(
             stx,
@@ -143,9 +144,9 @@ contract MempoolTest is PoolTest {
         bytes32 proofId = mempool.getProofId(stxHashPI);
 
         vm.expectEmit(true, true, true, true);
-        emit Mempool.STXProcessed(stxHashPI, proofId, block.timestamp);
+        emit IMempool.STXProcessed(stxHashPI, proofId, block.timestamp);
         vm.expectEmit(true, true, true, false);
-        emit Mempool.UnlockNotes(stxHashPI, noteNullifiers);
+        emit IMempool.UnlockNotes(stxHashPI, noteNullifiers);
         mempool.exitSTXFromMempool(stxHashPI);
 
         assertEq(IERC20(asset1.assetAddress).balanceOf(address(mempool)), 0);
@@ -163,7 +164,7 @@ contract MempoolTest is PoolTest {
         ).publicInputs[2];
 
         vm.expectRevert(
-            abi.encodeWithSelector(Mempool.STXNotInMempool.selector, stxHashPI)
+            abi.encodeWithSelector(IMempool.STXNotInMempool.selector, stxHashPI)
         );
         mempool.exitSTXFromMempool(stxHashPI);
     }
@@ -183,7 +184,7 @@ contract MempoolTest is PoolTest {
 
         vm.expectRevert(
             abi.encodeWithSelector(
-                Mempool.STXNotPreVerified.selector,
+                IMempool.STXNotPreVerified.selector,
                 stxHashPI,
                 mempool.getProofId(stxHashPI)
             )
@@ -207,9 +208,9 @@ contract MempoolTest is PoolTest {
         }
 
         vm.expectEmit(true, true, true, true);
-        emit Mempool.STXDropped(stxHashPI, address(this), block.timestamp);
+        emit IMempool.STXDropped(stxHashPI, address(this), block.timestamp);
         vm.expectEmit(true, true, true, true);
-        emit Mempool.UnlockNotes(stxHashPI, noteNullifiers);
+        emit IMempool.UnlockNotes(stxHashPI, noteNullifiers);
 
         mempool.dropFromMempool(stxHashPI);
         assert(IERC20(token1).balanceOf(address(this)) == INITIAL_MINT_AMT);

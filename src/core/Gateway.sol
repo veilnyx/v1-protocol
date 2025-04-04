@@ -6,8 +6,10 @@ import {IAccount} from "@account-abstraction/contracts/interfaces/IAccount.sol";
 import {IEntryPoint} from "@account-abstraction/contracts/interfaces/IEntryPoint.sol";
 import {PackedUserOperation} from "@account-abstraction/contracts/interfaces/PackedUserOperation.sol";
 import {ShieldedTransaction} from "../libraries/ShieldedTransaction.sol";
+import {PreVerificationDetails} from "./Mempool.sol";
 import {IWToken} from "../interfaces/IWToken.sol";
 import {IPool} from "../interfaces/IPool.sol";
+import {IMempool} from "../interfaces/IMempool.sol";
 import {IGateway} from "../interfaces/IGateway.sol";
 
 contract Gateway is IGateway, Ownable {
@@ -16,6 +18,7 @@ contract Gateway is IGateway, Ownable {
 
     address internal immutable _entryPoint;
     address internal immutable _pool;
+    address internal immutable _mempool;
     address internal immutable _wToken;
 
     error InvalidEntryPoint(address entryPoint);
@@ -30,11 +33,13 @@ contract Gateway is IGateway, Ownable {
     constructor(
         address entryPoint_,
         address wToken_,
-        address pool_
+        address pool_,
+        address mempool_
     ) Ownable(msg.sender) {
         _entryPoint = entryPoint_;
         _pool = pool_;
         _wToken = wToken_;
+        _mempool = mempool_;
     }
 
     /// @dev `missingAccountFunds` is always expected to be 0 since paymaster
@@ -48,9 +53,14 @@ contract Gateway is IGateway, Ownable {
     }
 
     function handleUserOp(
-        ShieldedTransaction calldata stx
+        ShieldedTransaction calldata stx,
+        PreVerificationDetails calldata preVerificationDetails
     ) external onlyEntryPoint {
-        IPool(_pool).transact(stx, false);
+        if (preVerificationDetails.isPreVerified) {
+            IMempool(_mempool).addSTXToMempool(stx, preVerificationDetails);
+        } else {
+            IPool(_pool).transact(stx, false);
+        }
     }
 
     function handleWrapAndDeposit(

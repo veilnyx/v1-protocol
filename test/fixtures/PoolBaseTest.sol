@@ -69,12 +69,13 @@ contract PoolBaseTest is BaseTest {
         hasher = _deployHasher();
         mempool = _deployMempool();
 
-        InitAddressParams memory initAddrParams = InitAddressParams({
+        InitAddressParams memory initAddressParams = InitAddressParams({
             mempool: address(mempool),
             verifier: address(verifier),
             adaptorHandler: address(adaptorHandler),
             screener: address(screener),
-            hasher: address(hasher)
+            hasher: address(hasher),
+            verificationTrackerService: makeAddr('zkVerificationTrackerService')
         });
 
         bytes memory initData = abi.encodeCall(
@@ -83,7 +84,7 @@ contract PoolBaseTest is BaseTest {
                 fixture.addressTreeDepth,
                 fixture.commitmentTreeDepth,
                 fixture.commitmentTreeQueueSize,
-                initAddrParams,
+                initAddressParams,
                 fixture.withdrawFeeBps
             )
         );

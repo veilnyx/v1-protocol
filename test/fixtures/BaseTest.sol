@@ -27,6 +27,7 @@ abstract contract BaseTest is Test {
     Config public config;
     uint256 MEMPOOL_EXIT_FEES = 45e13; // 500k gas @ 0.9 gwei = 0.00045 ETH
     address VERIFICATION_TRACKER_SERVICE = makeAddr("tracker");
+    address MOCK_GATEWAY = makeAddr("gateway");
 
     function _setUp() internal virtual {
         fixture = FixtureLib.load(vm);
@@ -115,7 +116,8 @@ abstract contract BaseTest is Test {
             address(0),
             MEMPOOL_EXIT_FEES,
             VERIFICATION_TRACKER_SERVICE,
-            nebraVerifier
+            nebraVerifier,
+            MOCK_GATEWAY
         );
 
         MempoolProxy proxy = new MempoolProxy(address(mempool), initializeData);

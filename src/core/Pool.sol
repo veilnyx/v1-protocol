@@ -31,6 +31,7 @@ struct InitAddressParams {
     address adaptorHandler;
     address screener;
     address hasher;
+    address verificationTrackerService;
 }
 
 contract Pool is
@@ -70,6 +71,8 @@ contract Pool is
         adaptorHandler = initAddressParams.adaptorHandler;
         hasher = initAddressParams.hasher;
         screener = initAddressParams.screener;
+        verificationTrackerService = initAddressParams
+            .verificationTrackerService;
         withdrawFeeBps = withdrawFeeBps_;
 
         _addressTree.init(addressTreeDepth, hasher);
@@ -209,6 +212,7 @@ contract Pool is
         ShieldedTransaction calldata stx,
         bool isPreVerified
     ) external nonReentrant whenNotPaused {
+        // constraining preVerified request sender to just the mempool contract.
         if (isPreVerified) {
             if (msg.sender != mempool) {
                 revert IPool.InvalidSenderForPreverifiedSTX(
@@ -230,12 +234,14 @@ contract Pool is
         });
 
         stx.execute({
+            isPreVerified: isPreVerified,
             commitmentTree: _commitmentTree,
             assets: _assets,
-            withdrawFees: _withdrawFees,
             paymasterFees: _paymasterFees,
-            adaptorHandler: adaptorHandler,
+            exitMempoolFeeCollected: _exitMempoolFeeCollected,
+            withdrawFees: _withdrawFees,
             hasher: hasher,
+            adaptorHandler: adaptorHandler,
             withdrawFeeBps: withdrawFeeBps
         });
     }
@@ -254,6 +260,23 @@ contract Pool is
         AssetLogic.transferAsset({
             assets: _assets,
             to: to,
+            assetId: assetId,
+            value: fee
+        });
+    }
+
+    function withdrawExitMempoolFee(
+        uint24 assetId
+    ) external nonReentrant whenNotPaused {
+        uint256 fee = _exitMempoolFeeCollected[assetId];
+        if (fee == 0) {
+            revert NoFeeToClaim(verificationTrackerService, assetId);
+        }
+
+        _exitMempoolFeeCollected[assetId] = 0;
+        AssetLogic.transferAsset({
+            assets: _assets,
+            to: verificationTrackerService,
             assetId: assetId,
             value: fee
         });
@@ -305,6 +328,12 @@ contract Pool is
         address paymaster
     ) external view returns (uint256) {
         return _paymasterFees[paymaster][assertId];
+    }
+
+    function getCollectedExitMempoolFee(
+        uint24 assetId
+    ) external view returns (uint256) {
+        return _exitMempoolFeeCollected[assetId];
     }
 
     function isAdaptorSupported(

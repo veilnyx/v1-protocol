@@ -9,6 +9,7 @@ import {Gateway} from "src/core/Gateway.sol";
 import {Paymaster} from "src/core/Paymaster.sol";
 import {IWToken} from "src/interfaces/IWToken.sol";
 import {ShieldedTransaction, ShieldedTransactionType} from "src/libraries/ShieldedTransaction.sol";
+import {PreVerificationDetails, Mempool} from "src/core/Mempool.sol";
 import {MockWToken} from "test/mocks/MockWToken.sol";
 
 contract MockPool {
@@ -20,8 +21,21 @@ contract MockPool {
     }
 }
 
+contract MockMempool {
+    function addSTXToMempool(
+        ShieldedTransaction calldata stx,
+        PreVerificationDetails calldata preVerificationDetails
+    ) external {
+        // Simulate gas usage
+        for (uint256 i = 0; i < 10; i++) {
+            new MockWToken();
+        }
+    }
+}
+
 contract GatewayTest is Test {
     MockPool public pool;
+    MockMempool public mempool;
     EntryPoint public entryPoint;
     Paymaster paymaster;
 
@@ -36,11 +50,13 @@ contract GatewayTest is Test {
     function setUp() public {
         entryPoint = new EntryPoint();
         pool = new MockPool();
+        mempool = new MockMempool();
         wToken = address(new MockWToken());
         gateway = new Gateway(
             address(entryPoint),
             address(wToken),
-            address(pool)
+            address(pool),
+            address(mempool)
         );
         paymaster = new Paymaster(address(entryPoint), address(gateway));
 
@@ -59,7 +75,7 @@ contract GatewayTest is Test {
 
     function test_handleUserOp() public {
         ShieldedTransaction memory stx;
-
+        PreVerificationDetails memory preVerificationDetails;
         uint24[] memory pubAssetIds = new uint24[](1);
         uint224[] memory pubAssetValues = new uint224[](1);
         uint248[] memory pubAssets = new uint248[](1);
@@ -81,6 +97,8 @@ contract GatewayTest is Test {
             )
         );
 
+        preVerificationDetails.isPreVerified = false;
+
         uint128 callGasLimit = uint128(2_000_000);
         uint128 verificationGasLimit = uint128(50_000);
         uint256 preVerificationGas = uint256(10_000);
@@ -91,7 +109,10 @@ contract GatewayTest is Test {
 
         PackedUserOperation memory userOp;
         userOp.sender = address(gateway);
-        userOp.callData = abi.encodeCall(Gateway.handleUserOp, stx);
+        userOp.callData = abi.encodeCall(
+            Gateway.handleUserOp,
+            (stx, preVerificationDetails)
+        );
         userOp.accountGasLimits = bytes32(
             bytes.concat(bytes16(verificationGasLimit), bytes16(callGasLimit))
         );
