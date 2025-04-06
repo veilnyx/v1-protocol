@@ -1,8 +1,9 @@
 import { genAddressRegistrations, genAddrRegWithOutsourceProofVerification } from "./genTestAddressRegistration";
-import { genTestDeposits, genTestDepositsWithOutsourceProofVerification } from "./genTestDeposits";
+import { genTestDeposits, genTestDepositsWithOutsourceProofVerification, genPackedUserOp } from "./genTestDeposits";
 import { genTestWithdrawals } from "./genTestWithdrawals";
 import { genTestTransfers } from "./genTestTransfers";
 import { genTestCallAdaptors } from './genTestCallAdaptor';
+
 import { getSDKInstance } from "./sdk";
 import { Point, poseidonHash } from "@zkfi-tech/babyjubjub";
 import { randomBigInt } from "@zkfi-tech/utils";
@@ -13,10 +14,11 @@ import {
 
 const main = async () => {
 	const { sdk, nebraClient, circuitIds } = await getSDKInstance();
+	await genPackedUserOp(sdk);
 	// await genAddressRegistrations(sdk);
 	// await genAddrRegWithOutsourceProofVerification(sdk, nebraClient, circuitIds.register);
 	// await genTestDeposits(sdk);
-	await genTestDepositsWithOutsourceProofVerification(sdk, nebraClient, circuitIds.transact21);
+	// await genTestDepositsWithOutsourceProofVerification(sdk, nebraClient, circuitIds.transact21);
 	// await genTestWithdrawals(sdk);
 	// await genTestTransfers(sdk);
 	// await genTestCallAdaptors(sdk);

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.24;
 
+import {PackedUserOperation} from "@account-abstraction/contracts/interfaces/PackedUserOperation.sol";
 import {Test} from "forge-std/Test.sol";
 import {Mempool} from "src/core/Mempool.sol";
 import {MempoolProxy} from "src/core/MempoolProxy.sol";
@@ -54,6 +55,12 @@ abstract contract BaseTest is Test {
         string memory name
     ) internal view returns (PreVerificationDetails memory) {
         return FixtureLib.loadPreVerificationDetails(name, vm);
+    }
+
+    function _loadPackedUserOp(
+        string memory name
+    ) internal view returns (PackedUserOperation memory) {
+        return FixtureLib.loadPackedUserOp(name, vm);
     }
 
     function _loadTreeUpdateData(

@@ -3,6 +3,7 @@ pragma solidity ^0.8.24;
 
 import {Test} from "forge-std/Test.sol";
 import {Vm} from "forge-std/Vm.sol";
+import {PackedUserOperation} from "@account-abstraction/contracts/interfaces/PackedUserOperation.sol";
 import {ShieldedTransaction, ShieldedTransactionType} from "src/libraries/ShieldedTransaction.sol";
 import {PreVerificationDetails} from "src/core/Mempool.sol";
 import {ShieldedAddressRegistrationData} from "src/libraries/ShieldedAddress.sol";
@@ -179,6 +180,18 @@ library FixtureLib {
             (PreVerificationDetails)
         );
         return preVerificationDetails;
+    }
+
+    function loadPackedUserOp(
+        string memory name,
+        Vm vm
+    ) external view returns (PackedUserOperation memory) {
+        bytes memory data = loadData(name, vm);
+        PackedUserOperation memory packedUserOp = abi.decode(
+            data,
+            (PackedUserOperation)
+        );
+        return packedUserOp;
     }
 
     function loadShieldedAddressRegistrationData(

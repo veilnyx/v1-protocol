@@ -1,7 +1,7 @@
 import { parseEther, parseUnits, zeroAddress } from "viem";
 import { Core } from "@zkfi-tech/core";
 import { TransactionType } from "@zkfi-tech/shared-types";
-import { fixture, generateTestTransactions, generateTestTransactionsWithOutsourcedProofVerification } from "./fixture";
+import { fixture, generateTestTransactions, generateTestTransactionsWithOutsourcedProofVerification, generatePackedUserOps } from "./fixture";
 import { parse } from 'path';
 
 const {
@@ -131,4 +131,11 @@ export const genTestDeposits = async (sdk: Core) => {
 
 export const genTestDepositsWithOutsourceProofVerification = async (sdk: Core, nebraClient: any, transactCircuitId: `0x${string}`) => {
   await generateTestTransactionsWithOutsourcedProofVerification(reqs, sdk, nebraClient, transactCircuitId);
+}
+
+export const genPackedUserOp = async (sdk: Core) => {
+  const [name, req] = Object.entries(reqs)[0];
+  console.log("req to userop:", req);
+  console.log("generating packed user op...");
+  await generatePackedUserOps(name, req, sdk);
 }

@@ -211,7 +211,7 @@ contract Pool is
     function transact(
         ShieldedTransaction calldata stx,
         bool isPreVerified
-    ) external nonReentrant whenNotPaused {
+    ) public nonReentrant whenNotPaused {
         // constraining preVerified request sender to just the mempool contract.
         if (isPreVerified) {
             if (msg.sender != mempool) {

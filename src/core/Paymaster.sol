@@ -10,7 +10,9 @@ import {IPaymaster} from "@account-abstraction/contracts/interfaces/IPaymaster.s
 import {IEntryPoint} from "@account-abstraction/contracts/interfaces/IEntryPoint.sol";
 import {PackedUserOperation} from "@account-abstraction/contracts/interfaces/PackedUserOperation.sol";
 import {ShieldedTransaction} from "../libraries/ShieldedTransaction.sol";
+import {PreVerificationDetails} from "../interfaces/IMempool.sol";
 import {IPool} from "../interfaces/IPool.sol";
+import {console} from "forge-std/console.sol";
 
 contract Paymaster is IPaymaster, Ownable {
     uint256 public constant VALIDATION_SUCCESS = 0;
@@ -165,7 +167,7 @@ contract Paymaster is IPaymaster, Ownable {
         bytes32 /*userOpHash*/,
         uint256 maxCostEth
     ) internal view returns (bytes memory, uint256) {
-        // Only support pool contract as sender
+        // Only support gateway contract as sender
         if (userOp.sender != sender) {
             revert InvalidSender(userOp.sender);
         }
@@ -197,38 +199,25 @@ contract Paymaster is IPaymaster, Ownable {
 
     function _parseFeeParams(
         PackedUserOperation calldata userOp
-    ) internal pure returns (address, uint24, uint256, bool) {
-        ShieldedTransaction memory stx = abi.decode(
-            userOp.callData[4:],
-            (ShieldedTransaction)
-        );
+    ) internal view returns (address, uint24, uint256, bool) {
+        (
+            ShieldedTransaction memory stx,
+            PreVerificationDetails memory preVeri
+        ) = abi.decode(
+                userOp.callData[4:],
+                (ShieldedTransaction, PreVerificationDetails)
+            );
+        console.logString("Calldata decoded!");
 
         // Check if the tx is outsourced verification tx or not
-        
-        /** @dev The paymasterAndData field is packed as follows (in order):
-         * 20 bytes - paymaster address
-         * 16 bytes - verification gas limit
-         * 16 bytes - postOp gas limit
-         * undefined bytes - paymaster-specific extra data. In Labyrinth's case, we will just be sending a boolean value
-         * 0x00...00 - not outsourced (0)
-         * 0x01...01 - outsourced (1)
-        */
-        (address paymaster, , , bytes memory isOutsourcedVerificationTx) = abi
-            .decode(
-                userOp.paymasterAndData,
-                (address, uint128, uint128, bytes)
-            );
-
-        bool isVerificationOutsourced = abi.decode(
-            isOutsourcedVerificationTx,
-            (bool)
-        );
+        bool isVerificationOutsourced = preVeri.isPreVerified;
 
         // FeeData is packed as follows (in order):
         // 20 bytes - paymaster address
         // 3 bytes - feeAssetId (24 bits)
         // 9 bytes - feeValue (72 bits)
-        // address paymaster = address(uint160(stx.feeData >> (24 + 72)));
+        address paymaster = address(uint160(stx.feeData >> (24 + 72)));
+        
         // Extract the feeAssetId (3 bytes)
         uint24 feeAssetId = uint24(stx.feeData >> 72);
 

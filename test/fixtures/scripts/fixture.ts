@@ -1,10 +1,10 @@
 import { readFileSync, writeFileSync } from "fs";
 import path from "path";
-import * as ethers from "ethers";
 import {
   bytesToBigInt,
   Hex,
-  hexToBigInt,
+  concatHex,
+  padHex,
   hexToBytes,
   keccak256,
   parseEther,
@@ -12,15 +12,24 @@ import {
   sliceHex,
   stringToHex,
   stringToBytes,
+  encodeFunctionData, encodeAbiParameters, parseAbiParameters,
+  bytesToHex,
+  getAddress,
+  toHex
 } from "viem";
+import {
+  UserOperation,
+  getPackedUserOperation
+} from "permissionless";
 import { ShieldedAccount } from "@zkfi-tech/account";
 import { Fp, Point, poseidonDecrypt } from "@zkfi-tech/babyjubjub";
+import { randomBigInt, randomBytes } from "@zkfi-tech/utils";
 import {
   TransactionOptions,
   TransactionRequest,
 } from "@zkfi-tech/shared-types";
 import { Core } from "@zkfi-tech/core";
-import { ZTransaction } from "@zkfi-tech/zk-prover";
+import { ZTransaction, PreVerification, PreVerificationDetails } from "@zkfi-tech/zk-prover";
 import { Note, SIZE_ENCRYPTED_DECRYPTION_KEY, SIZE_FULLY_ENCRYPTED_NOTE_DATA } from "@zkfi-tech/transaction";
 import config from "../config.json";
 import { register } from "module";
@@ -295,4 +304,102 @@ export async function mockNotes(depositName: string, sdk: Core) {
     //@ts-ignore
     sdk.commitmentTreeSource.insert(notes[i].commitment);
   }
+}
+
+export const generatePackedUserOps = async (name: string, req: TransactionRequest & TransactionOptions, sdk: Core) => {
+  // Generating ztx
+  const opts = {
+    viaBundler: req.viaBundler,
+    paymaster: req.paymaster,
+    revokerId: req.revokerId,
+  };
+  const tx = await sdk.createTransaction(req, opts);
+  const signedTx = await sdk.signTransaction(tx);
+  const ztx = await sdk.proveTransaction(signedTx);
+  console.log("ZTX:", ztx);
+
+  // generating preVerification
+  const preVeriDetails: PreVerificationDetails = {
+    isPreVerified: false,
+    circuitId: bytesToHex(randomBytes(32)),
+    publicInputs: [BigInt(0), BigInt(0)],
+    verifierAddr: bytesToHex(randomBytes(20)),
+  };
+  const preVerification = new PreVerification(preVeriDetails);
+
+  const gatewayAbi = JSON.parse(readFileSync("artifacts/Gateway.sol/Gateway.json", "utf-8")).abi;
+  const calldata = encodeFunctionData({
+    abi: gatewayAbi,
+    functionName: "handleUserOp",
+    args: [ztx.toSolidityInput(), preVerification]
+  });
+
+
+  const userOp: UserOperation<"v0.7"> = {
+    sender: getAddress(bytesToHex(randomBytes(20))), // to be set in solidity test setup
+    nonce: randomBigInt(32),
+    factory: undefined,
+    factoryData: "0x",
+    callData: calldata,
+    callGasLimit: BigInt(10_00_000),
+    verificationGasLimit: BigInt(10_00_000),
+    preVerificationGas: BigInt(10_00_000),
+    maxFeePerGas: BigInt(10_000_000_000),
+    maxPriorityFeePerGas: BigInt(10_000_000_000),
+    paymaster: getAddress(bytesToHex(randomBytes(20))), // to be set in solidity test setup
+    paymasterVerificationGasLimit: BigInt(10_00_000),
+    paymasterPostOpGasLimit: BigInt(10_00_000),
+    paymasterData: padHex(toHex(false), { size: 32 }),
+    signature: "0x",
+  };
+
+  const packedUserOp = await getPackedUserOperation(userOp);
+  console.log("Packed User Ops:", packedUserOp);
+
+  // Encode Packed User Ops
+  const solidityPackedUserOp = [
+    { name: 'sender', type: 'address' },
+    { name: 'nonce', type: 'uint256' },
+    { name: 'initCode', type: 'bytes' },
+    { name: 'callData', type: 'bytes' },
+    { name: 'accountGasLimits', type: 'bytes32' },
+    { name: 'preVerificationGas', type: 'uint256' },
+    { name: 'gasFees', type: 'bytes32' },
+    { name: 'paymasterAndData', type: 'bytes' },
+    { name: 'signature', type: 'bytes' }
+  ] as const;
+
+  // preparing PackedUserOps ABI
+  const packedUserOpPropertiesArray = solidityPackedUserOp.map((t) => `${t.type} ${t.name}`);
+  const packedUserOpPropertiesString = packedUserOpPropertiesArray.join(';');
+  const packedUserOpAbi = parseAbiParameters([
+    'PackedUserOperation userOp',
+    `struct PackedUserOperation { ${packedUserOpPropertiesString} }`,
+  ])
+
+  // preparing PackedUserOps values
+  const packedUserOpValues = [
+    packedUserOp.sender,
+    packedUserOp.nonce,
+    packedUserOp.initCode,
+    packedUserOp.callData,
+    packedUserOp.accountGasLimits,
+    packedUserOp.preVerificationGas,
+    packedUserOp.gasFees,
+    packedUserOp.paymasterAndData,
+    packedUserOp.signature
+  ]
+
+  const packedUserOpValueObj: Record<string, any> = {};
+  solidityPackedUserOp.forEach((t, i) => {
+    packedUserOpValueObj[t.name] = packedUserOpValues[i];
+  });
+
+  console.log("Starting Encoding of Packed User Op");
+  console.log("ABI: ", packedUserOpAbi);
+  console.log("Packed User Op Values: ", packedUserOpValueObj);
+  // @ts-ignore
+  const encoded = encodeAbiParameters(packedUserOpAbi, [packedUserOpValueObj]);
+
+  writeFileSync(`${dirFixtureData}/${name}_packed_userop.txt`, encoded);
 }
