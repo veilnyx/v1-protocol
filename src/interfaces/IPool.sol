@@ -54,6 +54,8 @@ interface IPool {
     error PublicAddressAlreadyRegistered(address addr);
     error BadArguments();
     error InvalidAddressProof();
+    error NotPreVerified();
+    error RootAddrMismatch(uint256 proofForRootAddr, uint256 rootAddrBeingRegisted);
     error InvalidSubtreeUpdateProof();
     error InvalidTransactionProof();
     error UnknownCommitmentTreeRoot();

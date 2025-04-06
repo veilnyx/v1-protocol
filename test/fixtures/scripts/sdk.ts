@@ -1,5 +1,8 @@
 //@ts-ignore
 import * as snarkJs from "snarkjs";
+import * as ethers from "ethers";
+import dotenv from 'dotenv';
+import path from 'path';
 import {
   createTestClient,
   http,
@@ -11,9 +14,10 @@ import {
   toHex,
 } from "viem";
 import { foundry } from "viem/chains";
-import { Core } from "@zkfi-tech/core";
+import { Core, CoreOptions } from "@zkfi-tech/core";
 import MerkleTree from "fixed-merkle-tree";
 import { Fp, poseidonHash } from "@zkfi-tech/babyjubjub";
+import { NebraClientAndCircuitIds } from "@zkfi-tech/zk-prover";
 import { toBigInt } from "@zkfi-tech/utils";
 import {
   MockAddressResolver,
@@ -31,6 +35,10 @@ const {
   commitmentTreeDepth,
 } = fixture;
 
+dotenv.config({
+  path: path.resolve(__dirname, '../../../.env')
+});
+
 const zeroElement = Fp.from(BigInt(keccak256(stringToBytes("zero")))).toHex();
 const hashFunction = (a: any, b: any) =>
   padHex(toHex(poseidonHash([toBigInt(a), toBigInt(b)])), { size: 32 });
@@ -44,7 +52,7 @@ export const addressTree = new MerkleTree(addressTreeDepth, [], {
   hashFunction,
 });
 
-export const getSDKInstance = () => {
+export const getSDKInstance = async () => {
   const client = createTestClient({
     chain: foundry,
     mode: "anvil",
@@ -58,7 +66,7 @@ export const getSDKInstance = () => {
 
   addressTreeSource.insert(senderAccount.rootAddress);
 
-  const zkfi = new Core({
+  const coreOpt: CoreOptions = {
     chainId: foundry.id,
     account: senderAccount,
     rpc: client as any,
@@ -72,8 +80,21 @@ export const getSDKInstance = () => {
       addressResolver,
       notesSource,
       contractSource: {} as any,
-    },
-  });
+    }
+  }
+
+  const zkfi = new Core(coreOpt);
+
+  // creating ethers signer using its wallet class
+  const sepoliaProvider = new ethers.JsonRpcProvider(process.env.RPC_ETHEREUM_SEPOLIA);
+  const envPrivateKey = process.env.SEPOLIA_TEST_PRIV_KEY;
+  const privateKey = envPrivateKey.slice(2).padStart(64, '0');
+  const wallet = new ethers.Wallet(privateKey);
+
+  const signer = wallet.connect(sepoliaProvider);
+  console.log("Creating nebra client");
+  const nebraClientAndCircuitIds: NebraClientAndCircuitIds = await zkfi.createNebraClientAndRegisterAllCircuits(signer);
+  const { nebraClient, circuitIds } = nebraClientAndCircuitIds;
 
   zkfi.getRevokerData = async () => ({
     id: 0,
@@ -84,5 +105,9 @@ export const getSDKInstance = () => {
 
   zkfi.getPaymasterFee = async () => BigInt(parseUnits("5", 6));
 
-  return zkfi;
+  return {
+    sdk: zkfi,
+    nebraClient,
+    circuitIds
+  };
 };

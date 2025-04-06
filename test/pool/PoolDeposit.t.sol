@@ -15,6 +15,18 @@ contract PoolDepositTest is PoolTest {
         _approveAsset(asset2, address(pool), 10000 ether);
     }
 
+    function test_weth_deposit() public {
+        uint256 deposit1 = 100 ether;
+        uint256 balance1 = token1.balanceOf(address(pool));
+
+        ShieldedTransaction memory stx = _loadShieldedTransaction(
+            "deposit_weth_tx"
+        );
+        _checkEventEmits(stx);
+
+        assertEq(token1.balanceOf(address(pool)), balance1 + deposit1);
+    }
+
     function test_deposit() public {
         uint256 deposit1 = 10000 ether;
         uint256 deposit2 = 10000e6;
