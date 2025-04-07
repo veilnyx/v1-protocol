@@ -110,7 +110,7 @@ export const getSDKInstance = async () => {
     isActive: true,
   });
 
-  zkfi.getPaymasterFee = async () => BigInt(parseUnits("5", 6));
+  zkfi.getPaymasterFee = async () => BigInt(parseEther("0.002"));
 
   return {
     sdk: zkfi,

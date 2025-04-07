@@ -19,8 +19,18 @@ export const reqs = {
     viaBundler: false,
     paymaster: zeroAddress,
     revokerId: 0,
+  }
+  /**,
+  deposit_pre_tx: {
+    type: TransactionType.DEPOSIT,
+    assetIds: [weth, usdc],
+    values: [parseEther("10000"), parseUnits("10000", 6)],
+    feeAssetId: 0,
+    to: senderAccount.shieldedAddress.pack(),
+    viaBundler: false,
+    paymaster: zeroAddress,
+    revokerId: 0,
   },
-  /**
   deposit_aaveWeth_testnetUsdc: {
     type: TransactionType.DEPOSIT,
     assetIds: [testnetWeth, testnetUsdc],
@@ -51,16 +61,6 @@ export const reqs = {
     paymaster: zeroAddress,
     revokerId: 0,
   }, 
-  deposit_pre_tx: {
-    type: TransactionType.DEPOSIT,
-    assetIds: [weth, usdc],
-    values: [parseEther("10000"), parseUnits("10000", 6)],
-    feeAssetId: 0,
-    to: senderAccount.shieldedAddress.pack(),
-    viaBundler: false,
-    paymaster: zeroAddress,
-    revokerId: 0,
-  },
   deposit_1000_weth_without_fee: {
     type: TransactionType.DEPOSIT,
     assetIds: [weth],
@@ -131,11 +131,4 @@ export const genTestDeposits = async (sdk: Core) => {
 
 export const genTestDepositsWithOutsourceProofVerification = async (sdk: Core, nebraClient: any, transactCircuitId: `0x${string}`) => {
   await generateTestTransactionsWithOutsourcedProofVerification(reqs, sdk, nebraClient, transactCircuitId);
-}
-
-export const genPackedUserOp = async (sdk: Core) => {
-  const [name, req] = Object.entries(reqs)[0];
-  console.log("req to userop:", req);
-  console.log("generating packed user op...");
-  await generatePackedUserOps(name, req, sdk);
 }

@@ -23,7 +23,7 @@ import {
 } from "permissionless";
 import { ShieldedAccount } from "@zkfi-tech/account";
 import { Fp, Point, poseidonDecrypt } from "@zkfi-tech/babyjubjub";
-import { randomBigInt, randomBytes } from "@zkfi-tech/utils";
+import { randomBigInt, randomBytes, randomHex } from "@zkfi-tech/utils";
 import {
   TransactionOptions,
   TransactionRequest,
@@ -327,32 +327,39 @@ export const generatePackedUserOps = async (name: string, req: TransactionReques
   };
   const preVerification = new PreVerification(preVeriDetails);
 
-  const gatewayAbi = JSON.parse(readFileSync("artifacts/Gateway.sol/Gateway.json", "utf-8")).abi;
+  // Generating calldata
+  const gatewayAbi = JSON.parse(readFileSync("out/Gateway.sol/Gateway.json", "utf-8")).abi;
   const calldata = encodeFunctionData({
     abi: gatewayAbi,
     functionName: "handleUserOp",
     args: [ztx.toSolidityInput(), preVerification]
   });
 
+  const nonce = concatHex([
+    padHex(randomHex(24), { size: 24 }),
+    padHex("0x0", { size: 8 }),
+  ]);
 
+  // Generating user op
   const userOp: UserOperation<"v0.7"> = {
-    sender: getAddress(bytesToHex(randomBytes(20))), // to be set in solidity test setup
-    nonce: randomBigInt(32),
+    sender: `0x${"77BF63adC47ADf53838Ad833C85364F16aAc228D"}` as `0x${string}`, // make sure this matches the Gateway address from solidity test setup
+    nonce: BigInt(nonce),
     factory: undefined,
     factoryData: "0x",
     callData: calldata,
-    callGasLimit: BigInt(10_00_000),
-    verificationGasLimit: BigInt(10_00_000),
-    preVerificationGas: BigInt(10_00_000),
-    maxFeePerGas: BigInt(10_000_000_000),
-    maxPriorityFeePerGas: BigInt(10_000_000_000),
-    paymaster: getAddress(bytesToHex(randomBytes(20))), // to be set in solidity test setup
-    paymasterVerificationGasLimit: BigInt(10_00_000),
-    paymasterPostOpGasLimit: BigInt(10_00_000),
-    paymasterData: padHex(toHex(false), { size: 32 }),
+    callGasLimit: BigInt(2_500_000),
+    verificationGasLimit: BigInt(75_000),
+    preVerificationGas: BigInt(75_000),
+    maxFeePerGas: BigInt(150_000_000),
+    maxPriorityFeePerGas: BigInt(150_000_000),
+    paymaster: `0x${"0beEbd452688b33EF0021261d93D3c3A04916598"}` as `0x${string}`, // make sure this matches the Paymaster address from solidity test setup
+    paymasterVerificationGasLimit: BigInt(25_000),
+    paymasterPostOpGasLimit: BigInt(5),
+    paymasterData: "0x",
     signature: "0x",
   };
 
+  // Generating packed user op
   const packedUserOp = await getPackedUserOperation(userOp);
   console.log("Packed User Ops:", packedUserOp);
 
