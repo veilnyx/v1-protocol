@@ -16,7 +16,7 @@ const main = async () => {
 	const { sdk, nebraClient, circuitIds } = await getSDKInstance();
 	await genTestDeposits(sdk);
 	// await genTestTransfers(sdk);
-	await genTransferPackedUserOp(sdk);
+	// await genTransferPackedUserOp(sdk);
 	// await genAddressRegistrations(sdk);
 	// await genAddrRegWithOutsourceProofVerification(sdk, nebraClient, circuitIds.register);
 	// await genTestDepositsWithOutsourceProofVerification(sdk, nebraClient, circuitIds.transact21);
