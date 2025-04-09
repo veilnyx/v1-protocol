@@ -101,6 +101,16 @@ struct MemoParams {
     bytes refundMemo;
 }
 
+struct UHFArrays {
+    uint256[] pubAssetIds;
+    uint256[] pubValues;
+    uint256[] nullifiers;
+    uint256[] commitments;
+    uint256[] encryptedDataEncryptionKeySeed;
+    uint256[] refundInputs;
+    uint256[][] notes;
+}
+
 /// @title ShieldedTransactionLogic library for shielded transaction logic
 library ShieldedTransactionLogic {
     using MerkleTreeLogic for MerkleTree;
@@ -252,7 +262,7 @@ library ShieldedTransactionLogic {
             stx.nullifiers.length,
             stx.commitments.length
         );
-        bytes memory vInp = toVerifierInput(stx, revokerData, hasher);
+        bytes memory vInp = toVerifierInput(stx, revokerData);
         return IVerifier(verifier).verifyTransactionProof(vId, vInp);
     }
 
@@ -260,23 +270,21 @@ library ShieldedTransactionLogic {
      *
      * @param self ShieldedTransaction to convert to a proper verifier input
      * @param revokerData The RevokerData used for this transaction
-     * @param hasher The address of the hasher contract
      * @return Calldata bytes for appropriate verifier contract
      * @dev We divide the public inputs into 2 chunks to avoid stack too deep error
      */
     function toVerifierInput(
         ShieldedTransaction calldata self,
-        RevokerData memory revokerData,
-        address hasher
+        RevokerData memory revokerData
     ) public view returns (bytes memory) {
         bytes memory pubDataChunk1;
+        // uint256 nOuts = self.commitments.length;
+        uint256 nPubs = self.pubAssets.length;
+        uint256[] memory pubAssetIds = new uint256[](nPubs);
+        uint256[] memory pubValues = new uint256[](nPubs);
         {
-            uint256 nOuts = self.commitments.length;
-            uint256 nPubs = self.pubAssets.length;
-            bytes memory padZeroBytes = new bytes((nOuts - nPubs) * 32);
+            // bytes memory padZeroBytes = new bytes((nOuts - nPubs) * 32);
 
-            uint256[] memory pubAssetIds = new uint256[](nPubs);
-            uint256[] memory pubValues = new uint256[](nPubs);
             for (uint8 i; i < nPubs; ++i) {
                 pubAssetIds[i] = uint24(bytes3(bytes31(self.pubAssets[i])));
                 pubValues[i] = uint224(self.pubAssets[i]);
@@ -288,11 +296,11 @@ library ShieldedTransactionLogic {
                 hash(self),
                 self.txType == ShieldedTransactionType.DEPOSIT
                     ? uint256(0)
-                    : uint256(1),
-                pubAssetIds,
-                padZeroBytes,
-                pubValues,
-                padZeroBytes
+                    : uint256(1)
+                // pubAssetIds,
+                // padZeroBytes,
+                // pubValues,
+                // padZeroBytes
             );
         }
 
@@ -310,13 +318,23 @@ library ShieldedTransactionLogic {
             );
         }
 
+        UHFArrays memory uhfArrays = UHFArrays({
+            pubAssetIds: pubAssetIds,
+            pubValues: pubValues,
+            nullifiers: self.nullifiers,
+            commitments: self.commitments,
+            encryptedDataEncryptionKeySeed: new uint256[](0),
+            refundInputs: new uint256[](0),
+            notes: new uint256[][](0)
+        });
+        (
+            uhfArrays.encryptedDataEncryptionKeySeed,
+            uhfArrays.refundInputs,
+            uhfArrays.notes
+        ) = _decomposeNotesMemo(self.notesMemo, self.commitments.length);
+
         // Performing sequential hashing (sha256) of encrypted data derived from notesMemo
-        (uint256 alpha, uint256 beta) = _UHF(
-            self.nullifiers,
-            self.commitments,
-            self.notesMemo,
-            self.commitments.length
-        );
+        (uint256 alpha, uint256 beta) = _UHF(uhfArrays);
 
         bytes memory verifierParams = abi.encodePacked(
             self.proof,
@@ -337,7 +355,7 @@ library ShieldedTransactionLogic {
         ) public view returns (uint256) {
             uint256 encryptedDataHash;
 
-            // Call _decomposeNotesMemo() to get the arrays
+            // Call _decomposeNotesMemo() to get the uhfArrays
             (
                 uint256[] memory encryptedDataEncryptionKeySeed,
                 uint256[] memory refundInputs,
@@ -439,44 +457,36 @@ library ShieldedTransactionLogic {
 
     /// @dev Performs sequential hashing (sha256) to generate `alpha` for _UHF
     function _genEncryptedDataHashUsingSha256(
-        uint256[] memory nullifiers,
-        uint256[] memory commitments,
-        bytes calldata notesMemo,
-        uint256 nOuts
-    ) internal view returns (uint256) {
-        // Call _decomposeNotesMemo() to get the arrays
-        (
-            uint256[] memory encryptedDataEncryptionKeySeed,
-            uint256[] memory refundInputs,
-            uint256[][] memory notes
-        ) = _decomposeNotesMemo(notesMemo, nOuts);
+        UHFArrays memory uhfArrays
+    ) internal pure returns (uint256) {
+        // Call _decomposeNotesMemo() to get the uhfArrays
 
-        uint256 currentHash = _hashChunkUsingSha256(0, nullifiers);
-        console.log("nullifiersHash:");
-        console.log(currentHash);
+        uint256 currentHash = _hashChunkUsingSha256(0, uhfArrays.pubAssetIds);
 
-        currentHash = _hashChunkUsingSha256(currentHash, commitments);
-        console.log("commitmentsHash:");
-        console.log(currentHash);
+        currentHash = _hashChunkUsingSha256(currentHash, uhfArrays.pubValues);
+
+        currentHash = _hashChunkUsingSha256(currentHash, uhfArrays.nullifiers);
+
+        currentHash = _hashChunkUsingSha256(currentHash, uhfArrays.commitments);
 
         currentHash = _hashChunkUsingSha256(
             currentHash,
-            encryptedDataEncryptionKeySeed
+            uhfArrays.encryptedDataEncryptionKeySeed
         );
-        console.log("encryptedDEKSeedHash:");
-        console.log(currentHash);
 
-        currentHash = _hashChunkUsingSha256(currentHash, refundInputs);
-        console.log("encryptedRefundDataHash:");
-        console.log(currentHash);
+        currentHash = _hashChunkUsingSha256(
+            currentHash,
+            uhfArrays.refundInputs
+        );
 
         // Hash note data in chunks of 4
-        for (uint i = 0; i < notes.length; i++) {
-            require(notes[i].length == 4, "Invalid note data length");
-            currentHash = _hashChunkUsingSha256(currentHash, notes[i]);
+        for (uint i = 0; i < uhfArrays.notes.length; i++) {
+            require(uhfArrays.notes[i].length == 4, "Invalid note data length");
+            currentHash = _hashChunkUsingSha256(
+                currentHash,
+                uhfArrays.notes[i]
+            );
         }
-        console.log("encryptedNoteDataHash (FINAL HASH):");
-        console.log(currentHash);
         return currentHash;
     }
 
@@ -516,59 +526,59 @@ library ShieldedTransactionLogic {
     /// @dev The onchain implementation of UHF processes each array of inputs being hashed seperately (unlike the TS implementation), due to the stack size limit of 16 in Solidity.
 
     function _UHF(
-        uint256[] calldata nullifiers,
-        uint256[] calldata commitments,
-        bytes calldata notesMemo,
-        uint256 nOuts
+        UHFArrays memory uhfArrays
     ) internal view returns (uint256, uint256) {
-        uint256 alpha = _genEncryptedDataHashUsingSha256(
-            nullifiers,
-            commitments,
-            notesMemo,
-            nOuts
-        );
-
-        (
-            uint256[] memory encryptedDataEncryptionKeySeed,
-            uint256[] memory refundInputs,
-            uint256[][] memory notes
-        ) = _decomposeNotesMemo(notesMemo, nOuts);
+        uint256 alpha = _genEncryptedDataHashUsingSha256(uhfArrays);
 
         uint256 alphaPow = 1;
         uint256 accumulator = 0;
 
         (accumulator, alphaPow) = _addToUHFAccumulator(
-            nullifiers,
+            uhfArrays.pubAssetIds,
             alpha,
             alphaPow,
             accumulator
         );
 
         (accumulator, alphaPow) = _addToUHFAccumulator(
-            commitments,
+            uhfArrays.pubValues,
             alpha,
             alphaPow,
             accumulator
         );
 
         (accumulator, alphaPow) = _addToUHFAccumulator(
-            encryptedDataEncryptionKeySeed,
+            uhfArrays.nullifiers,
             alpha,
             alphaPow,
             accumulator
         );
 
         (accumulator, alphaPow) = _addToUHFAccumulator(
-            refundInputs,
+            uhfArrays.commitments,
+            alpha,
+            alphaPow,
+            accumulator
+        );
+
+        (accumulator, alphaPow) = _addToUHFAccumulator(
+            uhfArrays.encryptedDataEncryptionKeySeed,
+            alpha,
+            alphaPow,
+            accumulator
+        );
+
+        (accumulator, alphaPow) = _addToUHFAccumulator(
+            uhfArrays.refundInputs,
             alpha,
             alphaPow,
             accumulator
         );
 
         // Process individual notes
-        for (uint i = 0; i < nOuts; i++) {
+        for (uint i = 0; i < uhfArrays.commitments.length; i++) {
             (accumulator, alphaPow) = _addToUHFAccumulator(
-                notes[i],
+                uhfArrays.notes[i],
                 alpha,
                 alphaPow,
                 accumulator
