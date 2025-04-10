@@ -48,6 +48,11 @@ contract Pool is
     using ShieldedAddressLogic for ShieldedAddressRegistrationData;
     using ShieldedTransactionLogic for ShieldedTransaction;
 
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
     /// @notice Initializes the Pool contract with the given parameters.
     /// @dev Pool is an UUPSUpgradeable contract, so it needs to be initialized.
     /// @param addressTreeDepth The depth of the address tree.
@@ -179,6 +184,12 @@ contract Pool is
 
     function setWithdrawFeeBips(uint256 feeBps) external onlyOwner {
         withdrawFeeBps = feeBps;
+    }
+
+    function updateVerificationTrackerService(
+        address verificationTrackerService_
+    ) external onlyOwner {
+        verificationTrackerService = verificationTrackerService_;
     }
 
     /////////////////////////////////////////

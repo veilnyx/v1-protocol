@@ -10,7 +10,7 @@ import {IVerifier} from "../interfaces/IVerifier.sol";
 import {IHasher} from "../interfaces/IHasher.sol";
 import {IAdaptorHandler} from "../interfaces/IAdaptorHandler.sol";
 import {INebraUpa} from "../interfaces/INebraUpa.sol";
-import {console} from "forge-std/console.sol";
+
 /// @title ShieldedTransactionType enum representing types of shielded transactions
 enum ShieldedTransactionType {
     DEPOSIT,
@@ -278,16 +278,26 @@ library ShieldedTransactionLogic {
         RevokerData memory revokerData
     ) public view returns (bytes memory) {
         bytes memory pubDataChunk1;
-        // uint256 nOuts = self.commitments.length;
+        uint256 nOuts = self.commitments.length;
         uint256 nPubs = self.pubAssets.length;
-        uint256[] memory pubAssetIds = new uint256[](nPubs);
-        uint256[] memory pubValues = new uint256[](nPubs);
+        uint256[] memory pubAssetIds = new uint256[](nOuts);
+        uint256[] memory pubValues = new uint256[](nOuts);
         {
             // bytes memory padZeroBytes = new bytes((nOuts - nPubs) * 32);
+            uint256 padLen = nOuts - nPubs;
+            if (padLen < 0) {
+                revert("Output notes count is less than public assets");
+            }
 
             for (uint8 i; i < nPubs; ++i) {
                 pubAssetIds[i] = uint24(bytes3(bytes31(self.pubAssets[i])));
                 pubValues[i] = uint224(self.pubAssets[i]);
+            }
+
+            // padding to make pubAsset
+            for (uint i = nPubs; i < nOuts; ++i) {
+                pubAssetIds[i] = 0;
+                pubValues[i] = 0;
             }
 
             pubDataChunk1 = abi.encodePacked(
@@ -458,12 +468,20 @@ library ShieldedTransactionLogic {
     /// @dev Performs sequential hashing (sha256) to generate `alpha` for _UHF
     function _genEncryptedDataHashUsingSha256(
         UHFArrays memory uhfArrays
-    ) internal pure returns (uint256) {
+    ) internal view returns (uint256) {
         // Call _decomposeNotesMemo() to get the uhfArrays
+        uint256 currentHash = 0;
+        if (uhfArrays.pubAssetIds.length != 0) {
+            currentHash = _hashChunkUsingSha256(
+                currentHash,
+                uhfArrays.pubAssetIds
+            );
 
-        uint256 currentHash = _hashChunkUsingSha256(0, uhfArrays.pubAssetIds);
-
-        currentHash = _hashChunkUsingSha256(currentHash, uhfArrays.pubValues);
+            currentHash = _hashChunkUsingSha256(
+                currentHash,
+                uhfArrays.pubValues
+            );
+        }
 
         currentHash = _hashChunkUsingSha256(currentHash, uhfArrays.nullifiers);
 
@@ -585,10 +603,6 @@ library ShieldedTransactionLogic {
             );
         }
 
-        console.log("onchain::alpha:");
-        console.logUint(alpha);
-        console.log("onchain::beta:");
-        console.logUint(accumulator);
         return (alpha, accumulator);
     }
 

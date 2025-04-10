@@ -209,7 +209,7 @@ contract PoolTest is PoolBaseTest, BaseScript {
         _approveAsset(asset1, address(pool), deposit1);
         _approveAsset(asset2, address(pool), deposit2);
         ShieldedTransaction memory stx = _loadShieldedTransaction(
-            "deposit_weth_tx"
+            "deposit_pre_tx"
         );
         pool.transact(stx, false);
         _processCommitmentTreeQueue();

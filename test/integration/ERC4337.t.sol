@@ -6,7 +6,7 @@ import {EntryPoint} from "@account-abstraction/contracts/core/EntryPoint.sol";
 import {PackedUserOperation} from "@account-abstraction/contracts/interfaces/PackedUserOperation.sol";
 import {Paymaster} from "src/core/Paymaster.sol";
 import {Gateway} from "src/core/Gateway.sol";
-import {ShieldedTransaction, ShieldedTransactionType} from "src/libraries/ShieldedTransaction.sol";
+import {ShieldedTransaction, ShieldedTransactionLogic, ShieldedTransactionType} from "src/libraries/ShieldedTransaction.sol";
 import {Mempool, PreVerificationDetails} from "src/core/Mempool.sol";
 import {Pool} from "src/core/Pool.sol";
 import {MockPool} from "test/mocks/MockPool.sol";
@@ -42,6 +42,8 @@ contract ERC4337 is PoolTest {
         console2.log("Gateway(Sender) address:");
         console2.logAddress(address(gateway));
 
+        mempool.updateGatewayContract(address(gateway));
+
         paymaster = new Paymaster(
             address(entryPointContract),
             address(gateway)
@@ -53,7 +55,7 @@ contract ERC4337 is PoolTest {
         vm.deal(address(this), 100 ether);
         paymaster.depositToEntryPoint{value: 100 ether}();
         paymaster.setAssetFee(feeAssetId, feeValue);
-        paymaster.setAssetFeeForOutsourcedVerificationTx(
+        paymaster.setAssetFeeForPreVerifiedTx(
             feeAssetId,
             feeValueForOutsourcedVerification
         );
@@ -66,14 +68,32 @@ contract ERC4337 is PoolTest {
         _processCommitmentTreeQueue();
     }
 
-    function testHandleOps() public {
+    // Since this tx is not preVerfied, it will go to the pool
+    function testHandleOpsForBundlerInstanTx() public {
         PackedUserOperation[] memory ops = new PackedUserOperation[](1);
         PackedUserOperation memory packedUserOp = _loadPackedUserOp(
-            "transfer_100_weth_with_weth_fee_packed_userop"
+            "transfer_20_weth_with_weth_fee_packed_userop"
         );
 
         ops[0] = packedUserOp;
         entryPointContract.handleOps(ops, payable(address(this)));
+    }
+
+    // Since this tx will be preVerified, it will go to the mempool
+    function testHandleOpsForBundlerPreVerifiedTx() public {
+        PackedUserOperation[] memory ops = new PackedUserOperation[](1); // Entrypoint contract requires an array of ops
+        PackedUserOperation memory packedUserOp = _loadPackedUserOp(
+            "transfer_20_weth_with_weth_fee_packed_userop_preVerified"
+        );
+
+        ops[0] = packedUserOp;
+        entryPointContract.handleOps(ops, payable(address(this))); // add STX to Mempool
+
+        // exiting mempool for being processed by the Pool
+        ShieldedTransaction memory stx = _loadShieldedTransaction(
+            "transfer_20_weth_with_weth_fee"
+        );
+        mempool.exitSTXFromMempool(ShieldedTransactionLogic.hash(stx));
     }
 
     receive() external payable {

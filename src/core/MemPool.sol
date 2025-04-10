@@ -17,6 +17,7 @@ import {Asset, AssetLogic, AssetType} from "src/libraries/Asset.sol";
 import {INebraUpa} from "../interfaces/INebraUpa.sol";
 import {console} from "forge-std/console.sol";
 
+/// @dev Prerequisite: Mempool::updatePool(..) needs to be called if Pool address is 0x, for the mempool to be able to interact with the pool, incase a new Pool is deployed (pool address will be preknown if its upgraded).
 contract Mempool is
     Initializable,
     UUPSUpgradeable,
@@ -269,9 +270,10 @@ contract Mempool is
         PreVerificationDetails memory preVerificationDetails
     ) public pure returns (bytes32) {
         // Pre-allocate memory for exact encoding pattern
-        bytes memory encoded = new bytes(544);
+        bytes memory encoded = new bytes(416); // circuit ID + 11 public inputs = 32 + 384 = 416 bytes
 
         assembly {
+            let publicInputCount := 11
             let ptr := add(encoded, 32)
 
             // Store circuitId with proper padding
@@ -284,7 +286,7 @@ contract Mempool is
 
             // Check array length (first 32 bytes of array contain length)
             let arrayLength := mload(publicInputsPtr)
-            if iszero(eq(arrayLength, 16)) {
+            if iszero(eq(arrayLength, publicInputCount)) {
                 revert(0, 0) // Revert if not exactly 16 inputs
             }
 
@@ -292,7 +294,7 @@ contract Mempool is
             publicInputsPtr := add(publicInputsPtr, 32)
             for {
                 let i := 0
-            } lt(i, 16) {
+            } lt(i, publicInputCount) {
                 i := add(i, 1)
             } {
                 mstore(ptr, mload(add(publicInputsPtr, mul(i, 32))))
@@ -321,13 +323,8 @@ contract Mempool is
             revert DuplicateStx(stxHashPI);
         }
 
-        // Mempool exit fee check
-        if (msg.value < mempoolExitFee) {
-            revert InsufficientFee(msg.value, mempoolExitFee);
-        }
-
         // Non-deposit STX are only supported through Account Abstraction (ERC4337) infra
-        // This is done to enforce privacy by not exposing the user's public address in the tx traces and to manage fee reimbursement to paymaster and verification tracker service by the Laby pool, using the `stx.feeData`.
+        // This is done to enforce privacy by not exposing the user's public address in the tx traces and to manage fee reimbursement to both paymaster and verification tracker service by the Laby pool, using the `stx.feeData`.
         if (stx.txType != ShieldedTransactionType.DEPOSIT) {
             // msg.sender should only be the Gateway contract
             if (msg.sender != gateway) {
@@ -337,6 +334,12 @@ contract Mempool is
 
         // Asset checks and transfer for DEPOSIT tx
         if (stx.txType == ShieldedTransactionType.DEPOSIT) {
+            // Mempool exit fee check
+            // User pays mempool exit fee in ETH for deposit tx only. Other tx types are handled by the ERC4337 infra.
+            if (msg.value < mempoolExitFee) {
+                revert InsufficientFee(msg.value, mempoolExitFee);
+            }
+
             for (uint i = 0; i < stx.pubAssets.length; i++) {
                 (uint24 assetId, uint224 value) = _decodeAsset(
                     stx.pubAssets[i]

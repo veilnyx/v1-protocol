@@ -67,7 +67,7 @@ contract PaymasterTest is PoolTest {
         paymaster = new Paymaster(entryPoint, address(pool));
         console2.log("paymaster:", address(paymaster));
         paymaster.setAssetFee(feeAssetId, feeValue);
-        paymaster.setAssetFeeForOutsourcedVerificationTx(
+        paymaster.setAssetFeeForPreVerifiedTx(
             feeAssetId,
             feeValueForOutsourcedVerification
         );

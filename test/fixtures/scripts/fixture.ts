@@ -151,6 +151,7 @@ export const generateTestTransactionWithOutsourcedProofVerification = async (
     viaBundler: req.viaBundler,
     paymaster: req.paymaster,
     revokerId: req.revokerId,
+    isPreVerified: true
   };
   const tx = await sdk.createTransaction(req, opts);
   console.log("TX: ", tx);
@@ -301,31 +302,51 @@ export async function mockNotes(depositName: string, sdk: Core) {
   for (let i = 0; i < notes.length; i++) {
     //@ts-ignore
     sdk.notesSource.mockNotes(notes[i].assetId, [notes[i]]);
-    //@ts-ignore
+    // @ts-ignore
     sdk.commitmentTreeSource.insert(notes[i].commitment);
   }
 }
 
-export const generatePackedUserOps = async (name: string, req: TransactionRequest & TransactionOptions, sdk: Core) => {
+export const generatePackedUserOps = async (name: string, req: TransactionRequest & TransactionOptions, sdk: Core, isPreVerified: boolean, nebraClient, transactCircuitId) => {
   // Generating ztx
   const opts = {
     viaBundler: req.viaBundler,
     paymaster: req.paymaster,
     revokerId: req.revokerId,
+    isPreVerified: isPreVerified
   };
   const tx = await sdk.createTransaction(req, opts);
   const signedTx = await sdk.signTransaction(tx);
-  const ztx = await sdk.proveTransaction(signedTx);
-  console.log("ZTX:", ztx);
 
-  // generating preVerification
-  const preVeriDetails: PreVerificationDetails = {
-    isPreVerified: false,
-    circuitId: bytesToHex(randomBytes(32)),
-    publicInputs: [BigInt(0), BigInt(0)],
-    verifierAddr: bytesToHex(randomBytes(20)),
-  };
-  const preVerification = new PreVerification(preVeriDetails);
+  let ztx: ZTransaction;
+  let preVerification: PreVerification;
+
+  if (isPreVerified) {
+    const { provedTx, preVerification: preVerification_ } = await sdk.proveTransactionAndOutsourceVerification(
+      tx,
+      nebraClient,
+      transactCircuitId
+    );
+    ztx = provedTx;
+    preVerification = preVerification_;
+  } else {
+    ztx = await sdk.proveTransaction(signedTx);
+    
+    // generating preVerificationDetails obj since required by Gateway contract
+    const preVeriDetails: PreVerificationDetails = {
+      isPreVerified: isPreVerified,
+      circuitId: bytesToHex(randomBytes(32)),
+      publicInputs: [BigInt(0), BigInt(0)],
+      verifierAddr: bytesToHex(randomBytes(20)),
+    };
+    
+    preVerification = new PreVerification(preVeriDetails);
+  }
+
+  console.log("ZTX:", ztx);
+  const encodedZTx = ztx.encode();
+  console.log("ZTX Encoded:", encodedZTx);
+  writeFileSync(`${dirFixtureData}/${name}.txt`, encodedZTx);
 
   // Generating calldata
   const gatewayAbi = JSON.parse(readFileSync("out/Gateway.sol/Gateway.json", "utf-8")).abi;
@@ -408,5 +429,9 @@ export const generatePackedUserOps = async (name: string, req: TransactionReques
   // @ts-ignore
   const encoded = encodeAbiParameters(packedUserOpAbi, [packedUserOpValueObj]);
 
-  writeFileSync(`${dirFixtureData}/${name}_packed_userop.txt`, encoded);
+  if(isPreVerified) {
+    writeFileSync(`${dirFixtureData}/${name}_packed_userop_preVerified.txt`, encoded);
+  } else {
+    writeFileSync(`${dirFixtureData}/${name}_packed_userop.txt`, encoded);
+  }
 }

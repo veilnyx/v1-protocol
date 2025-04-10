@@ -41,11 +41,11 @@ contract PoolWithdrawTest is PoolTest {
         );
         uint224 withdrawAmt = uint224(stx.pubAssets[0]);
         uint256 feeBps = pool.withdrawFeeBps();
-        uint96 feeValue = uint72(stx.feeData);
+        uint72 feeValue = uint72(stx.feeData);
 
         _checkEventEmits(stx);
 
-        // feeValue and withdraw fee amt is left back in the pool
+        // feeValue and protocol withdraw fee amt is left back in the pool
         uint256 expectedBalPostWithdraw = balance1 -
             withdrawAmt +
             feeValue +
@@ -63,7 +63,7 @@ contract PoolWithdrawTest is PoolTest {
         );
         uint224 withdrawAmt = uint224(stx.pubAssets[0]);
         uint256 feeBps = pool.withdrawFeeBps();
-        uint96 feeValue = uint72(stx.feeData);
+        uint72 feeValue = uint72(stx.feeData);
         address paymaster = address(bytes20(bytes32(stx.feeData)));
 
         _checkEventEmits(stx);

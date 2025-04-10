@@ -7,7 +7,6 @@ import {Asset, AssetType} from "../libraries/Asset.sol";
 import {RevokerData} from "../libraries/ShieldedTransaction.sol";
 
 abstract contract PoolStorage {
-    address public mempool;
     address public verifier;
     address public adaptorHandler;
     address public hasher;
@@ -38,5 +37,6 @@ abstract contract PoolStorage {
     mapping(uint24 => uint256) internal _withdrawFees;
     mapping(address paymaster => mapping(uint24 assetId => uint256 feeAmount))
         internal _paymasterFees;
+    address public mempool;
     mapping(uint24 => uint256) internal _exitMempoolFeeCollected;
 }

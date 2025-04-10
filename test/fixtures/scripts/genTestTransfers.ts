@@ -10,10 +10,10 @@ const {
 } = fixture;
 
 export const reqs = {
-	transfer_100_weth_with_weth_fee: {
+	transfer_20_weth_with_weth_fee: {
 		type: TransactionType.TRANSFER,
 		assetIds: [weth],
-		values: [parseEther("99.998")], // 99.998 to account for 0.002 fee and preventing use of transact22 (no refund notes) since transact22 circuit is not supporting UHF yet
+		values: [parseEther("20")],
 		to: receiverAccount.shieldedAddress.pack(),
 		viaBundler: true,
 		paymaster:
@@ -22,14 +22,25 @@ export const reqs = {
 		revokerId: 0,
 	}
 	/**,
-	transfer_100_weth_without_fee: {
+	transfer_20_weth_without_fee: {
 		type: TransactionType.TRANSFER,
 		assetIds: [weth],
-		values: [parseEther("100")],
+		values: [parseEther("20")],
 		feeAssetId: 0,
 		to: receiverAccount.shieldedAddress.pack(),
 		viaBundler: false,
 		paymaster: zeroAddress,
+		revokerId: 0,
+	},
+	transfer_500_weth_with_weth_fee: {
+		type: TransactionType.TRANSFER,
+		assetIds: [weth],
+		values: [parseEther("500")],
+		to: receiverAccount.shieldedAddress.pack(),
+		viaBundler: true,
+		paymaster:
+			`0x${"0beEbd452688b33EF0021261d93D3c3A04916598"}` as `0x${string}`,
+		feeAssetId: weth,
 		revokerId: 0,
 	},
 	transfer_500_weth_with_usdc_fee: {
@@ -47,13 +58,13 @@ export const reqs = {
 };
 
 export const genTestTransfers = async (sdk: Core) => {
-	await mockNotes("deposit_weth_tx", sdk);
+	await mockNotes("deposit_pre_tx", sdk);
 	await generateTestTransactions(reqs, sdk);
 };
 
-export const genTransferPackedUserOp = async (sdk: Core) => {
+export const genTransferPackedUserOp = async (sdk: Core, nebraClient: any, circuitIds: any) => {
 	await mockNotes("deposit_weth_tx", sdk);
 	const [name, req] = Object.entries(reqs)[0];
 	console.log("req to userop:", req);
-	await generatePackedUserOps(name, req, sdk);
+	await generatePackedUserOps(name, req, sdk, true, nebraClient, circuitIds.transact22);
 }

@@ -25,7 +25,7 @@ contract Paymaster is IPaymaster, Ownable {
      */
     mapping(uint24 => uint256) private _assetFees;
     /// @dev Mapping from assetId to fee value for outsourced verification tx. The gas cost for such tx will be lower due to the ZK proof verification being outsourced.
-    mapping(uint24 => uint256) private _assetFeesForOutsourcedVerfication;
+    mapping(uint24 => uint256) private _assetFeesForPreVerifiedTx;
 
     error InvalidPaymaster(address paymaster);
     error InvalidEntryPoint();
@@ -57,11 +57,11 @@ contract Paymaster is IPaymaster, Ownable {
      * @param assetId  - Asset id to update fee for.
      * @param feeValue - Fee value to set.
      */
-    function setAssetFeeForOutsourcedVerificationTx(
+    function setAssetFeeForPreVerifiedTx(
         uint24 assetId,
         uint256 feeValue
     ) external onlyOwner {
-        _assetFeesForOutsourcedVerfication[assetId] = feeValue;
+        _assetFeesForPreVerifiedTx[assetId] = feeValue;
     }
 
     /**
@@ -138,20 +138,20 @@ contract Paymaster is IPaymaster, Ownable {
     /**
      * Return fee value for an asset for outsourced verification tx.
      */
-    function getAssetFeeForOutsourcedVerificationTx(
+    function getAssetFeeForPreVerifiedTx(
         uint24 assetId
     ) external view returns (uint256) {
-        return _assetFeesForOutsourcedVerfication[assetId];
+        return _assetFeesForPreVerifiedTx[assetId];
     }
 
     function isAssetFeeSupported(uint24 assetId) external view returns (bool) {
         return _assetFees[assetId] > 0;
     }
 
-    function isAssetFeeSupportedForOutsourcedVerificationTx(
+    function isAssetFeeSupportedForPreVerifiedTx(
         uint24 assetId
     ) external view returns (bool) {
-        return _assetFeesForOutsourcedVerfication[assetId] > 0;
+        return _assetFeesForPreVerifiedTx[assetId] > 0;
     }
 
     /// @dev The only requirements for validation are
@@ -217,7 +217,7 @@ contract Paymaster is IPaymaster, Ownable {
         // 3 bytes - feeAssetId (24 bits)
         // 9 bytes - feeValue (72 bits)
         address paymaster = address(uint160(stx.feeData >> (24 + 72)));
-        
+
         // Extract the feeAssetId (3 bytes)
         uint24 feeAssetId = uint24(stx.feeData >> 72);
 
@@ -234,7 +234,7 @@ contract Paymaster is IPaymaster, Ownable {
     ) internal view returns (uint256) {
         uint256 feeAssetValue;
         if (isVerificationOutsourced) {
-            feeAssetValue = _assetFeesForOutsourcedVerfication[feeAssetId];
+            feeAssetValue = _assetFeesForPreVerifiedTx[feeAssetId];
         } else {
             feeAssetValue = _assetFees[feeAssetId];
         }
