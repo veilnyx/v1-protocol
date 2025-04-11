@@ -11,18 +11,10 @@ struct PreVerificationDetails {
 }
 
 interface IMempool {
-    error LabyrinthPoolAddrNotInitialized();
-    error InvalidStx();
-    error DuplicateStx(uint256 stxHash);
     error STXNotInMempool(uint256 stxHash);
     error STXAndProofIdMismatch();
-    error InactiveAsset(uint24 assetId);
-    error UnsupportedAsset(uint24 assetId);
-    error ZeroValue();
-    error InsufficientFee(uint256 given, uint256 required);
     error STXNotPreVerified(uint256 stxHash, bytes32 proofId);
     error STXNonRefundable(uint256 stxHash);
-    error NonDepositTxReceivedFromPublicAddr(address sender);
 
     event STXAddedToMempool(
         uint256 indexed stxHash,
@@ -53,10 +45,6 @@ interface IMempool {
         address nebraVerifier_,
         address gateway_
     ) external;
-
-    function genNebraProofId(
-        PreVerificationDetails calldata preVerificationDetails
-    ) external pure returns (bytes32);
 
     function addSTXToMempool(
         ShieldedTransaction calldata stx,

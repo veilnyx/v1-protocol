@@ -8,6 +8,7 @@ import {PoolTest} from "test/fixtures/PoolTest.sol";
 import {IMempool} from "src/interfaces/IMempool.sol";
 import {Mempool} from "src/core/Mempool.sol";
 import {MempoolProxy} from "src/core/MempoolProxy.sol";
+import {MempoolValidationLib} from "src/libraries/MempoolValidation.sol";
 import {ShieldedTransaction} from "src/libraries/ShieldedTransaction.sol";
 import {PreVerificationDetails} from "src/core/Mempool.sol";
 
@@ -94,7 +95,7 @@ contract MempoolTest is PoolTest {
         _approveAsset(asset1, address(mempool), INITIAL_MINT_AMT);
         deal(address(this), MEMPOOL_EXIT_FEES);
 
-        vm.expectRevert(IMempool.InvalidStx.selector);
+        vm.expectRevert(MempoolValidationLib.InvalidStx.selector);
         mempool.addSTXToMempool{value: MEMPOOL_EXIT_FEES}(
             stx,
             preVerificationDetails
@@ -122,7 +123,7 @@ contract MempoolTest is PoolTest {
         );
 
         vm.expectRevert(
-            abi.encodeWithSelector(IMempool.DuplicateStx.selector, stxHashPI)
+            abi.encodeWithSelector(MempoolValidationLib.DuplicateStx.selector, stxHashPI)
         );
         mempool.addSTXToMempool{value: MEMPOOL_EXIT_FEES}(
             stx,

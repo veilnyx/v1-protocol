@@ -12,10 +12,12 @@ import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {IPool} from "src/interfaces/IPool.sol";
 import {IMempool, PreVerificationDetails} from "src/interfaces/IMempool.sol";
+import {MempoolStorage} from "src/base/MempoolStorage.sol";
+import {MempoolValidationLib} from "src/libraries/MempoolValidation.sol";
 import {ShieldedTransaction, ShieldedTransactionLogic, ShieldedTransactionType, PubAsset} from "src/libraries/ShieldedTransaction.sol";
 import {Asset, AssetLogic, AssetType} from "src/libraries/Asset.sol";
 import {INebraUpa} from "../interfaces/INebraUpa.sol";
-import {console} from "forge-std/console.sol";
+import {NebraLib} from "../libraries/Nebra.sol";
 
 /// @dev Prerequisite: Mempool::updatePool(..) needs to be called if Pool address is 0x, for the mempool to be able to interact with the pool, incase a new Pool is deployed (pool address will be preknown if its upgraded).
 contract Mempool is
@@ -24,26 +26,13 @@ contract Mempool is
     PausableUpgradeable,
     OwnableUpgradeable,
     ReentrancyGuard,
-    IMempool
+    IMempool,
+    MempoolStorage
 {
     using ShieldedTransactionLogic for ShieldedTransaction;
     using AssetLogic for Asset;
     using EnumerableSet for EnumerableSet.UintSet;
     using SafeERC20 for IERC20;
-
-    // @todo: Move storage outside of the upgradeable contract
-    IPool public pool;
-    EnumerableSet.UintSet internal _stxHashes;
-    mapping(uint256 stxHash => bytes32) public stxToProofId;
-    mapping(uint256 stxHash => ShieldedTransaction) public stxMap;
-    mapping(uint256 stxHash => address) public stxSenders;
-
-    // fees to be paid by the user for their STX to exit the mempool. This is a compensation for the verification tracker service that's responsible for taking the STX out of the mempool and verifying it. The fee is in wei.
-    uint256 public mempoolExitFee;
-    uint256 public mempoolExitFeeCollected;
-    address public verificationTrackerService;
-    address public nebraVerifier;
-    address public gateway;
 
     function initialize(
         address pool_,
@@ -76,15 +65,24 @@ contract Mempool is
         address stxSender = msg.sender;
         uint256 stxHashPI = preVerificationDetails.publicInputs[2];
 
-        _validityChecksBeforeAddingSTXToMempool(stx, stxHashPI);
+        MempoolValidationLib.validityChecksBeforeAddingSTXToMempool(
+            stx,
+            stxHashPI,
+            pool,
+            _stxHashes,
+            gateway,
+            mempoolExitFee
+        );
 
         // Transfer deposit assets from sender's wallet to the mempool
         if (stx.txType == ShieldedTransactionType.DEPOSIT) {
             for (uint i = 0; i < stx.pubAssets.length; i++) {
-                (uint24 assetId, uint224 value) = _decodeAsset(
-                    stx.pubAssets[i]
+                (uint24 assetId, uint224 value) = MempoolValidationLib
+                    .decodeAsset(stx.pubAssets[i]);
+                Asset memory asset = MempoolValidationLib.checkIfAssetValid(
+                    assetId,
+                    pool
                 );
-                Asset memory asset = _checkIfAssetValid(assetId);
 
                 // Transfer the right amt of assets being deposited to the pool
                 IERC20(asset.assetAddress).safeTransferFrom(
@@ -95,9 +93,7 @@ contract Mempool is
             }
         }
 
-        bytes32 proofId = genNebraProofId(preVerificationDetails);
-        console.log("ProofId generated onchain: ");
-        console.logBytes32(proofId);
+        bytes32 proofId = NebraLib.genNebraProofId(preVerificationDetails);
 
         stxToProofId[stxHashPI] = proofId;
         stxMap[stxHashPI] = stx;
@@ -118,9 +114,6 @@ contract Mempool is
         ShieldedTransaction memory stx = stxMap[stxHash];
         bytes32 proofId = stxToProofId[stxHash];
 
-        console.log("ProofId being verified onchain: ");
-        console.logBytes32(proofId);
-
         // Onchain check with Nebra to ensure the proof is verified
         bool isProofValid = INebraUpa(nebraVerifier).isProofVerified(proofId);
         if (!isProofValid) {
@@ -135,8 +128,13 @@ contract Mempool is
 
         // Approve assets to the pool
         for (uint i = 0; i < stx.pubAssets.length; i++) {
-            (uint24 assetId, uint224 value) = _decodeAsset(stx.pubAssets[i]);
-            Asset memory asset = _checkIfAssetValid(assetId);
+            (uint24 assetId, uint224 value) = MempoolValidationLib.decodeAsset(
+                stx.pubAssets[i]
+            );
+            Asset memory asset = MempoolValidationLib.checkIfAssetValid(
+                assetId,
+                pool
+            );
 
             IERC20(asset.assetAddress).forceApprove(address(pool), value);
         }
@@ -172,8 +170,13 @@ contract Mempool is
 
         // refund deposited assets to the stx sender
         for (uint i = 0; i < stx.pubAssets.length; i++) {
-            (uint24 assetId, uint224 value) = _decodeAsset(stx.pubAssets[i]);
-            Asset memory asset = _checkIfAssetValid(assetId);
+            (uint24 assetId, uint224 value) = MempoolValidationLib.decodeAsset(
+                stx.pubAssets[i]
+            );
+            Asset memory asset = MempoolValidationLib.checkIfAssetValid(
+                assetId,
+                pool
+            );
 
             IERC20(asset.assetAddress).safeTransfer(stxSender, value);
         }
@@ -235,121 +238,5 @@ contract Mempool is
     /// @notice Needs to be called immediately after the Labyrinth pool is deployed/upgraded, for the mempool to be able to interact with the pool
     function updatePoolAddress(address newPool) external onlyOwner {
         pool = IPool(newPool);
-    }
-
-    ///////////////////////////
-    //// Private Functions ////
-    ///////////////////////////
-    function _checkIfAssetValid(
-        uint24 assetId
-    ) internal view returns (Asset memory) {
-        Asset memory asset = pool.getAsset(assetId);
-        if (!asset.isActive) {
-            revert InactiveAsset(asset.id);
-        }
-
-        if (asset.assetType != AssetType.ERC20) {
-            revert UnsupportedAsset(asset.id);
-        }
-
-        return asset;
-    }
-
-    function _decodeAsset(
-        uint248 pubAsset
-    ) internal pure returns (uint24 assetId, uint224 value) {
-        // Extract first 3 bytes assetId
-        assetId = uint24(bytes3(bytes31(pubAsset)));
-        // Extract last 28 bytes value
-        value = uint224(pubAsset);
-    }
-
-    /// @notice Generates a proof id for Nebra proof verification
-    /// @dev Written in assembly because abi.encodePacked was causing stack too deep error due to large number of inputs (public inputs)
-    function genNebraProofId(
-        PreVerificationDetails memory preVerificationDetails
-    ) public pure returns (bytes32) {
-        // Pre-allocate memory for exact encoding pattern
-        bytes memory encoded = new bytes(416); // circuit ID + 11 public inputs = 32 + 384 = 416 bytes
-
-        assembly {
-            let publicInputCount := 11
-            let ptr := add(encoded, 32)
-
-            // Store circuitId with proper padding
-            mstore(ptr, mload(add(preVerificationDetails, 32)))
-            ptr := add(ptr, 32)
-
-            // Get publicInputs array pointer
-            // Add 64 instead of 32 to skip over the bool field (32 bytes) and access circuitId
-            let publicInputsPtr := mload(add(preVerificationDetails, 64))
-
-            // Check array length (first 32 bytes of array contain length)
-            let arrayLength := mload(publicInputsPtr)
-            if iszero(eq(arrayLength, publicInputCount)) {
-                revert(0, 0) // Revert if not exactly 16 inputs
-            }
-
-            // Skip array length prefix and copy inputs
-            publicInputsPtr := add(publicInputsPtr, 32)
-            for {
-                let i := 0
-            } lt(i, publicInputCount) {
-                i := add(i, 1)
-            } {
-                mstore(ptr, mload(add(publicInputsPtr, mul(i, 32))))
-                ptr := add(ptr, 32)
-            }
-        }
-
-        return keccak256(encoded);
-    }
-
-    function _validityChecksBeforeAddingSTXToMempool(
-        ShieldedTransaction calldata stx,
-        uint256 stxHashPI
-    ) internal {
-        if (address(pool) == address(0)) {
-            revert LabyrinthPoolAddrNotInitialized();
-        }
-
-        // validate the correlation btw the stx and public inputs
-        if (stx.hash() != stxHashPI) {
-            revert InvalidStx();
-        }
-
-        // check if stx is already in mempool
-        if (_stxHashes.contains(stxHashPI)) {
-            revert DuplicateStx(stxHashPI);
-        }
-
-        // Non-deposit STX are only supported through Account Abstraction (ERC4337) infra
-        // This is done to enforce privacy by not exposing the user's public address in the tx traces and to manage fee reimbursement to both paymaster and verification tracker service by the Laby pool, using the `stx.feeData`.
-        if (stx.txType != ShieldedTransactionType.DEPOSIT) {
-            // msg.sender should only be the Gateway contract
-            if (msg.sender != gateway) {
-                revert NonDepositTxReceivedFromPublicAddr(msg.sender);
-            }
-        }
-
-        // Asset checks and transfer for DEPOSIT tx
-        if (stx.txType == ShieldedTransactionType.DEPOSIT) {
-            // Mempool exit fee check
-            // User pays mempool exit fee in ETH for deposit tx only. Other tx types are handled by the ERC4337 infra.
-            if (msg.value < mempoolExitFee) {
-                revert InsufficientFee(msg.value, mempoolExitFee);
-            }
-
-            for (uint i = 0; i < stx.pubAssets.length; i++) {
-                (uint24 assetId, uint224 value) = _decodeAsset(
-                    stx.pubAssets[i]
-                );
-                Asset memory asset = _checkIfAssetValid(assetId);
-
-                if (value == 0) {
-                    revert ZeroValue();
-                }
-            }
-        }
     }
 }
