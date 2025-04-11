@@ -89,6 +89,18 @@ contract Pool is
         );
     }
 
+    /// @notice Reinitializes the contract with new variables after upgrade
+    /// @dev The version number must be greater than last initialization
+    /// @param mempool_ The address of the mempool contract
+    function reinitialize(
+        address mempool_,
+        address verificationTracker_
+    ) external reinitializer(version + 1) {
+        mempool = mempool_;
+        verificationTrackerService = verificationTracker_;
+        version += 1;
+    }
+
     /////////////////////////////////////////
     //         ADMIN WRITE METHODS         //
     ////////////////////////////////////////

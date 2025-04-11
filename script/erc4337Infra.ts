@@ -23,7 +23,14 @@ export const deployErc4337Infra = async (chainParams, poolAddress, deployConfig)
     const usdcAssetId = 65538;
     // Fee assets
     await setAssetFee(paymaster.address, wethAssetId, parseEther("0.001"), deployConfig.client.wallet, deployConfig.client.public);
+    await setAssetFeeForPreverifiedTx(paymaster.address, wethAssetId, parseEther("0.0005"), deployConfig.client.wallet, deployConfig.client.public)
     await setAssetFee(paymaster.address, usdcAssetId, parseUnits("1", 6), deployConfig.client.wallet, deployConfig.client.public);
+    await setAssetFeeForPreverifiedTx(paymaster.address, usdcAssetId, parseUnits("0.5", 6), deployConfig.client.wallet, deployConfig.client.public);
+
+    return {
+        paymaster: paymaster.address,
+        gateway: gateway.address
+    };
 }
 
 const fundPaymaster = async (paymaster, amount, wallet, client) => {
@@ -61,6 +68,27 @@ const setAssetFee = async (paymaster, assetId, amount, wallet, client) => {
 
         rct = await client.waitForTransactionReceipt({ hash });
         console.log("rct:assetIDFeeAdded", rct.status);
+    } catch (error) {
+        console.log("Error adding asset id");
+        console.log(error.message);
+        console.log("Error rct:", rct);
+    }
+}
+
+const setAssetFeeForPreverifiedTx = async (paymaster, assetId, amount, wallet, client) => {
+    const paymasterAbi = hre.artifacts.readArtifactSync("Paymaster").abi;
+    let rct;
+    try {
+
+        const hash = await wallet.writeContract({
+            address: paymaster,
+            abi: paymasterAbi,
+            functionName: "setAssetFeeForPreVerifiedTx",
+            args: [assetId, amount]
+        });
+
+        rct = await client.waitForTransactionReceipt({ hash });
+        console.log("rct:assetIDFeeAddedForPreverifiedTx", rct.status);
     } catch (error) {
         console.log("Error adding asset id");
         console.log(error.message);

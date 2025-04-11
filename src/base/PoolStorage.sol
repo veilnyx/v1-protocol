@@ -11,7 +11,6 @@ abstract contract PoolStorage {
     address public adaptorHandler;
     address public hasher;
     address public screener;
-    address public verificationTrackerService;
 
     MerkleTree internal _addressTree;
     QueuedMerkleTree internal _commitmentTree;
@@ -37,6 +36,10 @@ abstract contract PoolStorage {
     mapping(uint24 => uint256) internal _withdrawFees;
     mapping(address paymaster => mapping(uint24 assetId => uint256 feeAmount))
         internal _paymasterFees;
+
     address public mempool;
+    address public verificationTrackerService;
     mapping(uint24 => uint256) internal _exitMempoolFeeCollected;
+
+    uint8 public version;
 }

@@ -283,7 +283,6 @@ library ShieldedTransactionLogic {
         uint256[] memory pubAssetIds = new uint256[](nOuts);
         uint256[] memory pubValues = new uint256[](nOuts);
         {
-            // bytes memory padZeroBytes = new bytes((nOuts - nPubs) * 32);
             uint256 padLen = nOuts - nPubs;
             if (padLen < 0) {
                 revert("Output notes count is less than public assets");
@@ -294,7 +293,7 @@ library ShieldedTransactionLogic {
                 pubValues[i] = uint224(self.pubAssets[i]);
             }
 
-            // padding to make pubAsset
+            // padding to make pubAsset and pubValue arrays match the length of nOuts
             for (uint i = nPubs; i < nOuts; ++i) {
                 pubAssetIds[i] = 0;
                 pubValues[i] = 0;
@@ -307,24 +306,17 @@ library ShieldedTransactionLogic {
                 self.txType == ShieldedTransactionType.DEPOSIT
                     ? uint256(0)
                     : uint256(1)
-                // pubAssetIds,
-                // padZeroBytes,
-                // pubValues,
-                // padZeroBytes
             );
         }
 
         bytes memory pubDataChunk2;
         {
             pubDataChunk2 = abi.encodePacked(
-                // abi.encodePacked(self.nullifiers),
                 revokerData.revokerPublicKey[0],
                 revokerData.revokerPublicKey[1],
-                // abi.encodePacked(self.commitments),
                 self.refundAddress,
                 revokerData.encryptionPublicKey[0],
                 revokerData.encryptionPublicKey[1]
-                // self.notesMemo
             );
         }
 
@@ -468,7 +460,7 @@ library ShieldedTransactionLogic {
     /// @dev Performs sequential hashing (sha256) to generate `alpha` for _UHF
     function _genEncryptedDataHashUsingSha256(
         UHFArrays memory uhfArrays
-    ) internal view returns (uint256) {
+    ) internal pure returns (uint256) {
         // Call _decomposeNotesMemo() to get the uhfArrays
         uint256 currentHash = 0;
         if (uhfArrays.pubAssetIds.length != 0) {
@@ -545,7 +537,7 @@ library ShieldedTransactionLogic {
 
     function _UHF(
         UHFArrays memory uhfArrays
-    ) internal view returns (uint256, uint256) {
+    ) internal pure returns (uint256, uint256) {
         uint256 alpha = _genEncryptedDataHashUsingSha256(uhfArrays);
 
         uint256 alphaPow = 1;
