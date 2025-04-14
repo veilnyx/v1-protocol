@@ -17,7 +17,7 @@ export const reqs = {
 		to: receiverAccount.shieldedAddress.pack(),
 		viaBundler: true,
 		paymaster:
-			`0x${"0beEbd452688b33EF0021261d93D3c3A04916598"}` as `0x${string}`,
+			`0x${"5925279112eBf453E534a22c261A6E83696AE1Bc"}` as `0x${string}`, // make sure this matches the Paymaster address from solidity test setup
 		feeAssetId: weth,
 		revokerId: 0,
 	}
@@ -63,6 +63,13 @@ export const genTestTransfers = async (sdk: Core) => {
 };
 
 export const genTransferPackedUserOp = async (sdk: Core, nebraClient: any, circuitIds: any) => {
+	await mockNotes("deposit_weth_tx", sdk);
+	const [name, req] = Object.entries(reqs)[0];
+	console.log("req to userop:", req);
+	await generatePackedUserOps(name, req, sdk, false, nebraClient, circuitIds.transact22);
+}
+
+export const genTransferPackedUserOpPreVerified = async (sdk: Core, nebraClient: any, circuitIds: any) => {
 	await mockNotes("deposit_weth_tx", sdk);
 	const [name, req] = Object.entries(reqs)[0];
 	console.log("req to userop:", req);

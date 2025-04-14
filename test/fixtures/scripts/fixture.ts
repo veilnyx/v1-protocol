@@ -331,7 +331,7 @@ export const generatePackedUserOps = async (name: string, req: TransactionReques
     preVerification = preVerification_;
   } else {
     ztx = await sdk.proveTransaction(signedTx);
-    
+
     // generating preVerificationDetails obj since required by Gateway contract
     const preVeriDetails: PreVerificationDetails = {
       isPreVerified: isPreVerified,
@@ -339,7 +339,7 @@ export const generatePackedUserOps = async (name: string, req: TransactionReques
       publicInputs: [BigInt(0), BigInt(0)],
       verifierAddr: bytesToHex(randomBytes(20)),
     };
-    
+
     preVerification = new PreVerification(preVeriDetails);
   }
 
@@ -363,7 +363,7 @@ export const generatePackedUserOps = async (name: string, req: TransactionReques
 
   // Generating user op
   const userOp: UserOperation<"v0.7"> = {
-    sender: `0x${"77BF63adC47ADf53838Ad833C85364F16aAc228D"}` as `0x${string}`, // make sure this matches the Gateway address from solidity test setup
+    sender: `0x${"575253F9690dB75D36Da99f56003aFd0Eb29Eead"}` as `0x${string}`, // make sure this matches the Gateway address from solidity test setup
     nonce: BigInt(nonce),
     factory: undefined,
     factoryData: "0x",
@@ -373,7 +373,7 @@ export const generatePackedUserOps = async (name: string, req: TransactionReques
     preVerificationGas: BigInt(75_000),
     maxFeePerGas: BigInt(150_000_000),
     maxPriorityFeePerGas: BigInt(150_000_000),
-    paymaster: `0x${"0beEbd452688b33EF0021261d93D3c3A04916598"}` as `0x${string}`, // make sure this matches the Paymaster address from solidity test setup
+    paymaster: `0x${"5925279112eBf453E534a22c261A6E83696AE1Bc"}` as `0x${string}`, // make sure this matches the Paymaster address from solidity test setup
     paymasterVerificationGasLimit: BigInt(25_000),
     paymasterPostOpGasLimit: BigInt(5),
     paymasterData: "0x",
@@ -429,7 +429,7 @@ export const generatePackedUserOps = async (name: string, req: TransactionReques
   // @ts-ignore
   const encoded = encodeAbiParameters(packedUserOpAbi, [packedUserOpValueObj]);
 
-  if(isPreVerified) {
+  if (isPreVerified) {
     writeFileSync(`${dirFixtureData}/${name}_packed_userop_preVerified.txt`, encoded);
   } else {
     writeFileSync(`${dirFixtureData}/${name}_packed_userop.txt`, encoded);
