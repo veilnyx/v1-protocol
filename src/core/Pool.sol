@@ -250,7 +250,6 @@ contract Pool is
             isPreVerified: isPreVerified,
             addressTree: _addressTree,
             commitmentTree: _commitmentTree,
-            hasher: hasher,
             verifier: verifier,
             markedNullifiers: _markedNullifiers,
             supportedAdaptors: _adaptors,

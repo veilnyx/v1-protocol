@@ -22,6 +22,8 @@ library MempoolValidator {
     error InactiveAsset(uint24 assetId);
     error UnsupportedAsset(uint24 assetId);
 
+    /// @notice Validates the shielded transaction before adding it to the mempool
+    /// @notice Transfer deposit assets from sender's wallet to the mempool
     function validityChecksBeforeAddingSTXToMempool(
         ShieldedTransaction calldata stx,
         uint256 stxHashPI,

@@ -1,20 +1,8 @@
 import hre from "hardhat";
-import {
-    encodeAbiParameters,
-    encodeFunctionData,
-    parseAbiParameters,
-    Hex,
-    Chain
-} from "viem";
+import { encodeFunctionData } from "viem";
 import { DeployContractConfig } from '@nomicfoundation/hardhat-viem/types';
-import poolModule from "../ignition/modules/pool";
 import { loadConfigs, ChainParams, CommonParams } from "./configs";
-import { deployHasher } from "./hasher";
-import { deployVerifier } from "./verifier";
 import { deployErc4337Infra } from "./erc4337Infra";
-import { registerCircuitsOnNebra } from "./registerCircuitsOnNebra";
-import { addInitialAssets, registerRevokers } from "./setup";
-import { AbiCoder } from "ethers";
 
 // constants
 const config = loadConfigs();
@@ -138,7 +126,7 @@ const deployPoolImpl = async (commonLibs: any) => {
 
 const upgradePoolProxy = async (newPoolImpl: `0x${string}`, mempool: `0x${string}`, verificationTrackerService: `0x${string}`) => {
     const currentVersion = 1;
-    
+
     // Create calldata for PoolImpl::reinitialize(address mempool_, address verificationTrackerService_)
     const args = [
         mempool,

@@ -274,10 +274,10 @@ contract PaymasterTest is PoolTest {
         vm.deal(address(this), value);
         paymaster.depositToEntryPoint{value: value}();
 
-        ShieldedTransaction memory stx = _loadShieldedTransaction(
+        ShieldedTransaction memory withdrawSTX = _loadShieldedTransaction(
             "withdraw_10_weth_with_weth_fee"
         );
-        pool.transact(stx, false);
+        pool.transact(withdrawSTX, false);
 
         uint256 assetFeeByPaymaster = paymaster.getAssetFee(feeAssetId);
         vm.prank(address(paymaster));
@@ -294,10 +294,10 @@ contract PaymasterTest is PoolTest {
         vm.deal(address(this), value);
         paymaster.depositToEntryPoint{value: value}();
 
-        ShieldedTransaction memory stx = _loadShieldedTransaction(
+        ShieldedTransaction memory withdrawSTX = _loadShieldedTransaction(
             "withdraw_10_weth_with_weth_fee"
         );
-        pool.transact(stx, false);
+        pool.transact(withdrawSTX, false);
 
         vm.startPrank(address(paymaster));
         pool.withdrawPaymasterFee(feeAssetId, address(paymaster));

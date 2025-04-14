@@ -22,10 +22,7 @@ contract MockPool {
 }
 
 contract MockMempool {
-    function addSTXToMempool(
-        ShieldedTransaction calldata stx,
-        PreVerificationDetails calldata preVerificationDetails
-    ) external {
+    function addSTXToMempool() external {
         // Simulate gas usage
         for (uint256 i = 0; i < 10; i++) {
             new MockWToken();

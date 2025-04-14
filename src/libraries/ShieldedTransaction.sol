@@ -150,7 +150,6 @@ library ShieldedTransactionLogic {
         bool isPreVerified,
         MerkleTree storage addressTree,
         QueuedMerkleTree storage commitmentTree,
-        address hasher,
         address verifier,
         mapping(uint256 => uint32) storage markedNullifiers,
         mapping(address => bool) storage supportedAdaptors,
@@ -180,7 +179,7 @@ library ShieldedTransactionLogic {
         _checkAndMarkNullifiers(stx, commitmentTree, markedNullifiers);
 
         if (!isPreVerified) {
-            if (!verifyProof(stx, revokerData, hasher, verifier)) {
+            if (!verifyProof(stx, revokerData, verifier)) {
                 revert IPool.InvalidTransactionProof();
             }
         }
@@ -255,7 +254,6 @@ library ShieldedTransactionLogic {
     function verifyProof(
         ShieldedTransaction calldata stx,
         RevokerData memory revokerData,
-        address hasher,
         address verifier
     ) public view returns (bool) {
         uint16 vId = IVerifier(verifier).getTransactionVerifierId(
@@ -276,7 +274,7 @@ library ShieldedTransactionLogic {
     function toVerifierInput(
         ShieldedTransaction calldata self,
         RevokerData memory revokerData
-    ) public view returns (bytes memory) {
+    ) public pure returns (bytes memory) {
         bytes memory pubDataChunk1;
         uint256 nOuts = self.commitments.length;
         uint256 nPubs = self.pubAssets.length;

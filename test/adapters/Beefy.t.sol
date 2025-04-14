@@ -116,7 +116,7 @@ contract BeefyAdaptorTest is PoolTest {
 
         // Supplying
         (
-            uint24[] memory outAssetIds,
+            /* uint24[] memory outAssetIds */,
             uint256[] memory outAssetValues
         ) = beefyAdp.handleAssets({
                 inAssetIds: inAssetIds,
