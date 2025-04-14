@@ -163,11 +163,13 @@ interface IPool {
     //         READ METHODS                //
     ////////////////////////////////////////
 
+    /**
     /// @notice Verifies the proof of a stx.
     /// @param stx The stx to be verified.
     function verifyTransactionProof(
         ShieldedTransaction calldata stx
     ) external view returns (bool);
+     */
 
     /// @notice Returns the data of an asset.
     /// @param assetId The id of the asset.

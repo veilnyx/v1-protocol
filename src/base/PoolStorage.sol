@@ -41,5 +41,5 @@ abstract contract PoolStorage {
     address public verificationTrackerService;
     mapping(uint24 => uint256) internal _exitMempoolFeeCollected;
 
-    uint8 public version;
+    uint64 public version;
 }

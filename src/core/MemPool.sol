@@ -13,13 +13,14 @@ import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol
 import {IPool} from "src/interfaces/IPool.sol";
 import {IMempool, PreVerificationDetails} from "src/interfaces/IMempool.sol";
 import {MempoolStorage} from "src/base/MempoolStorage.sol";
-import {MempoolValidationLib} from "src/libraries/MempoolValidation.sol";
+import {MempoolValidator} from "src/libraries/MempoolValidator.sol";
 import {ShieldedTransaction, ShieldedTransactionLogic, ShieldedTransactionType, PubAsset} from "src/libraries/ShieldedTransaction.sol";
 import {Asset, AssetLogic, AssetType} from "src/libraries/Asset.sol";
 import {INebraUpa} from "../interfaces/INebraUpa.sol";
 import {NebraLib} from "../libraries/Nebra.sol";
 
-/// @dev Prerequisite: Mempool::updatePool(..) needs to be called if Pool address is 0x, for the mempool to be able to interact with the pool, incase a new Pool is deployed (pool address will be preknown if its upgraded).
+/// @dev Prerequisite 1: Mempool::updatePool(..) needs to be called immediately after the Mempool deployment, if Pool address is 0x. This will not be the case when pool is getting updated as pool proxy address will be preknown.
+/// @dev Prerequisite 2: Mempool::updateGatewayContract(..) needs to be called immediately after the Mempool deployment, since Gateway address is not known at the time of Mempool deployment.
 contract Mempool is
     Initializable,
     UUPSUpgradeable,
@@ -31,6 +32,8 @@ contract Mempool is
 {
     using ShieldedTransactionLogic for ShieldedTransaction;
     using AssetLogic for Asset;
+    using NebraLib for PreVerificationDetails;
+    using MempoolValidator for ShieldedTransaction;
     using EnumerableSet for EnumerableSet.UintSet;
     using SafeERC20 for IERC20;
 
@@ -65,8 +68,7 @@ contract Mempool is
         address stxSender = msg.sender;
         uint256 stxHashPI = preVerificationDetails.publicInputs[2];
 
-        MempoolValidationLib.validityChecksBeforeAddingSTXToMempool(
-            stx,
+        stx.validityChecksBeforeAddingSTXToMempool(
             stxHashPI,
             pool,
             _stxHashes,
@@ -74,26 +76,7 @@ contract Mempool is
             mempoolExitFee
         );
 
-        // Transfer deposit assets from sender's wallet to the mempool
-        if (stx.txType == ShieldedTransactionType.DEPOSIT) {
-            for (uint i = 0; i < stx.pubAssets.length; i++) {
-                (uint24 assetId, uint224 value) = MempoolValidationLib
-                    .decodeAsset(stx.pubAssets[i]);
-                Asset memory asset = MempoolValidationLib.checkIfAssetValid(
-                    assetId,
-                    pool
-                );
-
-                // Transfer the right amt of assets being deposited to the pool
-                IERC20(asset.assetAddress).safeTransferFrom(
-                    stxSender,
-                    address(this),
-                    value
-                );
-            }
-        }
-
-        bytes32 proofId = NebraLib.genNebraProofId(preVerificationDetails);
+        bytes32 proofId = preVerificationDetails.genNebraProofId();
 
         stxToProofId[stxHashPI] = proofId;
         stxMap[stxHashPI] = stx;
@@ -128,10 +111,10 @@ contract Mempool is
 
         // Approve assets to the pool
         for (uint i = 0; i < stx.pubAssets.length; i++) {
-            (uint24 assetId, uint224 value) = MempoolValidationLib.decodeAsset(
+            (uint24 assetId, uint224 value) = MempoolValidator.decodeAsset(
                 stx.pubAssets[i]
             );
-            Asset memory asset = MempoolValidationLib.checkIfAssetValid(
+            Asset memory asset = MempoolValidator.checkIfAssetValid(
                 assetId,
                 pool
             );
@@ -170,10 +153,10 @@ contract Mempool is
 
         // refund deposited assets to the stx sender
         for (uint i = 0; i < stx.pubAssets.length; i++) {
-            (uint24 assetId, uint224 value) = MempoolValidationLib.decodeAsset(
+            (uint24 assetId, uint224 value) = MempoolValidator.decodeAsset(
                 stx.pubAssets[i]
             );
-            Asset memory asset = MempoolValidationLib.checkIfAssetValid(
+            Asset memory asset = MempoolValidator.checkIfAssetValid(
                 assetId,
                 pool
             );

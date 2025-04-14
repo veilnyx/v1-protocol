@@ -94,11 +94,12 @@ contract Pool is
     /// @param mempool_ The address of the mempool contract
     function reinitialize(
         address mempool_,
-        address verificationTracker_
-    ) external reinitializer(version + 1) {
+        address verificationTracker_,
+        uint64 newVersion_
+    ) external reinitializer(newVersion_) {
         mempool = mempool_;
         verificationTrackerService = verificationTracker_;
-        version += 1;
+        version = newVersion_;
     }
 
     /////////////////////////////////////////
@@ -309,6 +310,7 @@ contract Pool is
     //         READ METHODS                //
     ////////////////////////////////////////
 
+    /**
     function verifyTransactionProof(
         ShieldedTransaction calldata stx
     ) external view returns (bool result) {
@@ -319,6 +321,11 @@ contract Pool is
             hasher: hasher,
             verifier: verifier
         });
+    }
+     */
+
+    function getLabyrinthVersion() external view returns (uint64) {
+        return version;
     }
 
     function getRevokerData(

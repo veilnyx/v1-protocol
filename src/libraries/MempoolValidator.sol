@@ -1,14 +1,17 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import {ShieldedTransaction, ShieldedTransactionLogic, ShieldedTransactionType} from "../libraries/ShieldedTransaction.sol";
 import {Asset, AssetType} from "../libraries/Asset.sol";
 import {IPool} from "../interfaces/IPool.sol";
 
-library MempoolValidationLib {
+library MempoolValidator {
     using EnumerableSet for EnumerableSet.UintSet;
     using ShieldedTransactionLogic for ShieldedTransaction;
+    using SafeERC20 for IERC20;
 
     error InvalidStx();
     error DuplicateStx(uint256 stxHash);
@@ -26,7 +29,7 @@ library MempoolValidationLib {
         EnumerableSet.UintSet storage _stxHashes,
         address gateway,
         uint256 mempoolExitFee
-    ) public view {
+    ) public {
         if (address(pool) == address(0)) {
             revert LabyrinthPoolAddrNotInitialized();
         }
@@ -61,11 +64,18 @@ library MempoolValidationLib {
             for (uint i = 0; i < stx.pubAssets.length; i++) {
                 (uint24 assetId, uint224 value) = decodeAsset(stx.pubAssets[i]);
 
-                checkIfAssetValid(assetId, pool);
+                Asset memory asset = checkIfAssetValid(assetId, pool);
 
                 if (value == 0) {
                     revert ZeroValue();
                 }
+
+                // Transfer deposit assets from sender's wallet to the mempool
+                IERC20(asset.assetAddress).safeTransferFrom(
+                    msg.sender,
+                    address(this),
+                    value
+                );
             }
         }
     }
