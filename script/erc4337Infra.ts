@@ -1,12 +1,13 @@
 import hre from "hardhat";
 import { parseEther, parseUnits } from "viem";
 
-export const deployErc4337Infra = async (chainParams, poolAddress, deployConfig) => {
+export const deployErc4337Infra = async (chainParams, poolAddress, mempoolAddress, deployConfig) => {
     // ERC4337 infra setup
     const gateway = await hre.viem.deployContract("Gateway", [
         chainParams.entryPoint,
         chainParams.wToken,
         poolAddress,
+        mempoolAddress,
     ], deployConfig);
     console.log("Gateway deployed:", gateway.address);
 

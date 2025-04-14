@@ -21,7 +21,7 @@ const config = loadConfigs();
 const poolAbi = hre.artifacts.readArtifactSync("Pool").abi;
 const mempoolAbi = hre.artifacts.readArtifactSync("Mempool").abi;
 const poolProxyAbi = hre.artifacts.readArtifactSync("PoolProxy").abi;
-const existingPoolProxy = `0x${"587539aa53356b15bf919a38d1c8d28e844a1838"}` as `0x${string}`;
+const existingPoolProxy = `0x${"587539aA53356b15bF919a38D1C8d28E844A1838"}` as `0x${string}`; // devnet parallel pool proxy to test upgrade. @todo replace with real pool proxy address
 const verificationTrackerService = `0x${"75a4dA1697aF884c99724474d26F2EAe23cc58Bc"}` as `0x${string}`;
 const nebraVerifierSepolia = `0x${"3B946743DEB7B6C97F05B7a31B23562448047E3E"}` as `0x${string}`;
 const MEMPOOL_EXIT_FEES: bigint = BigInt(45_000_000_000_0000); // 500k gas @ 0.9 gwei = 0.00045 ETH
@@ -54,21 +54,34 @@ const setup = async () => {
     }
 }
 
-const deployMempoolImplAndProxy = async (shieldedTransactionLogic: `0x${string}`, assetLogic: `0x${string}`, gateway: `0x${string}`) => {
+const deployMempoolImplAndProxy = async (shieldedTransactionLogicAddr: `0x${string}`, assetLogicAddr: `0x${string}`, gateway: `0x${string}`) => {
     console.log("Starting to deploy new Mempool");
-    const enumerableSet = await hre.viem.deployContract("EnumerableSet");
-    console.log("EnumerableSet deployed:", enumerableSet.address);
-    const safeERC20 = await hre.viem.deployContract("SafeERC20");
+    // const enumerableSet = await hre.viem.deployContract("EnumerableSet");
+    // console.log("EnumerableSet deployed:", enumerableSet.address);
+    // const safeERC20 = await hre.viem.deployContract("SafeERC20");
+
+    // deploy NebraLib
+    const nebraLib = await hre.viem.deployContract("NebraLib");
+    console.log("NebraLib deployed:", nebraLib.address);
+
+    // deploy MempoolValidator
+    const mempoolValidator = await hre.viem.deployContract("MempoolValidator", [], {
+        libraries: {
+            ShieldedTransactionLogic: shieldedTransactionLogicAddr
+        }
+    });
+    console.log("MempoolValidator deployed:", mempoolValidator.address);
 
     const mempoolImpl = await hre.viem.deployContract("Mempool", [], {
         libraries: {
-            EnumerableSet: enumerableSet.address,
-            SafeERC20: safeERC20.address,
-            ShieldedTransactionLogic: shieldedTransactionLogic,
-            AssetLogic: assetLogic
+            // EnumerableSet: enumerableSet.address,
+            // SafeERC20: safeERC20.address,
+            ShieldedTransactionLogic: shieldedTransactionLogicAddr,
+            AssetLogic: assetLogicAddr,
+            MempoolValidator: mempoolValidator.address,
+            NebraLib: nebraLib.address,
         },
     });
-    console.log("New Mempool deployed:", mempoolImpl.address);
 
     const args = [
         existingPoolProxy,
@@ -97,7 +110,6 @@ const deployPoolImpl = async (commonLibs: any) => {
     const eip712 = await hre.viem.deployContract("EIP712");
     console.log("EIP712 deployed:", eip712.address);
 
-
     const shieldedAddress = await hre.viem.deployContract(
         "ShieldedAddressLogic",
         [],
@@ -125,10 +137,13 @@ const deployPoolImpl = async (commonLibs: any) => {
 };
 
 const upgradePoolProxy = async (newPoolImpl: `0x${string}`, mempool: `0x${string}`, verificationTrackerService: `0x${string}`) => {
+    const currentVersion = 1;
+    
     // Create calldata for PoolImpl::reinitialize(address mempool_, address verificationTrackerService_)
     const args = [
         mempool,
-        verificationTrackerService
+        verificationTrackerService,
+        (currentVersion + 1)
     ];
 
     const reinitializeCallData = encodeFunctionData({
@@ -149,10 +164,11 @@ const upgradePoolProxy = async (newPoolImpl: `0x${string}`, mempool: `0x${string
     });
 
     const upgradeRct = await client.waitForTransactionReceipt({ hash: upgradeCallHash });
-    console.log("rct:upgrade", upgradeRct.status);
+    console.log("rct:Labyrinth Upgraded!!!!!", upgradeRct.status);
 }
 
 const deployCommonLibs = async () => {
+
     // deploying common libraries
     const asset = await hre.viem.deployContract("AssetLogic");
     console.log("AssetLogic deployed:", asset.address);
@@ -173,7 +189,7 @@ const deployCommonLibs = async () => {
                 AssetLogic: asset.address,
                 MerkleTreeLogic: merkleTree.address,
                 QueuedMerkleTreeLogic: queuedMerkleTree.address,
-            },
+            }
         }
     );
     console.log("ShieldedTransactionLogic deployed:", shieldedTransaction.address);
@@ -186,17 +202,40 @@ const deployCommonLibs = async () => {
     }
 }
 
+const updateGatewayInMempool = async (mempool: `0x${string}`, gateway: `0x${string}`) => {
+    const args = [
+        gateway
+    ];
+
+    // @ts-ignore
+    const updateGatewayHash = await wallet.writeContract({
+        address: mempool,
+        abi: mempoolAbi,
+        functionName: "updateGatewayContract",
+        args: [gateway]
+    });
+
+    const upgradeGatewayRct = await client.waitForTransactionReceipt({ hash: updateGatewayHash });
+    console.log("rct:upgradeGatewayRct", upgradeGatewayRct.status);
+}
+
 const main = async () => {
     await setup();
 
     // Common Libs
     const commonLibs = await deployCommonLibs();
 
-    // ERC4337 infra
-    const erc4337Contracts = await deployErc4337Infra(chainParams, existingPoolProxy, deployConfig);
+    // Mempool Proxy
+    /// @dev The gateway contract address will be a zero addr, but will be updated using MempoolProxy::updateGatewayContract() function after the deployment of the ERC4337 infrastructure. This is due to a circular dependency between the mempool and the ERC4337 infrastructure. The mempool needs to be deployed first, and then the ERC4337 infrastructure can be deployed with Gateway => Mempool. Lastly, the mempool can be updated with the Gateway address.
+    const mempoolProxy = await deployMempoolImplAndProxy(commonLibs.shieldedTransaction, commonLibs.asset, "0x0000000000000000000000000000000000000000" as `0x${string}`);
 
-    const mempoolProxy = await deployMempoolImplAndProxy(commonLibs.shieldedTransaction, commonLibs.asset, erc4337Contracts.gateway);
+    // ERC4337 infra
+    const erc4337Contracts = await deployErc4337Infra(chainParams, existingPoolProxy, mempoolProxy, deployConfig);
+
+    await updateGatewayInMempool(mempoolProxy, erc4337Contracts.gateway);
+
     const newPoolImpl = await deployPoolImpl(commonLibs);
+
     await upgradePoolProxy(newPoolImpl, mempoolProxy, verificationTrackerService);
 }
 
