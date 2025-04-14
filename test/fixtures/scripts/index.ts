@@ -13,8 +13,8 @@ import {
 
 const main = async () => {
 	const { sdk, nebraClient, circuitIds } = await getSDKInstance();
-	// await genAddressRegistrations(sdk);
-	await genAddrRegWithOutsourceProofVerification(sdk, nebraClient, circuitIds.register);
+	await genAddressRegistrations(sdk);
+	// await genAddrRegWithOutsourceProofVerification(sdk, nebraClient, circuitIds.register);
 	// await genTestDeposits(sdk);
 	// await genTestWithdrawals(sdk);
 	// await genTestTransfers(sdk);

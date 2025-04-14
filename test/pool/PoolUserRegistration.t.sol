@@ -26,7 +26,7 @@ contract PoolUserRegistration is PoolBaseTest {
         );
 
         addrRegDataWithProofVeriOutsourced = _loadShieldedAddressRegistrationData(
-            "register_sender_with_proof_veri_outsourced"
+            "register_sender_proof_veri_outsourced"
         );
 
         shieldedAddress = bytes.concat(
@@ -58,7 +58,7 @@ contract PoolUserRegistration is PoolBaseTest {
         assertEq(compressed, compressed2);
     }
 
-    function test_registerAddress() public {
+    function test_registerAddressInstantly() public {
         vm.expectEmit(true, true, false, false);
         emit IPool.RegisterAddress(
             senderAddr,
