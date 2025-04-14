@@ -57,7 +57,7 @@ contract EthenaAdaptorTest is PoolTest {
         ShieldedTransaction memory ztxDeposit = _loadShieldedTransaction(
             "deposit_2_testnet_usde"
         );
-        pool.transact(ztxDeposit);
+        pool.transact(ztxDeposit, false);
         _processCommitmentTreeQueue();
 
         uint256 poolsUSDeBalBeforeStaking = IERC20(ETHENA).balanceOf(
@@ -67,7 +67,7 @@ contract EthenaAdaptorTest is PoolTest {
         ShieldedTransaction memory ztxStake = _loadShieldedTransaction(
             "stake_2_orig_usde_on_ethena"
         );
-        pool.transact(ztxStake);
+        pool.transact(ztxStake, false);
         vm.stopPrank();
 
         // Asserts

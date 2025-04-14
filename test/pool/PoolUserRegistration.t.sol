@@ -26,7 +26,7 @@ contract PoolUserRegistration is PoolBaseTest {
         );
 
         addrRegDataWithProofVeriOutsourced = _loadShieldedAddressRegistrationData(
-            "register_sender_with_proof_veri_outsourced"
+            "register_sender_proof_veri_outsourced"
         );
 
         shieldedAddress = bytes.concat(

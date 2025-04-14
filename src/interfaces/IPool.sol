@@ -54,8 +54,10 @@ interface IPool {
     error PublicAddressAlreadyRegistered(address addr);
     error BadArguments();
     error InvalidAddressProof();
-    error NotPreVerified();
-    error RootAddrMismatch(uint256 proofForRootAddr, uint256 rootAddrBeingRegisted);
+    error RootAddrMismatch(
+        uint256 proofForRootAddr,
+        uint256 rootAddrBeingRegisted
+    );
     error InvalidSubtreeUpdateProof();
     error InvalidTransactionProof();
     error UnknownCommitmentTreeRoot();
@@ -67,6 +69,7 @@ interface IPool {
     error InvalidRevoker(uint256 id);
     error DuplicateRevoker(uint256[2] publicKey);
     error NoFeeToClaim(address paymaster, uint24 assetId);
+    error InvalidSenderForPreverifiedSTX(address sender, address mempool);
 
     /////////////////////////////////////////
     //         ADMIN WRITE METHODS         //
@@ -144,7 +147,11 @@ interface IPool {
     /// @notice Validates and executes a stx.
     /// @notice Can only be called when the contract is not paused.
     /// @param stx The stx to be executed.
-    function transact(ShieldedTransaction calldata stx) external;
+    /// @param isPreVerified Whether the stx is pre-verified or not.
+    function transact(
+        ShieldedTransaction calldata stx,
+        bool isPreVerified
+    ) external;
 
     /// @notice A function to call by a paymaster contract to claim the asset wise fees collected for the ERC-4337 transactions they catered to.
     /// @notice Can only be called when the contract is not paused.
@@ -156,11 +163,13 @@ interface IPool {
     //         READ METHODS                //
     ////////////////////////////////////////
 
+    /**
     /// @notice Verifies the proof of a stx.
     /// @param stx The stx to be verified.
     function verifyTransactionProof(
         ShieldedTransaction calldata stx
     ) external view returns (bool);
+     */
 
     /// @notice Returns the data of an asset.
     /// @param assetId The id of the asset.

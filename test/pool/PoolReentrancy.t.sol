@@ -35,7 +35,7 @@ contract PoolReentrancyTest is PoolTest {
             memory reentTokenDepositStx = _loadShieldedTransaction(
                 "deposit_1000_reentrantToken_without_fee"
             );
-        pool.transact(reentTokenDepositStx);
+        pool.transact(reentTokenDepositStx, false);
 
         // `to` address will be that of the attacker contract which
         // will perform the reentrancy attack
@@ -52,7 +52,7 @@ contract PoolReentrancyTest is PoolTest {
         _updateOnChainMT();
 
         // initiating the withdraw to attacker that will perform reentrancy attack and check the revert
-        pool.transact(attackerWithdrawStx);
+        pool.transact(attackerWithdrawStx, false);
     }
 
     function _updateOnChainMT() internal {

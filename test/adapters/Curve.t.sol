@@ -67,7 +67,7 @@ contract CurveAdaptorTest is PoolTest {
         ShieldedTransaction memory stxDeposit = _loadShieldedTransaction(
             "deposit_5_testnet_usdt_crvusd"
         );
-        pool.transact(stxDeposit);
+        pool.transact(stxDeposit, false);
         vm.stopPrank();
 
         _processCommitmentTreeQueue();
@@ -88,7 +88,7 @@ contract CurveAdaptorTest is PoolTest {
             "supply_5_usdt_crvUsd_on_curve"
         );
 
-        pool.transact(stxSupply);
+        pool.transact(stxSupply, false);
 
         // Asserts
         uint256 curveLPTokenBalPostSupply = IERC20(crvUSD_USDT_Pool).balanceOf(

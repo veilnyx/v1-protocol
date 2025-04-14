@@ -53,7 +53,7 @@ contract UniswapV3AdaptorTest is PoolTest {
         ShieldedTransaction memory stxWethDeposit = _loadShieldedTransaction(
             "deposit_2_testnet_weth"
         );
-        pool.transact(stxWethDeposit);
+        pool.transact(stxWethDeposit, false);
         vm.stopPrank();
 
         _processCommitmentTreeQueue();
@@ -72,7 +72,7 @@ contract UniswapV3AdaptorTest is PoolTest {
         ShieldedTransaction memory stxSwap = _loadShieldedTransaction(
             "swap_1_testnet_weth_to_usdc"
         );
-        pool.transact(stxSwap);
+        pool.transact(stxSwap, false);
 
         // Asserts
         uint256 poolUSDCBalPostConvert = IERC20(USDC).balanceOf(address(pool));
@@ -90,7 +90,7 @@ contract UniswapV3AdaptorTest is PoolTest {
         ShieldedTransaction memory stxDeposit = _loadShieldedTransaction(
             "swap_1_testnet_weth_to_usdc_via_bundler"
         );
-        pool.transact(stxDeposit);
+        pool.transact(stxDeposit, false);
 
         // Asserts
         uint256 poolUSDCBalPostConvert = IERC20(USDC).balanceOf(address(pool));

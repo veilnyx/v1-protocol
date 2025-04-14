@@ -9,19 +9,23 @@ import {IVerifier} from "../interfaces/IVerifier.sol";
 import {INebraUpa} from "../interfaces/INebraUpa.sol";
 import {EIP712_TYPEHASH_REGISTER_ADDRESS, MESSAGE_REGISTER_ADDRESS} from "../base/Constants.sol";
 
+// @todo Refactor PreVerificationDetails outside of ShieldedAddressRegistrationData
 struct PreVerificationDetails {
+    bool isPreVerified;
     bytes32 circuitId;
     uint256[] publicInputs;
     address verifierAddr;
 }
 
+// @todo Refactor preVerification details outside of ShieldedAddressRegistrationData and create a seperate register function for outsourced verification having preVerificationDetails as an seperate argument.
 struct ShieldedAddressRegistrationData {
-    bool isPreVerified;
     bytes preVerificationDetails;
     bytes proof;
     bytes shieldedAddress; // In uncompressed form
     bytes signature;
 }
+
+error NotPreVerified();
 
 library ShieldedAddressLogic {
     using MerkleTreeLogic for MerkleTree;
@@ -50,7 +54,17 @@ library ShieldedAddressLogic {
             revert IPool.BadArguments();
         }
 
-        if (self.isPreVerified) {
+        if (preVerificationDetailsDecoded.isPreVerified) {
+            // ensure that rootAddr of the proof matches the rootAddr being registered
+            if (rootAddress != preVerificationDetailsDecoded.publicInputs[0]) {
+                revert IPool.RootAddrMismatch(
+                    preVerificationDetailsDecoded.publicInputs[0],
+                    rootAddress
+                );
+            }
+
+            // verifying with Nebra
+            // Step 1: create `proofId` using the validated `publicInputs`
             bytes32 proofId = keccak256(
                 abi.encode(
                     preVerificationDetailsDecoded.circuitId,
@@ -62,21 +76,13 @@ library ShieldedAddressLogic {
                 )
             );
 
-            // verify with Nebra
+            // Step 2: check the status of the validated `proofId` generated onchain
             bool preVerifiedStatus = INebraUpa(
                 preVerificationDetailsDecoded.verifierAddr
             ).isProofVerified(proofId);
 
             if (!preVerifiedStatus) {
-                revert IPool.NotPreVerified();
-            }
-
-            // ensure that rootAddr of the proof matches the rootAddr being registered
-            if (rootAddress != preVerificationDetailsDecoded.publicInputs[0]) {
-                revert IPool.RootAddrMismatch(
-                    preVerificationDetailsDecoded.publicInputs[0],
-                    rootAddress
-                );
+                revert NotPreVerified();
             }
         } else {
             if (!verifyProof(self, verifier)) {

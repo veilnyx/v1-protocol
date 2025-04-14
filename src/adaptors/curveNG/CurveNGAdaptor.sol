@@ -349,6 +349,8 @@ contract CurveNGAdaptor is AdaptorBase {
                     isDeposit
                 );
         }
+
+        revert InvalidInput();
     }
 
     function totalLPTokenSupply(address pool) external view returns (uint256) {

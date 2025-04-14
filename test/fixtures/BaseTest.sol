@@ -1,14 +1,22 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.24;
 
+import {PackedUserOperation} from "@account-abstraction/contracts/interfaces/PackedUserOperation.sol";
 import {Test} from "forge-std/Test.sol";
+import {Mempool} from "src/core/Mempool.sol";
+import {MempoolProxy} from "src/core/MempoolProxy.sol";
+import {MockNebraVerifier} from "test/mocks/MockNebraVerifier.sol";
 import {ShieldedTransactionType, ShieldedTransaction} from "src/libraries/ShieldedTransaction.sol";
+import {PreVerificationDetails} from "src/core/Mempool.sol";
 import {ShieldedAddressRegistrationData} from "src/libraries/ShieldedAddress.sol";
 import {TreeUpdateData} from "src/libraries/QueuedMerkleTree.sol";
 import {Hasher} from "src/core/Hasher.sol";
+import {Config} from "script/Config.sol";
 import {Fixture, FixtureLib} from "test/fixtures/Fixture.sol";
 import {MockERC20} from "test/mocks/MockERC20.sol";
 import {MockERC20ForReentrancyTest} from "test/mocks/MockERC20ForReentrancyTest.sol";
+
+/// @dev BaseTest is the foundational contract of the test setup providing functions to read from pre-generated fixtures used in the tests. It also provides the ability to deploy the Poseidon hashers.
 
 abstract contract BaseTest is Test {
     Fixture public fixture;
@@ -16,6 +24,11 @@ abstract contract BaseTest is Test {
     MockERC20 public token1;
     MockERC20 public token2;
     MockERC20ForReentrancyTest public tokenReent;
+    MockNebraVerifier public mockNebraVerifier;
+    Config public config;
+    uint256 MEMPOOL_EXIT_FEES = 45e13; // 500k gas @ 0.9 gwei = 0.00045 ETH
+    address VERIFICATION_TRACKER_SERVICE = makeAddr("tracker");
+    address MOCK_GATEWAY = makeAddr("gateway");
 
     function _setUp() internal virtual {
         fixture = FixtureLib.load(vm);
@@ -23,6 +36,7 @@ abstract contract BaseTest is Test {
         token2 = new MockERC20(address(this));
         // Deploying the ERC20 token for testing reentrancy attack
         tokenReent = new MockERC20ForReentrancyTest(address(this));
+        config = new Config();
     }
 
     function _loadShieldedTransaction(
@@ -35,6 +49,18 @@ abstract contract BaseTest is Test {
         string memory name
     ) internal view returns (ShieldedAddressRegistrationData memory) {
         return FixtureLib.loadShieldedAddressRegistrationData(name, vm);
+    }
+
+    function _loadPreVerificationDetails(
+        string memory name
+    ) internal view returns (PreVerificationDetails memory) {
+        return FixtureLib.loadPreVerificationDetails(name, vm);
+    }
+
+    function _loadPackedUserOp(
+        string memory name
+    ) internal view returns (PackedUserOperation memory) {
+        return FixtureLib.loadPackedUserOp(name, vm);
     }
 
     function _loadTreeUpdateData(
@@ -58,20 +84,51 @@ abstract contract BaseTest is Test {
             vm.projectRoot(),
             "/src/poseidon/t4.txt"
         );
+        string memory t5Path = string.concat(
+            vm.projectRoot(),
+            "/src/poseidon/t5.txt"
+        );
 
         string memory t3BytecodeFile = vm.readFile(t3Path);
         string memory t4BytecodeFile = vm.readFile(t4Path);
+        string memory t5BytecodeFile = vm.readFile(t5Path);
         bytes memory t3Bytecode = vm.parseBytes(t3BytecodeFile);
         bytes memory t4Bytecode = vm.parseBytes(t4BytecodeFile);
+        bytes memory t5Bytecode = vm.parseBytes(t5BytecodeFile);
 
         address poseidonT3;
         address poseidonT4;
+        address poseidonT5;
         assembly {
             poseidonT3 := create(0, add(t3Bytecode, 0x20), mload(t3Bytecode))
             poseidonT4 := create(0, add(t4Bytecode, 0x20), mload(t4Bytecode))
+            poseidonT5 := create(0, add(t5Bytecode, 0x20), mload(t5Bytecode))
         }
 
-        Hasher hasher = new Hasher(poseidonT3, poseidonT4);
+        Hasher hasher = new Hasher(poseidonT3, poseidonT4, poseidonT5);
         return hasher;
+    }
+
+    function _deployMempool() internal returns (Mempool) {
+        Mempool mempool = new Mempool();
+        address nebraVerifier = config.nebraVerifier();
+        if (nebraVerifier == address(0)) {
+            mockNebraVerifier = new MockNebraVerifier();
+            mockNebraVerifier.setIsProofVerifiedResult(true);
+            nebraVerifier = address(mockNebraVerifier);
+        }
+
+        bytes memory initializeData = abi.encodeWithSelector(
+            mempool.initialize.selector,
+            address(0),
+            MEMPOOL_EXIT_FEES,
+            VERIFICATION_TRACKER_SERVICE,
+            nebraVerifier,
+            MOCK_GATEWAY
+        );
+
+        MempoolProxy proxy = new MempoolProxy(address(mempool), initializeData);
+        mempool = Mempool(address(proxy));
+        return mempool;
     }
 }
