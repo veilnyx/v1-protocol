@@ -62,13 +62,13 @@ contract BeefyAdaptorTest is PoolTest {
         ShieldedTransaction memory depositStx = _loadShieldedTransaction(
             "deposit_2_wantLPToken"
         );
-        pool.transact(depositStx);
+        pool.transact(depositStx, false);
         _processCommitmentTreeQueue();
 
         ShieldedTransaction memory supplyInBeefyStx = _loadShieldedTransaction(
             "supply_2_wantLPToken"
         );
-        pool.transact(supplyInBeefyStx);
+        pool.transact(supplyInBeefyStx, false);
         vm.stopPrank();
 
         console.log("Staking done!");
@@ -87,13 +87,13 @@ contract BeefyAdaptorTest is PoolTest {
         ShieldedTransaction memory depositStx = _loadShieldedTransaction(
             "deposit_2_mooLPToken"
         );
-        pool.transact(depositStx);
+        pool.transact(depositStx, false);
         _processCommitmentTreeQueue();
 
         ShieldedTransaction memory supplyInBeefyStx = _loadShieldedTransaction(
             "supply_2_mooLPToken"
         );
-        pool.transact(supplyInBeefyStx);
+        pool.transact(supplyInBeefyStx, false);
         vm.stopPrank();
 
         console.log("Staking done!");
@@ -116,7 +116,7 @@ contract BeefyAdaptorTest is PoolTest {
 
         // Supplying
         (
-            uint24[] memory outAssetIds,
+            /* uint24[] memory outAssetIds */,
             uint256[] memory outAssetValues
         ) = beefyAdp.handleAssets({
                 inAssetIds: inAssetIds,

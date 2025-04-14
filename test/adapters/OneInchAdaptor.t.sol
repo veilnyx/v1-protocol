@@ -70,10 +70,11 @@ contract OneInchAdaptorTest is PoolTest {
         vm.startPrank(user);
         iWETH.transfer(address(oneInchAdaptor), SWAP_AMT);
 
-        (
-            uint24[] memory outAssetIds,
-            uint256[] memory outAssetValues
-        ) = oneInchAdaptor.handleAssets(inAssetIds, inValues, oneInchCalldata);
+        (, uint256[] memory outAssetValues) = oneInchAdaptor.handleAssets(
+            inAssetIds,
+            inValues,
+            oneInchCalldata
+        );
         vm.stopPrank();
 
         // Asserts

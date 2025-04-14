@@ -9,6 +9,28 @@ const {
 } = fixture;
 
 export const reqs = {
+  withdraw_10_weth_with_weth_fee: {
+    type: TransactionType.WITHDRAW,
+    assetIds: [weth],
+    values: [parseEther("10")],
+    feeAssetId: weth,
+    to: senderPubAddress,
+    viaBundler: true,
+    paymaster:
+      `0x${"6e1913f0B4118052AFAc74407B0C532659e6B198"}` as `0x${string}`,
+    revokerId: 0,
+  }
+  /**,
+  withdraw_100_weth_without_fee: {
+    type: TransactionType.WITHDRAW,
+    assetIds: [weth],
+    values: [parseEther("100")],
+    feeAssetId: 0,
+    to: senderPubAddress,
+    viaBundler: false,
+    paymaster: zeroAddress,
+    revokerId: 0,
+  },
   withdraw_10_weth_with_usdc_fee: {
     type: TransactionType.WITHDRAW,
     assetIds: [weth],
@@ -19,8 +41,7 @@ export const reqs = {
     paymaster:
       `0x${"6e1913f0B4118052AFAc74407B0C532659e6B198"}` as `0x${string}`,
     revokerId: 0,
-  }
-  /**
+  },
   withdraw_500_weth_without_fee: {
     type: TransactionType.WITHDRAW,
     assetIds: [weth],
@@ -29,17 +50,6 @@ export const reqs = {
     to: senderPubAddress,
     viaBundler: false,
     paymaster: zeroAddress,
-    revokerId: 0,
-  },
-  withdraw_10_weth_with_weth_fee: {
-    type: TransactionType.WITHDRAW,
-    assetIds: [weth],
-    values: [parseEther("10")],
-    feeAssetId: weth,
-    to: senderPubAddress,
-    viaBundler: true,
-    paymaster:
-      `0x${"6e1913f0B4118052AFAc74407B0C532659e6B198"}` as `0x${string}`,
     revokerId: 0,
   },
   withdraw_500_reentrantToken_to_attacker_contract: {

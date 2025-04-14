@@ -4,6 +4,7 @@ pragma solidity ^0.8.18;
 import {IAccount} from "@account-abstraction/contracts/interfaces/IAccount.sol";
 import {PackedUserOperation} from "@account-abstraction/contracts/interfaces/PackedUserOperation.sol";
 import {ShieldedTransaction} from "../libraries/ShieldedTransaction.sol";
+import {PreVerificationDetails} from "../core/Mempool.sol";
 
 interface IGateway is IAccount {
     function validateUserOp(
@@ -12,7 +13,7 @@ interface IGateway is IAccount {
         uint256
     ) external view returns (uint256);
 
-    function handleUserOp(ShieldedTransaction calldata stx) external;
+    function handleUserOp(ShieldedTransaction calldata stx, PreVerificationDetails calldata preVerificationDetails) external;
 
     function handleWrapAndDeposit(
         ShieldedTransaction calldata stx

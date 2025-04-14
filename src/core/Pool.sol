@@ -20,6 +20,20 @@ import {QueuedMerkleTree, QueuedMerkleTreeLogic, TreeUpdateData} from "../librar
 import {ShieldedAddressRegistrationData, ShieldedAddressLogic} from "../libraries/ShieldedAddress.sol";
 import {ShieldedTransaction, ShieldedTransactionLogic, RevokerData} from "../libraries/ShieldedTransaction.sol";
 
+/// @param verifier The address of the verifier contract. Verifier contract verifies the stx's zk proof, address proof and merkle tree queue proof.
+/// @param adaptorHandler The address of the adaptor handler contract, responsible for delegate calling adaptors of external DeFi protocols.
+/// @param screener The address of the screener contract, responsible for screening sanctioned addresseses.
+/// @param hasher The address of the hasher contract. It provides a single interface to Poseidon hashing functions
+/// @param withdrawFeeBps The fee in basis points (1/10000) that is charged for withdrawing assets from the pool.
+struct InitAddressParams {
+    address mempool;
+    address verifier;
+    address adaptorHandler;
+    address screener;
+    address hasher;
+    address verificationTrackerService;
+}
+
 contract Pool is
     IPool,
     Initializable,
@@ -34,23 +48,21 @@ contract Pool is
     using ShieldedAddressLogic for ShieldedAddressRegistrationData;
     using ShieldedTransactionLogic for ShieldedTransaction;
 
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
     /// @notice Initializes the Pool contract with the given parameters.
     /// @dev Pool is an UUPSUpgradeable contract, so it needs to be initialized.
     /// @param addressTreeDepth The depth of the address tree.
     /// @param commitmentTreeDepth The depth of the commitment tree.
-    /// @param verifier_ The address of the verifier contract. Verifier contract verifies the stx's zk proof, address proof and merkle tree queue proof.
-    /// @param adaptorHandler_ The address of the adaptor handler contract, responsible for delegate calling adaptors of external DeFi protocols.
-    /// @param screener_ The address of the screener contract, responsible for screening sanctioned addresseses.
-    /// @param hasher_ The address of the hasher contract. It provides a single interface to Poseidon hashing functions
-    /// @param withdrawFeeBps_ The fee in basis points (1/10000) that is charged for withdrawing assets from the pool.
+
     function initialize(
         uint8 addressTreeDepth,
         uint8 commitmentTreeDepth,
         uint8 commitmentTreeQueueSize,
-        address verifier_,
-        address adaptorHandler_,
-        address screener_,
-        address hasher_,
+        InitAddressParams calldata initAddressParams,
         uint256 withdrawFeeBps_
     ) external initializer {
         __Ownable_init(msg.sender);
@@ -59,19 +71,35 @@ contract Pool is
         __Pausable_init();
         EIP712.init(EIP712_DOMAIN_NAME, EIP712_DOMAIN_VERSION);
 
-        verifier = verifier_;
-        adaptorHandler = adaptorHandler_;
-        hasher = hasher_;
-        screener = screener_;
+        mempool = initAddressParams.mempool;
+        verifier = initAddressParams.verifier;
+        adaptorHandler = initAddressParams.adaptorHandler;
+        hasher = initAddressParams.hasher;
+        screener = initAddressParams.screener;
+        verificationTrackerService = initAddressParams
+            .verificationTrackerService;
         withdrawFeeBps = withdrawFeeBps_;
 
-        _addressTree.init(addressTreeDepth, hasher_);
+        _addressTree.init(addressTreeDepth, hasher);
         _commitmentTree.init(
             commitmentTreeDepth,
             commitmentTreeQueueSize,
-            hasher_,
-            verifier_
+            hasher,
+            verifier
         );
+    }
+
+    /// @notice Reinitializes the contract with new variables after upgrade
+    /// @dev The version number must be greater than last initialization
+    /// @param mempool_ The address of the mempool contract
+    function reinitialize(
+        address mempool_,
+        address verificationTracker_,
+        uint64 newVersion_
+    ) external reinitializer(newVersion_) {
+        mempool = mempool_;
+        verificationTrackerService = verificationTracker_;
+        version = newVersion_;
     }
 
     /////////////////////////////////////////
@@ -171,6 +199,12 @@ contract Pool is
         withdrawFeeBps = feeBps;
     }
 
+    function updateVerificationTrackerService(
+        address verificationTrackerService_
+    ) external onlyOwner {
+        verificationTrackerService = verificationTrackerService_;
+    }
+
     /////////////////////////////////////////
     //        PUBLIC WRITE METHODS         //
     ////////////////////////////////////////
@@ -199,24 +233,38 @@ contract Pool is
     }
 
     function transact(
-        ShieldedTransaction calldata stx
-    ) external nonReentrant whenNotPaused {
+        ShieldedTransaction calldata stx,
+        bool isPreVerified
+    ) public nonReentrant whenNotPaused {
+        // constraining preVerified request sender to just the mempool contract.
+        if (isPreVerified) {
+            if (msg.sender != mempool) {
+                revert IPool.InvalidSenderForPreverifiedSTX(
+                    msg.sender,
+                    mempool
+                );
+            }
+        }
+
         stx.validate({
+            isPreVerified: isPreVerified,
             addressTree: _addressTree,
             commitmentTree: _commitmentTree,
+            verifier: verifier,
             markedNullifiers: _markedNullifiers,
             supportedAdaptors: _adaptors,
-            revokerDataMap: _revokers,
-            verifier: verifier
+            revokerDataMap: _revokers
         });
 
         stx.execute({
+            isPreVerified: isPreVerified,
             commitmentTree: _commitmentTree,
             assets: _assets,
-            withdrawFees: _withdrawFees,
             paymasterFees: _paymasterFees,
-            adaptorHandler: adaptorHandler,
+            exitMempoolFeeCollected: _exitMempoolFeeCollected,
+            withdrawFees: _withdrawFees,
             hasher: hasher,
+            adaptorHandler: adaptorHandler,
             withdrawFeeBps: withdrawFeeBps
         });
     }
@@ -240,19 +288,43 @@ contract Pool is
         });
     }
 
+    function withdrawExitMempoolFee(
+        uint24 assetId
+    ) external nonReentrant whenNotPaused {
+        uint256 fee = _exitMempoolFeeCollected[assetId];
+        if (fee == 0) {
+            revert NoFeeToClaim(verificationTrackerService, assetId);
+        }
+
+        _exitMempoolFeeCollected[assetId] = 0;
+        AssetLogic.transferAsset({
+            assets: _assets,
+            to: verificationTrackerService,
+            assetId: assetId,
+            value: fee
+        });
+    }
+
     /////////////////////////////////////////
     //         READ METHODS                //
     ////////////////////////////////////////
 
+    /**
     function verifyTransactionProof(
         ShieldedTransaction calldata stx
     ) external view returns (bool result) {
         RevokerData memory revokerData = _revokers[stx.revokerId];
 
-        result = stx._verifyProof({
+        result = stx.verifyProof({
             revokerData: revokerData,
+            hasher: hasher,
             verifier: verifier
         });
+    }
+     */
+
+    function getLabyrinthVersion() external view returns (uint64) {
+        return version;
     }
 
     function getRevokerData(
@@ -285,6 +357,12 @@ contract Pool is
         address paymaster
     ) external view returns (uint256) {
         return _paymasterFees[paymaster][assertId];
+    }
+
+    function getCollectedExitMempoolFee(
+        uint24 assetId
+    ) external view returns (uint256) {
+        return _exitMempoolFeeCollected[assetId];
     }
 
     function isAdaptorSupported(

@@ -36,7 +36,7 @@ contract MockAttacker is Test {
                         .selector
                 )
             );
-            pool.transact(withdrawStx);
+            pool.transact(withdrawStx, false);
         }
     }
 }

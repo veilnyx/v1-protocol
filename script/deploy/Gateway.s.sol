@@ -9,6 +9,7 @@ contract GatewayDeploy is BaseScript {
         address entryPoint = _config.entryPoint();
         address wToken = _config.wToken();
         address pool = _getContract("PoolProxy");
-        new Gateway(entryPoint, wToken, pool);
+        address mempool = _getContract("MempoolProxy");
+        new Gateway(entryPoint, wToken, pool, mempool);
     }
 }

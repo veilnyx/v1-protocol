@@ -97,9 +97,8 @@ contract LidoAdaptorTest is PoolTest {
 
         console.log("Initiating staking on RocketPool");
 
-        (uint24[] memory outAssetIds, uint256[] memory outValues) = IAdaptor(
-            address(rocketPoolAdp)
-        ).handleAssets(inAssetIds, inValues, payload); // staking directly through RocketPoolAdp
+        (, uint256[] memory outValues) = IAdaptor(address(rocketPoolAdp))
+            .handleAssets(inAssetIds, inValues, payload); // staking directly through RocketPoolAdp
 
         uint256 rEthBal = IERC20(rETH).balanceOf(address(rocketPoolAdp));
         console.log("rETH bal:", rEthBal);
@@ -123,9 +122,8 @@ contract LidoAdaptorTest is PoolTest {
         );
 
         console.log("Initiating unstaking on RocketPool");
-        (uint24[] memory outAssetIds, uint256[] memory outValues) = IAdaptor(
-            address(rocketPoolAdp)
-        ).handleAssets(inAssetIds, inValues, payload); // unstaking directly through RocketPoolAdp
+        (, uint256[] memory outValues) = IAdaptor(address(rocketPoolAdp))
+            .handleAssets(inAssetIds, inValues, payload); // unstaking directly through RocketPoolAdp
 
         uint256 wEthBal = IERC20(WETH).balanceOf(address(rocketPoolAdp));
         console.log("wETH bal:", wEthBal);

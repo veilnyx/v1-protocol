@@ -18,7 +18,7 @@ contract PoolTransferTest is PoolTest {
     function test_transferWithoutFee() external {
         uint256 balance1 = token1.balanceOf(address(pool));
         ShieldedTransaction memory stx = _loadShieldedTransaction(
-            "transfer_500_weth_without_fee"
+            "transfer_20_weth_without_fee"
         );
         _checkEventEmits(stx);
         assertEq(token1.balanceOf(address(pool)), balance1);
@@ -30,7 +30,7 @@ contract PoolTransferTest is PoolTest {
             "transfer_500_weth_with_weth_fee"
         );
 
-        uint96 feeValue = uint96(stx.feeData);
+        uint72 feeValue = uint72(stx.feeData);
         address paymaster = address(bytes20(bytes32(stx.feeData)));
         _checkEventEmits(stx);
 
@@ -70,13 +70,13 @@ contract PoolTransferTest is PoolTest {
         ShieldedTransaction memory stx = _loadShieldedTransaction(
             "transfer_500_weth_without_fee"
         );
-        pool.transact(stx);
+        pool.transact(stx, false);
         vm.expectRevert(
             abi.encodeWithSelector(
                 IPool.DoubleSpend.selector,
                 stx.nullifiers[0]
             )
         );
-        pool.transact(stx);
+        pool.transact(stx, false);
     }
 }

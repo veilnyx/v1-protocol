@@ -65,7 +65,7 @@ contract AaveAdaptorTest is PoolTest {
         ShieldedTransaction memory ztxDeposits = _loadShieldedTransaction(
             "deposit_aaveWeth_testnetUsdc"
         );
-        pool.transact(ztxDeposits);
+        pool.transact(ztxDeposits, false);
         vm.stopPrank();
         _processCommitmentTreeQueue();
     }
@@ -84,7 +84,7 @@ contract AaveAdaptorTest is PoolTest {
         ShieldedTransaction memory ztxLend = _loadShieldedTransaction(
             "lend_1_aave_weth"
         );
-        pool.transact(ztxLend);
+        pool.transact(ztxLend, false);
 
         // Asserts
         uint256 poolwETHStaticTokenBalAfterLending = IERC20(WETH_STATIC_A_TOKEN)
@@ -112,7 +112,7 @@ contract AaveAdaptorTest is PoolTest {
         ShieldedTransaction memory ztxLend = _loadShieldedTransaction(
             "lend_1_aave_weth_through_bundler"
         );
-        pool.transact(ztxLend);
+        pool.transact(ztxLend, false);
 
         // Asserts
         uint256 poolwETHStaticTokenBalAfterLending = IERC20(WETH_STATIC_A_TOKEN)
