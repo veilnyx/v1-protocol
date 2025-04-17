@@ -51,9 +51,12 @@ contract AaveAdaptorTest is PoolTest {
 
         AssetType assetType = AssetType.ERC20;
         address[] memory assetAddresses = new address[](1);
+        uint8[] memory assetsPrecision = new uint8[](1);
+
         // assetAddresses[0] = WETH_AAVE_UNDERLYING; // already added to the pool
         assetAddresses[0] = WETH_STATIC_A_TOKEN;
-        pool.addAssets(assetType, assetAddresses);
+        assetsPrecision[0] = 18;
+        pool.addAssets(assetType, assetAddresses, assetsPrecision);
         vm.stopPrank();
 
         deal(WETH_AAVE_UNDERLYING, user, INITIAL_SUPPLY);

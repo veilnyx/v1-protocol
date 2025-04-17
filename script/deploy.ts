@@ -118,7 +118,7 @@ const main1 = async () => {
       address: poolProxy.address,
       abi: poolAbi,
       functionName: "addAssets",
-      args: [chainParams.initAssetType, chainParams.initAssetAddresses],
+      args: [chainParams.initAssetType, chainParams.initAssetAddresses, chainParams.initAssetPrecision],
     });
 
     const rct = await client.waitForTransactionReceipt({ hash });

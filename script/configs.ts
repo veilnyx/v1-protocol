@@ -1,4 +1,4 @@
-import { Hex, isHex } from "viem";
+import { Hex, isHex, hexToNumber } from "viem";
 import configJson from "./config.json";
 import adaptorConfig from "./adaptorConfig.json";
 
@@ -13,6 +13,7 @@ export type ChainParams = {
   poseidonT4: Hex;
   initAssetType: number;
   initAssetAddresses: Hex[];
+  initAssetsPrecision: number[];
 };
 
 export type AdaptorParams = {
@@ -101,6 +102,10 @@ export function loadConfigs() {
         assets: {
           staticAWeth: getHex(aave.assets.staticAWeth),
           staticAUsdc: getHex(aave.assets.staticAUsdc),
+        },
+        assetsPrecision: {
+          staticAWeth: Number(aave.assetsPrecision.staticAWeth),
+          staticAUsdc: Number(aave.assetsPrecision.staticAUsdc)
         }
       },
       lido: {
@@ -111,6 +116,9 @@ export function loadConfigs() {
         wstETH: getHex(lido.wstETH),
         assets: {
           wstEth: getHex(lido.assets.wstEth)
+        },
+        assetsPrecision: {
+          wstEth: Number(lido.assetsPrecision.wstEth)
         }
       },
       curve: {
@@ -119,6 +127,12 @@ export function loadConfigs() {
           crvUsd: getHex(curve.assets.crvUsd),
           crvUsdUsdtLPToken: getHex(curve.assets.crvUsdUsdtLPToken),
           crvUsdSusdeLPToken: getHex(curve.assets.crvUsdSusdeLPToken)
+        },
+        assetsPrecision: {
+          usdt: Number(curve.assetsPrecision.usdt),
+          crvUsd: Number(curve.assetsPrecision.crvUsd),
+          crvUsdUsdtLPToken: Number(curve.assetsPrecision.crvUsdUsdtLPToken),
+          crvUsdSusdeLPToken: Number(curve.assetsPrecision.crvUsdSusdeLPToken)
         }
       },
       ethena: {
@@ -127,16 +141,26 @@ export function loadConfigs() {
         assets: {
           usde: getHex(ethena.assets.usde),
           sUsde: getHex(ethena.assets.sUsde)
+        },
+        assetsPrecision: {
+          usde: Number(ethena.assetsPrecision.usde),
+          sUsde: Number(ethena.assetsPrecision.sUsde)
         }
       },
       beefy: {
         assets: {
           mooCurveCrvUSDsUSDe: getHex(beefy.assets.mooCurveCrvUSDsUSDe)
+        },
+        assetsPrecision: {
+          mooCurveCrvUSDsUSDe: Number(beefy.assetsPrecision.mooCurveCrvUSDsUSDe)
         }
       },
       morpho: {
         assets: {
           gauntletWETHPrimeVault: getHex(morpho.assets.gauntletWETHPrimeVault)
+        },
+        assetsPrecision: {
+          gauntletWETHPrimeVault: Number(morpho.assetsPrecision.gauntletWETHPrimeVault)
         }
       },
       rocketPool: {
@@ -144,6 +168,9 @@ export function loadConfigs() {
         wETH: getHex(rocketPool.wETH),
         assets: {
           rETH: getHex(rocketPool.assets.rETH)
+        },
+        assetsPrecision: {
+          rETH: Number(rocketPool.assetsPrecision.rETH)
         }
       }
     };
@@ -160,6 +187,7 @@ export function loadConfigs() {
       sanctionsList,
       initAssetType,
       initAssetAddresses,
+      initAssetsPrecision
     } = params;
 
     chainParams[Number(chainId)] = {
@@ -170,6 +198,7 @@ export function loadConfigs() {
       poseidonT4: getHex(params.poseidonT4),
       initAssetType: Number(initAssetType),
       initAssetAddresses: initAssetAddresses.map(getHex),
+      initAssetsPrecision: initAssetsPrecision.map(p => Number(p))
     };
   }
 

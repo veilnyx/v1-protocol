@@ -45,7 +45,12 @@ contract CurveAdaptorTest is PoolTest {
         assetAddresses[0] = USDT;
         assetAddresses[1] = crvUSD;
         assetAddresses[2] = crvUSD_USDT_Pool;
-        pool.addAssets(assetType, assetAddresses);
+
+        uint8[] memory assetsPrecision = new uint8[](3);
+        assetsPrecision[0] = 6;
+        assetsPrecision[1] = 6;
+        assetsPrecision[2] = 6;
+        pool.addAssets(assetType, assetAddresses, assetsPrecision);
         
         vm.stopPrank();
 

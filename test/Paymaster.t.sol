@@ -8,6 +8,8 @@ import {Paymaster} from "src/core/Paymaster.sol";
 import {ShieldedTransaction, ShieldedTransactionType} from "src/libraries/ShieldedTransaction.sol";
 import {Mempool, PreVerificationDetails} from "src/core/Mempool.sol";
 import {Pool} from "src/core/Pool.sol";
+import {Gateway} from "src/core/Gateway.sol";
+import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
 import {MockPool} from "test/mocks/MockPool.sol";
 import {PoolTest} from "test/fixtures/PoolTest.sol";
 import {console2} from "forge-std/console2.sol";
@@ -16,6 +18,9 @@ import {console2} from "forge-std/console2.sol";
 
 contract PaymasterTest is PoolTest {
     Paymaster public paymaster;
+    address public constant CHAINLINK_USDC_ETH_FEED_SEPOLIA =
+        0x694AA1769357215DE4FAC081bf1f309aDC325306;
+    uint8 public constant ETH_DECIMALS = 18;
 
     uint24 feeAssetId;
     uint256 feeValue = 0.002 ether;
@@ -64,13 +69,21 @@ contract PaymasterTest is PoolTest {
         _setUp();
         feeAssetId = asset1.id;
         entryPoint = address(new EntryPoint());
-        paymaster = new Paymaster(entryPoint, address(pool));
-        console2.log("paymaster:", address(paymaster));
-        paymaster.setAssetFee(feeAssetId, feeValue);
-        paymaster.setAssetFeeForPreVerifiedTx(
-            feeAssetId,
-            feeValueForOutsourcedVerification
+        Gateway gateway = new Gateway(
+            address(entryPoint),
+            makeAddr("wToken"),
+            address(pool),
+            address(mempool)
         );
+        paymaster = new Paymaster(entryPoint, address(gateway), address(pool));
+        console2.log("paymaster:", address(paymaster));
+
+        paymaster.setChainlinkFeed(asset2.id, CHAINLINK_USDC_ETH_FEED_SEPOLIA);
+        // paymaster.setAssetFee(feeAssetId, feeValue);
+        // paymaster.setAssetFeeForPreVerifiedTx(
+        //     feeAssetId,
+        //     feeValueForOutsourcedVerification
+        // );
     }
 
     function test_updateFeeAsset() public {
@@ -132,6 +145,7 @@ contract PaymasterTest is PoolTest {
         vm.stopPrank();
     }
 
+    /**
     function test_revertWhenPaymasterFeesIsNotEnough() public {
         uint256 lowFeeValue = feeValue / 2;
 
@@ -161,8 +175,84 @@ contract PaymasterTest is PoolTest {
         );
         paymaster.validatePaymasterUserOp(userOp, bytes32(0), 0);
     }
+     */
 
-    function test_revertWhenPaymasterFeesIsNotEnoughForPreVerifiedTx()
+    function test_revertWhenPaymasterFeesInETHIsNotEnough() public {
+        uint256 lowFeeValue = feeValue / 2;
+
+        stx.feeData = uint256(
+            bytes32(
+                bytes.concat(
+                    bytes20(address(paymaster)),
+                    bytes3(uint24(feeAssetId)),
+                    bytes9(uint72(lowFeeValue))
+                )
+            )
+        );
+
+        userOp.sender = address(pool);
+        userOp.callData = abi.encodeCall(
+            MockPool.transactForPaymasterTestSetup,
+            (stx, preVerificationDetails)
+        );
+
+        vm.prank(entryPoint);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                Paymaster.InsufficientFee.selector,
+                lowFeeValue,
+                feeValue
+            )
+        );
+        paymaster.validatePaymasterUserOp(userOp, bytes32(0), feeValue);
+    }
+
+    function test_revertWhenPaymasterFeesInUSDCIsNotEnough() public {
+        (, int256 ethInUSDC, , , ) = AggregatorV3Interface(
+            CHAINLINK_USDC_ETH_FEED_SEPOLIA
+        ).latestRoundData();
+
+        uint8 feedDecimals = AggregatorV3Interface(
+            CHAINLINK_USDC_ETH_FEED_SEPOLIA
+        ).decimals();
+
+        uint256 lowFeeValueEth = feeValue / 2;
+        uint256 lowFeeValueUSDC = ((lowFeeValueEth * uint256(ethInUSDC)) /
+            10 ** (ETH_DECIMALS + feedDecimals)) * 10 ** 6;
+
+        stx.feeData = uint256(
+            bytes32(
+                bytes.concat(
+                    bytes20(address(paymaster)),
+                    bytes3(uint24(asset2.id)),
+                    bytes9(uint72(lowFeeValueUSDC))
+                )
+            )
+        );
+
+        userOp.sender = address(pool);
+        userOp.callData = abi.encodeCall(
+            MockPool.transactForPaymasterTestSetup,
+            (stx, preVerificationDetails)
+        );
+
+        // calc required fee in USDC
+        // convert `feeValue` (in ETH) to USDC
+        uint256 requiredUSDC = ((feeValue * uint256(ethInUSDC)) /
+            10 ** (ETH_DECIMALS + feedDecimals)) * 10 ** 6;
+
+        vm.prank(entryPoint);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                Paymaster.InsufficientFee.selector,
+                lowFeeValueUSDC,
+                requiredUSDC
+            )
+        );
+        paymaster.validatePaymasterUserOp(userOp, bytes32(0), feeValue); // feeValue is maxCostEth
+    }
+
+    function test_revertWhenPaymasterFeesInETHIsNotEnoughForPreVerifiedTx()
         public
         createPackedUserOps
     {
@@ -192,7 +282,11 @@ contract PaymasterTest is PoolTest {
                 feeValueForOutsourcedVerification
             )
         );
-        paymaster.validatePaymasterUserOp(userOp, bytes32(0), 0);
+        paymaster.validatePaymasterUserOp(
+            userOp,
+            bytes32(0),
+            feeValueForOutsourcedVerification
+        );
         vm.stopPrank();
     }
 
@@ -216,7 +310,7 @@ contract PaymasterTest is PoolTest {
         vm.prank(entryPoint);
         vm.expectRevert(
             abi.encodeWithSelector(
-                Paymaster.UnsupportedFeeAsset.selector,
+                Paymaster.FeeAssetInactive.selector,
                 uint24(0)
             )
         );

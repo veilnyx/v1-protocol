@@ -46,7 +46,8 @@ contract ERC4337 is PoolTest {
 
         paymaster = new Paymaster(
             address(entryPointContract),
-            address(gateway)
+            address(gateway),
+            address(pool)
         );
         console2.log("Paymaster address:");
         console2.logAddress(address(paymaster));

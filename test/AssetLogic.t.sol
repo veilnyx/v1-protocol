@@ -9,6 +9,7 @@ contract AssetLogicTest is Test {
     address public t1 = address(1);
     address public t2 = address(2);
     address public t3 = address(3);
+    uint8 public precision = 18;
 
     mapping(address => uint24) internal _assetIds;
     mapping(uint24 => Asset) internal _assets;
@@ -20,7 +21,8 @@ contract AssetLogicTest is Test {
             _assets,
             _counter,
             AssetType.ERC20,
-            t1
+            t1,
+            precision
         );
         assertEq(count, _counter + 1);
     }
@@ -33,12 +35,18 @@ contract AssetLogicTest is Test {
         assetAddresses[1] = t2;
         assetAddresses[2] = t3;
 
+        uint8[] memory assetsPrecision = new uint8[](3);
+        assetsPrecision[0] = precision;
+        assetsPrecision[1] = precision;
+        assetsPrecision[2] = precision;
+
         uint16 count = AssetLogic.addAssets(
             _assetIds,
             _assets,
             _counter,
             assetType,
-            assetAddresses
+            assetAddresses,
+            assetsPrecision
         );
 
         assertEq(count, _counter + assetAddresses.length);
@@ -50,7 +58,8 @@ contract AssetLogicTest is Test {
             _assets,
             _counter,
             AssetType.ERC20,
-            t1
+            t1,
+            precision
         );
         uint24 newAssetId = _assetIds[t1];
         AssetLogic.updateAsset(_assets, newAssetId, false);
@@ -58,6 +67,13 @@ contract AssetLogicTest is Test {
         vm.expectRevert(
             abi.encodeWithSelector(IPool.DuplicateAsset.selector, t1)
         );
-        AssetLogic.addAsset(_assetIds, _assets, count, AssetType.ERC20, t1);
+        AssetLogic.addAsset(
+            _assetIds,
+            _assets,
+            count,
+            AssetType.ERC20,
+            t1,
+            precision
+        );
     }
 }

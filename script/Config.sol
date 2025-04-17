@@ -27,6 +27,7 @@ contract Config is Script {
 
     AssetType public immutable initAssetType;
     address[] internal _initAssetAddresses;
+    uint8[] internal _initAssetsPrecision;
 
     constructor() {
         string memory path = string.concat(
@@ -104,6 +105,15 @@ contract Config is Script {
             configJson,
             string.concat(chainPrefix, ".initAssetAddresses")
         );
+
+        uint256[] memory initAssetsPrecisionUint256 = vm.parseJsonUintArray(
+            configJson,
+            string.concat(chainPrefix, ".initAssetsPrecision")
+        );
+
+        for(uint i = 0; i < initAssetsPrecisionUint256.length; i++) {
+            _initAssetsPrecision[i] = uint8(initAssetsPrecisionUint256[i]);
+        }
     }
 
     function revokerPublicKey() external view returns (uint256[2] memory) {
@@ -116,5 +126,9 @@ contract Config is Script {
 
     function initAssetAddresses() external view returns (address[] memory) {
         return _initAssetAddresses;
+    }
+
+    function initAssetsPrecision() external view returns (uint8[] memory) {
+        return _initAssetsPrecision;
     }
 }

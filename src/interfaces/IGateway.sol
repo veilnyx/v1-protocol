@@ -13,7 +13,10 @@ interface IGateway is IAccount {
         uint256
     ) external view returns (uint256);
 
-    function handleUserOp(ShieldedTransaction calldata stx, PreVerificationDetails calldata preVerificationDetails) external;
+    function handleUserOp(
+        ShieldedTransaction calldata stx,
+        PreVerificationDetails calldata preVerificationDetails
+    ) external;
 
     function handleWrapAndDeposit(
         ShieldedTransaction calldata stx

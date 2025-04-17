@@ -11,6 +11,10 @@
             "assets": {
                 "staticAWeth": "0x252231882FB38481497f3C767469106297c8d93b",
                 "staticAUsdc": "0x73edDFa87C71ADdC275c2b9890f5c3a8480bC9E6"
+            },
+            "assetsPrecision": {
+                "staticAWeth": 18,
+                "staticAUsdc": 6
             }
         },
         "lido": {
@@ -21,6 +25,9 @@
             "wstETH": "0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0",
             "assets": {
                 "wstEth": "0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0"
+            },
+            "assetsPrecision": {
+                "wstEth": 18
             }
         },
         "curve": {
@@ -29,6 +36,12 @@
                 "crvUsd": "0xf939E0A03FB07F59A73314E73794Be0E57ac1b4E",
                 "crvUsdUsdtLPToken": "0x390f3595bCa2Df7d23783dFd126427CCeb997BF4",
                 "crvUsdSusdeLPToken": "0x57064F49Ad7123C92560882a45518374ad982e85"
+            },
+            "assetsPrecision": {
+                "usdt": 6,
+                "crvUsd": 6,
+                "crvUsdUsdtLPToken": 6,
+                "crvUsdSusdeLPToken": 6
             }
         },
         "ethena": {
@@ -37,16 +50,26 @@
             "assets": {
                 "usde": "0x4c9EDD5852cd905f086C759E8383e09bff1E68B3",
                 "sUsde": "0x9D39A5DE30e57443BfF2A8307A4256c8797A3497"
+            },
+            "assetsPrecision": {
+                "usde": 6,
+                "sUsde": 6
             }
         },
         "beefy": {
             "assets": {
                 "mooCurveCrvUSDsUSDe": "0xBF7fc2A3d96d80f47b3b89BE84afe10376CE96A5"
+            },
+            "assetsPrecision": {
+                "mooCurveCrvUSDsUSDe": 18
             }
         },
         "morpho": {
             "assets": {
                 "gauntletWETHPrimeVault": "0x2371e134e3455e0593363cBF89d3b6cf53740618"
+            },
+            "assetsPrecision": {
+                "gauntletWETHPrimeVault": 18
             }
         },
         "rocketPool": {
@@ -54,6 +77,9 @@
             "wETH": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
             "assets": {
                 "rETH": "0xae78736Cd615f374D3085123A210448E74Fc6393"
+            },
+            "assetsPrecision": {
+                "rETH": 18
             }
         }
     },
@@ -69,6 +95,10 @@
             "assets": {
                 "staticAWeth": "0x252231882FB38481497f3C767469106297c8d93b",
                 "staticAUsdc": "0x73edDFa87C71ADdC275c2b9890f5c3a8480bC9E6"
+            },
+            "assetsPrecision": {
+                "staticAWeth": 18,
+                "staticAUsdc": 6
             }
         },
         "lido": {
@@ -79,6 +109,9 @@
             "wstETH": "0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0",
             "assets": {
                 "wstEth": "0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0"
+            },
+            "assetsPrecision": {
+                "wstEth": 18
             }
         },
         "curve": {
@@ -87,6 +120,12 @@
                 "crvUsd": "0xf939E0A03FB07F59A73314E73794Be0E57ac1b4E",
                 "crvUsdUsdtLPToken": "0x390f3595bCa2Df7d23783dFd126427CCeb997BF4",
                 "crvUsdSusdeLPToken": "0x57064F49Ad7123C92560882a45518374ad982e85"
+            },
+            "assetsPrecision": {
+                "usdt": 6,
+                "crvUsd": 6,
+                "crvUsdUsdtLPToken": 6,
+                "crvUsdSusdeLPToken": 6
             }
         },
         "ethena": {
@@ -95,16 +134,26 @@
             "assets": {
                 "usde": "0x4c9EDD5852cd905f086C759E8383e09bff1E68B3",
                 "sUsde": "0x9D39A5DE30e57443BfF2A8307A4256c8797A3497"
+            },
+            "assetsPrecision": {
+                "usde": 6,
+                "sUsde": 6
             }
         },
         "beefy": {
             "assets": {
                 "mooCurveCrvUSDsUSDe": "0xBF7fc2A3d96d80f47b3b89BE84afe10376CE96A5"
+            },
+            "assetsPrecision": {
+                "mooCurveCrvUSDsUSDe": 18
             }
         },
         "morpho": {
             "assets": {
                 "gauntletWETHPrimeVault": "0x2371e134e3455e0593363cBF89d3b6cf53740618"
+            },
+            "assetsPrecision": {
+                "gauntletWETHPrimeVault": 18
             }
         },
         "rocketPool": {
@@ -112,6 +161,9 @@
             "wETH": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
             "assets": {
                 "rETH": "0xae78736Cd615f374D3085123A210448E74Fc6393"
+            },
+            "assetsPrecision": {
+                "rETH": 18
             }
         }
     }

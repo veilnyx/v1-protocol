@@ -55,7 +55,7 @@ contract GatewayTest is Test {
             address(pool),
             address(mempool)
         );
-        paymaster = new Paymaster(address(entryPoint), address(gateway));
+        paymaster = new Paymaster(address(entryPoint), address(gateway), address(pool));
 
         // Deposit to entry point
         vm.deal(address(this), 100 ether);

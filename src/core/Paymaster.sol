@@ -11,6 +11,7 @@ import {IPaymaster} from "@account-abstraction/contracts/interfaces/IPaymaster.s
 import {IEntryPoint} from "@account-abstraction/contracts/interfaces/IEntryPoint.sol";
 import {PackedUserOperation} from "@account-abstraction/contracts/interfaces/PackedUserOperation.sol";
 import {ShieldedTransaction} from "../libraries/ShieldedTransaction.sol";
+import {Asset, AssetLogic} from "../libraries/Asset.sol";
 import {PreVerificationDetails} from "../interfaces/IMempool.sol";
 import {IPool} from "../interfaces/IPool.sol";
 
@@ -20,6 +21,7 @@ contract Paymaster is IPaymaster, Ownable {
     uint8 public constant ETH_DECIMALS = 18;
     IEntryPoint public immutable entryPoint;
     address public immutable sender;
+    IPool public immutable pool;
 
     /**
      * @dev Mapping from assetId to fee value.
@@ -35,19 +37,23 @@ contract Paymaster is IPaymaster, Ownable {
     error InvalidSender(address sender);
     error InvalidCallData();
     error InsufficientFee(uint256 given, uint256 required);
-    error UnsupportedFeeAsset(uint24 asset);
+    error FeeAssetInactive(uint24 asset);
     error ChainlinkPriceFeedNotFound(uint24 assetId);
     error ChainlinkPriceInvalid(int256 price);
-    error ChainlinkDecimalsInvalid(uint24 assetId);
     error MaxCostEthToAssetConversionFailed(uint24 assetId);
 
     /**
      * params entryPoint_: Address of the entry point contract.
      * params sender_: Address of the gateway contract.
      */
-    constructor(address entryPoint_, address sender_) Ownable(msg.sender) {
+    constructor(
+        address entryPoint_,
+        address sender_,
+        address pool_
+    ) Ownable(msg.sender) {
         entryPoint = IEntryPoint(entryPoint_);
         sender = sender_;
+        pool = IPool(pool_);
     }
 
     /**
@@ -163,7 +169,8 @@ contract Paymaster is IPaymaster, Ownable {
     /// @notice Returns the `maxCostEth` value in fee asset using Chainlink's price feeds.
     function convertFeeFromEthToFeeAsset(
         uint256 maxCostEth,
-        uint24 assetId
+        uint24 assetId,
+        uint8 feeAssetDecimals
     ) public view returns (uint256 feeInAsset) {
         if (assetIdToChainlinkFeed[assetId] == address(0)) {
             revert ChainlinkPriceFeedNotFound(assetId);
@@ -172,18 +179,18 @@ contract Paymaster is IPaymaster, Ownable {
         AggregatorV3Interface feed = AggregatorV3Interface(
             assetIdToChainlinkFeed[assetId]
         );
-        (, int256 price, , , ) = feed.latestRoundData();
-        if (price <= 0) {
-            revert ChainlinkPriceInvalid(price);
+        (, int256 priceETHInAsset, , , ) = feed.latestRoundData();
+        if (priceETHInAsset <= 0) {
+            revert ChainlinkPriceInvalid(priceETHInAsset);
         }
 
         // for conversion we assume price fetching of assetId in ETH only since maxCostEth is in ETH
-        uint8 decimals = feed.decimals();
-        if (decimals != ETH_DECIMALS) {
-            revert ChainlinkDecimalsInvalid(assetId);
-        }
+        uint8 feedDecimals = feed.decimals();
 
-        feeInAsset = maxCostEth / uint256(price);
+        feeInAsset =
+            ((maxCostEth * uint256(priceETHInAsset)) /
+                10 ** (ETH_DECIMALS + feedDecimals)) *
+            10 ** feeAssetDecimals;
 
         if (feeInAsset == 0) {
             revert MaxCostEthToAssetConversionFailed(assetId);
@@ -231,7 +238,16 @@ contract Paymaster is IPaymaster, Ownable {
             revert InvalidPaymaster(paymaster);
         }
 
-        uint256 requiredFee = _getRequiredFee(feeAssetId, maxCostEth);
+        Asset memory feeAsset = pool.getAsset(feeAssetId);
+        if (!feeAsset.isActive) {
+            revert FeeAssetInactive(feeAssetId);
+        }
+
+        uint256 requiredFee = _getRequiredFee(
+            feeAssetId,
+            maxCostEth,
+            feeAsset.precision
+        );
 
         if (givenFee < requiredFee) {
             revert InsufficientFee(givenFee, requiredFee);
@@ -266,13 +282,18 @@ contract Paymaster is IPaymaster, Ownable {
     /// @notice Returns `maxCostEth` amt of ETH in asset.
     function _getRequiredFee(
         uint24 feeAssetId,
-        uint256 maxCostEth
+        uint256 maxCostEth,
+        uint8 feeAssetDecimals
     ) internal view returns (uint256 feeInAsset) {
         if (feeAssetId == ETH_ASSET_ID) {
             return maxCostEth;
         }
 
-        feeInAsset = convertFeeFromEthToFeeAsset(maxCostEth, feeAssetId);
+        feeInAsset = convertFeeFromEthToFeeAsset(
+            maxCostEth,
+            feeAssetId,
+            feeAssetDecimals
+        );
         return feeInAsset;
     }
 
