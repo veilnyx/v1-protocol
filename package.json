@@ -14,6 +14,7 @@
     "deploy:tenderly": "hardhat run script/deployTenderly.ts --network tenderlyMainnetCustomId",
     "deploy:sepolia": "hardhat run script/deploy.ts --network ethereumSepolia",
     "upgrade:ethSepolia": "hardhat run script/upgrade.ts --network ethereumSepolia",
+    "upgradeMempool:ethSepolia": "hardhat run script/upgradeMempool.ts --network ethereumSepolia",
     "upgrade:opSepolia": "hardhat run script/upgrade.ts --network optimismSepolia",
     "transferOwnership": "forge script script/setup/TransferOwnership.s.sol:TransferOwnership --broadcast",
     "genPoseidon": "npx tsx script/genPoseidon.ts",
