@@ -10,6 +10,11 @@ struct PreVerificationDetails {
     address verifierAddr;
 }
 
+enum Action {
+    DROP,
+    EXIT
+}
+
 interface IMempool {
     error STXNotInMempool(uint256 stxHash);
     error STXAndProofIdMismatch();

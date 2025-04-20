@@ -14,13 +14,13 @@ import {
 
 const main = async () => {
 	const { sdk, nebraClient, circuitIds } = await getSDKInstance();
-	await genTestDeposits(sdk);
+	// await genTestDeposits(sdk);
 	// await genTestTransfers(sdk);
-	await genTransferPackedUserOp(sdk, nebraClient, circuitIds);
+	// await genTransferPackedUserOp(sdk, nebraClient, circuitIds);
 	// await genTransferPackedUserOpPreVerified(sdk, nebraClient, circuitIds);
 	// await genAddressRegistrations(sdk);
 	// await genAddrRegWithOutsourceProofVerification(sdk, nebraClient, circuitIds.register);
-	// await genTestDepositsWithOutsourceProofVerification(sdk, nebraClient, circuitIds.transact21);
+	await genTestDepositsWithOutsourceProofVerification(sdk, nebraClient, circuitIds.transact21);
 	// await genTestWithdrawals(sdk);
 	// await genTestCallAdaptors(sdk);
 	// await genTreeUpdateData(sdk);

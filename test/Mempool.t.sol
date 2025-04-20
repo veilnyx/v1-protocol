@@ -152,13 +152,11 @@ contract MempoolTest is PoolTest {
             "deposit_weth_tx"
         ).nullifiers;
 
-        // @todo: Uncomment when the proofId is available
-        /**
         bytes32 proofId = mempool.getProofId(stxHashPI);
 
         vm.expectEmit(true, true, true, true);
         emit IMempool.STXProcessed(stxHashPI, proofId, block.timestamp);
-         */
+
         vm.expectEmit(true, true, true, false);
         emit IMempool.UnlockNotes(stxHashPI, noteNullifiers);
         mempool.exitSTXFromMempool(stxHashPI);
@@ -184,7 +182,6 @@ contract MempoolTest is PoolTest {
     }
 
     // @todo: Uncomment when the proofId is available
-    /**
     function testRevertWhenExitingSTXTIsNotVerifiedYet()
         public
         addSTXToMempool
@@ -234,7 +231,6 @@ contract MempoolTest is PoolTest {
         assert(address(this).balance == MEMPOOL_EXIT_FEES);
         assert(address(mempool).balance == 0);
     }
-     */
 
     receive() external payable {
         console.log("Received native eth:", msg.value);

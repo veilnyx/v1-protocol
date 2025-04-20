@@ -11,7 +11,7 @@ import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/Pau
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {IPool} from "src/interfaces/IPool.sol";
-import {IMempool, PreVerificationDetails} from "src/interfaces/IMempool.sol";
+import {IMempool, PreVerificationDetails, Action} from "src/interfaces/IMempool.sol";
 import {MempoolStorage} from "src/base/MempoolStorage.sol";
 import {MempoolValidator} from "src/libraries/MempoolValidator.sol";
 import {ShieldedTransaction, ShieldedTransactionLogic, ShieldedTransactionType, PubAsset} from "src/libraries/ShieldedTransaction.sol";
@@ -107,19 +107,12 @@ contract Mempool is
 
         // Approve assets to the pool only for DEPOSIT tx
         if (stx.txType == ShieldedTransactionType.DEPOSIT) {
-            for (uint i = 0; i < stx.pubAssets.length; i++) {
-                (uint24 assetId, uint224 value) = MempoolValidator.decodeAsset(
-                    stx.pubAssets[i]
-                );
-                Asset memory asset = MempoolValidator.checkIfAssetValid(
-                    assetId,
-                    pool
-                );
-
-                IERC20(asset.assetAddress).forceApprove(address(pool), value);
-                // Update the deposit balance of the stx sender
-                depositBalance[stxSenders[stxHash]][assetId] -= value;
-            }
+            _handleDepositedAssets({
+                pubAssets: stx.pubAssets,
+                stxSender: stxSenders[stxHash],
+                pool: address(pool),
+                action: Action.EXIT
+            });
         }
 
         // Remove STX from mempool
@@ -134,7 +127,6 @@ contract Mempool is
         emit UnlockNotes(stxHash, stx.nullifiers);
     }
 
-    /**
     /// @notice Drops the STX from mempool if it's proof is not verified yet or has failed verification.
     /// @notice Refunds the user their deposit assets.
     function dropFromMempool(uint256 stxHash) external nonReentrant {
@@ -154,23 +146,12 @@ contract Mempool is
 
         // refund deposited assets to the stx sender only for DEPOSIT tx
         if (stx.txType == ShieldedTransactionType.DEPOSIT) {
-            for (uint i = 0; i < stx.pubAssets.length; i++) {
-                (uint24 assetId, uint224 value) = MempoolValidator.decodeAsset(
-                    stx.pubAssets[i]
-                );
-                Asset memory asset = MempoolValidator.checkIfAssetValid(
-                    assetId,
-                    pool
-                );
-
-                IERC20(asset.assetAddress).safeTransfer(stxSender, value);
-
-                // Update the deposit balance of the stx sender
-                depositBalance[stxSender][assetId] -= value;
-            }
-
-            // refund the mempool exit fee to the stx sender
-            Address.sendValue(payable(stxSender), mempoolExitFee);
+            _handleDepositedAssets({
+                pubAssets: stx.pubAssets,
+                stxSender: stxSender,
+                pool: address(pool),
+                action: Action.DROP
+            });
         }
 
         // Remove STX from mempool
@@ -182,7 +163,6 @@ contract Mempool is
         emit STXDropped(stxHash, stxSender, block.timestamp);
         emit UnlockNotes(stxHash, stx.nullifiers);
     }
-     */
 
     function withdrawMempoolExitFee() external nonReentrant {
         uint256 feeCollected = mempoolExitFeeCollected;
@@ -190,16 +170,12 @@ contract Mempool is
         Address.sendValue(payable(verificationTrackerService), feeCollected);
     }
 
-    /**
     ///////////////////////////
     //// Read Functions //////
     ///////////////////////////
+    /**
     function isSTXInMempool(uint256 stxHash) external view returns (bool) {
         return _stxHashes.contains(stxHash);
-    }
-
-    function getProofId(uint256 stxHash) external view returns (bytes32) {
-        return stxToProofId[stxHash];
     }
 
     function isSTXProofVerified(uint256 stxHash) external view returns (bool) {
@@ -207,6 +183,10 @@ contract Mempool is
         return INebraUpa(nebraVerifier).isProofVerified(proofId);
     }
      */
+
+    function getProofId(uint256 stxHash) external view returns (bytes32) {
+        return stxToProofId[stxHash];
+    }
 
     ///////////////////////////
     //// Owner Functions //////
@@ -230,13 +210,41 @@ contract Mempool is
         pool = IPool(newPool);
     }
 
-    /**
     function updateMempoolExitFee(uint256 newFee) external onlyOwner {
         mempoolExitFee = newFee;
     }
 
+    /**
     function updateNebraVerifier(address newAddr) external onlyOwner {
         nebraVerifier = newAddr;
     }
      */
+
+    function _handleDepositedAssets(
+        uint248[] memory pubAssets,
+        address stxSender,
+        address pool,
+        Action action
+    ) internal {
+        for (uint i = 0; i < pubAssets.length; i++) {
+            (uint24 assetId, uint224 value) = MempoolValidator.decodeAsset(
+                pubAssets[i]
+            );
+            Asset memory asset = MempoolValidator.checkIfAssetValid(
+                assetId,
+                IPool(pool)
+            );
+
+            if (action == Action.DROP) {
+                IERC20(asset.assetAddress).safeTransfer(stxSender, value);
+                // refund the mempool exit fee to the stx sender
+                Address.sendValue(payable(stxSender), mempoolExitFee);
+            } else {
+                IERC20(asset.assetAddress).forceApprove(pool, value);
+            }
+
+            // Update the deposit balance of the stx sender
+            depositBalance[stxSender][assetId] -= value;
+        }
+    }
 }
