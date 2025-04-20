@@ -53,25 +53,20 @@ interface IMempool {
 
     function exitSTXFromMempool(uint256 stxHash) external;
 
-    function dropFromMempool(uint256 stxHash) external;
-
     function withdrawMempoolExitFee() external;
-
-    function isSTXInMempool(uint256 stxHash) external view returns (bool);
-
-    function getProofId(uint256 stxHash) external view returns (bytes32);
-
-    function isSTXProofVerified(uint256 stxHash) external view returns (bool);
-
-    function updateMempoolExitFee(uint256 newFee) external;
 
     function updateVerificationTrackerService(address newAddr) external;
 
     function updatePoolAddress(address newPool) external;
 
     /**
+    function dropFromMempool(uint256 stxHash) external;
+    function isSTXProofVerified(uint256 stxHash) external view returns (bool);
+    function getProofId(uint256 stxHash) external view returns (bytes32);
+    function updateMempoolExitFee(uint256 newFee) external;
     function mempoolExitFee() external view returns (uint256);
 
+    function isSTXInMempool(uint256 stxHash) external view returns (bool);
     function mempoolExitFeeCollected() external view returns (uint256);
 
     function verificationTrackerService() external view returns (address);

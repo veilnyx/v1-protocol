@@ -17,4 +17,6 @@ abstract contract MempoolStorage {
     address public verificationTrackerService;
     address public nebraVerifier;
     address public gateway;
+
+    mapping(address stxSender => mapping(uint24 assetId => uint224 assetValue)) public depositBalance;
 }

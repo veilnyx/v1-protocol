@@ -30,7 +30,8 @@ library MempoolValidator {
         IPool pool,
         EnumerableSet.UintSet storage _stxHashes,
         address gateway,
-        uint256 mempoolExitFee
+        uint256 mempoolExitFee,
+        mapping(address stxSender => mapping(uint24 assetId => uint224 assetValue)) storage depositBalance
     ) public {
         if (address(pool) == address(0)) {
             revert LabyrinthPoolAddrNotInitialized();
@@ -78,6 +79,8 @@ library MempoolValidator {
                     address(this),
                     value
                 );
+
+                depositBalance[msg.sender][assetId] += value;
             }
         }
     }
