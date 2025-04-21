@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {console2} from "forge-std/console2.sol";
 import {Script} from "forge-std/Script.sol";
 import {AssetType} from "src/libraries/Asset.sol";
 
@@ -110,8 +109,9 @@ contract Config is Script {
             configJson,
             string.concat(chainPrefix, ".initAssetsPrecision")
         );
+        _initAssetsPrecision = new uint8[](initAssetsPrecisionUint256.length);
 
-        for(uint i = 0; i < initAssetsPrecisionUint256.length; i++) {
+        for (uint i = 0; i < initAssetsPrecisionUint256.length; i++) {
             _initAssetsPrecision[i] = uint8(initAssetsPrecisionUint256[i]);
         }
     }

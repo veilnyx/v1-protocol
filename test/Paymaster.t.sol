@@ -18,9 +18,11 @@ import {console2} from "forge-std/console2.sol";
 
 contract PaymasterTest is PoolTest {
     Paymaster public paymaster;
+    Gateway public gateway;
     address public constant CHAINLINK_USDC_ETH_FEED_SEPOLIA =
         0x694AA1769357215DE4FAC081bf1f309aDC325306;
     uint8 public constant ETH_DECIMALS = 18;
+    uint8 public constant USDC_DECIMALS = 6;
 
     uint24 feeAssetId;
     uint256 feeValue = 0.002 ether;
@@ -30,7 +32,7 @@ contract PaymasterTest is PoolTest {
     PreVerificationDetails preVerificationDetails;
     PackedUserOperation userOp;
 
-    modifier createPackedUserOps() {
+    modifier createPackedUserOps(address gatewayAddr) {
         stx.pubAssets = new uint248[](1);
         stx.pubAssets[0] = uint248(
             bytes31(bytes.concat(bytes3(feeAssetId), bytes12(uint96(10 ether))))
@@ -57,7 +59,7 @@ contract PaymasterTest is PoolTest {
             verifierAddr: address(0)
         });
 
-        userOp.sender = address(pool);
+        userOp.sender = gatewayAddr;
         userOp.callData = abi.encodeCall(
             MockPool.transactForPaymasterTestSetup,
             (stx, preVerificationDetails)
@@ -69,7 +71,7 @@ contract PaymasterTest is PoolTest {
         _setUp();
         feeAssetId = asset1.id;
         entryPoint = address(new EntryPoint());
-        Gateway gateway = new Gateway(
+        gateway = new Gateway(
             address(entryPoint),
             makeAddr("wToken"),
             address(pool),
@@ -134,7 +136,10 @@ contract PaymasterTest is PoolTest {
     /// Paymaster UserOp Validation tests /////
     //////////////////////////////////////////
     /// @dev The test cases are designed to have Pool as the sender. In actuality, the sender is the Gateway contract.
-    function test_revertWhenSenderIsNotPool() public createPackedUserOps {
+    function test_revertWhenSenderIsNotPool()
+        public
+        createPackedUserOps(address(gateway))
+    {
         userOp.sender = address(0);
 
         vm.expectRevert(
@@ -207,7 +212,10 @@ contract PaymasterTest is PoolTest {
         paymaster.validatePaymasterUserOp(userOp, bytes32(0), feeValue);
     }
 
-    function test_revertWhenPaymasterFeesInUSDCIsNotEnough() public {
+    function test_revertWhenPaymasterFeesInUSDCIsNotEnough()
+        public
+        createPackedUserOps(address(gateway))
+    {
         (, int256 ethInUSDC, , , ) = AggregatorV3Interface(
             CHAINLINK_USDC_ETH_FEED_SEPOLIA
         ).latestRoundData();
@@ -216,6 +224,7 @@ contract PaymasterTest is PoolTest {
             CHAINLINK_USDC_ETH_FEED_SEPOLIA
         ).decimals();
 
+        // altering the fee value to be less than the required fee
         uint256 lowFeeValueEth = feeValue / 2;
         uint256 lowFeeValueUSDC = ((lowFeeValueEth * uint256(ethInUSDC)) /
             10 ** (ETH_DECIMALS + feedDecimals)) * 10 ** 6;
@@ -230,7 +239,6 @@ contract PaymasterTest is PoolTest {
             )
         );
 
-        userOp.sender = address(pool);
         userOp.callData = abi.encodeCall(
             MockPool.transactForPaymasterTestSetup,
             (stx, preVerificationDetails)
@@ -239,7 +247,7 @@ contract PaymasterTest is PoolTest {
         // calc required fee in USDC
         // convert `feeValue` (in ETH) to USDC
         uint256 requiredUSDC = ((feeValue * uint256(ethInUSDC)) /
-            10 ** (ETH_DECIMALS + feedDecimals)) * 10 ** 6;
+            10 ** (ETH_DECIMALS + feedDecimals)) * 10 ** USDC_DECIMALS;
 
         vm.prank(entryPoint);
         vm.expectRevert(
@@ -254,7 +262,7 @@ contract PaymasterTest is PoolTest {
 
     function test_revertWhenPaymasterFeesInETHIsNotEnoughForPreVerifiedTx()
         public
-        createPackedUserOps
+        createPackedUserOps(address(gateway))
     {
         uint256 lowFeeValue = feeValueForOutsourcedVerification - 0.00005 ether;
         // feeding the required values for outsourced verification in userops.calldata
@@ -290,7 +298,10 @@ contract PaymasterTest is PoolTest {
         vm.stopPrank();
     }
 
-    function test_revertWhenFeeAssetIdIsInvalid() public createPackedUserOps {
+    function test_revertWhenFeeAssetIdIsInvalid()
+        public
+        createPackedUserOps(address(gateway))
+    {
         // feeding the wrong feeAssetId in STX and packedUserOp
         stx.feeData = uint256(
             bytes32(
@@ -317,7 +328,10 @@ contract PaymasterTest is PoolTest {
         paymaster.validatePaymasterUserOp(userOp, bytes32(0), 0);
     }
 
-    function test_validatePaymasterUserOp() public createPackedUserOps {
+    function test_validatePaymasterUserOp()
+        public
+        createPackedUserOps(address(gateway))
+    {
         vm.startPrank(entryPoint);
         (, uint256 flag) = paymaster.validatePaymasterUserOp(
             userOp,
@@ -329,9 +343,44 @@ contract PaymasterTest is PoolTest {
         assertEq(flag, 0);
     }
 
-    function test_validatePaymasterUserOpForOutsourcedTx()
+    function test_validatePaymasterUserOpWhenFeesInUSDC()
         public
-        createPackedUserOps
+        createPackedUserOps(address(gateway))
+    {
+        (, int256 ethInUSDC, , , ) = AggregatorV3Interface(
+            CHAINLINK_USDC_ETH_FEED_SEPOLIA
+        ).latestRoundData();
+
+        uint8 feedDecimals = AggregatorV3Interface(
+            CHAINLINK_USDC_ETH_FEED_SEPOLIA
+        ).decimals();
+
+        // converting `feeValue` in ETH to USDC
+        uint256 feeValueUSDC = ((feeValue * uint256(ethInUSDC)) /
+            10 ** (ETH_DECIMALS + feedDecimals)) * 10 ** 6;
+
+        stx.feeData = uint256(
+            bytes32(
+                bytes.concat(
+                    bytes20(address(paymaster)),
+                    bytes3(uint24(asset2.id)),
+                    bytes9(uint72(feeValueUSDC))
+                )
+            )
+        );
+
+        userOp.callData = abi.encodeCall(
+            MockPool.transactForPaymasterTestSetup,
+            (stx, preVerificationDetails)
+        );
+
+        vm.prank(entryPoint);
+        paymaster.validatePaymasterUserOp(userOp, bytes32(0), feeValue); // feeValue is maxCostEth
+    }
+
+    function test_validatePaymasterUserOpForPreVerifiedTx()
+        public
+        createPackedUserOps(address(gateway))
     {
         // feeding the required values for outsourced verification in userops.calldata
         preVerificationDetails.isPreVerified = true;
