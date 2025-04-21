@@ -34,7 +34,7 @@ const setup = async () => {
     }
 }
 
-const deployMempoolImpl = async (shieldedTransactionLogicAddr: `0x${string}`, nebraLib: `0x${string}`) => {
+const deployMempoolImpl = async (shieldedTransactionLogicAddr: `0x${string}`) => {
     console.log("Starting to deploy new Mempool");
 
     // deploy MempoolValidator
@@ -47,7 +47,6 @@ const deployMempoolImpl = async (shieldedTransactionLogicAddr: `0x${string}`, ne
 
     const mempoolImpl = await hre.viem.deployContract("Mempool", [], {
         libraries: {
-            NebraLib: nebraLib,
             MempoolValidator: mempoolValidator.address
         },
     });
@@ -62,8 +61,7 @@ const main = async () => {
 
     const existingMempoolProxy = "0x242060778df581e0b9ee49115e2b9bfda1ff33a5" as `0x${string}`;
     const shieldedTransactionLogicAddr = "0xb28096f5fe1463dd806947603d8269759b807c04" as `0x${string}`;
-    const nebraLib = "0xb39151c31cac1df3866148aebb9cb63e7948aa52" as `0x${string}`;
-    const newMempoolImpl = await deployMempoolImpl(shieldedTransactionLogicAddr, nebraLib);
+    const newMempoolImpl = await deployMempoolImpl(shieldedTransactionLogicAddr);
 
     const upgradeCallHash = await wallet.writeContract({
         address: existingMempoolProxy,
