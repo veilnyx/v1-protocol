@@ -14,11 +14,11 @@ import {
   toHex,
 } from "viem";
 import { foundry } from "viem/chains";
-import { Core, CoreOptions } from "@zkfi-tech/core";
+import { Core, CoreOptions } from "@labyrinthac/core";
 import MerkleTree from "fixed-merkle-tree";
-import { Fp, poseidonHash } from "@zkfi-tech/babyjubjub";
+import { Fp, poseidonHash } from "@labyrinthac/babyjubjub";
 import { UpaClient, UpaInstanceDescriptor } from "@nebrazkp/upa/sdk";
-import { toBigInt } from "@zkfi-tech/utils";
+import { toBigInt } from "@labyrinthac/utils";
 import {
   MockAddressResolver,
   MockNotesSource,

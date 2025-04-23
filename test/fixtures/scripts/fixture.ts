@@ -21,16 +21,16 @@ import {
   UserOperation,
   getPackedUserOperation
 } from "permissionless";
-import { ShieldedAccount } from "@zkfi-tech/account";
-import { Fp, Point, poseidonDecrypt } from "@zkfi-tech/babyjubjub";
-import { randomBigInt, randomBytes, randomHex } from "@zkfi-tech/utils";
+import { ShieldedAccount } from "@labyrinthac/account";
+import { Fp, Point, poseidonDecrypt } from "@labyrinthac/babyjubjub";
+import { randomBigInt, randomBytes, randomHex } from "@labyrinthac/utils";
 import {
   TransactionOptions,
   TransactionRequest,
-} from "@zkfi-tech/shared-types";
-import { Core } from "@zkfi-tech/core";
-import { ZTransaction, PreVerification, PreVerificationDetails } from "@zkfi-tech/zk-prover";
-import { Note, SIZE_ENCRYPTED_DECRYPTION_KEY, SIZE_FULLY_ENCRYPTED_NOTE_DATA } from "@zkfi-tech/transaction";
+} from "@labyrinthac/shared-types";
+import { Core } from "@labyrinthac/core";
+import { ZTransaction, PreVerification, PreVerificationDetails } from "@labyrinthac/zk-prover";
+import { Note, SIZE_ENCRYPTED_DECRYPTION_KEY, SIZE_FULLY_ENCRYPTED_NOTE_DATA } from "@labyrinthac/transaction";
 import config from "../config.json";
 import { register } from "module";
 
