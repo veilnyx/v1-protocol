@@ -66,12 +66,12 @@ export const genTransferPackedUserOp = async (sdk: Core, nebraClient: any, circu
 	await mockNotes("deposit_weth_tx", sdk);
 	const [name, req] = Object.entries(reqs)[0];
 	console.log("req to userop:", req);
-	await generatePackedUserOps(name, req, sdk, false, nebraClient, circuitIds.transact22);
+	await generatePackedUserOps(name, req, sdk, false, nebraClient);
 }
 
 export const genTransferPackedUserOpPreVerified = async (sdk: Core, nebraClient: any, circuitIds: any) => {
 	await mockNotes("deposit_weth_tx", sdk);
 	const [name, req] = Object.entries(reqs)[0];
 	console.log("req to userop:", req);
-	await generatePackedUserOps(name, req, sdk, true, nebraClient, circuitIds.transact22);
+	await generatePackedUserOps(name, req, sdk, true, nebraClient);
 }

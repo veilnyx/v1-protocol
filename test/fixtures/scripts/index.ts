@@ -13,14 +13,14 @@ import {
 } from "./genTreeUpdateData";
 
 const main = async () => {
-	const { sdk, nebraClient, circuitIds } = await getSDKInstance();
+	const { sdk, nebraClient } = await getSDKInstance();
 	// await genTestDeposits(sdk);
 	// await genTestTransfers(sdk);
-	// await genTransferPackedUserOp(sdk, nebraClient, circuitIds);
-	// await genTransferPackedUserOpPreVerified(sdk, nebraClient, circuitIds);
+	// await genTransferPackedUserOp(sdk, nebraClient);
+	// await genTransferPackedUserOpPreVerified(sdk, nebraClient);
 	// await genAddressRegistrations(sdk);
-	// await genAddrRegWithOutsourceProofVerification(sdk, nebraClient, circuitIds.register);
-	await genTestDepositsWithOutsourceProofVerification(sdk, nebraClient, circuitIds.transact21);
+	// await genAddrRegWithOutsourceProofVerification(sdk, nebraClient);
+	await genTestDepositsWithOutsourceProofVerification(sdk, nebraClient);
 	// await genTestWithdrawals(sdk);
 	// await genTestCallAdaptors(sdk);
 	// await genTreeUpdateData(sdk);

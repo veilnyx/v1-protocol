@@ -132,11 +132,10 @@ export const generateTestTransactionsWithOutsourcedProofVerification = async (
   reqs: Record<string, TransactionRequest & TransactionOptions>,
   sdk: Core,
   nebraClient: any,
-  transactCircuitId: `0x${string}`
 ) => {
   const reqArr = Object.entries(reqs);
   for (const [name, req] of reqArr) {
-    await generateTestTransactionWithOutsourcedProofVerification(name, req, sdk, nebraClient, transactCircuitId);
+    await generateTestTransactionWithOutsourcedProofVerification(name, req, sdk, nebraClient);
   }
 };
 
@@ -144,8 +143,7 @@ export const generateTestTransactionWithOutsourcedProofVerification = async (
   name: string,
   req: TransactionRequest & TransactionOptions,
   sdk: Core,
-  nebraClient: any,
-  transactCircuitId: `0x${string}`
+  nebraClient: any
 ) => {
   const opts = {
     viaBundler: req.viaBundler,
@@ -156,10 +154,10 @@ export const generateTestTransactionWithOutsourcedProofVerification = async (
   const tx = await sdk.createTransaction(req, opts);
   console.log("TX: ", tx);
   const signedTx = await sdk.signTransaction(tx);
-  const { provedTx, preVerification } = await sdk.proveTransactionAndOutsourceVerification(signedTx, nebraClient, transactCircuitId);
+  const { preVerifiedTx, preVerification } = await sdk.proveTransactionAndOutsourceVerification(signedTx, nebraClient);
 
-  console.log("ZTX:", provedTx);
-  const encoded = provedTx.encode();
+  console.log("ZTX:", preVerifiedTx);
+  const encoded = preVerifiedTx.encode();
   console.log("ZTX Encoded:", encoded);
   writeFileSync(`${dirFixtureData}/${name}.txt`, encoded);
 
@@ -186,7 +184,7 @@ export const generateTestAddrRegWithOutsourceProofVerifications = async (
 ) => {
   const reqArr = Object.entries(reqs);
   for (const [name, req] of reqArr) {
-    await generateTestAddrRegWithOutsourcedProofVerification(name, sdk, nebraClient, registerCircuitId);
+    await generateTestAddrRegWithOutsourcedProofVerification(name, sdk, nebraClient);
   }
 };
 
@@ -202,10 +200,9 @@ const generateTestAddressRegistration = async (
 const generateTestAddrRegWithOutsourcedProofVerification = async (
   name: string,
   sdk: Core,
-  nebraClient: any,
-  registerCircuitId: `0x${string}`
+  nebraClient: any
 ) => {
-  const zaddrReg = await sdk.proveAddressAndOutsourceVerification("0x", nebraClient, registerCircuitId);
+  const zaddrReg = await sdk.proveAddressAndOutsourceVerification("0x", nebraClient);
   console.log("zaddrReg obj returned after proof gen & submission to Nebra:", zaddrReg);
   console.log("Encoding to gen fixture");
   const encoded = zaddrReg.shieldedAddressRegistrationData.encode();
@@ -294,6 +291,7 @@ export async function mockNotes(depositName: string, sdk: Core) {
       leafIndex: i,
     });
     if (n) {
+      console.log("Note Nullifier: ", n.getNullifier(senderAccount.viewer));
       notes.push(n);
     }
   }
@@ -307,7 +305,7 @@ export async function mockNotes(depositName: string, sdk: Core) {
   }
 }
 
-export const generatePackedUserOps = async (name: string, req: TransactionRequest & TransactionOptions, sdk: Core, isPreVerified: boolean, nebraClient, transactCircuitId) => {
+export const generatePackedUserOps = async (name: string, req: TransactionRequest & TransactionOptions, sdk: Core, isPreVerified: boolean, nebraClient) => {
   // Generating ztx
   const opts = {
     viaBundler: req.viaBundler,
@@ -322,12 +320,11 @@ export const generatePackedUserOps = async (name: string, req: TransactionReques
   let preVerification: PreVerification;
 
   if (isPreVerified) {
-    const { provedTx, preVerification: preVerification_ } = await sdk.proveTransactionAndOutsourceVerification(
+    const { preVerifiedTx, preVerification: preVerification_ } = await sdk.proveTransactionAndOutsourceVerification(
       tx,
-      nebraClient,
-      transactCircuitId
+      nebraClient
     );
-    ztx = provedTx;
+    ztx = preVerifiedTx;
     preVerification = preVerification_;
   } else {
     ztx = await sdk.proveTransaction(signedTx);
@@ -368,7 +365,7 @@ export const generatePackedUserOps = async (name: string, req: TransactionReques
     factory: undefined,
     factoryData: "0x",
     callData: calldata,
-    callGasLimit: BigInt(2_500_000),
+    callGasLimit: BigInt(25_00_000), // 30 M gas is block gas limit = 30_000_000 gas
     verificationGasLimit: BigInt(75_000),
     preVerificationGas: BigInt(75_000),
     maxFeePerGas: BigInt(150_000_000),
