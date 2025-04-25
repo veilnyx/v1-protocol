@@ -3,13 +3,11 @@ pragma solidity ^0.8.24;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import {ShieldedTransaction, ShieldedTransactionLogic, ShieldedTransactionType} from "../libraries/ShieldedTransaction.sol";
 import {Asset, AssetType} from "../libraries/Asset.sol";
 import {IPool} from "../interfaces/IPool.sol";
 
 library MempoolValidator {
-    using EnumerableSet for EnumerableSet.UintSet;
     using ShieldedTransactionLogic for ShieldedTransaction;
     using SafeERC20 for IERC20;
 
@@ -28,10 +26,11 @@ library MempoolValidator {
         ShieldedTransaction calldata stx,
         uint256 stxHashPI,
         IPool pool,
-        EnumerableSet.UintSet storage _stxHashes,
         address gateway,
-        uint256 mempoolExitFee,
-        mapping(address stxSender => mapping(uint24 assetId => uint224 assetValue)) storage depositBalance
+        uint256 proofSubAndMempoolExitFee,
+        uint256 totalProofSubAndMempoolExitFee,
+        mapping(address stxSender => mapping(uint24 assetId => uint224 assetValue))
+            storage depositBalance
     ) public {
         if (address(pool) == address(0)) {
             revert LabyrinthPoolAddrNotInitialized();
@@ -40,11 +39,6 @@ library MempoolValidator {
         // validate the correlation btw the stx and public inputs
         if (stx.hash() != stxHashPI) {
             revert InvalidStx();
-        }
-
-        // check if stx is already in mempool
-        if (_stxHashes.contains(stxHashPI)) {
-            revert DuplicateStx(stxHashPI);
         }
 
         // Non-deposit STX are only supported through Account Abstraction (ERC4337) infra
@@ -60,13 +54,12 @@ library MempoolValidator {
         if (stx.txType == ShieldedTransactionType.DEPOSIT) {
             // Mempool exit fee check
             // User pays mempool exit fee in ETH for deposit tx only. Other tx types are handled by the ERC4337 infra.
-            if (msg.value < mempoolExitFee) {
-                revert InsufficientFee(msg.value, mempoolExitFee);
+            if (msg.value < proofSubAndMempoolExitFee) {
+                revert InsufficientFee(msg.value, proofSubAndMempoolExitFee);
             }
 
             for (uint i = 0; i < stx.pubAssets.length; i++) {
                 (uint24 assetId, uint224 value) = decodeAsset(stx.pubAssets[i]);
-
                 Asset memory asset = checkIfAssetValid(assetId, pool);
 
                 if (value == 0) {
@@ -82,6 +75,7 @@ library MempoolValidator {
 
                 depositBalance[msg.sender][assetId] += value;
             }
+            totalProofSubAndMempoolExitFee += proofSubAndMempoolExitFee;
         }
     }
 
@@ -108,5 +102,11 @@ library MempoolValidator {
         assetId = uint24(bytes3(bytes31(pubAsset)));
         // Extract last 28 bytes value
         value = uint224(pubAsset);
+    }
+
+    function hashSTX(
+        ShieldedTransaction calldata stx
+    ) public pure returns (uint256) {
+        return stx.hash();
     }
 }

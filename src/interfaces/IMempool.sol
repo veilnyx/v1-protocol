@@ -17,7 +17,8 @@ enum Action {
 
 interface IMempool {
     error STXNotInMempool(uint256 stxHash);
-    error STXAndProofIdMismatch();
+    error STXProofIdMismatchOrSTXAbsent(uint256 stxHash);
+    error STXAndSTXHashMismatch();
     error STXNotPreVerified(uint256 stxHash, bytes32 proofId);
     error STXNonRefundable(uint256 stxHash);
 
@@ -45,7 +46,7 @@ interface IMempool {
 
     function initialize(
         address pool_,
-        uint256 mempoolExitFee_,
+        uint256 proofSubAndMempoolExitFee_,
         address verificationTrackerService_,
         address nebraVerifier_,
         address gateway_
@@ -56,32 +57,23 @@ interface IMempool {
         PreVerificationDetails calldata preVerificationDetails
     ) external payable;
 
-    function exitSTXFromMempool(uint256 stxHash) external;
+    function exitSTXFromMempool(
+        uint256 stxHash,
+        ShieldedTransaction calldata stx,
+        bytes32 proofId
+    ) external;
 
-    function withdrawMempoolExitFee() external;
+    function dropFromMempool(
+        uint256 stxHash,
+        ShieldedTransaction calldata stx,
+        bytes32 proofId
+    ) external;
+
+    function withdrawproofSubAndMempoolExitFee() external;
 
     function updateVerificationTrackerService(address newAddr) external;
 
     function updatePoolAddress(address newPool) external;
 
-    /**
-    function dropFromMempool(uint256 stxHash) external;
-    function isSTXProofVerified(uint256 stxHash) external view returns (bool);
-    function getProofId(uint256 stxHash) external view returns (bytes32);
-    function updateMempoolExitFee(uint256 newFee) external;
-    function mempoolExitFee() external view returns (uint256);
-
-    function isSTXInMempool(uint256 stxHash) external view returns (bool);
-    function mempoolExitFeeCollected() external view returns (uint256);
-
-    function verificationTrackerService() external view returns (address);
-
-    function nebraVerifier() external view returns (address);
-
-    function stxMap(
-        uint256 stxHash
-    ) external view returns (ShieldedTransaction memory);
-
-    function stxSenders(uint256 stxHash) external view returns (address);
-     */
+    function updateProofSubAndMempoolExitFee(uint256 newFee) external;
 }

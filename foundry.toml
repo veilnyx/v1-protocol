@@ -9,6 +9,7 @@ optimizer-runs = 500
 build_info = true
 extra_output = ["storageLayout"]
 fs_permissions = [{ access = "read-write", path = "./" }]
+gas_reports = ["Mempool", "Pool"]
 
 [profile.lite]
 optimizer = false
