@@ -120,7 +120,7 @@ export const generateTestTransaction = async (
     revokerId: req.revokerId,
   };
   const tx = await sdk.createTransaction(req, opts);
-  console.log("TX: ", tx);
+  // console.log("TX: ", tx);
   const signedTx = await sdk.signTransaction(tx);
   const ztx = await sdk.proveTransaction(signedTx);
   console.log("ZTX:", ztx);
@@ -128,7 +128,7 @@ export const generateTestTransaction = async (
   writeFileSync(`${dirFixtureData}/${name}.txt`, encoded);
 };
 
-export const generateTestTransactionsWithOutsourcedProofVerification = async (
+export const generateTestTxsWithOutsourcedProofVerification = async (
   reqs: Record<string, TransactionRequest & TransactionOptions>,
   sdk: Core,
   nebraClient: any,
@@ -152,11 +152,11 @@ export const generateTestTransactionWithOutsourcedProofVerification = async (
     isPreVerified: true
   };
   const tx = await sdk.createTransaction(req, opts);
-  console.log("TX: ", tx);
+  // console.log("TX: ", tx);
   const signedTx = await sdk.signTransaction(tx);
   const { preVerifiedTx, preVerification } = await sdk.proveTransactionAndOutsourceVerification(signedTx, nebraClient);
 
-  console.log("ZTX:", preVerifiedTx);
+  // console.log("ZTX:", preVerifiedTx);
   const encoded = preVerifiedTx.encode();
   console.log("ZTX Encoded:", encoded);
   writeFileSync(`${dirFixtureData}/${name}.txt`, encoded);
@@ -303,6 +303,7 @@ export async function mockNotes(depositName: string, sdk: Core) {
     // @ts-ignore
     sdk.commitmentTreeSource.insert(notes[i].commitment);
   }
+  console.log("commit tree root after Mock Notes", sdk.commitmentTreeSource.root);
 }
 
 export const generatePackedUserOps = async (name: string, req: TransactionRequest & TransactionOptions, sdk: Core, isPreVerified: boolean, nebraClient) => {
@@ -345,6 +346,9 @@ export const generatePackedUserOps = async (name: string, req: TransactionReques
   console.log("ZTX Encoded:", encodedZTx);
   writeFileSync(`${dirFixtureData}/${name}.txt`, encodedZTx);
 
+  const encodedPreVerification = preVerification.encode();
+  writeFileSync(`${dirFixtureData}/${name}_preVerificationEncodedStruct.txt`, encodedPreVerification);
+
   // Generating calldata
   const gatewayAbi = JSON.parse(readFileSync("out/Gateway.sol/Gateway.json", "utf-8")).abi;
   const calldata = encodeFunctionData({
@@ -360,7 +364,7 @@ export const generatePackedUserOps = async (name: string, req: TransactionReques
 
   // Generating user op
   const userOp: UserOperation<"v0.7"> = {
-    sender: `0x${"575253F9690dB75D36Da99f56003aFd0Eb29Eead"}` as `0x${string}`, // make sure this matches the Gateway address from solidity test setup
+    sender: `0x${"F3d8f3B185d1448BD3f3762b6cCF7F129bC21fDB"}` as `0x${string}`, // make sure this matches the Gateway address from solidity test setup
     nonce: BigInt(nonce),
     factory: undefined,
     factoryData: "0x",
@@ -370,7 +374,7 @@ export const generatePackedUserOps = async (name: string, req: TransactionReques
     preVerificationGas: BigInt(75_000),
     maxFeePerGas: BigInt(150_000_000),
     maxPriorityFeePerGas: BigInt(150_000_000),
-    paymaster: `0x${"5925279112eBf453E534a22c261A6E83696AE1Bc"}` as `0x${string}`, // make sure this matches the Paymaster address from solidity test setup
+    paymaster: `0x${"C141A1Fc167930FA8E1448BdC7Cea9C7a13C1021"}` as `0x${string}`, // make sure this matches the Paymaster address from solidity test setup
     paymasterVerificationGasLimit: BigInt(25_000),
     paymasterPostOpGasLimit: BigInt(5),
     paymasterData: "0x",

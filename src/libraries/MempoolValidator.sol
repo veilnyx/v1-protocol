@@ -24,7 +24,10 @@ library MempoolValidator {
     /// @notice Transfer deposit assets from sender's wallet to the mempool
     function validityChecksBeforeAddingSTXToMempool(
         ShieldedTransaction calldata stx,
+        mapping(uint256 stxHash => mapping(bytes32 proofId => address sender))
+            storage stxProofIdSenderMap,
         uint256 stxHashPI,
+        bytes32 proofId,
         IPool pool,
         address gateway,
         uint256 proofSubAndMempoolExitFee,
@@ -39,6 +42,11 @@ library MempoolValidator {
         // validate the correlation btw the stx and public inputs
         if (stx.hash() != stxHashPI) {
             revert InvalidStx();
+        }
+
+        // Duplicate STX check
+        if (stxProofIdSenderMap[stxHashPI][proofId] != address(0)) {
+            revert DuplicateStx(stxHashPI);
         }
 
         // Non-deposit STX are only supported through Account Abstraction (ERC4337) infra

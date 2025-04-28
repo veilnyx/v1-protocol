@@ -6,7 +6,7 @@ import {ShieldedTransaction} from "src/libraries/ShieldedTransaction.sol";
 
 abstract contract MempoolStorage {
     IPool public pool;
-    mapping(uint256 => mapping(bytes32 => address)) public stxProofIdSenderMap;
+    mapping(uint256 stxHash => mapping(bytes32 proofId => address sender)) public stxProofIdSenderMap;
     mapping(address stxSender => mapping(uint24 assetId => uint224 assetValue))
         public depositBalance;
 

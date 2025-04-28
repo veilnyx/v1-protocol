@@ -33,8 +33,7 @@ contract Mempool is
     using EnumerableSet for EnumerableSet.UintSet;
     using SafeERC20 for IERC20;
 
-    uint16 public constant DROP_TX_PENALTY_PERC = 800; // 8% penalty on the mempool exit fee for dropping the STX from mempool
-    uint16 public constant PRECISION = 10000;
+    uint8 public constant DROP_TX_PENALTY_PERC = 8; // 8% penalty on the mempool exit fee for dropping the STX from mempool
 
     function initialize(
         address pool_,
@@ -65,21 +64,22 @@ contract Mempool is
         PreVerificationDetails calldata preVerificationDetails
     ) external payable whenNotPaused {
         uint256 stxHashPI = preVerificationDetails.publicInputs[2];
-
-        stx.validityChecksBeforeAddingSTXToMempool(
-            stxHashPI,
-            pool,
-            gateway,
-            proofSubAndMempoolExitFee,
-            totalProofSubAndMempoolExitFee,
-            depositBalance
-        );
-
         bytes32 proofId = keccak256(
             abi.encodePacked(
                 preVerificationDetails.circuitId,
                 preVerificationDetails.publicInputs
             )
+        );
+
+        stx.validityChecksBeforeAddingSTXToMempool(
+            stxProofIdSenderMap,
+            stxHashPI,
+            proofId,
+            pool,
+            gateway,
+            proofSubAndMempoolExitFee,
+            totalProofSubAndMempoolExitFee,
+            depositBalance
         );
 
         stxProofIdSenderMap[stxHashPI][proofId] = msg.sender;
@@ -230,12 +230,14 @@ contract Mempool is
             depositBalance[stxSender][assetId] -= value;
         }
 
-        // refund the mempool exit fee to the stx sender after deducting the penalty
-        Address.sendValue(
-            payable(stxSender),
-            (proofSubAndMempoolExitFee -
-                ((DROP_TX_PENALTY_PERC * proofSubAndMempoolExitFee) /
-                    PRECISION))
-        );
+        if (action == Action.DROP) {
+            // refund the mempool exit fee to the stx sender after deducting the penalty
+            Address.sendValue(
+                payable(stxSender),
+                (proofSubAndMempoolExitFee -
+                    (DROP_TX_PENALTY_PERC * proofSubAndMempoolExitFee) /
+                    100)
+            );
+        }
     }
 }

@@ -1,7 +1,7 @@
 import { parseEther, parseUnits, zeroAddress } from "viem";
 import { Core } from "@labyrinthac/core";
 import { TransactionType } from "@labyrinthac/shared-types";
-import { fixture, generateTestTransactions, generateTestTransactionsWithOutsourcedProofVerification, generatePackedUserOps, mockNotes } from "./fixture";
+import { fixture, generateTestTransactions, generateTestTxsWithOutsourcedProofVerification, generatePackedUserOps, mockNotes } from "./fixture";
 import { parse } from 'path';
 
 const {
@@ -127,9 +127,8 @@ export const reqs = {
 export const genTestDeposits = async (sdk: Core) => {
   console.log("depositing assets...");
   await generateTestTransactions(reqs, sdk);
-  await mockNotes("deposit_weth_tx", sdk);
 };
 
 export const genTestDepositsWithOutsourceProofVerification = async (sdk: Core, nebraClient: any) => {
-  await generateTestTransactionsWithOutsourcedProofVerification(reqs, sdk, nebraClient);
+  await generateTestTxsWithOutsourcedProofVerification(reqs, sdk, nebraClient);
 }
