@@ -16,20 +16,13 @@ import { addInitialAssets, registerRevokers } from "./setup";
 const config = loadConfigs();
 const poolAbi = hre.artifacts.readArtifactSync("Pool").abi;
 const mempoolAbi = hre.artifacts.readArtifactSync("Mempool").abi;
-const MEMPOOL_EXIT_FEES: bigint = BigInt(75_000_000_000_0000); // 375k gas @ 2 gwei = 0.00075 ETH
+const PROOF_SUB_MEMPOOL_EXIT_FEES: bigint = BigInt(75_000_000_000_0000); // 375k gas @ 2 gwei = 0.00075 ETH
 const verificationTrackerService = `0x${"75a4dA1697aF884c99724474d26F2EAe23cc58Bc"}` as `0x${string}`;
 const nebraVerifierSepolia = `0x${"3B946743DEB7B6C97F05B7a31B23562448047E3E"}` as `0x${string}`;
 const zeroAddr = "0x0000000000000000000000000000000000000000" as `0x${string}`;
 
-const deployMempoolImplAndProxy = async (pool: `0x${string}`, shieldedTransactionLogicAddr: `0x${string}`, assetLogicAddr: `0x${string}`, gateway: `0x${string}`) => {
+const deployMempoolImplAndProxy = async (pool: `0x${string}`, shieldedTransactionLogicAddr: `0x${string}`, gateway: `0x${string}`) => {
   console.log("Starting to deploy new Mempool");
-  // const enumerableSet = await hre.viem.deployContract("EnumerableSet");
-  // console.log("EnumerableSet deployed:", enumerableSet.address);
-  // const safeERC20 = await hre.viem.deployContract("SafeERC20");
-
-  // deploy NebraLib
-  const nebraLib = await hre.viem.deployContract("NebraLib");
-  console.log("NebraLib deployed:", nebraLib.address);
 
   // deploy MempoolValidator
   const mempoolValidator = await hre.viem.deployContract("MempoolValidator", [], {
@@ -41,12 +34,7 @@ const deployMempoolImplAndProxy = async (pool: `0x${string}`, shieldedTransactio
 
   const mempoolImpl = await hre.viem.deployContract("Mempool", [], {
     libraries: {
-      // EnumerableSet: enumerableSet.address,
-      // SafeERC20: safeERC20.address,
-      // ShieldedTransactionLogic: shieldedTransactionLogicAddr,
-      // AssetLogic: assetLogicAddr,
-      MempoolValidator: mempoolValidator.address,
-      NebraLib: nebraLib.address,
+      MempoolValidator: mempoolValidator.address
     },
   });
 
@@ -54,7 +42,7 @@ const deployMempoolImplAndProxy = async (pool: `0x${string}`, shieldedTransactio
 
   const args = [
     pool,
-    MEMPOOL_EXIT_FEES,
+    PROOF_SUB_MEMPOOL_EXIT_FEES,
     verificationTrackerService,
     nebraVerifierSepolia,
     gateway
@@ -85,7 +73,7 @@ const updateGatewayAndPoolInMempool = async (deployConfig, mempool: `0x${string}
   });
 
   const upgradePoolRct = await deployConfig.client.public.waitForTransactionReceipt({ hash: updatePoolTxHash });
-  console.log("rct:upgradePoolRct", upgradePoolRct.status);
+  console.log("rct:updatePoolAddress in Mempool", upgradePoolRct.status);
 
   // @ts-ignore
   const updateGatewayHash = await deployConfig.client.wallet.writeContract({
@@ -96,7 +84,7 @@ const updateGatewayAndPoolInMempool = async (deployConfig, mempool: `0x${string}
   });
 
   const upgradeGatewayRct = await deployConfig.client.public.waitForTransactionReceipt({ hash: updateGatewayHash });
-  console.log("rct:upgradeGatewayRct", upgradeGatewayRct.status);
+  console.log("rct:updateGatewayContract in Mempool", upgradeGatewayRct.status);
 }
 
 const main1 = async () => {
@@ -154,7 +142,7 @@ const main1 = async () => {
   console.log("AdaptorHandler deployed: ", adaptorHandler.address);
 
   // Pool and Gateway contract addr will be updated at the end
-  const mempoolProxy = await deployMempoolImplAndProxy(zeroAddr, shieldedTransaction.address, asset.address, zeroAddr);
+  const mempoolProxy = await deployMempoolImplAndProxy(zeroAddr, shieldedTransaction.address, zeroAddr);
 
   // POOL DEPLOYMENT
   let poolProxy;
@@ -179,7 +167,7 @@ const main1 = async () => {
     const initAddressParams = {
       mempool: mempoolProxy,
       verifier: verifier,
-      adaptorHandler: adaptorHandler,
+      adaptorHandler: adaptorHandler.address,
       screener: chainParams.sanctionsList,
       hasher: hasher,
       verificationTrackerService: verificationTrackerService
