@@ -94,7 +94,24 @@ contract ERC4337 is PoolTest {
         ShieldedTransaction memory stx = _loadShieldedTransaction(
             "transfer_20_weth_with_weth_fee"
         );
-        mempool.exitSTXFromMempool(ShieldedTransactionLogic.hash(stx));
+        PreVerificationDetails
+            memory preVerificationDetails = _loadPreVerificationDetails(
+                "transfer_20_weth_with_weth_fee_preVerificationEncodedStruct"
+            );
+        bytes32 proofId = keccak256(
+            abi.encodePacked(
+                preVerificationDetails.circuitId,
+                preVerificationDetails.publicInputs
+            )
+        );
+        console2.log("Transfer tx proofId");
+        console2.logBytes32(proofId);
+
+        mempool.exitSTXFromMempool(
+            ShieldedTransactionLogic.hash(stx),
+            stx,
+            proofId
+        );
     }
 
     receive() external payable {

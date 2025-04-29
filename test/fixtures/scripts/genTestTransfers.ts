@@ -1,7 +1,7 @@
 import { parseEther, zeroAddress } from "viem";
-import { Core } from "@zkfi-tech/core";
-import { TransactionType } from "@zkfi-tech/shared-types";
-import { fixture, generateTestTransactions, mockNotes, generatePackedUserOps } from "./fixture";
+import { Core } from "@labyrinthac/core";
+import { TransactionType } from "@labyrinthac/shared-types";
+import { fixture, generateTestTransactions, generateTestTxsWithOutsourcedProofVerification, mockNotes, generatePackedUserOps } from "./fixture";
 
 const {
 	assets: { weth, usdc },
@@ -17,7 +17,7 @@ export const reqs = {
 		to: receiverAccount.shieldedAddress.pack(),
 		viaBundler: true,
 		paymaster:
-			`0x${"5925279112eBf453E534a22c261A6E83696AE1Bc"}` as `0x${string}`, // make sure this matches the Paymaster address from solidity test setup
+			`0x${"C141A1Fc167930FA8E1448BdC7Cea9C7a13C1021"}` as `0x${string}`, // make sure this matches the Paymaster address from solidity test setup
 		feeAssetId: weth,
 		revokerId: 0,
 	}
@@ -58,20 +58,25 @@ export const reqs = {
 };
 
 export const genTestTransfers = async (sdk: Core) => {
-	await mockNotes("deposit_pre_tx", sdk);
+	await mockNotes("deposit_weth_tx", sdk);
 	await generateTestTransactions(reqs, sdk);
 };
 
-export const genTransferPackedUserOp = async (sdk: Core, nebraClient: any, circuitIds: any) => {
+export const genTestTransfersWithOutsourceProofVerification = async (sdk: Core, nebraClient: any) => {
 	await mockNotes("deposit_weth_tx", sdk);
-	const [name, req] = Object.entries(reqs)[0];
-	console.log("req to userop:", req);
-	await generatePackedUserOps(name, req, sdk, false, nebraClient, circuitIds.transact22);
+	await generateTestTxsWithOutsourcedProofVerification(reqs, sdk, nebraClient);
 }
 
-export const genTransferPackedUserOpPreVerified = async (sdk: Core, nebraClient: any, circuitIds: any) => {
+export const genTransferPackedUserOp = async (sdk: Core, nebraClient: any) => {
 	await mockNotes("deposit_weth_tx", sdk);
 	const [name, req] = Object.entries(reqs)[0];
 	console.log("req to userop:", req);
-	await generatePackedUserOps(name, req, sdk, true, nebraClient, circuitIds.transact22);
+	await generatePackedUserOps(name, req, sdk, false, nebraClient);
+}
+
+export const genTransferPackedUserOpPreVerified = async (sdk: Core, nebraClient: any) => {
+	await mockNotes("deposit_weth_tx", sdk);
+	const [name, req] = Object.entries(reqs)[0];
+	console.log("req to userop:", req);
+	await generatePackedUserOps(name, req, sdk, true, nebraClient);
 }

@@ -39,7 +39,7 @@ abstract contract PoolStorage {
 
     address public mempool;
     address public verificationTrackerService;
-    mapping(uint24 => uint256) internal _exitMempoolFeeCollected;
+    mapping(uint24 => uint256) internal _proofSubAndMempoolExitFee;
 
     uint64 public version;
 }

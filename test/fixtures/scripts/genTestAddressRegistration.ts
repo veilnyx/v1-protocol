@@ -1,4 +1,4 @@
-import { Core } from "@zkfi-tech/core";
+import { Core } from "@labyrinthac/core";
 import { generateTestAddressRegistrations, generateTestAddrRegWithOutsourceProofVerifications } from "./fixture";
 
 const reqs = {
