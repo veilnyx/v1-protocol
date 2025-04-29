@@ -1,7 +1,7 @@
 import { parseEther, parseUnits, zeroAddress } from "viem";
-import { Core } from "@zkfi-tech/core";
-import { TransactionType } from "@zkfi-tech/shared-types";
-import { fixture, generateTestTransactions, generateTestTransactionsWithOutsourcedProofVerification, generatePackedUserOps } from "./fixture";
+import { Core } from "@labyrinthac/core";
+import { TransactionType } from "@labyrinthac/shared-types";
+import { fixture, generateTestTransactions, generateTestTxsWithOutsourcedProofVerification, generatePackedUserOps, mockNotes } from "./fixture";
 import { parse } from 'path';
 
 const {
@@ -129,6 +129,6 @@ export const genTestDeposits = async (sdk: Core) => {
   await generateTestTransactions(reqs, sdk);
 };
 
-export const genTestDepositsWithOutsourceProofVerification = async (sdk: Core, nebraClient: any, transactCircuitId: `0x${string}`) => {
-  await generateTestTransactionsWithOutsourcedProofVerification(reqs, sdk, nebraClient, transactCircuitId);
+export const genTestDepositsWithOutsourceProofVerification = async (sdk: Core, nebraClient: any) => {
+  await generateTestTxsWithOutsourcedProofVerification(reqs, sdk, nebraClient);
 }

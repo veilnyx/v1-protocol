@@ -6,14 +6,13 @@ import {ShieldedTransaction} from "src/libraries/ShieldedTransaction.sol";
 
 abstract contract MempoolStorage {
     IPool public pool;
-    EnumerableSet.UintSet internal _stxHashes;
-    mapping(uint256 => bytes32) public stxToProofId;
-    mapping(uint256 => ShieldedTransaction) public stxMap;
-    mapping(uint256 => address) public stxSenders;
+    mapping(uint256 stxHash => mapping(bytes32 proofId => address sender)) public stxProofIdSenderMap;
+    mapping(address stxSender => mapping(uint24 assetId => uint224 assetValue))
+        public depositBalance;
 
     // fees to be paid by the user for their STX to exit the mempool. This is a compensation for the verification tracker service that's responsible for taking the STX out of the mempool and verifying it. The fee is in wei.
-    uint256 public mempoolExitFee;
-    uint256 public mempoolExitFeeCollected;
+    uint256 public proofSubAndMempoolExitFee;
+    uint256 public totalProofSubAndMempoolExitFee;
     address public verificationTrackerService;
     address public nebraVerifier;
     address public gateway;

@@ -48,15 +48,29 @@ export const deployHasher = async (wallet, client, tenderlyDeployConfig) => {
   });
   const receiptPT4 = await client.waitForTransactionReceipt({ hash: hashPoseidonT4 });
 
+  const hashPoseidonT5 = await wallet.deployContract({
+    bytecode: poseidonT5Code,
+    abi: [],
+    account: address
+  });
+
+  const receiptPT5 = await client.waitForTransactionReceipt({ hash: hashPoseidonT5 });
+
+
   const poseidonT3 = receiptPT3.contractAddress;
   console.log("PoseidonT3 deployed:", poseidonT3);
 
   const poseidonT4 = receiptPT4.contractAddress;
   console.log("PoseidonT4 deployed:", poseidonT4);
 
+  const poseidonT5 = receiptPT5.contractAddress;
+  console.log("PoseidonT3 deployed:", poseidonT5);
+
+
   const hasher = await hre.viem.deployContract("Hasher", [
     poseidonT3,
     poseidonT4,
+    poseidonT5
   ], tenderlyDeployConfig);
 
   return { hasher: hasher.address, poseidonT3, poseidonT4 };

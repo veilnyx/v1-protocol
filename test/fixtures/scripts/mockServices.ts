@@ -1,14 +1,14 @@
 import { Hex, hexToBigInt, keccak256, stringToBytes } from "viem";
 import MerkleTree from "fixed-merkle-tree";
-import { Fp } from "@zkfi-tech/babyjubjub";
-import { ShieldedAddress } from "@zkfi-tech/account";
+import { Fp } from "@labyrinthac/babyjubjub";
+import { ShieldedAddress } from "@labyrinthac/account";
 import {
   IAddressResolver,
   INote,
   INoteSource,
   ITreeSource,
-} from "@zkfi-tech/shared-types";
-import { hexFixed } from "@zkfi-tech/utils";
+} from "@labyrinthac/shared-types";
+import { hexFixed } from "@labyrinthac/utils";
 
 export class MockAddressResolver implements IAddressResolver {
   private _mockedEnsNames: Record<string, Hex> = {};
@@ -33,7 +33,7 @@ export class MockAddressResolver implements IAddressResolver {
 
 export class MockTreeSource implements ITreeSource {
   private _tree: MerkleTree;
-  lastUpdatedLeafIndex = 2**32;
+  lastUpdatedLeafIndex = 2 ** 32;
 
   constructor(tree: MerkleTree) {
     this._tree = tree;

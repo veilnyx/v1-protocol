@@ -261,7 +261,7 @@ contract Pool is
             commitmentTree: _commitmentTree,
             assets: _assets,
             paymasterFees: _paymasterFees,
-            exitMempoolFeeCollected: _exitMempoolFeeCollected,
+            proofSubAndExitMempoolFees: _proofSubAndMempoolExitFee,
             withdrawFees: _withdrawFees,
             hasher: hasher,
             adaptorHandler: adaptorHandler,
@@ -291,12 +291,12 @@ contract Pool is
     function withdrawExitMempoolFee(
         uint24 assetId
     ) external nonReentrant whenNotPaused {
-        uint256 fee = _exitMempoolFeeCollected[assetId];
+        uint256 fee = _proofSubAndMempoolExitFee[assetId];
         if (fee == 0) {
             revert NoFeeToClaim(verificationTrackerService, assetId);
         }
 
-        _exitMempoolFeeCollected[assetId] = 0;
+        _proofSubAndMempoolExitFee[assetId] = 0;
         AssetLogic.transferAsset({
             assets: _assets,
             to: verificationTrackerService,
@@ -362,7 +362,7 @@ contract Pool is
     function getCollectedExitMempoolFee(
         uint24 assetId
     ) external view returns (uint256) {
-        return _exitMempoolFeeCollected[assetId];
+        return _proofSubAndMempoolExitFee[assetId];
     }
 
     function isAdaptorSupported(
