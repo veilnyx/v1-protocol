@@ -18,7 +18,7 @@ export const reqs = {
     viaBundler: true,
     paymaster:
       `0x${"6e1913f0B4118052AFAc74407B0C532659e6B198"}` as `0x${string}`,
-    revokerId: 0,
+    revokerId: 0
   }
   /**,
   withdraw_100_weth_without_fee: {

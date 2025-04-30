@@ -2,7 +2,7 @@
 import * as snarkJs from "snarkjs";
 import * as ethers from "ethers";
 import dotenv from 'dotenv';
-import path from 'path';
+import path, { parse } from 'path';
 import {
   createTestClient,
   http,
@@ -12,6 +12,8 @@ import {
   parseUnits,
   stringToBytes,
   toHex,
+  Hex,
+  PublicClient
 } from "viem";
 import { foundry } from "viem/chains";
 import { Core, CoreOptions } from "@labyrinthac/core";
@@ -26,6 +28,7 @@ import {
 } from "./mockServices";
 import { circuits } from "./zk";
 import { fixture } from "./fixture";
+import { TransactionOptions } from "@labyrinthac/shared-types";
 
 const {
   sender: { account: senderAccount },
@@ -108,10 +111,28 @@ export const getSDKInstance = async () => {
     isActive: true,
   });
 
-  zkfi.getPaymasterFee = async () => BigInt(parseEther("0.002"));
+  // zkfi.getPaymasterFee = async () => BigInt(parseEther("0.002"));
+
+  zkfi.getUserOpFee = async (options: TransactionOptions, feeAssetId: number, client: any): Promise<bigint> => {
+    const requiredPrefundInETH = options.requiredPrefundEth;
+    const ethInUSD: bigint = parseUnits("2000", 6);
+
+    console.log("getUserOpFee:: requiredPrefundInETH", requiredPrefundInETH.toString());
+    console.log("getUserOpFee:: requiredPrefundInETHInUSDC", ((requiredPrefundInETH * ethInUSD) / parseEther("1")));
+
+    // assuming the fee asset is USDC
+    if (feeAssetId == Number(0x010002)) {
+      return ((requiredPrefundInETH * ethInUSD) / parseEther("1"));
+    } else {
+      return requiredPrefundInETH;
+    }
+  }
 
   return {
     sdk: zkfi,
     nebraClient
   };
 };
+
+// 26250000000000n
+// 431252250000000n

@@ -4,12 +4,12 @@ pragma solidity ^0.8.24;
 import {Test, console} from "forge-std/Test.sol";
 import {EntryPoint} from "@account-abstraction/contracts/core/EntryPoint.sol";
 import {PackedUserOperation} from "@account-abstraction/contracts/interfaces/PackedUserOperation.sol";
+import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
 import {Paymaster} from "src/core/Paymaster.sol";
 import {ShieldedTransaction, ShieldedTransactionType} from "src/libraries/ShieldedTransaction.sol";
 import {Mempool, PreVerificationDetails} from "src/core/Mempool.sol";
 import {Pool} from "src/core/Pool.sol";
 import {Gateway} from "src/core/Gateway.sol";
-import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
 import {MockPool} from "test/mocks/MockPool.sol";
 import {PoolTest} from "test/fixtures/PoolTest.sol";
 import {console2} from "forge-std/console2.sol";
@@ -19,7 +19,7 @@ import {console2} from "forge-std/console2.sol";
 contract PaymasterTest is PoolTest {
     Paymaster public paymaster;
     Gateway public gateway;
-    address public constant CHAINLINK_USDC_ETH_FEED_SEPOLIA =
+    address public constant CHAINLINK_ETH_USDC_FEED_SEPOLIA =
         0x694AA1769357215DE4FAC081bf1f309aDC325306;
     uint8 public constant ETH_DECIMALS = 18;
     uint8 public constant USDC_DECIMALS = 6;
@@ -80,7 +80,8 @@ contract PaymasterTest is PoolTest {
         paymaster = new Paymaster(entryPoint, address(gateway), address(pool));
         console2.log("paymaster:", address(paymaster));
 
-        paymaster.setChainlinkFeed(asset2.id, CHAINLINK_USDC_ETH_FEED_SEPOLIA);
+        paymaster.setChainlinkFeed(asset1.id, address(0));
+        paymaster.setChainlinkFeed(asset2.id, CHAINLINK_ETH_USDC_FEED_SEPOLIA);
         // paymaster.setAssetFee(feeAssetId, feeValue);
         // paymaster.setAssetFeeForPreVerifiedTx(
         //     feeAssetId,
@@ -96,6 +97,31 @@ contract PaymasterTest is PoolTest {
 
         bool isSupported = paymaster.isAssetFeeSupported(assetId);
         assertTrue(isSupported);
+    }
+
+    function test_convertFeeFromEthToUSDC() public {
+        if (block.chainid != 11155111) {
+            vm.skip(true);
+        }
+
+        uint256 feeValueInEth = 2e18;
+        uint24 feeAssetIdUSDC = 65538; // USDC
+
+        uint256 feeValueInUSDC = paymaster.convertFeeFromEthToFeeAsset(
+            feeValueInEth,
+            feeAssetIdUSDC
+        );
+
+        // assertion
+        AggregatorV3Interface feed = AggregatorV3Interface(
+            CHAINLINK_ETH_USDC_FEED_SEPOLIA
+        );
+        (, int256 ethInUSDC, , , ) = feed.latestRoundData();
+        uint8 feedDecimals = feed.decimals();
+
+        uint256 expectedFeeValueInUSDC = ((feeValueInEth * uint256(ethInUSDC)) /
+            10 ** (ETH_DECIMALS + feedDecimals)) * 10 ** USDC_DECIMALS;
+        assertEq(feeValueInUSDC, expectedFeeValueInUSDC);
     }
 
     function test_depositAndWithdrawEntryPoint() public {
@@ -209,7 +235,7 @@ contract PaymasterTest is PoolTest {
                 feeValue
             )
         );
-        paymaster.validatePaymasterUserOp(userOp, bytes32(0), feeValue);
+        paymaster.validatePaymasterUserOp(userOp, bytes32(0), feeValue); // feeValue is maxCostEth
     }
 
     function test_revertWhenPaymasterFeesInUSDCIsNotEnough()
@@ -217,11 +243,11 @@ contract PaymasterTest is PoolTest {
         createPackedUserOps(address(gateway))
     {
         (, int256 ethInUSDC, , , ) = AggregatorV3Interface(
-            CHAINLINK_USDC_ETH_FEED_SEPOLIA
+            CHAINLINK_ETH_USDC_FEED_SEPOLIA
         ).latestRoundData();
 
         uint8 feedDecimals = AggregatorV3Interface(
-            CHAINLINK_USDC_ETH_FEED_SEPOLIA
+            CHAINLINK_ETH_USDC_FEED_SEPOLIA
         ).decimals();
 
         // altering the fee value to be less than the required fee
@@ -348,11 +374,11 @@ contract PaymasterTest is PoolTest {
         createPackedUserOps(address(gateway))
     {
         (, int256 ethInUSDC, , , ) = AggregatorV3Interface(
-            CHAINLINK_USDC_ETH_FEED_SEPOLIA
+            CHAINLINK_ETH_USDC_FEED_SEPOLIA
         ).latestRoundData();
 
         uint8 feedDecimals = AggregatorV3Interface(
-            CHAINLINK_USDC_ETH_FEED_SEPOLIA
+            CHAINLINK_ETH_USDC_FEED_SEPOLIA
         ).decimals();
 
         // converting `feeValue` in ETH to USDC

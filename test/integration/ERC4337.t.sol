@@ -55,12 +55,19 @@ contract ERC4337 is PoolTest {
         // Deposit to entry point
         vm.deal(address(this), 100 ether);
         paymaster.depositToEntryPoint{value: 100 ether}();
+
+        // Set Chainlink Oracle Price Feed address to fetch prices
+        paymaster.setChainlinkFeed(feeAssetId, address(0));
+
+        /**
         paymaster.setAssetFee(feeAssetId, feeValue);
         paymaster.setAssetFeeForPreVerifiedTx(
             feeAssetId,
             feeValueForOutsourcedVerification
         );
+         */
 
+        // Deposit funds to test transfer/withdraw tx supported by ERC4337
         ShieldedTransaction memory stx = _loadShieldedTransaction(
             "deposit_weth_tx"
         );
@@ -78,6 +85,17 @@ contract ERC4337 is PoolTest {
 
         ops[0] = packedUserOp;
         entryPointContract.handleOps(ops, payable(address(this)));
+
+        // assertion
+        ShieldedTransaction memory stx = _loadShieldedTransaction(
+            "transfer_20_weth_with_weth_fee"
+        );
+        (, uint24 feeAssetId, uint256 feeValue) = _parseFeeParams(stx);
+        uint256 paymasterFeeCollected = pool.getCollectedPaymasterFee(
+            feeAssetId,
+            address(paymaster)
+        );
+        assert(paymasterFeeCollected == feeValue);
     }
 
     // Since this tx will be preVerified, it will go to the mempool
@@ -116,5 +134,23 @@ contract ERC4337 is PoolTest {
 
     receive() external payable {
         // Handle received Ether
+    }
+
+    function _parseFeeParams(
+        ShieldedTransaction memory stx
+    ) internal pure returns (address, uint24, uint256) {
+        // FeeData is packed as follows (in order):
+        // 20 bytes - paymaster address
+        // 3 bytes - feeAssetId (24 bits)
+        // 9 bytes - feeValue (72 bits)
+        address paymaster = address(uint160(stx.feeData >> (24 + 72)));
+
+        // Extract the feeAssetId (3 bytes)
+        uint24 feeAssetId = uint24(stx.feeData >> 72);
+
+        // Extract the feeValue (9 bytes)
+        uint256 feeValue = uint256(uint72(stx.feeData));
+
+        return (paymaster, feeAssetId, feeValue);
     }
 }

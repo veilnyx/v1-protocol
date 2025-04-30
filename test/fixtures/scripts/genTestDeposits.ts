@@ -1,8 +1,7 @@
 import { parseEther, parseUnits, zeroAddress } from "viem";
 import { Core } from "@labyrinthac/core";
 import { TransactionType } from "@labyrinthac/shared-types";
-import { fixture, generateTestTransactions, generateTestTxsWithOutsourcedProofVerification, generatePackedUserOps, mockNotes } from "./fixture";
-import { parse } from 'path';
+import { fixture, generateTestTransactions, generateTestTxsWithOutsourcedProofVerification } from "./fixture";
 
 const {
   assets: { weth, usdc, testnetWeth, testnetUsdc, morphoVaultToken },
@@ -21,16 +20,6 @@ export const reqs = {
     revokerId: 0,
   }
   /**,
- deposit_pre_tx: {
-   type: TransactionType.DEPOSIT,
-   assetIds: [weth, usdc],
-   values: [parseEther("10000"), parseUnits("10000", 6)],
-   feeAssetId: 0,
-   to: senderAccount.shieldedAddress.pack(),
-   viaBundler: false,
-   paymaster: zeroAddress,
-   revokerId: 0,
- },
  deposit_aaveWeth_testnetUsdc: {
    type: TransactionType.DEPOSIT,
    assetIds: [testnetWeth, testnetUsdc],

@@ -169,15 +169,20 @@ contract Paymaster is IPaymaster, Ownable {
     /// @notice Returns the `maxCostEth` value in fee asset using Chainlink's price feeds.
     function convertFeeFromEthToFeeAsset(
         uint256 maxCostEth,
-        uint24 assetId,
-        uint8 feeAssetDecimals
+        uint24 feeAssetId
     ) public view returns (uint256 feeInAsset) {
-        if (assetIdToChainlinkFeed[assetId] == address(0)) {
-            revert ChainlinkPriceFeedNotFound(assetId);
+        Asset memory feeAsset = pool.getAsset(feeAssetId);
+        if (!feeAsset.isActive) {
+            revert FeeAssetInactive(feeAssetId);
+        }
+
+        // if chainlink feed for assetId not found, return maxCostEth
+        if (assetIdToChainlinkFeed[feeAssetId] == address(0)) {
+            return maxCostEth;
         }
 
         AggregatorV3Interface feed = AggregatorV3Interface(
-            assetIdToChainlinkFeed[assetId]
+            assetIdToChainlinkFeed[feeAssetId]
         );
         (, int256 priceETHInAsset, , , ) = feed.latestRoundData();
         if (priceETHInAsset <= 0) {
@@ -190,10 +195,10 @@ contract Paymaster is IPaymaster, Ownable {
         feeInAsset =
             ((maxCostEth * uint256(priceETHInAsset)) /
                 10 ** (ETH_DECIMALS + feedDecimals)) *
-            10 ** feeAssetDecimals;
+            10 ** feeAsset.precision;
 
         if (feeInAsset == 0) {
-            revert MaxCostEthToAssetConversionFailed(assetId);
+            revert MaxCostEthToAssetConversionFailed(feeAssetId);
         }
 
         return feeInAsset;
@@ -238,16 +243,7 @@ contract Paymaster is IPaymaster, Ownable {
             revert InvalidPaymaster(paymaster);
         }
 
-        Asset memory feeAsset = pool.getAsset(feeAssetId);
-        if (!feeAsset.isActive) {
-            revert FeeAssetInactive(feeAssetId);
-        }
-
-        uint256 requiredFee = _getRequiredFee(
-            feeAssetId,
-            maxCostEth,
-            feeAsset.precision
-        );
+        uint256 requiredFee = _getRequiredFee(feeAssetId, maxCostEth);
 
         if (givenFee < requiredFee) {
             revert InsufficientFee(givenFee, requiredFee);
@@ -282,18 +278,9 @@ contract Paymaster is IPaymaster, Ownable {
     /// @notice Returns `maxCostEth` amt of ETH in asset.
     function _getRequiredFee(
         uint24 feeAssetId,
-        uint256 maxCostEth,
-        uint8 feeAssetDecimals
+        uint256 maxCostEth
     ) internal view returns (uint256 feeInAsset) {
-        if (feeAssetId == ETH_ASSET_ID) {
-            return maxCostEth;
-        }
-
-        feeInAsset = convertFeeFromEthToFeeAsset(
-            maxCostEth,
-            feeAssetId,
-            feeAssetDecimals
-        );
+        feeInAsset = convertFeeFromEthToFeeAsset(maxCostEth, feeAssetId);
         return feeInAsset;
     }
 
