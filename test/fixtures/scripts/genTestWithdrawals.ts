@@ -17,7 +17,7 @@ export const reqs = {
     to: senderPubAddress,
     viaBundler: true,
     paymaster:
-      `0x${"6e1913f0B4118052AFAc74407B0C532659e6B198"}` as `0x${string}`,
+      `0xF3d8f3B185d1448BD3f3762b6cCF7F129bC21fDB` as `0x${string}`,
     revokerId: 0
   }
   /**,

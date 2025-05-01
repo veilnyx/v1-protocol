@@ -23,6 +23,7 @@ contract PaymasterTest is PoolTest {
         0x694AA1769357215DE4FAC081bf1f309aDC325306;
     uint8 public constant ETH_DECIMALS = 18;
     uint8 public constant USDC_DECIMALS = 6;
+    uint256 public constant ETH_SEPOLIA = 11155111;
 
     uint24 feeAssetId;
     uint256 feeValue = 0.002 ether;
@@ -80,27 +81,22 @@ contract PaymasterTest is PoolTest {
         paymaster = new Paymaster(entryPoint, address(gateway), address(pool));
         console2.log("paymaster:", address(paymaster));
 
+        // Setting chainlink feed address to fetch prices
         paymaster.setChainlinkFeed(asset1.id, address(0));
-        paymaster.setChainlinkFeed(asset2.id, CHAINLINK_ETH_USDC_FEED_SEPOLIA);
-        // paymaster.setAssetFee(feeAssetId, feeValue);
-        // paymaster.setAssetFeeForPreVerifiedTx(
-        //     feeAssetId,
-        //     feeValueForOutsourcedVerification
-        // );
-    }
-
-    function test_updateFeeAsset() public {
-        uint24 assetId = 65538;
-        uint256 newFeeValue = 0.1 ether;
-        paymaster.setAssetFee(assetId, newFeeValue);
-        assertEq(paymaster.getAssetFee(assetId), newFeeValue);
-
-        bool isSupported = paymaster.isAssetFeeSupported(assetId);
-        assertTrue(isSupported);
+        // asset 2 (USDC)
+        if (block.chainid == ETH_SEPOLIA) {
+            // Sepolia
+            paymaster.setChainlinkFeed(
+                asset2.id,
+                CHAINLINK_ETH_USDC_FEED_SEPOLIA
+            );
+        } else {
+            paymaster.setChainlinkFeed(asset2.id, address(0));
+        }
     }
 
     function test_convertFeeFromEthToUSDC() public {
-        if (block.chainid != 11155111) {
+        if (block.chainid != ETH_SEPOLIA) {
             vm.skip(true);
         }
 
@@ -208,7 +204,10 @@ contract PaymasterTest is PoolTest {
     }
      */
 
-    function test_revertWhenPaymasterFeesInETHIsNotEnough() public {
+    function test_revertWhenPaymasterFeesInETHIsNotEnough()
+        public
+        createPackedUserOps(address(gateway))
+    {
         uint256 lowFeeValue = feeValue / 2;
 
         stx.feeData = uint256(
@@ -221,7 +220,6 @@ contract PaymasterTest is PoolTest {
             )
         );
 
-        userOp.sender = address(pool);
         userOp.callData = abi.encodeCall(
             MockPool.transactForPaymasterTestSetup,
             (stx, preVerificationDetails)
@@ -242,6 +240,10 @@ contract PaymasterTest is PoolTest {
         public
         createPackedUserOps(address(gateway))
     {
+        if (block.chainid != ETH_SEPOLIA) {
+            vm.skip(true);
+        }
+
         (, int256 ethInUSDC, , , ) = AggregatorV3Interface(
             CHAINLINK_ETH_USDC_FEED_SEPOLIA
         ).latestRoundData();
@@ -373,6 +375,10 @@ contract PaymasterTest is PoolTest {
         public
         createPackedUserOps(address(gateway))
     {
+        if (block.chainid == ETH_SEPOLIA) {
+            vm.skip(true);
+        }
+
         (, int256 ethInUSDC, , , ) = AggregatorV3Interface(
             CHAINLINK_ETH_USDC_FEED_SEPOLIA
         ).latestRoundData();
@@ -448,11 +454,12 @@ contract PaymasterTest is PoolTest {
         );
         pool.transact(withdrawSTX, false);
 
-        uint256 assetFeeByPaymaster = paymaster.getAssetFee(feeAssetId);
+        uint256 expectedFeeValue = uint256(uint72(withdrawSTX.feeData));
+
         vm.prank(address(paymaster));
         assertEq(
             pool.getCollectedPaymasterFee(feeAssetId, address(paymaster)),
-            assetFeeByPaymaster
+            expectedFeeValue
         );
     }
 
@@ -471,27 +478,12 @@ contract PaymasterTest is PoolTest {
         vm.startPrank(address(paymaster));
         pool.withdrawPaymasterFee(feeAssetId, address(paymaster));
 
+        /// assertions
+        uint256 expectedFeeValue = uint256(uint72(withdrawSTX.feeData));
         assertEq(
             pool.getCollectedPaymasterFee(feeAssetId, address(paymaster)),
             0
         );
-        assertEq(token1.balanceOf(address(paymaster)), feeValue);
+        assertEq(token1.balanceOf(address(paymaster)), expectedFeeValue);
     }
-
-    /**
-    function testDecodePackedUserOp() public {
-        PackedUserOperation memory packedUserOp = _loadPackedUserOp(
-            "deposit_weth_tx_packed_userop"
-        );
-
-        (
-            address paymaster,
-            uint24 feeAssetId,
-            uint256 feeValue,
-            bool isVeriOutsourced
-        ) = paymaster.parseFeeAndPaymasterData(packedUserOp);
-
-        assertEq(isVeriOutsourced, false);
-    }
-     */
 }

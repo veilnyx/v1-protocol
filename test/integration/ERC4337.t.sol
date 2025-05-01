@@ -23,6 +23,8 @@ contract ERC4337 is PoolTest {
     uint24 feeAssetId;
     uint256 feeValue = 0.002 ether;
     uint256 feeValueForOutsourcedVerification = 0.001 ether;
+    address public constant CHAINLINK_ETH_USDC_FEED_SEPOLIA =
+        0x694AA1769357215DE4FAC081bf1f309aDC325306;
 
     function setUp() public {
         _setUp();
@@ -57,15 +59,16 @@ contract ERC4337 is PoolTest {
         paymaster.depositToEntryPoint{value: 100 ether}();
 
         // Set Chainlink Oracle Price Feed address to fetch prices
-        paymaster.setChainlinkFeed(feeAssetId, address(0));
-
-        /**
-        paymaster.setAssetFee(feeAssetId, feeValue);
-        paymaster.setAssetFeeForPreVerifiedTx(
-            feeAssetId,
-            feeValueForOutsourcedVerification
-        );
-         */
+        paymaster.setChainlinkFeed(asset1.id, address(0));
+        if (block.chainid == 11155111) {
+            // Sepolia
+            paymaster.setChainlinkFeed(
+                asset2.id,
+                CHAINLINK_ETH_USDC_FEED_SEPOLIA
+            );
+        } else {
+            paymaster.setChainlinkFeed(asset2.id, address(0));
+        }
 
         // Deposit funds to test transfer/withdraw tx supported by ERC4337
         ShieldedTransaction memory stx = _loadShieldedTransaction(

@@ -23,13 +23,6 @@ contract Paymaster is IPaymaster, Ownable {
     address public immutable sender;
     IPool public immutable pool;
 
-    /**
-     * @dev Mapping from assetId to fee value.
-     */
-    mapping(uint24 => uint256) private _assetFees;
-    /// @dev Mapping from assetId to fee value for outsourced verification tx. The gas cost for such tx will be lower due to the ZK proof verification being outsourced.
-    mapping(uint24 => uint256) private _assetFeesForPreVerifiedTx;
-
     mapping(uint24 => address) public assetIdToChainlinkFeed;
 
     error InvalidPaymaster(address paymaster);
@@ -54,27 +47,6 @@ contract Paymaster is IPaymaster, Ownable {
         entryPoint = IEntryPoint(entryPoint_);
         sender = sender_;
         pool = IPool(pool_);
-    }
-
-    /**
-     * Sets fee value for an asset.
-     * @param assetId  - Asset id to update fee for.
-     * @param feeValue - Fee value to set.
-     */
-    function setAssetFee(uint24 assetId, uint256 feeValue) external onlyOwner {
-        _assetFees[assetId] = feeValue;
-    }
-
-    /**
-     * Sets fee value for an asset for outsourced verification tx.
-     * @param assetId  - Asset id to update fee for.
-     * @param feeValue - Fee value to set.
-     */
-    function setAssetFeeForPreVerifiedTx(
-        uint24 assetId,
-        uint256 feeValue
-    ) external onlyOwner {
-        _assetFeesForPreVerifiedTx[assetId] = feeValue;
     }
 
     /**
@@ -150,22 +122,6 @@ contract Paymaster is IPaymaster, Ownable {
         return entryPoint.balanceOf(address(this));
     }
 
-    /**
-     * Return fee value for an asset.
-     */
-    function getAssetFee(uint24 assetId) external view returns (uint256) {
-        return _assetFees[assetId];
-    }
-
-    /**
-     * Return fee value for an asset for outsourced verification tx.
-     */
-    function getAssetFeeForPreVerifiedTx(
-        uint24 assetId
-    ) external view returns (uint256) {
-        return _assetFeesForPreVerifiedTx[assetId];
-    }
-
     /// @notice Returns the `maxCostEth` value in fee asset using Chainlink's price feeds.
     function convertFeeFromEthToFeeAsset(
         uint256 maxCostEth,
@@ -202,16 +158,6 @@ contract Paymaster is IPaymaster, Ownable {
         }
 
         return feeInAsset;
-    }
-
-    function isAssetFeeSupported(uint24 assetId) external view returns (bool) {
-        return _assetFees[assetId] > 0;
-    }
-
-    function isAssetFeeSupportedForPreVerifiedTx(
-        uint24 assetId
-    ) external view returns (bool) {
-        return _assetFeesForPreVerifiedTx[assetId] > 0;
     }
 
     /// @dev The only requirements for validation are
