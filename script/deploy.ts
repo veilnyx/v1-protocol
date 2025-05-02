@@ -201,7 +201,7 @@ const main1 = async () => {
       address: poolProxy.address,
       abi: poolAbi,
       functionName: "addAssets",
-      args: [chainParams.initAssetType, chainParams.initAssetAddresses, chainParams.initAssetPrecision],
+      args: [chainParams.initAssetType, chainParams.initAssetAddresses, chainParams.initAssetsPrecision],
     });
 
     const rct = await client.waitForTransactionReceipt({ hash });
@@ -253,28 +253,12 @@ const main = async () => {
   console.log("Running deployment on chain:", chainId);
   console.log("Deployer address:", walletAddress);
 
-  const parameters = {
-    pool: { ...commonParams },
-    hasher: {
-      poseidonT3: chainParams.poseidonT3,
-      poseidonT4: chainParams.poseidonT4,
-    },
-    screener: {
-      sanctionsList: chainParams.sanctionsList,
-    },
-  };
-
-  const { poolProxy } = await hre.ignition.deploy(poolModule, {
-    parameters,
-  });
-  const poolAddress = poolProxy.address;
-  console.log("Pool deployed at:", poolAddress);
-
-  // SETUP ASSETS
-  await addInitialAssets(poolAddress);
-
-  // REGISTER REVOKERS
-  await registerRevokers(poolAddress);
+  const deployConfig: DeployContractConfig = {
+    client: {
+      public: client,
+      wallet: wallet
+    }
+  }
 };
 
 main1().catch(console.error);

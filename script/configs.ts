@@ -14,6 +14,8 @@ export type ChainParams = {
   initAssetType: number;
   initAssetAddresses: Hex[];
   initAssetsPrecision: number[];
+  initAssetChainlinkFeeds: Hex[];
+  initAssetIdsLabyrinth: number[];
 };
 
 export type AdaptorParams = {
@@ -187,7 +189,9 @@ export function loadConfigs() {
       sanctionsList,
       initAssetType,
       initAssetAddresses,
-      initAssetsPrecision
+      initAssetsPrecision,
+      initAssetChainlinkFeeds,
+      initAssetIdsLabyrinth
     } = params;
 
     chainParams[Number(chainId)] = {
@@ -198,7 +202,9 @@ export function loadConfigs() {
       poseidonT4: getHex(params.poseidonT4),
       initAssetType: Number(initAssetType),
       initAssetAddresses: initAssetAddresses.map(getHex),
-      initAssetsPrecision: initAssetsPrecision.map(p => Number(p))
+      initAssetsPrecision: initAssetsPrecision.map(p => Number(p)),
+      initAssetChainlinkFeeds: initAssetChainlinkFeeds.map(getHex),
+      initAssetIdsLabyrinth: initAssetIdsLabyrinth.map(assetId => Number(assetId)),
     };
   }
 
