@@ -154,7 +154,7 @@ export const generateTestTransactionWithOutsourcedProofVerification = async (
   const tx = await sdk.createTransaction(req, opts);
   // console.log("TX: ", tx);
   const signedTx = await sdk.signTransaction(tx);
-  const { preVerifiedTx, preVerification } = await sdk.proveTransactionAndOutsourceVerification(signedTx, nebraClient);
+  const { ztx: preVerifiedTx, preVerification, nebraProofSubmissionObj } = await sdk.proveOutsourcedVerificationTx(signedTx, nebraClient);
 
   // console.log("ZTX:", preVerifiedTx);
   const encoded = preVerifiedTx.encode();
@@ -321,7 +321,7 @@ export const generatePackedUserOps = async (name: string, req: TransactionReques
   let preVerification: PreVerification;
 
   if (isPreVerified) {
-    const { preVerifiedTx, preVerification: preVerification_ } = await sdk.proveTransactionAndOutsourceVerification(
+    const { ztx: preVerifiedTx, preVerification: preVerification_, } = await sdk.proveOutsourcedVerificationTx(
       tx,
       nebraClient
     );
