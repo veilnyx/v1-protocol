@@ -4,6 +4,7 @@ import "@nomicfoundation/hardhat-viem";
 import "@nomicfoundation/hardhat-foundry";
 import "@nomicfoundation/hardhat-ignition";
 import "@nomicfoundation/hardhat-ignition-viem";
+import "@openzeppelin/hardhat-upgrades";
 import "hardhat-contract-sizer";
 // import * as tdly from "@tenderly/hardhat-tenderly";
 

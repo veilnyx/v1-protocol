@@ -59,7 +59,7 @@ const deployMempoolImpl = async (shieldedTransactionLogicAddr: `0x${string}`) =>
 const main = async () => {
     await setup();
 
-    const existingMempoolProxy = "0x242060778df581e0b9ee49115e2b9bfda1ff33a5" as `0x${string}`;
+    const existingMempoolProxy = "0x9642346eE64cf65D67f324Ff7Ec24AfF903Fbe2d" as `0x${string}`;
     const shieldedTransactionLogicAddr = "0xb28096f5fe1463dd806947603d8269759b807c04" as `0x${string}`;
     const newMempoolImpl = await deployMempoolImpl(shieldedTransactionLogicAddr);
 

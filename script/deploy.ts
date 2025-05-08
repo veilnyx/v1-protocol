@@ -1,4 +1,5 @@
 import hre from "hardhat";
+import { ethers, upgrades } from "hardhat";
 import {
   encodeAbiParameters,
   encodeFunctionData,
@@ -32,14 +33,6 @@ const deployMempoolImplAndProxy = async (pool: `0x${string}`, shieldedTransactio
   });
   console.log("MempoolValidator deployed:", mempoolValidator.address);
 
-  const mempoolImpl = await hre.viem.deployContract("Mempool", [], {
-    libraries: {
-      MempoolValidator: mempoolValidator.address
-    },
-  });
-
-  console.log("Mempool Impl deployed:", mempoolImpl.address);
-
   const args = [
     pool,
     PROOF_SUB_MEMPOOL_EXIT_FEES,
@@ -47,19 +40,22 @@ const deployMempoolImplAndProxy = async (pool: `0x${string}`, shieldedTransactio
     nebraVerifierSepolia,
     gateway
   ];
-
-  const initData = encodeFunctionData({
-    abi: mempoolAbi,
-    functionName: "initialize",
-    args: args as any,
+  
+  // deploying using Hardhat Proxy deploy plugin
+  const mempoolImpl = await ethers.getContractFactory("Mempool", {
+    libraries: {
+      MempoolValidator: mempoolValidator.address
+    }
   });
 
-  const mempoolProxy = await hre.viem.deployContract("MempoolProxy", [
-    mempoolImpl.address,
-    initData,
-  ]);
-  console.log("MempoolProxy deployed:", mempoolProxy.address);
-  return mempoolProxy.address;
+  const mempoolProxy = await upgrades.deployProxy(mempoolImpl, args, {
+    kind: "uups",
+    unsafeAllow: ["external-library-linking"]
+  });
+  await mempoolProxy.waitForDeployment();
+  const mempoolProxyAddr = await mempoolProxy.getAddress();
+  console.log("MempoolProxy deployed:", mempoolProxyAddr);
+  return mempoolProxyAddr;
 }
 
 const updateGatewayAndPoolInMempool = async (deployConfig, mempool: `0x${string}`, gateway: `0x${string}`, pool: `0x${string}`) => {
@@ -253,28 +249,14 @@ const main = async () => {
   console.log("Running deployment on chain:", chainId);
   console.log("Deployer address:", walletAddress);
 
-  const parameters = {
-    pool: { ...commonParams },
-    hasher: {
-      poseidonT3: chainParams.poseidonT3,
-      poseidonT4: chainParams.poseidonT4,
-    },
-    screener: {
-      sanctionsList: chainParams.sanctionsList,
-    },
-  };
+  const deployConfig: DeployContractConfig = {
+    client: {
+      public: client,
+      wallet: wallet
+    }
+  }
 
-  const { poolProxy } = await hre.ignition.deploy(poolModule, {
-    parameters,
-  });
-  const poolAddress = poolProxy.address;
-  console.log("Pool deployed at:", poolAddress);
-
-  // SETUP ASSETS
-  await addInitialAssets(poolAddress);
-
-  // REGISTER REVOKERS
-  await registerRevokers(poolAddress);
+  const mempoolProxy = await deployMempoolImplAndProxy(`0x0369cb46f2cbe32c775a2f00177d8dbf84fcb4af` as `0x${string}`, `0xb28096f5fe1463dd806947603d8269759b807c04` as `0x${string}`, `0xf0335a55ef61a57cd4d726a1a53e0143835168b0` as `0x${string}`);
 };
 
 main1().catch(console.error);
