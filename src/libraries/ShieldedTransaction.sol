@@ -197,7 +197,7 @@ library ShieldedTransactionLogic {
         QueuedMerkleTree storage commitmentTree,
         mapping(uint24 => Asset) storage assets,
         mapping(address => mapping(uint24 => uint256)) storage paymasterFees,
-        mapping(uint24 => uint256) storage exitMempoolFeeCollected,
+        mapping(uint24 => uint256) storage proofSubAndExitMempoolFees,
         mapping(uint24 => uint256) storage withdrawFees,
         address hasher,
         address adaptorHandler,
@@ -209,7 +209,7 @@ library ShieldedTransactionLogic {
         // Credit paymaster fees
         _creditPaymasterFee(
             paymasterFees,
-            exitMempoolFeeCollected,
+            proofSubAndExitMempoolFees,
             params,
             isPreVerified
         );
@@ -638,7 +638,7 @@ library ShieldedTransactionLogic {
 
     function _creditPaymasterFee(
         mapping(address => mapping(uint24 => uint256)) storage paymasterFees,
-        mapping(uint24 => uint256) storage exitMempoolFeeCollected,
+        mapping(uint24 => uint256) storage proofSubAndExitMempoolFees,
         Params memory params,
         bool isPreVerified
     ) internal {
@@ -646,15 +646,17 @@ library ShieldedTransactionLogic {
 
         if (feeValue != 0) {
             if (isPreVerified) {
-                // Allot 80% percentage of fee to the verification tracker service for pushing the tx out of mempool to the Labyrinth pool and the balance (20%) to the paymaster for sponsering the submission of tx onchain to the Mempool.
-                uint256 gasFeeAddMempool = (feeValue * 20) / 100;
+                // Allot 65% percentage of fee to the verification tracker service for exiting tx out of mempool to the Labyrinth pool and the balance (35%) to the paymaster for adding tx to the Mempool.
+                uint256 gasFeeAddMempool = (feeValue * 35) / 100;
                 uint256 gasFeeExitMempool = feeValue - gasFeeAddMempool;
 
                 paymasterFees[params.paymaster][
                     params.feeAssetId
                 ] += gasFeeAddMempool;
 
-                exitMempoolFeeCollected[params.feeAssetId] += gasFeeExitMempool;
+                proofSubAndExitMempoolFees[
+                    params.feeAssetId
+                ] += gasFeeExitMempool;
             } else {
                 // All fee goes to the paymaster only
                 paymasterFees[params.paymaster][params.feeAssetId] += feeValue;

@@ -14,12 +14,11 @@ import {
   toHex,
 } from "viem";
 import { foundry } from "viem/chains";
-import { Core, CoreOptions } from "@zkfi-tech/core";
+import { Core, CoreOptions } from "@labyrinthac/core";
 import MerkleTree from "fixed-merkle-tree";
-import { Fp, poseidonHash } from "@zkfi-tech/babyjubjub";
-import { NebraClientAndCircuitIds } from "@zkfi-tech/zk-prover";
-import { UpaInstanceDescriptor } from "@nebrazkp/upa/sdk";
-import { toBigInt } from "@zkfi-tech/utils";
+import { Fp, poseidonHash } from "@labyrinthac/babyjubjub";
+import { UpaClient, UpaInstanceDescriptor } from "@nebrazkp/upa/sdk";
+import { toBigInt } from "@labyrinthac/utils";
 import {
   MockAddressResolver,
   MockNotesSource,
@@ -100,8 +99,7 @@ export const getSDKInstance = async () => {
     "deploymentTx": "0xa8626318b76b71cd21cdfb93ef67c9571d94e01383e852a3eb6dc5dc6188808e",
     "chainId": "11155111"
   };
-  const nebraClientAndCircuitIds: NebraClientAndCircuitIds = await zkfi.createNebraClientAndGenerateCircuitIds(signer, upaInstanceDescriptor);
-  const { nebraClient, circuitIds } = nebraClientAndCircuitIds;
+  const nebraClient: UpaClient = await zkfi.generateNebraClient(signer, upaInstanceDescriptor);
 
   zkfi.getRevokerData = async () => ({
     id: 0,
@@ -114,7 +112,6 @@ export const getSDKInstance = async () => {
 
   return {
     sdk: zkfi,
-    nebraClient,
-    circuitIds
+    nebraClient
   };
 };

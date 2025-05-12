@@ -33,22 +33,34 @@ export const registerCircuitsOnNebra = async () => {
     const registerVKNebraFormat: Groth16VerifyingKey = Groth16VerifyingKey.from_snarkjs(registerCircuitVKSnarkJs as SnarkJSVKey);
     console.log("Register circuit Groth16VK created");
 
+    // TRANSACT 21
     const transact21CircuitVKSnarkJs = JSON.parse(fs.readFileSync(circuits.transact21.vKey, "ascii"));
     const transact21VKNebraFormat: Groth16VerifyingKey = Groth16VerifyingKey.from_snarkjs(transact21CircuitVKSnarkJs as SnarkJSVKey);
     console.log("transact21 circuit Groth16VK created");
 
     // On-chain call to Nebra's verifier contract to register the verification key
-    const registerVKTxRes = await upaClient.upaInstance.verifier.registerVK(transact21VKNebraFormat, {
+    const transact21RegisterVKTxRes = await upaClient.upaInstance.verifier.registerVK(transact21VKNebraFormat, {
         gasLimit: 15_00_000
     });
-    console.log("VK registration on Nebra tx res:", registerVKTxRes);
+    console.log("VK transact21 registration on Nebra tx res:", transact21RegisterVKTxRes);
+
+    // TRANSACT 22
+    const transact22CircuitVKSnarkJs = JSON.parse(fs.readFileSync(circuits.transact22.vKey, "ascii"));
+    const transact22VKNebraFormat: Groth16VerifyingKey = Groth16VerifyingKey.from_snarkjs(transact22CircuitVKSnarkJs as SnarkJSVKey);
+    console.log("transact22 circuit Groth16VK created");
+
+    // On-chain call to Nebra's verifier contract to register the verification key
+    const transact22RegisterVKTxRes = await upaClient.upaInstance.verifier.registerVK(transact22VKNebraFormat, {
+        gasLimit: 15_00_000
+    });
+    console.log("VK transact22 registration on Nebra tx res:", transact22RegisterVKTxRes);
 
     // Computing circuit Ids
     const registerCircuitId = await utils.computeCircuitId(registerVKNebraFormat);
-    const transactCircuitId = await utils.computeCircuitId(transact21VKNebraFormat);
+    const transact21CircuitId = await utils.computeCircuitId(transact21VKNebraFormat);
+    const transact22CircuitId = await utils.computeCircuitId(transact22VKNebraFormat);
 
     console.log("Register circuit ID:", registerCircuitId);
-    console.log("Transact circuit ID:", transactCircuitId);
+    console.log("Transact21 circuit ID:", transact21CircuitId);
+    console.log("Transact22 circuit ID:", transact22CircuitId);
 }
-
-registerCircuitsOnNebra().catch(console.error);
