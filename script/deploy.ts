@@ -40,7 +40,7 @@ const deployMempoolImplAndProxy = async (pool: `0x${string}`, shieldedTransactio
     nebraVerifierSepolia,
     gateway
   ];
-  
+
   // deploying using Hardhat Proxy deploy plugin
   const mempoolImpl = await ethers.getContractFactory("Mempool", {
     libraries: {
@@ -256,7 +256,15 @@ const main = async () => {
     }
   }
 
-  const mempoolProxy = await deployMempoolImplAndProxy(`0x0369cb46f2cbe32c775a2f00177d8dbf84fcb4af` as `0x${string}`, `0xb28096f5fe1463dd806947603d8269759b807c04` as `0x${string}`, `0xf0335a55ef61a57cd4d726a1a53e0143835168b0` as `0x${string}`);
+  // const mempoolProxy = await deployMempoolImplAndProxy(`0x0369cb46f2cbe32c775a2f00177d8dbf84fcb4af` as `0x${string}`, `0xb28096f5fe1463dd806947603d8269759b807c04` as `0x${string}`, `0xf0335a55ef61a57cd4d726a1a53e0143835168b0` as `0x${string}`);
+
+  const mempoolProxy = `0x9642346eE64cf65D67f324Ff7Ec24AfF903Fbe2d` as `0x${string}`;
+  const poolProxy = `0x0369cb46f2cbe32c775a2f00177d8dbf84fcb4af` as `0x${string}`;
+  // ERC4337 infra
+  const erc4337Contracts = await deployErc4337Infra(chainParams, poolProxy, mempoolProxy, deployConfig);
+
+  await updateGatewayAndPoolInMempool(deployConfig, mempoolProxy, erc4337Contracts.gateway, poolProxy);
+
 };
 
 main1().catch(console.error);

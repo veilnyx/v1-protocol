@@ -16,15 +16,15 @@ contract Gateway is IGateway, Ownable {
     uint256 internal constant VALIDATION_SUCCEEDED = 0;
     uint256 internal constant VALIDATION_FAILED = 1;
 
-    address internal immutable _entryPoint;
-    address internal immutable _pool;
-    address internal immutable _mempool;
-    address internal immutable _wToken;
+    address public immutable entryPoint;
+    address public immutable pool;
+    address public immutable mempool;
+    address public immutable wToken;
 
     error InvalidEntryPoint(address entryPoint);
 
     modifier onlyEntryPoint() {
-        if (msg.sender != _entryPoint) {
+        if (msg.sender != entryPoint) {
             revert InvalidEntryPoint(msg.sender);
         }
         _;
@@ -36,10 +36,10 @@ contract Gateway is IGateway, Ownable {
         address pool_,
         address mempool_
     ) Ownable(msg.sender) {
-        _entryPoint = entryPoint_;
-        _pool = pool_;
-        _wToken = wToken_;
-        _mempool = mempool_;
+        entryPoint = entryPoint_;
+        pool = pool_;
+        wToken = wToken_;
+        mempool = mempool_;
     }
 
     /// @dev `missingAccountFunds` is always expected to be 0 since paymaster
@@ -57,18 +57,18 @@ contract Gateway is IGateway, Ownable {
         PreVerificationDetails calldata preVerificationDetails
     ) external onlyEntryPoint {
         if (preVerificationDetails.isPreVerified) {
-            IMempool(_mempool).addSTXToMempool(stx, preVerificationDetails);
+            IMempool(mempool).addSTXToMempool(stx, preVerificationDetails);
         } else {
-            IPool(_pool).transact(stx, false);
+            IPool(pool).transact(stx, false);
         }
     }
 
     function handleWrapAndDeposit(
         ShieldedTransaction calldata stx
     ) external payable {
-        IWToken(_wToken).deposit{value: msg.value}();
-        IWToken(_wToken).approve(_pool, msg.value);
-        IPool(_pool).transact(stx, false);
+        IWToken(wToken).deposit{value: msg.value}();
+        IWToken(wToken).approve(pool, msg.value);
+        IPool(pool).transact(stx, false);
     }
 
     // This may not be needed as paymaster is always supposed to pay for gas
@@ -77,15 +77,7 @@ contract Gateway is IGateway, Ownable {
         address payable withdrawAddress,
         uint256 amount
     ) external onlyOwner {
-        IEntryPoint(_entryPoint).withdrawTo(withdrawAddress, amount);
-    }
-
-    function wToken() external view returns (address) {
-        return _wToken;
-    }
-
-    function entryPoint() external view returns (address) {
-        return _entryPoint;
+        IEntryPoint(entryPoint).withdrawTo(withdrawAddress, amount);
     }
 
     receive() external payable {}
