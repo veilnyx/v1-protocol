@@ -10,10 +10,10 @@ import {
   toHex,
 } from "viem";
 import { foundry } from "viem/chains";
-import { Core } from "@zkfi-tech/core";
+import { Core } from "@labyrinthac/core";
 import MerkleTree from "fixed-merkle-tree";
-import { Fp, poseidonHash } from "@zkfi-tech/babyjubjub";
-import { toBigInt } from "@zkfi-tech/utils";
+import { Fp, poseidonHash } from "@labyrinthac/babyjubjub";
+import { toBigInt } from "@labyrinthac/utils";
 import {
   MockAddressResolver,
   MockNotesSource,

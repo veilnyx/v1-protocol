@@ -12,15 +12,15 @@ import {
   stringToHex,
   stringToBytes,
 } from "viem";
-import { ShieldedAccount } from "@zkfi-tech/account";
-import { Fp, Point, poseidonDecrypt } from "@zkfi-tech/babyjubjub";
+import { ShieldedAccount } from "@labyrinthac/account";
+import { Fp, Point, poseidonDecrypt } from "@labyrinthac/babyjubjub";
 import {
   TransactionOptions,
   TransactionRequest,
-} from "@zkfi-tech/shared-types";
-import { Core } from "@zkfi-tech/core";
-import { ZTransaction } from "@zkfi-tech/zk-prover";
-import { Note, SIZE_ENCRYPTED_DECRYPTION_KEY, SIZE_FULLY_ENCRYPTED_NOTE_DATA } from "@zkfi-tech/transaction";
+} from "@labyrinthac/shared-types";
+import { Core } from "@labyrinthac/core";
+import { ZTransaction } from "@labyrinthac/zk-prover";
+import { Note, SIZE_ENCRYPTED_DECRYPTION_KEY, SIZE_FULLY_ENCRYPTED_NOTE_DATA } from "@labyrinthac/transaction";
 import config from "../config.json";
 
 const senderSeed = BigInt(config.sender.seed);

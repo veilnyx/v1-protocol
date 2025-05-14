@@ -1,6 +1,6 @@
 import { parseEther, parseUnits, zeroAddress } from "viem";
-import { Core } from "@zkfi-tech/core";
-import { TransactionType } from "@zkfi-tech/shared-types";
+import { Core } from "@labyrinthac/core";
+import { TransactionType } from "@labyrinthac/shared-types";
 import { fixture, generateTestTransactions } from "./fixture";
 import { parse } from 'path';
 

@@ -4,8 +4,8 @@ import { genTestWithdrawals } from "./genTestWithdrawals";
 import { genTestTransfers } from "./genTestTransfers";
 import { genTestCallAdaptors } from './genTestCallAdaptor';
 import { getSDKInstance } from "./sdk";
-import { Point, poseidonHash } from "@zkfi-tech/babyjubjub";
-import { randomBigInt } from "@zkfi-tech/utils";
+import { Point, poseidonHash } from "@labyrinthac/babyjubjub";
+import { randomBigInt } from "@labyrinthac/utils";
 import {
   genTreeUpdateData,
   genTreeUpdateDataWithPartialQueue,
