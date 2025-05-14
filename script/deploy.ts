@@ -22,7 +22,7 @@ const verificationTrackerService = `0x${"75a4dA1697aF884c99724474d26F2EAe23cc58B
 const nebraVerifierSepolia = `0x${"3B946743DEB7B6C97F05B7a31B23562448047E3E"}` as `0x${string}`;
 const zeroAddr = "0x0000000000000000000000000000000000000000" as `0x${string}`;
 
-const deployMempoolImplAndProxy = async (pool: `0x${string}`, shieldedTransactionLogicAddr: `0x${string}`, gateway: `0x${string}`) => {
+const deployMempoolProxy = async (pool: `0x${string}`, shieldedTransactionLogicAddr: `0x${string}`, gateway: `0x${string}`): Promise<`0x${string}`> => {
   console.log("Starting to deploy new Mempool");
 
   // deploy MempoolValidator
@@ -33,6 +33,13 @@ const deployMempoolImplAndProxy = async (pool: `0x${string}`, shieldedTransactio
   });
   console.log("MempoolValidator deployed:", mempoolValidator.address);
 
+  // deploying using Hardhat Proxy deploy plugin
+  const mempoolImpl = await ethers.getContractFactory("Mempool", {
+    libraries: {
+      MempoolValidator: mempoolValidator.address
+    }
+  });
+
   const args = [
     pool,
     PROOF_SUB_MEMPOOL_EXIT_FEES,
@@ -41,21 +48,15 @@ const deployMempoolImplAndProxy = async (pool: `0x${string}`, shieldedTransactio
     gateway
   ];
 
-  // deploying using Hardhat Proxy deploy plugin
-  const mempoolImpl = await ethers.getContractFactory("Mempool", {
-    libraries: {
-      MempoolValidator: mempoolValidator.address
-    }
-  });
-
   const mempoolProxy = await upgrades.deployProxy(mempoolImpl, args, {
     kind: "uups",
     unsafeAllow: ["external-library-linking"]
   });
+
   await mempoolProxy.waitForDeployment();
   const mempoolProxyAddr = await mempoolProxy.getAddress();
   console.log("MempoolProxy deployed:", mempoolProxyAddr);
-  return mempoolProxyAddr;
+  return mempoolProxyAddr as `0x${string}`;
 }
 
 const updateGatewayAndPoolInMempool = async (deployConfig, mempool: `0x${string}`, gateway: `0x${string}`, pool: `0x${string}`) => {
@@ -138,22 +139,24 @@ const main1 = async () => {
   console.log("AdaptorHandler deployed: ", adaptorHandler.address);
 
   // Pool and Gateway contract addr will be updated at the end
-  const mempoolProxy = await deployMempoolImplAndProxy(zeroAddr, shieldedTransaction.address, zeroAddr);
+  const mempoolProxy = await deployMempoolProxy(zeroAddr, shieldedTransaction.address, zeroAddr);
 
   // POOL DEPLOYMENT
   let poolProxy;
   {
-    const poolImpl = await hre.viem.deployContract("Pool", [], {
-      libraries: {
-        EIP712: eip712.address,
-        AssetLogic: asset.address,
-        MerkleTreeLogic: merkleTree.address,
-        QueuedMerkleTreeLogic: queuedMerkleTree.address,
-        ShieldedAddressLogic: shieldedAddress.address,
-        ShieldedTransactionLogic: shieldedTransaction.address,
-      },
+
+    const libraries = {
+      EIP712: eip712.address,
+      AssetLogic: asset.address,
+      MerkleTreeLogic: merkleTree.address,
+      QueuedMerkleTreeLogic: queuedMerkleTree.address,
+      ShieldedAddressLogic: shieldedAddress.address,
+      ShieldedTransactionLogic: shieldedTransaction.address,
+    }
+
+    const poolFactory = await ethers.getContractFactory("Pool", {
+      libraries: libraries
     });
-    console.log("Pool deployed:", poolImpl.address);
 
     const { hasher } = await deployHasher(wallet, client, deployConfig);
     console.log("Hasher deployed:", hasher);
@@ -177,16 +180,10 @@ const main1 = async () => {
       BigInt(commonParams.withdrawFeeBps),
     ];
 
-    const initData = encodeFunctionData({
-      abi: poolAbi,
-      functionName: "initialize",
-      args: args as any,
+    poolProxy = await upgrades.deployProxy(poolFactory, args, {
+      kind: "uups",
+      unsafeAllow: ["external-library-linking"],
     });
-
-    poolProxy = await hre.viem.deployContract("PoolProxy", [
-      poolImpl.address,
-      initData,
-    ]);
     console.log("PoolProxy deployed:", poolProxy.address);
   }
 
@@ -234,7 +231,7 @@ const main1 = async () => {
   await updateGatewayAndPoolInMempool(deployConfig, mempoolProxy, erc4337Contracts.gateway, poolProxy.address);
 
   // Register Labyrinth's circuits with Nebra
-  await registerCircuitsOnNebra();
+  // await registerCircuitsOnNebra();
 };
 
 const main = async () => {
@@ -256,7 +253,7 @@ const main = async () => {
     }
   }
 
-  // const mempoolProxy = await deployMempoolImplAndProxy(`0x0369cb46f2cbe32c775a2f00177d8dbf84fcb4af` as `0x${string}`, `0xb28096f5fe1463dd806947603d8269759b807c04` as `0x${string}`, `0xf0335a55ef61a57cd4d726a1a53e0143835168b0` as `0x${string}`);
+  // const mempoolProxy = await deployMempoolProxy(`0x0369cb46f2cbe32c775a2f00177d8dbf84fcb4af` as `0x${string}`, `0xb28096f5fe1463dd806947603d8269759b807c04` as `0x${string}`, `0xf0335a55ef61a57cd4d726a1a53e0143835168b0` as `0x${string}`);
 
   const mempoolProxy = `0x9642346eE64cf65D67f324Ff7Ec24AfF903Fbe2d` as `0x${string}`;
   const poolProxy = `0x0369cb46f2cbe32c775a2f00177d8dbf84fcb4af` as `0x${string}`;

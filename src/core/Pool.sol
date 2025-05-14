@@ -26,12 +26,12 @@ import {ShieldedTransaction, ShieldedTransactionLogic, RevokerData} from "../lib
 /// @param hasher The address of the hasher contract. It provides a single interface to Poseidon hashing functions
 /// @param withdrawFeeBps The fee in basis points (1/10000) that is charged for withdrawing assets from the pool.
 struct InitAddressParams {
-    address mempool;
+    // address mempool;
     address verifier;
     address adaptorHandler;
     address screener;
     address hasher;
-    address verificationTrackerService;
+    // address verificationTrackerService;
 }
 
 contract Pool is
@@ -71,13 +71,15 @@ contract Pool is
         __Pausable_init();
         EIP712.init(EIP712_DOMAIN_NAME, EIP712_DOMAIN_VERSION);
 
-        mempool = initAddressParams.mempool;
+        // mempool = initAddressParams.mempool;
         verifier = initAddressParams.verifier;
         adaptorHandler = initAddressParams.adaptorHandler;
         hasher = initAddressParams.hasher;
         screener = initAddressParams.screener;
+        /**
         verificationTrackerService = initAddressParams
             .verificationTrackerService;
+        */
         withdrawFeeBps = withdrawFeeBps_;
 
         _addressTree.init(addressTreeDepth, hasher);
@@ -88,7 +90,20 @@ contract Pool is
             verifier
         );
     }
-    
+
+    /// TODO: Once these variables are set, we can remove the reinitialize function and initialize these variables in the initialize() itself for mainnet deployment, where we don't have to maintain the current state of the contract.
+    /// @notice Reinitializes the contract with new variables after Proof aggregation upgrade.
+    /// @dev The version number must be greater than last initialization
+    /// @param mempool_ The address of the mempool contract
+    /// @param verificationTracker_ The address of the verificationTracker contract
+    function reinitialize(
+        address mempool_,
+        address verificationTracker_
+    ) external reinitializer(2) {
+        mempool = mempool_;
+        verificationTrackerService = verificationTracker_;
+    }
+
     /////////////////////////////////////////
     //         ADMIN WRITE METHODS         //
     ////////////////////////////////////////
@@ -309,10 +324,6 @@ contract Pool is
         });
     }
      */
-
-    function getLabyrinthVersion() external view returns (uint64) {
-        return version;
-    }
 
     function getRevokerData(
         uint256 id

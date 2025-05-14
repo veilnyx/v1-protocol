@@ -1,4 +1,5 @@
 import hre from "hardhat";
+import { ethers, upgrades } from "hardhat";
 import { encodeFunctionData } from "viem";
 import { DeployContractConfig } from '@nomicfoundation/hardhat-viem/types';
 import { loadConfigs, ChainParams, CommonParams } from "./configs";
@@ -12,7 +13,7 @@ const poolProxyAbi = hre.artifacts.readArtifactSync("PoolProxy").abi;
 const existingPoolProxy = `0x0369cb46f2cbe32c775a2f00177d8dbf84fcb4af` as `0x${string}`; // devnet parallel pool proxy to test upgrade. @todo replace with real pool proxy address
 const verificationTrackerService = `0x${"75a4dA1697aF884c99724474d26F2EAe23cc58Bc"}` as `0x${string}`;
 const nebraVerifierSepolia = `0x${"3B946743DEB7B6C97F05B7a31B23562448047E3E"}` as `0x${string}`;
-const MEMPOOL_EXIT_FEES: bigint = BigInt(45_000_000_000_0000); // 500k gas @ 0.9 gwei = 0.00045 ETH
+const PROOF_SUB_MEMPOOL_EXIT_FEES: bigint = BigInt(75_000_000_000_0000); // 375k gas @ 2 gwei = 0.00075 ETH
 
 let client: any;
 let chainId: number;
@@ -41,8 +42,47 @@ const setup = async () => {
         }
     }
 }
+ 
+const deployMempoolProxy = async (pool: `0x${string}`, shieldedTransactionLogicAddr: `0x${string}`, gateway: `0x${string}`): Promise<`0x${string}`> => {
+    console.log("Starting to deploy new Mempool");
 
-const deployMempoolImplAndProxy = async (shieldedTransactionLogicAddr: `0x${string}`, assetLogicAddr: `0x${string}`, gateway: `0x${string}`) => {
+    // deploy MempoolValidator
+    const mempoolValidator = await hre.viem.deployContract("MempoolValidator", [], {
+        libraries: {
+            ShieldedTransactionLogic: shieldedTransactionLogicAddr
+        }
+    });
+    console.log("MempoolValidator deployed:", mempoolValidator.address);
+
+    // deploying using Hardhat Proxy deploy plugin
+    const mempoolImpl = await ethers.getContractFactory("Mempool", {
+        libraries: {
+            MempoolValidator: mempoolValidator.address
+        }
+    });
+
+    const args = [
+        pool,
+        PROOF_SUB_MEMPOOL_EXIT_FEES,
+        verificationTrackerService,
+        nebraVerifierSepolia,
+        gateway
+    ];
+
+    const mempoolProxy = await upgrades.deployProxy(mempoolImpl, args, {
+        kind: "uups",
+        unsafeAllow: ["external-library-linking"]
+    });
+
+    await mempoolProxy.waitForDeployment();
+    const mempoolProxyAddr = await mempoolProxy.getAddress();
+    console.log("MempoolProxy deployed:", mempoolProxyAddr);
+    return mempoolProxyAddr as `0x${string}`;
+}
+
+/**
+// @todo: use openzep upgrade plugin to upgrade the mempool proxy
+const deployMempoolProxy = async (shieldedTransactionLogicAddr: `0x${string}`, assetLogicAddr: `0x${string}`, gateway: `0x${string}`) => {
     console.log("Starting to deploy new Mempool");
     // const enumerableSet = await hre.viem.deployContract("EnumerableSet");
     // console.log("EnumerableSet deployed:", enumerableSet.address);
@@ -92,8 +132,9 @@ const deployMempoolImplAndProxy = async (shieldedTransactionLogicAddr: `0x${stri
     console.log("MempoolProxy deployed:", mempoolProxy.address);
     return mempoolProxy.address;
 }
+*/
 
-const deployPoolImpl = async (commonLibs: any) => {
+const upgradePool = async (poolProxy: `0x${string}`, commonLibs: any, reinitializeArgs: any) => {
     console.log("Starting to deploy new Pool");
     const eip712 = await hre.viem.deployContract("EIP712");
     console.log("EIP712 deployed:", eip712.address);
@@ -109,6 +150,26 @@ const deployPoolImpl = async (commonLibs: any) => {
     );
     console.log("ShieldedAddressLogic deployed:", shieldedAddress.address);
 
+    const poolLibraries = {
+        EIP712: eip712.address,
+        AssetLogic: commonLibs.asset,
+        MerkleTreeLogic: commonLibs.merkleTree,
+        QueuedMerkleTreeLogic: commonLibs.queuedMerkleTree,
+        ShieldedAddressLogic: shieldedAddress.address,
+        ShieldedTransactionLogic: commonLibs.shieldedTransaction,
+    };
+
+    const poolContractFactory = await ethers.getContractFactory("Pool", {
+        libraries: poolLibraries
+    });
+
+    await upgrades.upgradeProxy(poolProxy, poolContractFactory, {
+        call: { fn: 'reinitialize', args: [reinitializeArgs.mempoolProxyAddr, reinitializeArgs.verificationTrackerService] },
+        kind: "uups",
+        unsafeAllow: ["external-library-linking"]
+    })
+
+    /**
     const poolImpl = await hre.viem.deployContract("Pool", [], {
         libraries: {
             EIP712: eip712.address,
@@ -122,9 +183,26 @@ const deployPoolImpl = async (commonLibs: any) => {
     console.log("New Pool deployed:", poolImpl.address);
     /// @dev we dont have to again add assets/revokers/adaptorHandler/adaptor support in an upgrade as the state is retained in PoolProxy itself.
     return poolImpl.address;
+     */
 };
 
-const upgradePoolProxy = async (newPoolImpl: `0x${string}`) => {
+/**
+const upgradePoolProxy = async (newPoolImpl: `0x${string}`, mempool: `0x${string}`) => {
+
+    const newPoolImpl = await ethers.getContractFactory("Pool",)
+
+
+    // Create calldata for PoolImpl::reinitialize(address mempool_, address verificationTrackerService_)
+    const args = [
+        mempool,
+        verificationTrackerService
+    ];
+
+    const reinitializeCallData = encodeFunctionData({
+        abi: poolAbi,
+        functionName: "reinitialize",
+        args: args as any,
+    });
 
     // upgrade existing PoolProxy to point to the latest pool
     /// @notice the initData in the args should be 0x if PoolProxy does not need reinitialisation (as if case of no changes to the Pool proxy storage). The upgraded Pool will just continue to use the existing state of the PoolProxy as the state is managed there. Pool impl. is just a logic layer that functions in context of PoolProxy.
@@ -134,12 +212,13 @@ const upgradePoolProxy = async (newPoolImpl: `0x${string}`) => {
         address: existingPoolProxy,
         abi: poolAbi,
         functionName: "upgradeToAndCall",
-        args: [newPoolImpl, "0x"]
+        args: [newPoolImpl, reinitializeCallData]
     });
 
     const upgradeRct = await client.waitForTransactionReceipt({ hash: upgradeCallHash });
     console.log("rct:Labyrinth Upgraded!!!!!", upgradeRct.status);
 }
+*/
 
 const deployCommonLibs = async () => {
 
@@ -201,16 +280,18 @@ const main = async () => {
 
     // Mempool Proxy
     /// @dev The gateway contract address will be a zero addr, but will be updated using MempoolProxy::updateGatewayContract() function after the deployment of the ERC4337 infrastructure. This is due to a circular dependency between the mempool and the ERC4337 infrastructure. The mempool needs to be deployed first, and then the ERC4337 infrastructure can be deployed with Gateway => Mempool. Lastly, the mempool can be updated with the Gateway address.
-    const mempoolProxy = await deployMempoolImplAndProxy(commonLibs.shieldedTransaction, commonLibs.asset, "0x0000000000000000000000000000000000000000" as `0x${string}`);
+    const mempoolProxy = await deployMempoolProxy(existingPoolProxy, commonLibs.shieldedTransaction, "0x0000000000000000000000000000000000000000" as `0x${string}`);
 
     // ERC4337 infra
     const erc4337Contracts = await deployErc4337Infra(chainParams, existingPoolProxy, mempoolProxy, deployConfig);
 
     await updateGatewayInMempool(mempoolProxy, erc4337Contracts.gateway);
 
-    const newPoolImpl = await deployPoolImpl(commonLibs);
-
-    await upgradePoolProxy(newPoolImpl);
+    await upgradePool(existingPoolProxy, commonLibs, {
+        mempoolProxyAddr: mempoolProxy,
+        verificationTrackerService: verificationTrackerService
+    });
+    console.log("Pool upgraded successfully");
 }
 
 const upgradePoolOnly = async () => {
@@ -224,9 +305,12 @@ const upgradePoolOnly = async () => {
         shieldedTransaction: `0xb28096f5fe1463dd806947603d8269759b807c04` as `0x${string}`
     }
 
-    const newPoolImpl = await deployPoolImpl(commonLibs);
-    await upgradePoolProxy(newPoolImpl);
+    await upgradePool(existingPoolProxy, commonLibs, {
+        mempoolProxyAddr: mempoolProxy,
+        verificationTrackerService: verificationTrackerService
+    });
+    console.log("Pool upgraded successfully");
 }
 
-// main().catch((err) => { console.log(err) });
-upgradePoolOnly();
+main().catch((err) => { console.log(err) });
+// upgradePoolOnly();

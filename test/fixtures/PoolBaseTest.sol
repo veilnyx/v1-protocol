@@ -70,12 +70,12 @@ contract PoolBaseTest is BaseTest {
         mempool = _deployMempool();
 
         InitAddressParams memory initAddressParams = InitAddressParams({
-            mempool: address(mempool),
+            // mempool: address(mempool),
             verifier: address(verifier),
             adaptorHandler: address(adaptorHandler),
             screener: address(screener),
-            hasher: address(hasher),
-            verificationTrackerService: makeAddr('zkVerificationTrackerService')
+            hasher: address(hasher)
+            // verificationTrackerService: makeAddr('VerificationTrackerService')
         });
 
         bytes memory initData = abi.encodeCall(
@@ -91,6 +91,13 @@ contract PoolBaseTest is BaseTest {
 
         ERC1967Proxy poolProxy = new ERC1967Proxy(address(pool), initData);
         pool = MockPool(address(poolProxy));
+
+        /// @todo to be removed once reinitialize() is removed from Pool
+        pool.reinitialize(
+            address(mempool),
+            makeAddr("VerificationTrackerService")
+        );
+
         mempool.updatePoolAddress(address(pool));
     }
 
