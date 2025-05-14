@@ -9,7 +9,7 @@ const config = loadConfigs();
 const poolAbi = hre.artifacts.readArtifactSync("Pool").abi;
 const mempoolAbi = hre.artifacts.readArtifactSync("Mempool").abi;
 const poolProxyAbi = hre.artifacts.readArtifactSync("PoolProxy").abi;
-const existingPoolProxy = `0x${"587539aA53356b15bF919a38D1C8d28E844A1838"}` as `0x${string}`; // devnet parallel pool proxy to test upgrade. @todo replace with real pool proxy address
+const existingPoolProxy = `0x0369cb46f2cbe32c775a2f00177d8dbf84fcb4af` as `0x${string}`; // devnet parallel pool proxy to test upgrade. @todo replace with real pool proxy address
 const verificationTrackerService = `0x${"75a4dA1697aF884c99724474d26F2EAe23cc58Bc"}` as `0x${string}`;
 const nebraVerifierSepolia = `0x${"3B946743DEB7B6C97F05B7a31B23562448047E3E"}` as `0x${string}`;
 const MEMPOOL_EXIT_FEES: bigint = BigInt(45_000_000_000_0000); // 500k gas @ 0.9 gwei = 0.00045 ETH
@@ -124,21 +124,7 @@ const deployPoolImpl = async (commonLibs: any) => {
     return poolImpl.address;
 };
 
-const upgradePoolProxy = async (newPoolImpl: `0x${string}`, mempool: `0x${string}`, verificationTrackerService: `0x${string}`) => {
-    const currentVersion = 1;
-
-    // Create calldata for PoolImpl::reinitialize(address mempool_, address verificationTrackerService_)
-    const args = [
-        mempool,
-        verificationTrackerService,
-        (currentVersion + 1)
-    ];
-
-    const reinitializeCallData = encodeFunctionData({
-        abi: poolAbi,
-        functionName: "reinitialize",
-        args: args as any,
-    });
+const upgradePoolProxy = async (newPoolImpl: `0x${string}`) => {
 
     // upgrade existing PoolProxy to point to the latest pool
     /// @notice the initData in the args should be 0x if PoolProxy does not need reinitialisation (as if case of no changes to the Pool proxy storage). The upgraded Pool will just continue to use the existing state of the PoolProxy as the state is managed there. Pool impl. is just a logic layer that functions in context of PoolProxy.
@@ -148,7 +134,7 @@ const upgradePoolProxy = async (newPoolImpl: `0x${string}`, mempool: `0x${string
         address: existingPoolProxy,
         abi: poolAbi,
         functionName: "upgradeToAndCall",
-        args: [newPoolImpl, reinitializeCallData]
+        args: [newPoolImpl, "0x"]
     });
 
     const upgradeRct = await client.waitForTransactionReceipt({ hash: upgradeCallHash });
@@ -224,7 +210,23 @@ const main = async () => {
 
     const newPoolImpl = await deployPoolImpl(commonLibs);
 
-    await upgradePoolProxy(newPoolImpl, mempoolProxy, verificationTrackerService);
+    await upgradePoolProxy(newPoolImpl);
 }
 
-main().catch((err) => { console.log(err) });
+const upgradePoolOnly = async () => {
+    await setup();
+
+    const mempoolProxy = `0x9642346eE64cf65D67f324Ff7Ec24AfF903Fbe2d` as `0x${string}`;
+    const commonLibs = {
+        asset: `0x18c58a90d190953e0cb08c7075a5f4e7718616fe` as `0x${string}`,
+        merkleTree: `0x220c00d601a39da4f92873929295f0f70488fd2c` as `0x${string}`,
+        queuedMerkleTree: `0x77bd63353b2ef38eca6517585c727cb96ab64894` as `0x${string}`,
+        shieldedTransaction: `0xb28096f5fe1463dd806947603d8269759b807c04` as `0x${string}`
+    }
+
+    const newPoolImpl = await deployPoolImpl(commonLibs);
+    await upgradePoolProxy(newPoolImpl);
+}
+
+// main().catch((err) => { console.log(err) });
+upgradePoolOnly();

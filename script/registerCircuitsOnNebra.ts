@@ -64,5 +64,3 @@ export const registerCircuitsOnNebra = async () => {
     console.log("Transact21 circuit ID:", transact21CircuitId);
     console.log("Transact22 circuit ID:", transact22CircuitId);
 }
-
-registerCircuitsOnNebra().catch(console.error);

@@ -9,7 +9,7 @@ import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/U
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
-import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import {IPool} from "src/interfaces/IPool.sol";
 import {IMempool, PreVerificationDetails, Action} from "src/interfaces/IMempool.sol";
 import {MempoolStorage} from "src/base/MempoolStorage.sol";
@@ -23,9 +23,9 @@ import {INebraUpa} from "../interfaces/INebraUpa.sol";
 contract Mempool is
     Initializable,
     UUPSUpgradeable,
-    PausableUpgradeable,
     OwnableUpgradeable,
-    ReentrancyGuard,
+    ReentrancyGuardUpgradeable,
+    PausableUpgradeable,
     IMempool,
     MempoolStorage
 {
@@ -34,6 +34,11 @@ contract Mempool is
     using SafeERC20 for IERC20;
 
     uint8 public constant DROP_TX_PENALTY_PERC = 8; // 8% penalty on the mempool exit fee for dropping the STX from mempool
+
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
 
     function initialize(
         address pool_,
@@ -44,6 +49,7 @@ contract Mempool is
     ) public initializer {
         __Ownable_init(msg.sender);
         __UUPSUpgradeable_init();
+        __ReentrancyGuard_init();
         __Pausable_init();
         pool = IPool(pool_);
         proofSubAndMempoolExitFee = proofSubAndMempoolExitFee_;
