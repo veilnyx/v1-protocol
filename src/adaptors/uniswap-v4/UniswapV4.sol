@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.24;
+pragma solidity 0.8.26;
 
 // PoolSwapTest swapRouter = PoolSwapTest(0x01);
 import {PoolSwapTest} from "@uniswapV4/src/test/PoolSwapTest.sol";
 import {IPoolManager} from "@uniswapV4/src/interfaces/IPoolManager.sol";
+import {SwapParams} from "@uniswap/v4-core/src/types/PoolOperation.sol";
 import {IHooks} from "@uniswapV4/src/interfaces/IHooks.sol";
 import {PoolKey} from "@uniswapV4/src/types/PoolKey.sol";
 import {Currency, CurrencyLibrary} from "@uniswapV4/src/types/Currency.sol";
@@ -57,7 +58,7 @@ contract UniswapV4 is IUnlockCallback {
             hooks: IHooks(hookAddr)
         });
 
-        IPoolManager.SwapParams memory swapParams = IPoolManager.SwapParams({
+        SwapParams memory swapParams = SwapParams({
             zeroForOne: zeroForOne,
             amountSpecified: 1 ether,
             sqrtPriceLimitX96: zeroForOne ? MIN_PRICE_LIMIT : MAX_PRICE_LIMIT
@@ -94,11 +95,11 @@ contract UniswapV4 is IUnlockCallback {
 
         (
             PoolKey memory key,
-            IPoolManager.SwapParams memory params,
+            SwapParams memory params,
             bytes memory hookData
         ) = abi.decode(
                 swapParamsCalldata,
-                (PoolKey, IPoolManager.SwapParams, bytes)
+                (PoolKey, SwapParams, bytes)
             );
 
         BalanceDelta balDelta = poolManager.swap(key, params, hookData);
