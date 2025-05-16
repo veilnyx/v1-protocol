@@ -47,6 +47,7 @@
     "ts-node": "^10.9.2",
     "typescript": "^5.3.3",
     "v4-core": "github:Uniswap/v4-core",
+    "v4-periphery": "github:Uniswap/v4-periphery",
     "viem": "^2.19.7"
   }
 }
