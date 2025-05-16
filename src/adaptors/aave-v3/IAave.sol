@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-pragma solidity 0.8.24;
+pragma solidity 0.8.26;
 
 /// Interface for Aave Pool.
 /// ETH Sepolia addr: 0x6Ae43d3271ff6888e7Fc43Fd7321a503ff738951

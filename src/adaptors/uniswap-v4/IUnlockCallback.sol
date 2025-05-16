@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.24;
+pragma solidity 0.8.26;
 
 /// @notice Interface for the callback executed when an address unlocks the pool manager
 interface IUnlockCallback {

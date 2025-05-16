@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL
-pragma solidity 0.8.24;
+pragma solidity 0.8.26;
 
 interface IBeefyVault {
     /// @notice Returns the amount of "want" (i.e. underlying farm token) stored in the vault and strategy and yield source as an integer.

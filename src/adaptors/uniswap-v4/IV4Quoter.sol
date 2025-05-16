@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-pragma solidity 0.8.24;
+pragma solidity 0.8.26;
 
-import {PoolKey, Currency} from "./PoolKey.sol";
+import {PoolKey, Currency} from "@uniswap/v4-core/src/types/PoolKey.sol";
 
 /// @title V4 Quoter Interface
 /// @notice Supports quoting the delta amounts for exact input or exact output swaps.

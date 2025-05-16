@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-
-pragma solidity 0.8.24;
+pragma solidity 0.8.26;
 
 import {AdaptorBase} from "../../base/AdaptorBase.sol";
 import {Asset, AssetType} from "src/libraries/Asset.sol";

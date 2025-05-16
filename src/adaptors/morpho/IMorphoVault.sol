@@ -1,5 +1,5 @@
 // SPDX-LICENSE-Identifier: GPL-3.0
-pragma solidity 0.8.24;
+pragma solidity 0.8.26;
 
 /// @dev Morpho vaults are ERC-4626 compatible.
 /// @notice Vaults are the entrypoint for lenders who wish to lend loan token. Each vault will only accept a single `loan token`. Vaults then distribute the received `loan token` deposits to various underlying markets. This makes Morpho a very modular system based on a shared base layer.
