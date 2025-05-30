@@ -16,15 +16,23 @@ contract PoolDepositTest is PoolTest {
     }
 
     function test_weth_deposit() public {
-        uint256 deposit1 = 100 ether;
+        uint256 depositAmt = 100 ether;
         uint256 balance1 = token1.balanceOf(address(pool));
+        uint256 protocolFee = (PROTOCOL_FEE_BPS * depositAmt) / 10000;
 
         ShieldedTransaction memory stx = _loadShieldedTransaction(
             "deposit_weth_tx"
         );
         _checkEventEmits(stx);
 
-        assertEq(token1.balanceOf(address(pool)), balance1 + deposit1);
+        assertEq(
+            token1.balanceOf(address(pool)),
+            balance1 + depositAmt + protocolFee
+        );
+        assertEq(
+            token1.balanceOf(address(this)),
+            10000 ether - depositAmt - protocolFee
+        );
     }
 
     function test_deposit() public {

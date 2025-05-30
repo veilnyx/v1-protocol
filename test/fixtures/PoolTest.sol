@@ -36,6 +36,7 @@ contract PoolTest is PoolBaseTest, BaseScript {
     Asset public asset2;
 
     MerkleTree internal _helperTree;
+    uint16 public constant PROTOCOL_FEE_BPS = 15;
 
     bytes revokerMetaData = abi.encode("Revoker 1", "Organization 1");
 
@@ -145,6 +146,11 @@ contract PoolTest is PoolBaseTest, BaseScript {
             fixture.encryptionPublicKey,
             revokerMetaData
         );
+
+        pool.setDepositProtocolFee(PROTOCOL_FEE_BPS, true);
+        pool.setWithdrawProtocolFee(PROTOCOL_FEE_BPS, true);
+        pool.setTransferProtocolFee(PROTOCOL_FEE_BPS, true);
+        pool.setAdaptorProtocolFee(PROTOCOL_FEE_BPS, true);
 
         // Register a user - "sender"
         (, uint256 senderPk) = makeAddrAndKey("sender");
