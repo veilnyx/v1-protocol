@@ -70,6 +70,7 @@ interface IPool {
     error DuplicateRevoker(uint256[2] publicKey);
     error NoFeeToClaim(address paymaster, uint24 assetId);
     error InvalidSenderForPreverifiedSTX(address sender, address mempool);
+    error InvalidTransactionType();
 
     /////////////////////////////////////////
     //         ADMIN WRITE METHODS         //
@@ -113,7 +114,7 @@ interface IPool {
     /// @notice Can only be called by the owner.
     /// @param assetId The id of the asset for which the paymaster wants to claim the fee.
     /// @param to The address to which the fee will be transferred.
-    function withdrawProtocolFee(uint24 assetId, address to) external;
+    function withdrawCollectedProtocolFee(uint24 assetId, address to) external;
 
     /// @notice Updates the status of a revoker.
     /// @notice Can only be called by the owner.
@@ -125,7 +126,7 @@ interface IPool {
 
     /// @notice Sets the no. of bips (basis points: 1/10000) fee that is charged for withdrawing assets from the pool.
     /// @notice Can only be called by the owner.
-    function setWithdrawFeeBips(uint256 feeBips) external;
+    function setWithdrawProtocolFee(uint16 feeBips, bool isActive) external;
 
     /////////////////////////////////////////
     //        PUBLIC WRITE METHODS         //

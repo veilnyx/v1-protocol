@@ -6,6 +6,11 @@ import {QueuedMerkleTree} from "../libraries/QueuedMerkleTree.sol";
 import {Asset, AssetType} from "../libraries/Asset.sol";
 import {RevokerData} from "../libraries/ShieldedTransaction.sol";
 
+struct ProtocolFee {
+    uint16 bps; // since max deposit fee is 100% of the deposit amt, we can use uint16
+    bool isActive;
+}
+
 abstract contract PoolStorage {
     address public verifier;
     address public adaptorHandler;
@@ -32,6 +37,7 @@ abstract contract PoolStorage {
     mapping(uint256 => bool) internal _revokerPublicKeys;
     mapping(uint256 => RevokerData) internal _revokers;
 
+    /// todo To be removed after the migration to the new fee structure when deploying a fresh pool with state reset
     uint256 public withdrawFeeBps; // 1 bip = 1% / 100
     mapping(uint24 => uint256) internal _withdrawFees;
     mapping(address paymaster => mapping(uint24 assetId => uint256 feeAmount))
@@ -41,5 +47,8 @@ abstract contract PoolStorage {
     address public verificationTrackerService;
     mapping(uint24 => uint256) internal _proofSubAndMempoolExitFee;
 
-    uint64 public version;
+    ProtocolFee public depositProtocolFee;
+    ProtocolFee public withdrawProtocolFee;
+    ProtocolFee public transferProtocolFee;
+    ProtocolFee public adaptorProtocolFee;
 }
