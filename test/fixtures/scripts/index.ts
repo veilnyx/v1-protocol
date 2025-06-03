@@ -15,14 +15,14 @@ import {
 const main = async () => {
 	const { sdk, nebraClient } = await getSDKInstance();
 	await genTestDeposits(sdk);
-	await genTestTransfers(sdk);
+	// await genTestTransfers(sdk);
 	// await genTransferPackedUserOp(sdk, nebraClient);
 	// await genTransferPackedUserOpPreVerified(sdk, nebraClient);
 	// await genAddressRegistrations(sdk);
 	// await genAddrRegWithOutsourceProofVerification(sdk, nebraClient);
 	// await genTestDepositsWithOutsourceProofVerification(sdk, nebraClient);
 	// await genTestTransfersWithOutsourceProofVerification(sdk, nebraClient);
-	// await genTestWithdrawals(sdk);
+	await genTestWithdrawals(sdk);
 	// await genTestCallAdaptors(sdk);
 	// await genTreeUpdateData(sdk);
 	// await genTreeUpdateDataWithPartialQueue(sdk);

@@ -19,17 +19,13 @@ contract PoolWithdrawTest is PoolTest {
             "withdraw_100_weth_without_fee"
         );
 
-        uint256 feeBps = pool.withdrawFeeBps();
-
         uint224 withdrawAmt = uint224(stx.pubAssets[0]);
-        uint256 balanceAfter = balance1 -
-            withdrawAmt +
-            (withdrawAmt * feeBps) /
-            10000;
 
+        uint256 balanceAfter = balance1 - withdrawAmt;
         _checkEventEmits(stx);
 
         assertEq(token1.balanceOf(address(pool)), balanceAfter);
+        assert(pool.getCollectedWithdrawFee(asset1.id) > 0);
     }
 
     function test_withdrawWethWithWethFee() public {
@@ -40,7 +36,7 @@ contract PoolWithdrawTest is PoolTest {
             "withdraw_10_weth_with_weth_fee"
         );
         uint224 withdrawAmt = uint224(stx.pubAssets[0]);
-        uint256 feeBps = pool.withdrawFeeBps();
+        uint256 feeBps = pool.getProtocolFee(stx.txType);
         uint72 feeValue = uint72(stx.feeData);
 
         _checkEventEmits(stx);
@@ -62,7 +58,7 @@ contract PoolWithdrawTest is PoolTest {
             "withdraw_10_weth_with_usdc_fee"
         );
         uint224 withdrawAmt = uint224(stx.pubAssets[0]);
-        uint256 feeBps = pool.withdrawFeeBps();
+        uint256 feeBps = pool.getProtocolFee(stx.txType);
         uint72 feeValue = uint72(stx.feeData);
         address paymaster = address(bytes20(bytes32(stx.feeData)));
 

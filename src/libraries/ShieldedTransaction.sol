@@ -161,7 +161,7 @@ library ShieldedTransactionLogic {
             address verifier,
             uint16 protocolFeeBps
         ) = _unpackValidationParams(packedValidationParams);
-        
+
         if (!revokerData.isActive) {
             revert IPool.InvalidRevoker(stx.revokerId);
         }
@@ -733,7 +733,7 @@ library ShieldedTransactionLogic {
                 assets: assets,
                 to: to,
                 assetId: pubAssets[i].id,
-                value: pubAssets[i].value - fee
+                value: pubAssets[i].value
             });
 
             if (fee != 0) {

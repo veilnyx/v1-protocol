@@ -208,8 +208,8 @@ contract PoolTest is PoolBaseTest, BaseScript {
 
     function _makePreDeposit() internal {
         // Deposit 10000 WETH and 10000 USDC
-        uint256 deposit1 = 10000 ether;
-        uint256 deposit2 = 10000e6;
+        uint256 deposit1 = 10_000 ether;
+        uint256 deposit2 = 10_000e6;
         _mintAsset(asset1, address(this), deposit1);
         _mintAsset(asset2, address(this), deposit2);
         _approveAsset(asset1, address(pool), deposit1);
