@@ -10,6 +10,17 @@ const {
 } = fixture;
 
 export const reqs = {
+	transfer_20_weth_without_fee: {
+		type: TransactionType.TRANSFER,
+		assetIds: [weth],
+		values: [parseEther("20")],
+		feeAssetId: 0,
+		to: receiverAccount.shieldedAddress.pack(),
+		viaBundler: false,
+		paymaster: zeroAddress,
+		revokerId: 0,
+	}
+	/**,
 	transfer_20_weth_with_weth_fee: {
 		type: TransactionType.TRANSFER,
 		assetIds: [weth],
@@ -19,17 +30,6 @@ export const reqs = {
 		paymaster:
 			`0x${"C141A1Fc167930FA8E1448BdC7Cea9C7a13C1021"}` as `0x${string}`, // make sure this matches the Paymaster address from solidity test setup
 		feeAssetId: weth,
-		revokerId: 0,
-	}
-	/**,
-	transfer_20_weth_without_fee: {
-		type: TransactionType.TRANSFER,
-		assetIds: [weth],
-		values: [parseEther("20")],
-		feeAssetId: 0,
-		to: receiverAccount.shieldedAddress.pack(),
-		viaBundler: false,
-		paymaster: zeroAddress,
 		revokerId: 0,
 	},
 	transfer_500_weth_with_weth_fee: {
@@ -58,7 +58,7 @@ export const reqs = {
 };
 
 export const genTestTransfers = async (sdk: Core) => {
-	await mockNotes("deposit_weth_tx", sdk);
+	await mockNotes("deposit_pre_tx", sdk);
 	await generateTestTransactions(reqs, sdk);
 };
 

@@ -15,7 +15,7 @@ import {
 const main = async () => {
 	const { sdk, nebraClient } = await getSDKInstance();
 	await genTestDeposits(sdk);
-	// await genTestTransfers(sdk);
+	await genTestTransfers(sdk);
 	// await genTransferPackedUserOp(sdk, nebraClient);
 	// await genTransferPackedUserOpPreVerified(sdk, nebraClient);
 	// await genAddressRegistrations(sdk);

@@ -10,6 +10,17 @@ const {
 } = fixture;
 
 export const reqs = {
+  deposit_pre_tx: {
+    type: TransactionType.DEPOSIT,
+    assetIds: [weth, usdc],
+    values: [parseEther("1000"), parseUnits("1000", 6)],
+    feeAssetId: 0,
+    to: senderAccount.shieldedAddress.pack(),
+    viaBundler: false,
+    paymaster: zeroAddress,
+    revokerId: 0,
+  }
+  /**
   deposit_weth_tx: {
     type: TransactionType.DEPOSIT,
     assetIds: [weth],
@@ -19,19 +30,8 @@ export const reqs = {
     viaBundler: false,
     paymaster: zeroAddress,
     revokerId: 0,
-  }
-  /**,
- deposit_pre_tx: {
-   type: TransactionType.DEPOSIT,
-   assetIds: [weth, usdc],
-   values: [parseEther("10000"), parseUnits("10000", 6)],
-   feeAssetId: 0,
-   to: senderAccount.shieldedAddress.pack(),
-   viaBundler: false,
-   paymaster: zeroAddress,
-   revokerId: 0,
- },
- deposit_aaveWeth_testnetUsdc: {
+  },
+  deposit_aaveWeth_testnetUsdc: {
    type: TransactionType.DEPOSIT,
    assetIds: [testnetWeth, testnetUsdc],
    values: [parseEther("2"), parseUnits("10", 6)],

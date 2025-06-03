@@ -225,9 +225,9 @@ contract PoolTest is PoolBaseTest, BaseScript {
         // Process the batch
         uint8 depth = fixture.commitmentTreeDepth;
         _helperTree.init(depth, address(hasher));
-        (uint256[] memory leaves, , , , ) = pool.getCommitmentTreeState();
-        for (uint256 i = 0; i < leaves.length; ++i) {
-            _helperTree.insert(leaves[i]);
+        (uint256[] memory queuedLeaves, , , , ) = pool.getCommitmentTreeState();
+        for (uint256 i = 0; i < queuedLeaves.length; ++i) {
+            _helperTree.insert(queuedLeaves[i]);
         }
 
         (uint256[] memory lastSubtrees, uint256 lastRoot, , ) = _helperTree
