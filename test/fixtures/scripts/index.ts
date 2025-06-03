@@ -22,8 +22,8 @@ const main = async () => {
 	// await genAddrRegWithOutsourceProofVerification(sdk, nebraClient);
 	// await genTestDepositsWithOutsourceProofVerification(sdk, nebraClient);
 	// await genTestTransfersWithOutsourceProofVerification(sdk, nebraClient);
-	await genTestWithdrawals(sdk);
-	// await genTestCallAdaptors(sdk);
+	// await genTestWithdrawals(sdk);
+	await genTestCallAdaptors(sdk);
 	// await genTreeUpdateData(sdk);
 	// await genTreeUpdateDataWithPartialQueue(sdk);
 };
