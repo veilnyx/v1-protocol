@@ -79,44 +79,44 @@ contract MockLabyrinthLimitOrderHook is IHooks, ERC1155, IERC1155Receiver {
     // IMPLEMENTING ALL IHOOKS METHODS
     //=======================================
 
-    function afterInitialize(address sender, PoolKey calldata key, uint160 sqrtPriceX96, int24 tick) external override returns (bytes4) {
+    function afterInitialize(address, PoolKey calldata key, uint160, int24 tick) external override returns (bytes4) {
         lastTicks[toId(key)] = tick;
         return IHooks.afterInitialize.selector;
     }
 
-    function afterSwap(address sender, PoolKey calldata key, SwapParams calldata params, BalanceDelta delta, bytes calldata hookData) external override returns (bytes4, int128) {
+    function afterSwap(address, PoolKey calldata, SwapParams calldata, BalanceDelta, bytes calldata) external pure override returns (bytes4, int128) {
         return (IHooks.afterSwap.selector, 0);
     }
 
-    function beforeInitialize(address sender, PoolKey calldata key, uint160 sqrtPriceX96) external override returns (bytes4) {
+    function beforeInitialize(address, PoolKey calldata, uint160) external pure override returns (bytes4) {
         return IHooks.beforeInitialize.selector;
     }
     
-    function beforeAddLiquidity(address sender, PoolKey calldata key, ModifyLiquidityParams calldata params, bytes calldata hookData) external override returns (bytes4) {
+    function beforeAddLiquidity(address, PoolKey calldata, ModifyLiquidityParams calldata, bytes calldata) external pure override returns (bytes4) {
         return IHooks.beforeAddLiquidity.selector;
     }
 
-    function afterAddLiquidity(address sender, PoolKey calldata key, ModifyLiquidityParams calldata params, BalanceDelta delta, BalanceDelta feesAccrued, bytes calldata hookData) external override returns (bytes4, BalanceDelta) {
+    function afterAddLiquidity(address, PoolKey calldata, ModifyLiquidityParams calldata, BalanceDelta, BalanceDelta, bytes calldata) external pure override returns (bytes4, BalanceDelta) {
         return (IHooks.afterAddLiquidity.selector, BalanceDelta.wrap(0));
     }
     
-    function beforeRemoveLiquidity(address sender, PoolKey calldata key, ModifyLiquidityParams calldata params, bytes calldata hookData) external override returns (bytes4) {
+    function beforeRemoveLiquidity(address, PoolKey calldata, ModifyLiquidityParams calldata, bytes calldata) external pure override returns (bytes4) {
         return IHooks.beforeRemoveLiquidity.selector;
     }
 
-    function afterRemoveLiquidity(address sender, PoolKey calldata key, ModifyLiquidityParams calldata params, BalanceDelta delta, BalanceDelta feesAccrued, bytes calldata hookData) external override returns (bytes4, BalanceDelta) {
+    function afterRemoveLiquidity(address, PoolKey calldata, ModifyLiquidityParams calldata, BalanceDelta, BalanceDelta, bytes calldata) external pure override returns (bytes4, BalanceDelta) {
         return (IHooks.afterRemoveLiquidity.selector, BalanceDelta.wrap(0));
     }
 
-    function beforeSwap(address sender, PoolKey calldata key, SwapParams calldata params, bytes calldata hookData) external override returns (bytes4, BeforeSwapDelta, uint24) {
+    function beforeSwap(address, PoolKey calldata, SwapParams calldata, bytes calldata) external pure override returns (bytes4, BeforeSwapDelta, uint24) {
         return (IHooks.beforeSwap.selector, BeforeSwapDelta.wrap(0), 0);
     }
     
-    function beforeDonate(address sender, PoolKey calldata key, uint256 amount0, uint256 amount1, bytes calldata hookData) external override returns (bytes4) {
+    function beforeDonate(address, PoolKey calldata, uint256, uint256, bytes calldata) external pure override returns (bytes4) {
         return IHooks.beforeDonate.selector;
     }
     
-    function afterDonate(address sender, PoolKey calldata key, uint256 amount0, uint256 amount1, bytes calldata hookData) external override returns (bytes4) {
+    function afterDonate(address, PoolKey calldata, uint256, uint256, bytes calldata) external pure override returns (bytes4) {
         return IHooks.afterDonate.selector;
     }
     

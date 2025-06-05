@@ -18,7 +18,7 @@ contract MockPoolManager is IPoolManager {
     }
 
     // Override the hook validation function
-    function isValidHookAddress(IHooks hooks) internal pure returns (bool) {
+    function isValidHookAddress(IHooks) internal pure returns (bool) {
         return true;
     }
 
@@ -33,12 +33,11 @@ contract MockPoolManager is IPoolManager {
         
         return 0;
     }
-
+ 
     function swap(PoolKey memory key, SwapParams memory params, bytes calldata) 
         external override returns (BalanceDelta) 
     {
         int128 amount0 = params.zeroForOne ? -int128(uint128(uint256(-params.amountSpecified))) : int128(uint128(uint256(-params.amountSpecified)/2));
-        int128 amount1 = params.zeroForOne ? int128(uint128(uint256(-params.amountSpecified)/2)) : -int128(uint128(uint256(-params.amountSpecified)));
         
         BalanceDelta delta = BalanceDelta.wrap(int256(amount0));
         
@@ -75,17 +74,17 @@ contract MockPoolManager is IPoolManager {
     function updateDynamicLPFee(PoolKey memory, uint24) external pure override {}
 
     function collectProtocolFees(address, Currency, uint256) external pure override returns (uint256) { return 0; }
-    function protocolFeeController() external view override returns (address) { return address(0); }
-    function protocolFeesAccrued(Currency) external view override returns (uint256) { return 0; }
+    function protocolFeeController() external pure override returns (address) { return address(0); }
+    function protocolFeesAccrued(Currency) external pure override returns (uint256) { return 0; }
     
     function setProtocolFee(PoolKey memory key, uint24 newProtocolFee) external pure override {}
     
     function setProtocolFeeController(address) external pure override {}
 
-    function balanceOf(address, uint256) external view override returns (uint256) { return 0; }
-    function allowance(address, address, uint256) external view override returns (uint256) { return 0; }
+    function balanceOf(address, uint256) external pure override returns (uint256) { return 0; }
+    function allowance(address, address, uint256) external pure override returns (uint256) { return 0; }
     function approve(address, uint256, uint256) external pure override returns (bool) { return true; }
-    function isOperator(address, address) external view override returns (bool) { return false; }
+    function isOperator(address, address) external pure override returns (bool) { return false; }
     function setOperator(address, bool) external pure override returns (bool) { return true; }
     function transfer(address, uint256, uint256) external pure override returns (bool) { return true; }
     function transferFrom(address, address, uint256, uint256) external pure override returns (bool) { return true; }
@@ -93,17 +92,17 @@ contract MockPoolManager is IPoolManager {
     function extsload(bytes32) external view override returns (bytes32) { return bytes32(0); }
     function extsload(bytes32[] calldata) external view override returns (bytes32[] memory) { return new bytes32[](0); }
     
-    function extsload(bytes32 startSlot, uint256 nSlots) external view override returns (bytes32[] memory) { 
+    function extsload(bytes32, uint256) external pure override returns (bytes32[] memory) { 
         return new bytes32[](0); 
     }
     
     function exttload(bytes32) external view override returns (bytes32) { return bytes32(0); }
     
-    function exttload(bytes32[] calldata slots) external view override returns (bytes32[] memory) { 
+    function exttload(bytes32[] calldata) external pure override returns (bytes32[] memory) { 
         return new bytes32[](0); 
     }
     
-    function exttsload(bytes32 slot) external view returns (bytes32) { return bytes32(0); }
+    function exttsload(bytes32) external pure returns (bytes32) { return bytes32(0); }
     
     function unlock(bytes calldata) external pure override returns (bytes memory) { return bytes(""); }
 }
