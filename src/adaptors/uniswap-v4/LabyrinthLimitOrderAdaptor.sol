@@ -21,6 +21,7 @@ contract LabyrinthLimitOrderAdaptor is AdaptorBase {
         bool zeroForOne;
         PoolKey key;
         int24 tickToSellAt;
+        address recipient;
     }
 
     LabyrinthLimitOrderHook public hook;
@@ -55,9 +56,9 @@ contract LabyrinthLimitOrderAdaptor is AdaptorBase {
         
         LimitOrderParams memory params;
         
-        (params.action, params.inputToken, params.outputToken, params.limitPrice, params.amount, params.zeroForOne, params.key) = abi.decode(
+        (params.action, params.inputToken, params.outputToken, params.limitPrice, params.amount, params.zeroForOne, params.key, params.recipient) = abi.decode(
             payload,
-            (Action, address, address, uint256, uint256, bool, PoolKey)
+            (Action, address, address, uint256, uint256, bool, PoolKey, address)
         );
         
         // Calculate tick from price
@@ -84,7 +85,7 @@ contract LabyrinthLimitOrderAdaptor is AdaptorBase {
     ) private returns (uint24[] memory outAssetIds, uint256[] memory outValues) {
         require(inputValue >= params.amount, "Insufficient input");
         erc20.approve(address(hook), params.amount);
-        hook.placeOrder(params.key, params.tickToSellAt, params.zeroForOne, params.amount);
+        hook.placeOrder(params.key, params.tickToSellAt, params.zeroForOne, params.amount, params.recipient);
         // No output asset for PlaceOrder
         outAssetIds = new uint24[](0);
         outValues = new uint256[](0);

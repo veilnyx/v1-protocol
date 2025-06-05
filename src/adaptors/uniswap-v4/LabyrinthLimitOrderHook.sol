@@ -126,17 +126,18 @@ contract LabyrinthLimitOrderHook is BaseHook, ERC1155 {
         PoolKey calldata key,
         int24 tickToSellAt,
         bool zeroForOne,
-        uint256 inputAmount
+        uint256 inputAmount,
+        address recipient
     ) external returns (int24) {
         // Get lower actually usable tick given `tickToSellAt`
         int24 tick = getLowerUsableTick(tickToSellAt, key.tickSpacing);
         // Create a pending order
         pendingOrders[key.toId()][tick][zeroForOne] += inputAmount;
 
-        // Mint claim tokens to user equal to their `inputAmount`
+        // Mint claim tokens to recipient equal to their `inputAmount`
         uint256 orderId = getOrderId(key, tick, zeroForOne);
         claimTokensSupply[orderId] += inputAmount;
-        _mint(msg.sender, orderId, inputAmount, "");
+        _mint(recipient, orderId, inputAmount, "");
 
         // Depending on direction of swap, we select the proper input token
         // and request a transfer of those tokens to the hook contract
