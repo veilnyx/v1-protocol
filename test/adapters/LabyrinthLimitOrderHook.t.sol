@@ -25,17 +25,14 @@ import {ERC1155Holder} from "@openzeppelin/contracts/token/ERC1155/utils/ERC1155
 import {LabyrinthLimitOrderHook} from "../../src/adaptors/uniswap-v4/LabyrinthLimitOrderHook.sol";
 
 contract LabyrinthLimitOrderHookTest is Test, Deployers, ERC1155Holder {
-    // Use the libraries
     using StateLibrary for IPoolManager;
 
-    // The two currencies (tokens) from the pool
     Currency token0;
     Currency token1;
 
     LabyrinthLimitOrderHook hook;
 
     function setUp() public {
-        // Deploy v4 core contracts
         deployFreshManagerAndRouters();
 
         // Deploy two test tokens
@@ -115,7 +112,7 @@ contract LabyrinthLimitOrderHookTest is Test, Deployers, ERC1155Holder {
         uint256 originalBalance = token0.balanceOfSelf();
 
         // Place the order
-        int24 tickLower = hook.placeOrder(key, tick, zeroForOne, amount);
+        int24 tickLower = hook.placeOrder(key, tick, zeroForOne, amount, address(this));
 
         // Note the new balance of token0 we have
         uint256 newBalance = token0.balanceOfSelf();
@@ -145,7 +142,7 @@ contract LabyrinthLimitOrderHookTest is Test, Deployers, ERC1155Holder {
         bool zeroForOne = true;
 
         uint256 originalBalance = token0.balanceOfSelf();
-        int24 tickLower = hook.placeOrder(key, tick, zeroForOne, amount);
+        int24 tickLower = hook.placeOrder(key, tick, zeroForOne, amount, address(this));
         uint256 newBalance = token0.balanceOfSelf();
 
         assertEq(tickLower, 60);
@@ -156,7 +153,6 @@ contract LabyrinthLimitOrderHookTest is Test, Deployers, ERC1155Holder {
         uint256 tokenBalance = hook.balanceOf(address(this), orderId);
         assertEq(tokenBalance, amount);
 
-        // Cancel the order
         hook.cancelOrder(key, tickLower, zeroForOne, amount);
 
         // Check that we received our token0 tokens back, and no longer own any ERC-1155 tokens
@@ -173,7 +169,7 @@ contract LabyrinthLimitOrderHookTest is Test, Deployers, ERC1155Holder {
         bool zeroForOne = true;
 
         // Place our order at tick 100 for 10e18 token0 tokens
-        int24 tickLower = hook.placeOrder(key, tick, zeroForOne, amount);
+        int24 tickLower = hook.placeOrder(key, tick, zeroForOne, amount, address(this));
 
         // Do a separate swap from oneForZero to make tick go up
         // Sell 1e18 token1 tokens for token0 tokens
@@ -221,7 +217,7 @@ contract LabyrinthLimitOrderHookTest is Test, Deployers, ERC1155Holder {
         bool zeroForOne = false;
 
         // Place our order at tick -100 for 10e18 token1 tokens
-        int24 tickLower = hook.placeOrder(key, tick, zeroForOne, amount);
+        int24 tickLower = hook.placeOrder(key, tick, zeroForOne, amount, address(this));
 
         // Do a separate swap from zeroForOne to make tick go down
         // Sell 1e18 token0 tokens for token1 tokens
@@ -265,11 +261,10 @@ contract LabyrinthLimitOrderHookTest is Test, Deployers, ERC1155Holder {
         PoolSwapTest.TestSettings memory testSettings = PoolSwapTest
             .TestSettings({takeClaims: false, settleUsingBurn: false});
 
-        // Setup two zeroForOne orders at ticks 0 and 60
         uint256 amount = 0.01 ether;
 
-        hook.placeOrder(key, 0, true, amount);
-        hook.placeOrder(key, 60, true, amount);
+        hook.placeOrder(key, 0, true, amount, address(this));
+        hook.placeOrder(key, 60, true, amount, address(this));
 
         (, int24 currentTick, , ) = manager.getSlot0(key.toId());
         assertEq(currentTick, 0);
@@ -295,18 +290,16 @@ contract LabyrinthLimitOrderHookTest is Test, Deployers, ERC1155Holder {
         tokensLeftToSell = hook.pendingOrders(key.toId(), 60, true);
         assertEq(tokensLeftToSell, amount);
     }
-
+ 
     function test_multiple_orderExecute_zeroForOne_both() public {
         PoolSwapTest.TestSettings memory testSettings = PoolSwapTest
             .TestSettings({takeClaims: false, settleUsingBurn: false});
 
-        // Setup two zeroForOne orders at ticks 0 and 60
         uint256 amount = 0.01 ether;
 
-        hook.placeOrder(key, 0, true, amount);
-        hook.placeOrder(key, 60, true, amount);
+        hook.placeOrder(key, 0, true, amount, address(this));
+        hook.placeOrder(key, 60, true, amount, address(this));
 
-        // Do a swap to make tick increase
         SwapParams memory params = SwapParams({
             zeroForOne: false,
             amountSpecified: -0.5 ether,
