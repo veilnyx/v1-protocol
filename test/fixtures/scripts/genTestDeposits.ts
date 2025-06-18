@@ -10,10 +10,10 @@ const {
 } = fixture;
 
 export const reqs = {
-  deposit_2_testnet_weth: {
+  deposit_pre_tx: {
     type: TransactionType.DEPOSIT,
-    assetIds: [testnetWeth],
-    values: [parseEther("2")],
+    assetIds: [weth, usdc],
+    values: [parseEther("1000"), parseUnits("1000", 6)],
     feeAssetId: 0,
     to: senderAccount.shieldedAddress.pack(),
     viaBundler: false,
@@ -21,10 +21,10 @@ export const reqs = {
     revokerId: 0,
   }
   /**,
-  deposit_pre_tx: {
+  deposit_2_testnet_weth: {
     type: TransactionType.DEPOSIT,
-    assetIds: [weth, usdc],
-    values: [parseEther("1000"), parseUnits("1000", 6)],
+    assetIds: [testnetWeth],
+    values: [parseEther("2")],
     feeAssetId: 0,
     to: senderAccount.shieldedAddress.pack(),
     viaBundler: false,

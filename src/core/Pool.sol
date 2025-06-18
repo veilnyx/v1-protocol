@@ -259,6 +259,7 @@ contract Pool is
 
         uint16 protocolFeeBps = _getProtocolFeeBps(stx.txType);
 
+        // to avoid stack too deep error, we pack the validation params into a single bytes32.
         bytes32 packedValidationParams = _packValidationParams(
             isPreVerified,
             verifier,

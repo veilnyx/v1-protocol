@@ -230,7 +230,7 @@ library ShieldedTransactionLogic {
                 assets,
                 withdrawFees,
                 params.pubAssets,
-                params.target,
+                adaptorHandler,
                 protocolFeeBps
             );
         }
@@ -836,7 +836,9 @@ library ShieldedTransactionLogic {
             // Extract last 28 bytes value
             params.pubAssets[i].value = uint224(stx.pubAssets[i]);
 
-            /// @dev since feeAsset pushed into pubAssets, for transfer tx, the pubAssets value will become 0, but thats fine as pubAssets is not used in transfer tx. Only used in other types tx to move assets.
+            /// @dev since paymaster fee (`feeAsset`) is pushed into pubAssets by the UTXO algo, we remove the paymaster fee component from `pubAssets` to arrive at the actual tx values before transferring assets. This means for:
+            /// 1: Depost tx, there is no paymaster fee involved, so `feeValue` will be 0 and `pubAssets` will remain unchanged.
+            /// 2: Transfer tx, the `pubAssets` value will become 0, but thats fine as no transfer of `pubAssets` happen for transfer tx.
             if (params.pubAssets[i].id == params.feeAssetId) {
                 params.pubAssets[i].value =
                     params.pubAssets[i].value -
