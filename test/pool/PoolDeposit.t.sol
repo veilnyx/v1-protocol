@@ -16,29 +16,47 @@ contract PoolDepositTest is PoolTest {
     }
 
     function test_weth_deposit() public {
-        uint256 deposit1 = 100 ether;
+        uint256 depositAmt = 100 ether;
         uint256 balance1 = token1.balanceOf(address(pool));
+        uint256 protocolFee = (PROTOCOL_FEE_BPS * depositAmt) / 10000;
 
         ShieldedTransaction memory stx = _loadShieldedTransaction(
             "deposit_weth_tx"
         );
         _checkEventEmits(stx);
 
-        assertEq(token1.balanceOf(address(pool)), balance1 + deposit1);
+        assertEq(
+            token1.balanceOf(address(pool)),
+            balance1 + depositAmt + protocolFee
+        );
+        assertEq(
+            token1.balanceOf(address(this)),
+            10000 ether - depositAmt - protocolFee
+        );
     }
 
     function test_deposit() public {
-        uint256 deposit1 = 10000 ether;
-        uint256 deposit2 = 10000e6;
+        uint256 deposit1 = 1000 ether;
+        uint256 deposit2 = 1000e6;
         uint256 balance1 = token1.balanceOf(address(pool));
         uint256 balance2 = token2.balanceOf(address(pool));
+
+        uint256 protocolFee1 = (PROTOCOL_FEE_BPS * deposit1) / 10000;
+        uint256 protocolFee2 = (PROTOCOL_FEE_BPS * deposit2) / 10000;
+
         ShieldedTransaction memory stx = _loadShieldedTransaction(
             "deposit_pre_tx"
         );
         _checkEventEmits(stx);
 
-        assertEq(token1.balanceOf(address(pool)), balance1 + deposit1);
-        assertEq(token2.balanceOf(address(pool)), balance2 + deposit2);
+        assertEq(
+            token1.balanceOf(address(pool)),
+            balance1 + deposit1 + protocolFee1
+        );
+        assertEq(
+            token2.balanceOf(address(pool)),
+            balance2 + deposit2 + protocolFee2
+        );
     }
 
     function test_revertOnDoubleSpendDeposit() external {

@@ -36,6 +36,7 @@ contract PoolTest is PoolBaseTest, BaseScript {
     Asset public asset2;
 
     MerkleTree internal _helperTree;
+    uint16 public constant PROTOCOL_FEE_BPS = 15;
 
     bytes revokerMetaData = abi.encode("Revoker 1", "Organization 1");
 
@@ -146,6 +147,11 @@ contract PoolTest is PoolBaseTest, BaseScript {
             revokerMetaData
         );
 
+        pool.setDepositProtocolFee(PROTOCOL_FEE_BPS, true);
+        pool.setWithdrawProtocolFee(PROTOCOL_FEE_BPS, true);
+        pool.setTransferProtocolFee(PROTOCOL_FEE_BPS, true);
+        pool.setAdaptorProtocolFee(PROTOCOL_FEE_BPS, true);
+
         // Register a user - "sender"
         (, uint256 senderPk) = makeAddrAndKey("sender");
         bytes memory signature = _getRegisterAddressSignature(
@@ -202,8 +208,8 @@ contract PoolTest is PoolBaseTest, BaseScript {
 
     function _makePreDeposit() internal {
         // Deposit 10000 WETH and 10000 USDC
-        uint256 deposit1 = 10000 ether;
-        uint256 deposit2 = 10000e6;
+        uint256 deposit1 = 10_000 ether;
+        uint256 deposit2 = 10_000e6;
         _mintAsset(asset1, address(this), deposit1);
         _mintAsset(asset2, address(this), deposit2);
         _approveAsset(asset1, address(pool), deposit1);
@@ -219,9 +225,9 @@ contract PoolTest is PoolBaseTest, BaseScript {
         // Process the batch
         uint8 depth = fixture.commitmentTreeDepth;
         _helperTree.init(depth, address(hasher));
-        (uint256[] memory leaves, , , , ) = pool.getCommitmentTreeState();
-        for (uint256 i = 0; i < leaves.length; ++i) {
-            _helperTree.insert(leaves[i]);
+        (uint256[] memory queuedLeaves, , , , ) = pool.getCommitmentTreeState();
+        for (uint256 i = 0; i < queuedLeaves.length; ++i) {
+            _helperTree.insert(queuedLeaves[i]);
         }
 
         (uint256[] memory lastSubtrees, uint256 lastRoot, , ) = _helperTree

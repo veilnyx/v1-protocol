@@ -32,7 +32,6 @@ import { Core } from "@labyrinthac/core";
 import { ZTransaction, PreVerification, PreVerificationDetails } from "@labyrinthac/zk-prover";
 import { Note, SIZE_ENCRYPTED_DECRYPTION_KEY, SIZE_FULLY_ENCRYPTED_NOTE_DATA } from "@labyrinthac/transaction";
 import config from "../config.json";
-import { register } from "module";
 
 const senderSeed = BigInt(config.sender.seed);
 const receiverSeed = BigInt(config.receiver.seed);
@@ -122,7 +121,7 @@ export const generateTestTransaction = async (
   const tx = await sdk.createTransaction(req, opts);
   // console.log("TX: ", tx);
   const signedTx = await sdk.signTransaction(tx);
-  const ztx = await sdk.proveTransaction(signedTx);
+  const ztx = await sdk.proveTransaction(signedTx, req);
   console.log("ZTX:", ztx);
   const encoded = ztx.encode();
   writeFileSync(`${dirFixtureData}/${name}.txt`, encoded);
@@ -154,7 +153,7 @@ export const generateTestTransactionWithOutsourcedProofVerification = async (
   const tx = await sdk.createTransaction(req, opts);
   // console.log("TX: ", tx);
   const signedTx = await sdk.signTransaction(tx);
-  const { ztx: preVerifiedTx, preVerification, nebraProofSubmissionObj } = await sdk.proveOutsourcedVerificationTx(signedTx, nebraClient);
+  const { ztx: preVerifiedTx, preVerification, nebraProofSubmissionObj } = await sdk.proveOutsourcedVerificationTx(signedTx, req, nebraClient);
 
   // console.log("ZTX:", preVerifiedTx);
   const encoded = preVerifiedTx.encode();
@@ -323,12 +322,13 @@ export const generatePackedUserOps = async (name: string, req: TransactionReques
   if (isPreVerified) {
     const { ztx: preVerifiedTx, preVerification: preVerification_, } = await sdk.proveOutsourcedVerificationTx(
       tx,
+      req,
       nebraClient
     );
     ztx = preVerifiedTx;
     preVerification = preVerification_;
   } else {
-    ztx = await sdk.proveTransaction(signedTx);
+    ztx = await sdk.proveTransaction(signedTx, req);
 
     // generating preVerificationDetails obj since required by Gateway contract
     const preVeriDetails: PreVerificationDetails = {

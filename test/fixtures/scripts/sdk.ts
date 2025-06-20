@@ -14,7 +14,7 @@ import {
   toHex,
 } from "viem";
 import { foundry } from "viem/chains";
-import { Core, CoreOptions } from "@labyrinthac/core";
+import { Core, CoreOptions, ProtocolFee } from "@labyrinthac/core";
 import MerkleTree from "fixed-merkle-tree";
 import { Fp, poseidonHash } from "@labyrinthac/babyjubjub";
 import { UpaClient, UpaInstanceDescriptor } from "@nebrazkp/upa/sdk";
@@ -108,7 +108,12 @@ export const getSDKInstance = async () => {
     isActive: true,
   });
 
-  zkfi.getPaymasterFee = async () => BigInt(parseEther("0.002"));
+  zkfi.getProtocolFee = async () => {
+    return Number(15);
+  }
+
+  // zkfi.getPaymasterFee = async () => BigInt(parseEther("0.002"));
+  zkfi.getPaymasterFee = async () => BigInt(parseUnits("0.002", 6));
 
   return {
     sdk: zkfi,

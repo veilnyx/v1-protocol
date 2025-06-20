@@ -2,6 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {FIELD_SIZE} from "../base/Constants.sol";
+import {ProtocolFee} from "../base/PoolStorage.sol";
 import {Asset, AssetLogic} from "./Asset.sol";
 import {MerkleTree, MerkleTreeLogic} from "./MerkleTree.sol";
 import {QueuedMerkleTree, QueuedMerkleTreeLogic} from "./QueuedMerkleTree.sol";
@@ -147,15 +148,19 @@ library ShieldedTransactionLogic {
     /// @param stx ShieldedTransaction to be executed
     function validate(
         ShieldedTransaction calldata stx,
-        bool isPreVerified,
         MerkleTree storage addressTree,
         QueuedMerkleTree storage commitmentTree,
-        address verifier,
         mapping(uint256 => uint32) storage markedNullifiers,
         mapping(address => bool) storage supportedAdaptors,
-        mapping(uint256 => RevokerData) storage revokerDataMap
+        mapping(uint256 => RevokerData) storage revokerDataMap,
+        bytes32 packedValidationParams
     ) external {
         RevokerData memory revokerData = revokerDataMap[stx.revokerId];
+        (
+            bool isPreVerified,
+            address verifier,
+            uint16 protocolFeeBps
+        ) = _unpackValidationParams(packedValidationParams);
 
         if (!revokerData.isActive) {
             revert IPool.InvalidRevoker(stx.revokerId);
@@ -179,7 +184,7 @@ library ShieldedTransactionLogic {
         _checkAndMarkNullifiers(stx, commitmentTree, markedNullifiers);
 
         if (!isPreVerified) {
-            if (!verifyProof(stx, revokerData, verifier)) {
+            if (!verifyProof(stx, revokerData, verifier, protocolFeeBps)) {
                 revert IPool.InvalidTransactionProof();
             }
         }
@@ -201,7 +206,7 @@ library ShieldedTransactionLogic {
         mapping(uint24 => uint256) storage withdrawFees,
         address hasher,
         address adaptorHandler,
-        uint256 withdrawFeeBps
+        uint16 protocolFeeBps
     ) external {
         Params memory params = _copyParamsToMemory(stx);
         MemoParams memory memoParams = _copyMemoParamsToMemory(stx);
@@ -225,8 +230,8 @@ library ShieldedTransactionLogic {
                 assets,
                 withdrawFees,
                 params.pubAssets,
-                params.target,
-                withdrawFeeBps
+                adaptorHandler,
+                protocolFeeBps
             );
         }
 
@@ -237,7 +242,7 @@ library ShieldedTransactionLogic {
                 withdrawFees,
                 params.pubAssets,
                 adaptorHandler,
-                0
+                protocolFeeBps
             );
             _handleAdaptorCall(
                 assets,
@@ -254,13 +259,14 @@ library ShieldedTransactionLogic {
     function verifyProof(
         ShieldedTransaction calldata stx,
         RevokerData memory revokerData,
-        address verifier
+        address verifier,
+        uint16 protocolFeeBps
     ) public view returns (bool) {
         uint16 vId = IVerifier(verifier).getTransactionVerifierId(
             stx.nullifiers.length,
             stx.commitments.length
         );
-        bytes memory vInp = toVerifierInput(stx, revokerData);
+        bytes memory vInp = toVerifierInput(stx, revokerData, protocolFeeBps);
         return IVerifier(verifier).verifyTransactionProof(vId, vInp);
     }
 
@@ -273,16 +279,17 @@ library ShieldedTransactionLogic {
      */
     function toVerifierInput(
         ShieldedTransaction calldata self,
-        RevokerData memory revokerData
+        RevokerData memory revokerData,
+        uint16 protocolFeeBps
     ) public pure returns (bytes memory) {
-        bytes memory pubDataChunk1;
         uint256 nOuts = self.commitments.length;
         uint256 nPubs = self.pubAssets.length;
         uint256[] memory pubAssetIds = new uint256[](nOuts);
         uint256[] memory pubValues = new uint256[](nOuts);
+
+        bytes memory pubDataChunk1;
         {
-            uint256 padLen = nOuts - nPubs;
-            if (padLen < 0) {
+            if ((nOuts - nPubs) < 0) {
                 revert("Output notes count is less than public assets");
             }
 
@@ -318,35 +325,41 @@ library ShieldedTransactionLogic {
             );
         }
 
-        UHFArrays memory uhfArrays = UHFArrays({
-            pubAssetIds: pubAssetIds,
-            pubValues: pubValues,
-            nullifiers: self.nullifiers,
-            commitments: self.commitments,
-            encryptedDataEncryptionKeySeed: new uint256[](0),
-            refundInputs: new uint256[](0),
-            notes: new uint256[][](0)
-        });
+        // Perfourming sequential hashing (sha256) of encrypted data derived from notesMemo
+        (uint256 alpha, uint256 beta) = _UHF(
+            _prepareUHFArrays(self, pubAssetIds, pubValues)
+        );
+
+        return
+            abi.encodePacked(
+                self.proof,
+                pubDataChunk1,
+                pubDataChunk2,
+                alpha,
+                beta,
+                uint256(protocolFeeBps)
+            );
+    }
+
+    function _prepareUHFArrays(
+        ShieldedTransaction calldata self,
+        uint256[] memory pubAssetIds,
+        uint256[] memory pubValues
+    ) internal pure returns (UHFArrays memory uhfArrays) {
+        uhfArrays.pubAssetIds = pubAssetIds;
+        uhfArrays.pubValues = pubValues;
+        uhfArrays.nullifiers = self.nullifiers;
+        uhfArrays.commitments = self.commitments;
+
+        // Decomposing notesMemo to get encryptedDataEncryptionKeySeed, refundInputs and notes
         (
             uhfArrays.encryptedDataEncryptionKeySeed,
             uhfArrays.refundInputs,
             uhfArrays.notes
         ) = _decomposeNotesMemo(self.notesMemo, self.commitments.length);
-
-        // Performing sequential hashing (sha256) of encrypted data derived from notesMemo
-        (uint256 alpha, uint256 beta) = _UHF(uhfArrays);
-
-        bytes memory verifierParams = abi.encodePacked(
-            self.proof,
-            pubDataChunk1,
-            pubDataChunk2,
-            alpha,
-            beta
-        );
-
-        return verifierParams;
     }
 
+    /// @todo remove after audit
     /**
         function genEncryptDataHashUsingPoseidon(
             bytes calldata notesMemo,
@@ -401,11 +414,23 @@ library ShieldedTransactionLogic {
             console.logUint(encryptedDataHash);
             return encryptedDataHash;
         }
-     */
+    */
 
     ///////////////////////////////////
     ///////// Internal Functions //////
     ///////////////////////////////////
+
+    function _unpackValidationParams(
+        bytes32 packed
+    )
+        public
+        pure
+        returns (bool isPreVerified, address verifier, uint16 protocolFeeBps)
+    {
+        isPreVerified = uint256(packed) & 1 == 1;
+        protocolFeeBps = uint16(uint256(packed) >> 80);
+        verifier = address(uint160(uint256(packed) >> 96));
+    }
 
     function _decomposeNotesMemo(
         bytes calldata notesMemo,
@@ -708,7 +733,7 @@ library ShieldedTransactionLogic {
                 assets: assets,
                 to: to,
                 assetId: pubAssets[i].id,
-                value: pubAssets[i].value - fee
+                value: pubAssets[i].value
             });
 
             if (fee != 0) {
@@ -811,7 +836,9 @@ library ShieldedTransactionLogic {
             // Extract last 28 bytes value
             params.pubAssets[i].value = uint224(stx.pubAssets[i]);
 
-            /// @dev since feeAsset pushed into pubAssets, for transfer tx, the pubAssets value will become 0, but thats fine as pubAssets is not used in transfer tx. Only used in other types tx to move assets.
+            /// @dev since paymaster fee (`feeAsset`) is pushed into pubAssets by the UTXO algo, we remove the paymaster fee component from `pubAssets` to arrive at the actual tx values before transferring assets. This means for:
+            /// 1: Depost tx, there is no paymaster fee involved, so `feeValue` will be 0 and `pubAssets` will remain unchanged.
+            /// 2: Transfer tx, the `pubAssets` value will become 0, but thats fine as no transfer of `pubAssets` happen for transfer tx.
             if (params.pubAssets[i].id == params.feeAssetId) {
                 params.pubAssets[i].value =
                     params.pubAssets[i].value -

@@ -389,6 +389,7 @@ const main = async () => {
 
   const verifier = await deployVerifier(tenderlyDeployConfig);
 
+  /// @todo: initialise params for pool to be updated
   const args = [
     commonParams.addressTreeDepth,
     commonParams.commitmentTreeDepth,

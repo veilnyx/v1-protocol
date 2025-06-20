@@ -13,12 +13,12 @@ import {IPool} from "../interfaces/IPool.sol";
 import {IAdaptorHandler} from "../interfaces/IAdaptorHandler.sol";
 import {IScreener} from "../interfaces/IScreener.sol";
 import {EIP712_DOMAIN_NAME, EIP712_DOMAIN_VERSION} from "../base/Constants.sol";
-import {PoolStorage} from "../base/PoolStorage.sol";
+import {PoolStorage, ProtocolFee} from "../base/PoolStorage.sol";
 import {Asset, AssetType, AssetLogic} from "../libraries/Asset.sol";
 import {MerkleTree, MerkleTreeLogic} from "../libraries/MerkleTree.sol";
 import {QueuedMerkleTree, QueuedMerkleTreeLogic, TreeUpdateData} from "../libraries/QueuedMerkleTree.sol";
 import {ShieldedAddressRegistrationData, ShieldedAddressLogic} from "../libraries/ShieldedAddress.sol";
-import {ShieldedTransaction, ShieldedTransactionLogic, RevokerData} from "../libraries/ShieldedTransaction.sol";
+import {ShieldedTransaction, ShieldedTransactionLogic, ShieldedTransactionType, RevokerData} from "../libraries/ShieldedTransaction.sol";
 
 /// @param verifier The address of the verifier contract. Verifier contract verifies the stx's zk proof, address proof and merkle tree queue proof.
 /// @param adaptorHandler The address of the adaptor handler contract, responsible for delegate calling adaptors of external DeFi protocols.
@@ -88,7 +88,7 @@ contract Pool is
             verifier
         );
     }
-    
+
     /////////////////////////////////////////
     //         ADMIN WRITE METHODS         //
     ////////////////////////////////////////
@@ -155,7 +155,7 @@ contract Pool is
         _revokerCount += 1;
     }
 
-    function withdrawProtocolFee(
+    function withdrawCollectedProtocolFee(
         uint24 assetId,
         address to
     ) external nonReentrant onlyOwner {
@@ -182,8 +182,32 @@ contract Pool is
         screener = screener_;
     }
 
-    function setWithdrawFeeBips(uint256 feeBps) external onlyOwner {
-        withdrawFeeBps = feeBps;
+    function setDepositProtocolFee(
+        uint16 feeBps,
+        bool isActive
+    ) external onlyOwner {
+        depositProtocolFee = ProtocolFee({bps: feeBps, isActive: isActive});
+    }
+
+    function setWithdrawProtocolFee(
+        uint16 feeBps,
+        bool isActive
+    ) external onlyOwner {
+        withdrawProtocolFee = ProtocolFee({bps: feeBps, isActive: isActive});
+    }
+
+    function setTransferProtocolFee(
+        uint16 feeBps,
+        bool isActive
+    ) external onlyOwner {
+        transferProtocolFee = ProtocolFee({bps: feeBps, isActive: isActive});
+    }
+
+    function setAdaptorProtocolFee(
+        uint16 feeBps,
+        bool isActive
+    ) external onlyOwner {
+        adaptorProtocolFee = ProtocolFee({bps: feeBps, isActive: isActive});
     }
 
     function updateVerificationTrackerService(
@@ -233,14 +257,22 @@ contract Pool is
             }
         }
 
+        uint16 protocolFeeBps = _getProtocolFeeBps(stx.txType);
+
+        // to avoid stack too deep error, we pack the validation params into a single bytes32.
+        bytes32 packedValidationParams = _packValidationParams(
+            isPreVerified,
+            verifier,
+            protocolFeeBps
+        );
+
         stx.validate({
-            isPreVerified: isPreVerified,
             addressTree: _addressTree,
             commitmentTree: _commitmentTree,
-            verifier: verifier,
             markedNullifiers: _markedNullifiers,
             supportedAdaptors: _adaptors,
-            revokerDataMap: _revokers
+            revokerDataMap: _revokers,
+            packedValidationParams: packedValidationParams
         });
 
         stx.execute({
@@ -252,7 +284,7 @@ contract Pool is
             withdrawFees: _withdrawFees,
             hasher: hasher,
             adaptorHandler: adaptorHandler,
-            withdrawFeeBps: withdrawFeeBps
+            protocolFeeBps: protocolFeeBps
         });
     }
 
@@ -310,10 +342,6 @@ contract Pool is
     }
      */
 
-    function getLabyrinthVersion() external view returns (uint64) {
-        return version;
-    }
-
     function getRevokerData(
         uint256 id
     ) external view returns (RevokerData memory) {
@@ -337,6 +365,12 @@ contract Pool is
         uint24 assetId
     ) external view returns (uint256) {
         return _withdrawFees[assetId];
+    }
+
+    function getProtocolFee(
+        ShieldedTransactionType txType
+    ) external view returns (uint16) {
+        return _getProtocolFeeBps(txType);
     }
 
     function getCollectedPaymasterFee(
@@ -425,4 +459,41 @@ contract Pool is
     function _authorizeUpgrade(
         address newImplementation
     ) internal override onlyOwner {}
+
+    function _packValidationParams(
+        bool isPreVerified,
+        address verifier,
+        uint16 protocolFeeBps
+    ) internal pure returns (bytes32) {
+        return
+            bytes32(
+                (uint256(uint160(verifier)) << 96) |
+                    (uint256(protocolFeeBps) << 80) |
+                    (isPreVerified ? 1 : 0)
+            );
+    }
+
+    function _getProtocolFeeBps(
+        ShieldedTransactionType txType
+    ) internal view returns (uint16 protocolFeeBps) {
+        if (txType == ShieldedTransactionType.DEPOSIT) {
+            protocolFeeBps = depositProtocolFee.isActive
+                ? depositProtocolFee.bps
+                : 0;
+        } else if (txType == ShieldedTransactionType.WITHDRAW) {
+            protocolFeeBps = withdrawProtocolFee.isActive
+                ? withdrawProtocolFee.bps
+                : 0;
+        } else if (txType == ShieldedTransactionType.TRANSFER) {
+            protocolFeeBps = transferProtocolFee.isActive
+                ? transferProtocolFee.bps
+                : 0;
+        } else if (txType == ShieldedTransactionType.CALL_ADAPTOR) {
+            protocolFeeBps = adaptorProtocolFee.isActive
+                ? adaptorProtocolFee.bps
+                : 0;
+        } else {
+            revert InvalidTransactionType();
+        }
+    }
 }

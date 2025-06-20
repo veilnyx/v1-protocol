@@ -17,11 +17,11 @@ contract UniswapV3AdaptorTest is PoolTest {
     error CheckChainConfig();
 
     UniswapV3Adapter uniswapV3Adapter;
-    address uniswapSwapRouter02 = 0x68b3465833fb72A70ecDF485E0e4C7bD8665Fc45;
-    address public WETH = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
-    address public USDC = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48;
+    address uniswapSwapRouter02 = 0x3bFA4769FB09eefC5a80d6E87c3B9C650f7Ae48E;
+    address public WETH = 0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14;
+    address public USDC = 0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238;
     IWToken public iWETH;
-    uint256 public constant INITIAL_SUPPLY = 2 ether;
+    uint256 public constant INITIAL_SUPPLY = 4 ether;
     uint256 public constant SWAP_AMT = 1 ether;
     address public user = 0x689EcF264657302052c3dfBD631e4c20d3ED0baB;
 
@@ -38,7 +38,7 @@ contract UniswapV3AdaptorTest is PoolTest {
         );
 
         // uniswapV3Adapter = 0x14992438240Be80bE2077DCb6615805C2E72362d;
-        
+
         /// @dev update convert req fixture with this adaptor addr as `to`
         console.log("Uniswap adaptor:", address(uniswapV3Adapter));
 
@@ -46,7 +46,7 @@ contract UniswapV3AdaptorTest is PoolTest {
         vm.prank(poolOwner);
         pool.addAdaptorSupport(address(uniswapV3Adapter), true);
 
-        vm.deal(user, INITIAL_SUPPLY * 2);
+        vm.deal(user, INITIAL_SUPPLY);
         vm.startPrank(user);
         iWETH.deposit{value: INITIAL_SUPPLY}(); // wrapping eth to weth
         iWETH.approve(address(pool), INITIAL_SUPPLY); // depositing weth to pool
@@ -68,6 +68,9 @@ contract UniswapV3AdaptorTest is PoolTest {
         uint256 poolUSDCBalBeforeConvert = IERC20(USDC).balanceOf(
             address(pool)
         );
+        uint256 poolWETHBalBeforeConvert = IERC20(WETH).balanceOf(
+            address(pool)
+        );
 
         ShieldedTransaction memory stxSwap = _loadShieldedTransaction(
             "swap_1_testnet_weth_to_usdc"
@@ -76,9 +79,12 @@ contract UniswapV3AdaptorTest is PoolTest {
 
         // Asserts
         uint256 poolUSDCBalPostConvert = IERC20(USDC).balanceOf(address(pool));
+        uint256 poolWETHBalPostConvert = IERC20(WETH).balanceOf(address(pool));
+
         console.log("Pool USDC bal before swap:", poolUSDCBalBeforeConvert);
         console.log("Pool USDC bal after swap:", poolUSDCBalPostConvert);
         assert(poolUSDCBalPostConvert > poolUSDCBalBeforeConvert);
+        assertEq(poolWETHBalPostConvert, poolWETHBalBeforeConvert - SWAP_AMT);
     }
 
     function testSwapViaBundler() public {
