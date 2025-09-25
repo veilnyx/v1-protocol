@@ -12,7 +12,7 @@ import {
   Hex
 } from "viem";
 
-import { DeployContractConfig } from '@nomicfoundation/hardhat-viem/types';
+import { DeployContractConfig, KeyedClient } from '@nomicfoundation/hardhat-viem/types';
 import { loadConfigs, ChainParams, AdaptorParams, CommonParams } from "./configs";
 import { deployHasher } from "./hasher";
 import { privateKeyToAccount } from 'viem/accounts';
@@ -85,7 +85,7 @@ const deployAave = async (aaveParams, pool, tenderlyDeployConfig) => {
   await addAdpatorSupport(pool, aave.address, true, tenderlyDeployConfig.client.wallet, tenderlyDeployConfig.client.public);
 
   const assets = [aaveParams.assets.staticAWeth, aaveParams.assets.staticAUsdc];
-  await addAssets(assets, 1, pool, wallet, client);
+  await addAssets(assets, 1, pool, tenderlyDeployConfig.client.wallet, tenderlyDeployConfig.client.public);
 }
 
 const deployLido = async (lidoParams, pool, tenderlyDeployConfig) => {
@@ -307,18 +307,13 @@ const main = async () => {
     chain: tenderlyChain
   });
   const chainId = await client.getChainId();
-  const wallet = createWalletClient({
-    chain: tenderlyChain,
-    transport: http(tenderlyChain.rpcUrls.default.http[0]),
-    account: privateKeyToAccount(privateKey)
-  });
+  const wallets = await hre.viem.getWalletClients({ chain: tenderlyChain });
 
   const tenderlyDeployConfig: DeployContractConfig = {
-    //@ts-ignore
     client: {
       public: client,
-      wallet: wallet
-    }
+      wallet: wallets[0]
+    } as KeyedClient
   }
 
   const commonParams = config.common as CommonParams;
@@ -384,7 +379,7 @@ const main = async () => {
   });
   console.log("Pool deployed:", poolImpl.address);
 
-  const { hasher } = await deployHasher(wallet, client, tenderlyDeployConfig);
+  const { hasher } = await deployHasher(tenderlyDeployConfig.client.wallet, client, tenderlyDeployConfig);
   console.log("Hasher deployed:", hasher);
 
   const verifier = await deployVerifier(tenderlyDeployConfig);
@@ -434,7 +429,7 @@ const main = async () => {
   // await fundPaymaster(paymaster.address, "20", wallet, client);
 
   // Asset & Revoker Setup
-  await addAssetsAndRevokers(poolProxy.address, chainParams, commonParams, client, wallet);
+  await addAssetsAndRevokers(poolProxy.address, chainParams, commonParams, client, tenderlyDeployConfig.client.wallet);
 };
 
 main().catch(console.error);

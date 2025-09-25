@@ -14,8 +14,10 @@ dotenv.config();
 const rpcEthereumSepolia = process.env.RPC_ETHEREUM_SEPOLIA as string;
 const rpcOptimismSepolia = process.env.RPC_OPTIMISM_SEPOLIA as string;
 const rpcTenderlyMainnet = process.env.RPC_TENDERLY_MAINNET as string;
+const rpcVeilnyxTestnet = process.env.RPC_VEILNYX_TESTNET as string;
 const rpcTenderlyMainnetCustomId = process.env.RPC_TENDERLY_MAINNET_CUSTOM_ID as string;
 const privateKeys = [process.env.PRIVATE_KEY as string];
+const veilnyxPrivateKeys = [process.env.VEILNYX_TEST_PRIV_KEY as string];
 const forkEnabled = process.env.HARDHAT_FORK === "true";
 
 const config: HardhatUserConfig = {
@@ -32,19 +34,27 @@ const config: HardhatUserConfig = {
     ethereumSepolia: {
       url: rpcEthereumSepolia,
       accounts: privateKeys,
+      chainId: 11155111
     },
     optimismSepolia: {
       url: rpcOptimismSepolia,
       accounts: privateKeys,
+      chainId: 11155420
     },
     tenderlyMainnet: {
       url: rpcTenderlyMainnet,
       accounts: privateKeys,
+      chainId: 1
     },
     tenderlyMainnetCustomId: {
       url: rpcTenderlyMainnetCustomId,
       accounts: privateKeys,
       chainId: 7800
+    },
+    veilnyxTestnet: {
+      url: rpcVeilnyxTestnet,
+      accounts: veilnyxPrivateKeys,
+      chainId: 34244
     }
   },
   contractSizer: {

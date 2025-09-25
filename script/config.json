@@ -184,5 +184,21 @@
       "0x3F1c547b21f65e10480dE3ad8E19fAAC46C95034",
       "0x8d09a4502Cc8Cf1547aD300E066060D043f6982D"
     ]
+  },
+  "34244": {
+    "chain": "veilnyx-appchain-testnet",
+    "entryPoint": "0x0000000071727De22E5E9d8BAf0edAc6f37da032",
+    "gateway": "0xab595ec0694f7cead3bf338266ab7527a2b4e3f5",
+    "paymaster": "0x9365ed769466d04de2085b74a0fc8a116a37caca",
+    "nebraVerifier": "0x0000000000000000000000000000000000000000",
+    "wToken": "0xC047cfabBbDD41F382DE565A0F8239EC5B6E1893",
+    "poseidonT3": "0x67386d033b581aa97c8a3b11ed59e0c829c32e27",
+    "poseidonT4": "0xf297bd5314f5d21c872a52f190386bd15411b47e",
+    "sanctionsList": "0x0000000000000000000000000000000000000000",
+    "initAssetType": 1,
+    "initAssetAddresses": [
+      "0xC047cfabBbDD41F382DE565A0F8239EC5B6E1893",
+      "0x9aB19B1E375624b9A79aF4d2c728bf4d0feee30e"
+    ]
   }
 }
