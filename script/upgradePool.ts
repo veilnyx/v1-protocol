@@ -1,5 +1,5 @@
 import hre from "hardhat";
-import { encodeFunctionData } from "viem";
+import { encodeFunctionData, zeroAddress } from "viem";
 import { DeployContractConfig } from '@nomicfoundation/hardhat-viem/types';
 import { loadConfigs, ChainParams, CommonParams } from "./configs";
 import { deployErc4337Infra } from "./erc4337Infra";
@@ -40,6 +40,77 @@ const setup = async () => {
             wallet: wallet
         }
     }
+}
+
+const upgradePoolOnly = async () => {
+    await setup();
+
+    const mempoolProxy = `0x9642346eE64cf65D67f324Ff7Ec24AfF903Fbe2d` as `0x${string}`;
+    const eip712 = `0x76ab750eb7df96368740bc3631b1e5e43bdcd4c8` as `0x${string}`;
+    const shieldedAddressLogic = `0xa09f658fe6268dedff5873bbc6745085d7074213` as `0x${string}`;
+    const commonLibs = {
+        asset: `0x18c58a90d190953e0cb08c7075a5f4e7718616fe` as `0x${string}`,
+        merkleTree: `0x220c00d601a39da4f92873929295f0f70488fd2c` as `0x${string}`,
+        queuedMerkleTree: `0x77bd63353b2ef38eca6517585c727cb96ab64894` as `0x${string}`,
+        shieldedTransaction: `0xb28096f5fe1463dd806947603d8269759b807c04` as `0x${string}`
+    }
+
+    const newPoolImpl = await deployPoolImpl(commonLibs, eip712, shieldedAddressLogic);
+    await upgradePoolProxy(newPoolImpl);
+}
+
+const deployPoolImpl = async (commonLibs: any, eip712LibAddr: `0x${string}`, shieldedAddressLogicLibAddr: `0x${string}`) => {
+    console.log("Starting to deploy new Pool");
+    if (eip712LibAddr === undefined || eip712LibAddr === zeroAddress) {
+        const eip712 = await hre.viem.deployContract("EIP712");
+        eip712LibAddr = eip712.address;
+        console.log("EIP712 deployed:", eip712.address);
+    }
+
+    if (shieldedAddressLogicLibAddr === undefined || shieldedAddressLogicLibAddr === zeroAddress) {
+        const shieldedAddressLogic = await hre.viem.deployContract(
+            "ShieldedAddressLogic",
+            [],
+            {
+                libraries: {
+                    MerkleTreeLogic: commonLibs.merkleTree,
+                },
+            }
+        );
+        shieldedAddressLogicLibAddr = shieldedAddressLogic.address;
+        console.log("ShieldedAddressLogic deployed:", shieldedAddressLogic.address);
+    }
+
+    const poolImpl = await hre.viem.deployContract("Pool", [], {
+        libraries: {
+            EIP712: eip712LibAddr,
+            AssetLogic: commonLibs.asset,
+            MerkleTreeLogic: commonLibs.merkleTree,
+            QueuedMerkleTreeLogic: commonLibs.queuedMerkleTree,
+            ShieldedAddressLogic: shieldedAddressLogicLibAddr,
+            ShieldedTransactionLogic: commonLibs.shieldedTransaction,
+        },
+    });
+    console.log("New Pool deployed:", poolImpl.address);
+    /// @dev we dont have to again add assets/revokers/adaptorHandler/adaptor support in an upgrade as the state is retained in PoolProxy itself.
+    return poolImpl.address;
+};
+
+const upgradePoolProxy = async (newPoolImpl: `0x${string}`) => {
+
+    // upgrade existing PoolProxy to point to the latest pool
+    /// @notice the initData in the args should be 0x if PoolProxy does not need reinitialisation (as if case of no changes to the Pool proxy storage). The upgraded Pool will just continue to use the existing state of the PoolProxy as the state is managed there. Pool impl. is just a logic layer that functions in context of PoolProxy.
+    /// @notice But in case of reinitilisation required due to any new state changes, the initData should be the calldata for the reinitialisation function in the PoolImpl contract.
+    // @ts-ignore
+    const upgradeCallHash = await wallet.writeContract({
+        address: existingPoolProxy,
+        abi: poolAbi,
+        functionName: "upgradeToAndCall",
+        args: [newPoolImpl, "0x"]
+    });
+
+    const upgradeRct = await client.waitForTransactionReceipt({ hash: upgradeCallHash });
+    console.log("rct:Veilnyx Upgraded!!!!!", upgradeRct.status);
 }
 
 const deployMempoolImplAndProxy = async (shieldedTransactionLogicAddr: `0x${string}`, assetLogicAddr: `0x${string}`, gateway: `0x${string}`) => {
@@ -91,54 +162,6 @@ const deployMempoolImplAndProxy = async (shieldedTransactionLogicAddr: `0x${stri
     ]);
     console.log("MempoolProxy deployed:", mempoolProxy.address);
     return mempoolProxy.address;
-}
-
-const deployPoolImpl = async (commonLibs: any) => {
-    console.log("Starting to deploy new Pool");
-    const eip712 = await hre.viem.deployContract("EIP712");
-    console.log("EIP712 deployed:", eip712.address);
-
-    const shieldedAddress = await hre.viem.deployContract(
-        "ShieldedAddressLogic",
-        [],
-        {
-            libraries: {
-                MerkleTreeLogic: commonLibs.merkleTree,
-            },
-        }
-    );
-    console.log("ShieldedAddressLogic deployed:", shieldedAddress.address);
-
-    const poolImpl = await hre.viem.deployContract("Pool", [], {
-        libraries: {
-            EIP712: eip712.address,
-            AssetLogic: commonLibs.asset,
-            MerkleTreeLogic: commonLibs.merkleTree,
-            QueuedMerkleTreeLogic: commonLibs.queuedMerkleTree,
-            ShieldedAddressLogic: shieldedAddress.address,
-            ShieldedTransactionLogic: commonLibs.shieldedTransaction,
-        },
-    });
-    console.log("New Pool deployed:", poolImpl.address);
-    /// @dev we dont have to again add assets/revokers/adaptorHandler/adaptor support in an upgrade as the state is retained in PoolProxy itself.
-    return poolImpl.address;
-};
-
-const upgradePoolProxy = async (newPoolImpl: `0x${string}`) => {
-
-    // upgrade existing PoolProxy to point to the latest pool
-    /// @notice the initData in the args should be 0x if PoolProxy does not need reinitialisation (as if case of no changes to the Pool proxy storage). The upgraded Pool will just continue to use the existing state of the PoolProxy as the state is managed there. Pool impl. is just a logic layer that functions in context of PoolProxy.
-    /// @notice But in case of reinitilisation required due to any new state changes, the initData should be the calldata for the reinitialisation function in the PoolImpl contract.
-    // @ts-ignore
-    const upgradeCallHash = await wallet.writeContract({
-        address: existingPoolProxy,
-        abi: poolAbi,
-        functionName: "upgradeToAndCall",
-        args: [newPoolImpl, "0x"]
-    });
-
-    const upgradeRct = await client.waitForTransactionReceipt({ hash: upgradeCallHash });
-    console.log("rct:Labyrinth Upgraded!!!!!", upgradeRct.status);
 }
 
 const deployCommonLibs = async () => {
@@ -210,21 +233,6 @@ const main = async () => {
 
     const newPoolImpl = await deployPoolImpl(commonLibs);
 
-    await upgradePoolProxy(newPoolImpl);
-}
-
-const upgradePoolOnly = async () => {
-    await setup();
-
-    const mempoolProxy = `0x9642346eE64cf65D67f324Ff7Ec24AfF903Fbe2d` as `0x${string}`;
-    const commonLibs = {
-        asset: `0x18c58a90d190953e0cb08c7075a5f4e7718616fe` as `0x${string}`,
-        merkleTree: `0x220c00d601a39da4f92873929295f0f70488fd2c` as `0x${string}`,
-        queuedMerkleTree: `0x77bd63353b2ef38eca6517585c727cb96ab64894` as `0x${string}`,
-        shieldedTransaction: `0xb28096f5fe1463dd806947603d8269759b807c04` as `0x${string}`
-    }
-
-    const newPoolImpl = await deployPoolImpl(commonLibs);
     await upgradePoolProxy(newPoolImpl);
 }
 
