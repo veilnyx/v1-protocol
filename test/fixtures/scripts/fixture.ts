@@ -21,16 +21,16 @@ import {
   UserOperation,
   getPackedUserOperation
 } from "permissionless";
-import { ShieldedAccount } from "@zkfi-tech/account";
-import { Fp, Point, poseidonDecrypt } from "@zkfi-tech/babyjubjub";
-import { randomBigInt, randomBytes, randomHex } from "@zkfi-tech/utils";
+import { ShieldedAccount } from "@labyrinthac/account";
+import { Fp, Point, poseidonDecrypt } from "@labyrinthac/babyjubjub";
+import { randomBigInt, randomBytes, randomHex } from "@labyrinthac/utils";
 import {
   TransactionOptions,
   TransactionRequest,
-} from "@zkfi-tech/shared-types";
-import { Core } from "@zkfi-tech/core";
-import { ZTransaction, PreVerification, PreVerificationDetails } from "@zkfi-tech/zk-prover";
-import { Note, SIZE_ENCRYPTED_DECRYPTION_KEY, SIZE_FULLY_ENCRYPTED_NOTE_DATA } from "@zkfi-tech/transaction";
+} from "@labyrinthac/shared-types";
+import { Core } from "@labyrinthac/core";
+import { ZTransaction, PreVerification, PreVerificationDetails } from "@labyrinthac/zk-prover";
+import { Note, SIZE_ENCRYPTED_DECRYPTION_KEY, SIZE_FULLY_ENCRYPTED_NOTE_DATA } from "@labyrinthac/transaction";
 import config from "../config.json";
 import { register } from "module";
 
@@ -120,7 +120,7 @@ export const generateTestTransaction = async (
     revokerId: req.revokerId,
   };
   const tx = await sdk.createTransaction(req, opts);
-  console.log("TX: ", tx);
+  // console.log("TX: ", tx);
   const signedTx = await sdk.signTransaction(tx);
   const ztx = await sdk.proveTransaction(signedTx);
   console.log("ZTX:", ztx);
@@ -128,15 +128,14 @@ export const generateTestTransaction = async (
   writeFileSync(`${dirFixtureData}/${name}.txt`, encoded);
 };
 
-export const generateTestTransactionsWithOutsourcedProofVerification = async (
+export const generateTestTxsWithOutsourcedProofVerification = async (
   reqs: Record<string, TransactionRequest & TransactionOptions>,
   sdk: Core,
   nebraClient: any,
-  transactCircuitId: `0x${string}`
 ) => {
   const reqArr = Object.entries(reqs);
   for (const [name, req] of reqArr) {
-    await generateTestTransactionWithOutsourcedProofVerification(name, req, sdk, nebraClient, transactCircuitId);
+    await generateTestTransactionWithOutsourcedProofVerification(name, req, sdk, nebraClient);
   }
 };
 
@@ -144,8 +143,7 @@ export const generateTestTransactionWithOutsourcedProofVerification = async (
   name: string,
   req: TransactionRequest & TransactionOptions,
   sdk: Core,
-  nebraClient: any,
-  transactCircuitId: `0x${string}`
+  nebraClient: any
 ) => {
   const opts = {
     viaBundler: req.viaBundler,
@@ -154,12 +152,12 @@ export const generateTestTransactionWithOutsourcedProofVerification = async (
     isPreVerified: true
   };
   const tx = await sdk.createTransaction(req, opts);
-  console.log("TX: ", tx);
+  // console.log("TX: ", tx);
   const signedTx = await sdk.signTransaction(tx);
-  const { provedTx, preVerification } = await sdk.proveTransactionAndOutsourceVerification(signedTx, nebraClient, transactCircuitId);
+  const { ztx: preVerifiedTx, preVerification, nebraProofSubmissionObj } = await sdk.proveOutsourcedVerificationTx(signedTx, nebraClient);
 
-  console.log("ZTX:", provedTx);
-  const encoded = provedTx.encode();
+  // console.log("ZTX:", preVerifiedTx);
+  const encoded = preVerifiedTx.encode();
   console.log("ZTX Encoded:", encoded);
   writeFileSync(`${dirFixtureData}/${name}.txt`, encoded);
 
@@ -186,7 +184,7 @@ export const generateTestAddrRegWithOutsourceProofVerifications = async (
 ) => {
   const reqArr = Object.entries(reqs);
   for (const [name, req] of reqArr) {
-    await generateTestAddrRegWithOutsourcedProofVerification(name, sdk, nebraClient, registerCircuitId);
+    await generateTestAddrRegWithOutsourcedProofVerification(name, sdk, nebraClient);
   }
 };
 
@@ -202,10 +200,9 @@ const generateTestAddressRegistration = async (
 const generateTestAddrRegWithOutsourcedProofVerification = async (
   name: string,
   sdk: Core,
-  nebraClient: any,
-  registerCircuitId: `0x${string}`
+  nebraClient: any
 ) => {
-  const zaddrReg = await sdk.proveAddressAndOutsourceVerification("0x", nebraClient, registerCircuitId);
+  const zaddrReg = await sdk.proveAddressAndOutsourceVerification("0x", nebraClient);
   console.log("zaddrReg obj returned after proof gen & submission to Nebra:", zaddrReg);
   console.log("Encoding to gen fixture");
   const encoded = zaddrReg.shieldedAddressRegistrationData.encode();
@@ -294,6 +291,7 @@ export async function mockNotes(depositName: string, sdk: Core) {
       leafIndex: i,
     });
     if (n) {
+      console.log("Note Nullifier: ", n.getNullifier(senderAccount.viewer));
       notes.push(n);
     }
   }
@@ -305,9 +303,10 @@ export async function mockNotes(depositName: string, sdk: Core) {
     // @ts-ignore
     sdk.commitmentTreeSource.insert(notes[i].commitment);
   }
+  console.log("commit tree root after Mock Notes", sdk.commitmentTreeSource.root);
 }
 
-export const generatePackedUserOps = async (name: string, req: TransactionRequest & TransactionOptions, sdk: Core, isPreVerified: boolean, nebraClient, transactCircuitId) => {
+export const generatePackedUserOps = async (name: string, req: TransactionRequest & TransactionOptions, sdk: Core, isPreVerified: boolean, nebraClient) => {
   // Generating ztx
   const opts = {
     viaBundler: req.viaBundler,
@@ -322,12 +321,11 @@ export const generatePackedUserOps = async (name: string, req: TransactionReques
   let preVerification: PreVerification;
 
   if (isPreVerified) {
-    const { provedTx, preVerification: preVerification_ } = await sdk.proveTransactionAndOutsourceVerification(
+    const { ztx: preVerifiedTx, preVerification: preVerification_, } = await sdk.proveOutsourcedVerificationTx(
       tx,
-      nebraClient,
-      transactCircuitId
+      nebraClient
     );
-    ztx = provedTx;
+    ztx = preVerifiedTx;
     preVerification = preVerification_;
   } else {
     ztx = await sdk.proveTransaction(signedTx);
@@ -348,6 +346,9 @@ export const generatePackedUserOps = async (name: string, req: TransactionReques
   console.log("ZTX Encoded:", encodedZTx);
   writeFileSync(`${dirFixtureData}/${name}.txt`, encodedZTx);
 
+  const encodedPreVerification = preVerification.encode();
+  writeFileSync(`${dirFixtureData}/${name}_preVerificationEncodedStruct.txt`, encodedPreVerification);
+
   // Generating calldata
   const gatewayAbi = JSON.parse(readFileSync("out/Gateway.sol/Gateway.json", "utf-8")).abi;
   const calldata = encodeFunctionData({
@@ -363,17 +364,17 @@ export const generatePackedUserOps = async (name: string, req: TransactionReques
 
   // Generating user op
   const userOp: UserOperation<"v0.7"> = {
-    sender: `0x${"575253F9690dB75D36Da99f56003aFd0Eb29Eead"}` as `0x${string}`, // make sure this matches the Gateway address from solidity test setup
+    sender: `0x${"F3d8f3B185d1448BD3f3762b6cCF7F129bC21fDB"}` as `0x${string}`, // make sure this matches the Gateway address from solidity test setup
     nonce: BigInt(nonce),
     factory: undefined,
     factoryData: "0x",
     callData: calldata,
-    callGasLimit: BigInt(2_500_000),
+    callGasLimit: BigInt(25_00_000), // 30 M gas is block gas limit = 30_000_000 gas
     verificationGasLimit: BigInt(75_000),
     preVerificationGas: BigInt(75_000),
     maxFeePerGas: BigInt(150_000_000),
     maxPriorityFeePerGas: BigInt(150_000_000),
-    paymaster: `0x${"5925279112eBf453E534a22c261A6E83696AE1Bc"}` as `0x${string}`, // make sure this matches the Paymaster address from solidity test setup
+    paymaster: `0x${"C141A1Fc167930FA8E1448BdC7Cea9C7a13C1021"}` as `0x${string}`, // make sure this matches the Paymaster address from solidity test setup
     paymasterVerificationGasLimit: BigInt(25_000),
     paymasterPostOpGasLimit: BigInt(5),
     paymasterData: "0x",

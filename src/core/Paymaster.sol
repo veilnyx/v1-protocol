@@ -6,17 +6,18 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC165} from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
 import {IPaymaster} from "@account-abstraction/contracts/interfaces/IPaymaster.sol";
 import {IEntryPoint} from "@account-abstraction/contracts/interfaces/IEntryPoint.sol";
 import {PackedUserOperation} from "@account-abstraction/contracts/interfaces/PackedUserOperation.sol";
 import {ShieldedTransaction} from "../libraries/ShieldedTransaction.sol";
 import {PreVerificationDetails} from "../interfaces/IMempool.sol";
 import {IPool} from "../interfaces/IPool.sol";
-import {console} from "forge-std/console.sol";
 
 contract Paymaster is IPaymaster, Ownable {
     uint256 public constant VALIDATION_SUCCESS = 0;
-
+    uint24 public constant ETH_ASSET_ID = 65537;
+    uint8 public constant ETH_DECIMALS = 18;
     IEntryPoint public immutable entryPoint;
     address public immutable sender;
 
@@ -27,12 +28,18 @@ contract Paymaster is IPaymaster, Ownable {
     /// @dev Mapping from assetId to fee value for outsourced verification tx. The gas cost for such tx will be lower due to the ZK proof verification being outsourced.
     mapping(uint24 => uint256) private _assetFeesForPreVerifiedTx;
 
+    mapping(uint24 => address) public assetIdToChainlinkFeed;
+
     error InvalidPaymaster(address paymaster);
     error InvalidEntryPoint();
     error InvalidSender(address sender);
     error InvalidCallData();
     error InsufficientFee(uint256 given, uint256 required);
     error UnsupportedFeeAsset(uint24 asset);
+    error ChainlinkPriceFeedNotFound(uint24 assetId);
+    error ChainlinkPriceInvalid(int256 price);
+    error ChainlinkDecimalsInvalid(uint24 assetId);
+    error MaxCostEthToAssetConversionFailed(uint24 assetId);
 
     /**
      * params entryPoint_: Address of the entry point contract.
@@ -62,6 +69,15 @@ contract Paymaster is IPaymaster, Ownable {
         uint256 feeValue
     ) external onlyOwner {
         _assetFeesForPreVerifiedTx[assetId] = feeValue;
+    }
+
+    /**
+     * Sets Chainlink feed address for an asset.
+     * @param assetId - Asset id to update fee for.
+     * @param feed    - Chainlink feed address.
+     */
+    function setChainlinkFeed(uint24 assetId, address feed) external onlyOwner {
+        assetIdToChainlinkFeed[assetId] = feed;
     }
 
     /**
@@ -144,6 +160,38 @@ contract Paymaster is IPaymaster, Ownable {
         return _assetFeesForPreVerifiedTx[assetId];
     }
 
+    /// @notice Returns the `maxCostEth` value in fee asset using Chainlink's price feeds.
+    function convertFeeFromEthToFeeAsset(
+        uint256 maxCostEth,
+        uint24 assetId
+    ) public view returns (uint256 feeInAsset) {
+        if (assetIdToChainlinkFeed[assetId] == address(0)) {
+            revert ChainlinkPriceFeedNotFound(assetId);
+        }
+
+        AggregatorV3Interface feed = AggregatorV3Interface(
+            assetIdToChainlinkFeed[assetId]
+        );
+        (, int256 price, , , ) = feed.latestRoundData();
+        if (price <= 0) {
+            revert ChainlinkPriceInvalid(price);
+        }
+
+        // for conversion we assume price fetching of assetId in ETH only since maxCostEth is in ETH
+        uint8 decimals = feed.decimals();
+        if (decimals != ETH_DECIMALS) {
+            revert ChainlinkDecimalsInvalid(assetId);
+        }
+
+        feeInAsset = maxCostEth / uint256(price);
+
+        if (feeInAsset == 0) {
+            revert MaxCostEthToAssetConversionFailed(assetId);
+        }
+
+        return feeInAsset;
+    }
+
     function isAssetFeeSupported(uint24 assetId) external view returns (bool) {
         return _assetFees[assetId] > 0;
     }
@@ -175,8 +223,7 @@ contract Paymaster is IPaymaster, Ownable {
         (
             address paymaster,
             uint24 feeAssetId,
-            uint256 givenFee,
-            bool isVerificationOutsourced
+            uint256 givenFee
         ) = _parseFeeParams(userOp);
 
         // Fee recipient must be this contract
@@ -184,11 +231,7 @@ contract Paymaster is IPaymaster, Ownable {
             revert InvalidPaymaster(paymaster);
         }
 
-        uint256 requiredFee = _getRequiredFee(
-            feeAssetId,
-            isVerificationOutsourced,
-            maxCostEth
-        );
+        uint256 requiredFee = _getRequiredFee(feeAssetId, maxCostEth);
 
         if (givenFee < requiredFee) {
             revert InsufficientFee(givenFee, requiredFee);
@@ -199,18 +242,11 @@ contract Paymaster is IPaymaster, Ownable {
 
     function _parseFeeParams(
         PackedUserOperation calldata userOp
-    ) internal view returns (address, uint24, uint256, bool) {
-        (
-            ShieldedTransaction memory stx,
-            PreVerificationDetails memory preVeri
-        ) = abi.decode(
-                userOp.callData[4:],
-                (ShieldedTransaction, PreVerificationDetails)
-            );
-        console.logString("Calldata decoded!");
-
-        // Check if the tx is outsourced verification tx or not
-        bool isVerificationOutsourced = preVeri.isPreVerified;
+    ) internal pure returns (address, uint24, uint256) {
+        (ShieldedTransaction memory stx, ) = abi.decode(
+            userOp.callData[4:],
+            (ShieldedTransaction, PreVerificationDetails)
+        );
 
         // FeeData is packed as follows (in order):
         // 20 bytes - paymaster address
@@ -224,26 +260,20 @@ contract Paymaster is IPaymaster, Ownable {
         // Extract the feeValue (9 bytes)
         uint256 feeValue = uint256(uint72(stx.feeData));
 
-        return (paymaster, feeAssetId, feeValue, isVerificationOutsourced);
+        return (paymaster, feeAssetId, feeValue);
     }
 
+    /// @notice Returns `maxCostEth` amt of ETH in asset.
     function _getRequiredFee(
         uint24 feeAssetId,
-        bool isVerificationOutsourced,
-        uint256 /*maxCostEth*/
-    ) internal view returns (uint256) {
-        uint256 feeAssetValue;
-        if (isVerificationOutsourced) {
-            feeAssetValue = _assetFeesForPreVerifiedTx[feeAssetId];
-        } else {
-            feeAssetValue = _assetFees[feeAssetId];
+        uint256 maxCostEth
+    ) internal view returns (uint256 feeInAsset) {
+        if (feeAssetId == ETH_ASSET_ID) {
+            return maxCostEth;
         }
 
-        if (feeAssetValue == 0) {
-            revert UnsupportedFeeAsset(feeAssetId);
-        }
-
-        return feeAssetValue;
+        feeInAsset = convertFeeFromEthToFeeAsset(maxCostEth, feeAssetId);
+        return feeInAsset;
     }
 
     /**
