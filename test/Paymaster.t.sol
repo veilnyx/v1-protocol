@@ -233,7 +233,7 @@ contract PaymasterTest is PoolTest {
                 feeValue
             )
         );
-        paymaster.validatePaymasterUserOp(userOp, bytes32(0), feeValue); // feeValue is maxCostEth
+        paymaster.validatePaymasterUserOp(userOp, bytes32(0), feeValue); // feeValue is maxCostEth (paymaster) / requiredPreFund (entrypoint)
     }
 
     function test_revertWhenPaymasterFeesInUSDCIsNotEnough()
@@ -375,7 +375,7 @@ contract PaymasterTest is PoolTest {
         public
         createPackedUserOps(address(gateway))
     {
-        if (block.chainid == ETH_SEPOLIA) {
+        if (block.chainid != ETH_SEPOLIA) {
             vm.skip(true);
         }
 

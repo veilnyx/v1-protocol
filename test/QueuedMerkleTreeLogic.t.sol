@@ -2,7 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {BinaryIMT as BinaryIMTLogic, BinaryIMTData} from "@zk-kit/imt/BinaryIMT.sol";
+import {BinaryIMT as BinaryIMTLogic, BinaryIMTData} from "@zk-kit/imt.sol/BinaryIMT.sol";
 import {MerkleTree, MerkleTreeLogic} from "../src/libraries/MerkleTree.sol";
 import {IHasher} from "src/interfaces/IHasher.sol";
 import {IPool} from "src/interfaces/IPool.sol";
