@@ -40,7 +40,7 @@ contract MempoolTest is PoolTest {
                 "transfer_20_weth_with_weth_fee_preVerificationEncodedStruct"
             );
 
-        vm.prank(MOCK_GATEWAY);
+        vm.prank(MOCK_GATEWAY); // Non-deposit tx to Mempool can only come from the Gateway
         mempool.addSTXToMempool(transferStx, preVerificationDetailsForTransfer);
         _;
     }

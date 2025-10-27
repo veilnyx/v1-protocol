@@ -21,20 +21,16 @@ export const deployErc4337Infra = async (chainParams, poolAddress, mempoolAddres
     const paymaster = await hre.viem.deployContract("Paymaster", [
         chainParams.entryPoint,
         gateway.address,
+        poolAddress
     ], deployConfig);
     console.log("Paymaster deployed:", paymaster.address);
 
+    // Set up Chainlink feeds for paymaster
+    chainParams.initAssetIdsLabyrinth.forEach(async (assetId, index) => {
+        await setAssetChainlinkFeedInPaymaster(paymaster.address, assetId, chainParams.initAssetChainlinkFeeds[index], deployConfig.client.wallet, deployConfig.client.public);
+    });
+
     await fundPaymaster(paymaster.address, "2", deployConfig.client.wallet, deployConfig.client.public);
-
-    // Assuming WETH and USDC are supported assets in the protocol
-    const wethAssetId = 65537;
-    const usdcAssetId = 65538;
-    // Fee assets
-    await setAssetFee(paymaster.address, wethAssetId, PAYMASTER_FEE_INSTANT_TX_ETH, deployConfig.client.wallet, deployConfig.client.public);
-    await setAssetFeeForPreverifiedTx(paymaster.address, wethAssetId, PAYMASTER_FEE_PREVERIFIED_TX_ETH, deployConfig.client.wallet, deployConfig.client.public)
-    await setAssetFee(paymaster.address, usdcAssetId, PAYMASTER_FEE_INSTANT_TX_USDC, deployConfig.client.wallet, deployConfig.client.public);
-    await setAssetFeeForPreverifiedTx(paymaster.address, usdcAssetId, PAYMASTER_FEE_PREVERIFIED_TX_USDC, deployConfig.client.wallet, deployConfig.client.public);
-
     return {
         paymaster: paymaster.address,
         gateway: gateway.address
@@ -62,43 +58,21 @@ const fundPaymaster = async (paymaster, amount, wallet, client) => {
     }
 }
 
-const setAssetFee = async (paymaster, assetId, amount, wallet, client) => {
+const setAssetChainlinkFeedInPaymaster = async (paymaster, assetId, chainlinkFeed, wallet, client) => {
     const paymasterAbi = hre.artifacts.readArtifactSync("Paymaster").abi;
     let rct;
     try {
-
         const hash = await wallet.writeContract({
             address: paymaster,
             abi: paymasterAbi,
-            functionName: "setAssetFee",
-            args: [assetId, amount]
+            functionName: "setChainlinkFeed",
+            args: [assetId, chainlinkFeed]
         });
 
         rct = await client.waitForTransactionReceipt({ hash });
-        console.log("rct:assetIDFeeAdded", rct.status);
+        console.log("rct:ChainlinkFeedForAssetSet", rct.status);
     } catch (error) {
-        console.log("Error adding asset id");
-        console.log(error.message);
-        console.log("Error rct:", rct);
-    }
-}
-
-const setAssetFeeForPreverifiedTx = async (paymaster, assetId, amount, wallet, client) => {
-    const paymasterAbi = hre.artifacts.readArtifactSync("Paymaster").abi;
-    let rct;
-    try {
-
-        const hash = await wallet.writeContract({
-            address: paymaster,
-            abi: paymasterAbi,
-            functionName: "setAssetFeeForPreVerifiedTx",
-            args: [assetId, amount]
-        });
-
-        rct = await client.waitForTransactionReceipt({ hash });
-        console.log("rct:assetIDFeeAddedForPreverifiedTx", rct.status);
-    } catch (error) {
-        console.log("Error adding asset id");
+        console.log("Error setting chainlink feed for asset");
         console.log(error.message);
         console.log("Error rct:", rct);
     }

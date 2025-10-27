@@ -127,15 +127,21 @@ contract PoolTest is PoolBaseTest, BaseScript {
         assetAddresses[1] = address(token2);
         assetAddresses[2] = address(tokenReent);
 
+        uint8[] memory assetsPrecision = new uint8[](3 + initAssetLength);
+        assetsPrecision[0] = 18;
+        assetsPrecision[1] = 6;
+        assetsPrecision[2] = 18;
+
         // adding support for testnet tokens if any to provide support of adaptor testing
         if (initAssetLength > 0) {
             uint i = 0;
             do {
                 assetAddresses[3 + i] = _config.initAssetAddresses()[i];
+                assetsPrecision[3 + i] = _config.initAssetsPrecision()[i];
                 ++i;
             } while (i < initAssetLength);
         }
-        pool.addAssets(assetType, assetAddresses);
+        pool.addAssets(assetType, assetAddresses, assetsPrecision);
         asset1 = pool.getAsset(assetAddresses[0]);
         asset2 = pool.getAsset(assetAddresses[1]);
 

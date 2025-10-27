@@ -58,7 +58,10 @@ contract LidoAdaptorTest is PoolTest {
         AssetType assetType = AssetType.ERC20;
         address[] memory assetAddresses = new address[](1);
         assetAddresses[0] = wstETH;
-        pool.addAssets(assetType, assetAddresses);
+
+        uint8[] memory assetsPrecision = new uint8[](1);
+        assetsPrecision[0] = 18;
+        pool.addAssets(assetType, assetAddresses, assetsPrecision);
 
         deal(WETH, user, INITIAL_SUPPLY);
 

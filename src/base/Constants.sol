@@ -7,8 +7,8 @@ uint256 constant FIELD_SIZE_DIV_2 = FIELD_SIZE / 2;
 
 uint256 constant ZERO_LEAF = uint256(keccak256("zero")) % FIELD_SIZE;
 
-string constant EIP712_DOMAIN_NAME = "Veilnyx";
-string constant EIP712_DOMAIN_VERSION = "2.0";
+string constant EIP712_DOMAIN_NAME = "Labyrinth";
+string constant EIP712_DOMAIN_VERSION = "1";
 bytes32 constant EIP712_TYPEHASH_REGISTER_ADDRESS = keccak256(
     "RegisterAddress(string message,bytes shieldedAddress)"
 );

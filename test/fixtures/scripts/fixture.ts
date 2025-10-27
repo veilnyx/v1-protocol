@@ -19,7 +19,9 @@ import {
 } from "viem";
 import {
   UserOperation,
-  getPackedUserOperation
+  getPackedUserOperation,
+  getRequiredPrefund,
+  ENTRYPOINT_ADDRESS_V07,
 } from "permissionless";
 import { ShieldedAccount } from "@labyrinthac/account";
 import { Fp, Point, poseidonDecrypt } from "@labyrinthac/babyjubjub";
@@ -32,7 +34,6 @@ import { Core } from "@labyrinthac/core";
 import { ZTransaction, PreVerification, PreVerificationDetails } from "@labyrinthac/zk-prover";
 import { Note, SIZE_ENCRYPTED_DECRYPTION_KEY, SIZE_FULLY_ENCRYPTED_NOTE_DATA } from "@labyrinthac/transaction";
 import config from "../config.json";
-import { register } from "module";
 
 const senderSeed = BigInt(config.sender.seed);
 const receiverSeed = BigInt(config.receiver.seed);
@@ -44,6 +45,14 @@ const addressTreeDepth = Number(config.addressTreeDepth);
 const commitmentTreeDepth = Number(config.commitmentTreeDepth);
 const commitmentTreeQueueSize = Number(config.commitmentTreeQueueSize);
 const qmtBatchSize = Number(config.qmtBatchSize);
+
+export const USER_OP_CALL_GAS_LIMIT = BigInt(25_00_000);
+export const USER_OP_VERIFICATION_GAS_LIMIT = BigInt(75_000);
+export const USER_OP_PRE_VERIFICATION_GAS = BigInt(75_000);
+export const USER_OP_MAX_FEE_PER_GAS = BigInt(150_000_000);
+export const USER_OP_MAX_PRIORITY_FEE_PER_GAS = BigInt(150_000_000);
+export const USER_OP_PAYMASTER_VERIFICATION_GAS = BigInt(50_000);
+
 const assets = {
   weth: config.assets.weth,
   usdc: config.assets.usdc,
@@ -118,6 +127,7 @@ export const generateTestTransaction = async (
     viaBundler: req.viaBundler,
     paymaster: req.paymaster,
     revokerId: req.revokerId,
+    requiredPrefundEth: parseEther("0.00025")
   };
   const tx = await sdk.createTransaction(req, opts);
   // console.log("TX: ", tx);
@@ -131,7 +141,7 @@ export const generateTestTransaction = async (
 export const generateTestTxsWithOutsourcedProofVerification = async (
   reqs: Record<string, TransactionRequest & TransactionOptions>,
   sdk: Core,
-  nebraClient: any,
+  nebraClient: any
 ) => {
   const reqArr = Object.entries(reqs);
   for (const [name, req] of reqArr) {
@@ -149,19 +159,18 @@ export const generateTestTransactionWithOutsourcedProofVerification = async (
     viaBundler: req.viaBundler,
     paymaster: req.paymaster,
     revokerId: req.revokerId,
-    isPreVerified: true
+    requiredPrefundEth: parseEther("0.00025")
   };
   const tx = await sdk.createTransaction(req, opts);
   // console.log("TX: ", tx);
   const signedTx = await sdk.signTransaction(tx);
   const { ztx: preVerifiedTx, preVerification, nebraProofSubmissionObj } = await sdk.proveOutsourcedVerificationTx(signedTx, nebraClient);
 
-  // console.log("ZTX:", preVerifiedTx);
+  console.log("ZTX:", preVerifiedTx);
   const encoded = preVerifiedTx.encode();
-  console.log("ZTX Encoded:", encoded);
+  console.log("ZTX Encoded");
   writeFileSync(`${dirFixtureData}/${name}.txt`, encoded);
 
-  console.log("Pre-verification data:", preVerification);
   const encodedPreVerification = preVerification.encode();
   writeFileSync(`${dirFixtureData}/${name}_preVerificationEncodedStruct.txt`, encodedPreVerification);
 };
@@ -179,8 +188,7 @@ export const generateTestAddressRegistrations = async (
 export const generateTestAddrRegWithOutsourceProofVerifications = async (
   reqs: Record<string, {}>,
   sdk: Core,
-  nebraClient: any,
-  registerCircuitId: `0x${string}`
+  nebraClient: any
 ) => {
   const reqArr = Object.entries(reqs);
   for (const [name, req] of reqArr) {
@@ -307,14 +315,46 @@ export async function mockNotes(depositName: string, sdk: Core) {
 }
 
 export const generatePackedUserOps = async (name: string, req: TransactionRequest & TransactionOptions, sdk: Core, isPreVerified: boolean, nebraClient) => {
+
+  const nonce = concatHex([
+    padHex(randomHex(24), { size: 24 }),
+    padHex("0x0", { size: 8 }),
+  ]);
+
+  // Generating user op
+  const userOp: UserOperation<"v0.7"> = {
+    sender: `0x${"F3d8f3B185d1448BD3f3762b6cCF7F129bC21fDB"}` as `0x${string}`, // make sure this matches the Gateway address from solidity test setup
+    nonce: BigInt(nonce),
+    factory: undefined,
+    factoryData: "0x",
+    callData: "0x", // this will be replaced with the calldata generated below
+    callGasLimit: USER_OP_CALL_GAS_LIMIT, // 30 M gas is block gas limit = 30_000_000 gas
+    verificationGasLimit: USER_OP_VERIFICATION_GAS_LIMIT,
+    preVerificationGas: USER_OP_PRE_VERIFICATION_GAS,
+    maxFeePerGas: USER_OP_MAX_FEE_PER_GAS,
+    maxPriorityFeePerGas: USER_OP_MAX_FEE_PER_GAS,
+    paymaster: `0x${"C141A1Fc167930FA8E1448BdC7Cea9C7a13C1021"}` as `0x${string}`, // make sure this matches the Paymaster address from solidity test setup
+    paymasterVerificationGasLimit: USER_OP_PAYMASTER_VERIFICATION_GAS,
+    paymasterPostOpGasLimit: BigInt(5),
+    paymasterData: "0x",
+    signature: "0x",
+  };
+
+  const requiredPrefundEth = getRequiredPrefund({
+    userOperation: userOp,
+    entryPoint: ENTRYPOINT_ADDRESS_V07
+  });
+
   // Generating ztx
-  const opts = {
+  const opts: TransactionOptions = {
     viaBundler: req.viaBundler,
     paymaster: req.paymaster,
     revokerId: req.revokerId,
-    isPreVerified: isPreVerified
+    requiredPrefundEth: requiredPrefundEth
   };
+
   const tx = await sdk.createTransaction(req, opts);
+  console.log("TX: ", tx);
   const signedTx = await sdk.signTransaction(tx);
 
   let ztx: ZTransaction;
@@ -343,43 +383,19 @@ export const generatePackedUserOps = async (name: string, req: TransactionReques
 
   console.log("ZTX:", ztx);
   const encodedZTx = ztx.encode();
-  console.log("ZTX Encoded:", encodedZTx);
   writeFileSync(`${dirFixtureData}/${name}.txt`, encodedZTx);
+  console.log("ZTX fixture created");
 
   const encodedPreVerification = preVerification.encode();
   writeFileSync(`${dirFixtureData}/${name}_preVerificationEncodedStruct.txt`, encodedPreVerification);
 
-  // Generating calldata
+  // Generating & Updating calldata in UserOp
   const gatewayAbi = JSON.parse(readFileSync("out/Gateway.sol/Gateway.json", "utf-8")).abi;
-  const calldata = encodeFunctionData({
+  userOp.callData = encodeFunctionData({
     abi: gatewayAbi,
     functionName: "handleUserOp",
     args: [ztx.toSolidityInput(), preVerification]
   });
-
-  const nonce = concatHex([
-    padHex(randomHex(24), { size: 24 }),
-    padHex("0x0", { size: 8 }),
-  ]);
-
-  // Generating user op
-  const userOp: UserOperation<"v0.7"> = {
-    sender: `0x${"F3d8f3B185d1448BD3f3762b6cCF7F129bC21fDB"}` as `0x${string}`, // make sure this matches the Gateway address from solidity test setup
-    nonce: BigInt(nonce),
-    factory: undefined,
-    factoryData: "0x",
-    callData: calldata,
-    callGasLimit: BigInt(25_00_000), // 30 M gas is block gas limit = 30_000_000 gas
-    verificationGasLimit: BigInt(75_000),
-    preVerificationGas: BigInt(75_000),
-    maxFeePerGas: BigInt(150_000_000),
-    maxPriorityFeePerGas: BigInt(150_000_000),
-    paymaster: `0x${"C141A1Fc167930FA8E1448BdC7Cea9C7a13C1021"}` as `0x${string}`, // make sure this matches the Paymaster address from solidity test setup
-    paymasterVerificationGasLimit: BigInt(25_000),
-    paymasterPostOpGasLimit: BigInt(5),
-    paymasterData: "0x",
-    signature: "0x",
-  };
 
   // Generating packed user op
   const packedUserOp = await getPackedUserOperation(userOp);
@@ -425,7 +441,6 @@ export const generatePackedUserOps = async (name: string, req: TransactionReques
   });
 
   console.log("Starting Encoding of Packed User Op");
-  console.log("ABI: ", packedUserOpAbi);
   console.log("Packed User Op Values: ", packedUserOpValueObj);
   // @ts-ignore
   const encoded = encodeAbiParameters(packedUserOpAbi, [packedUserOpValueObj]);
