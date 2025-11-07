@@ -15,6 +15,7 @@ const rpcEthereumSepolia = process.env.RPC_ETHEREUM_SEPOLIA as string;
 const rpcOptimismSepolia = process.env.RPC_OPTIMISM_SEPOLIA as string;
 const rpcTenderlyMainnet = process.env.RPC_TENDERLY_MAINNET as string;
 const rpcVeilnyxTestnet = process.env.RPC_VEILNYX_TESTNET as string;
+const rpcArcTestnet = process.env.RPC_ARC_TESTNET as string;
 const rpcTenderlyMainnetCustomId = process.env.RPC_TENDERLY_MAINNET_CUSTOM_ID as string;
 const privateKeys = [process.env.PRIVATE_KEY as string];
 const veilnyxPrivateKeys = [process.env.VEILNYX_TEST_PRIV_KEY as string];
@@ -55,6 +56,11 @@ const config: HardhatUserConfig = {
       url: rpcVeilnyxTestnet,
       accounts: veilnyxPrivateKeys,
       chainId: 34244
+    },
+    arcTestnet: {
+      url: rpcArcTestnet,
+      accounts: privateKeys,
+      chainId: 5042002
     }
   },
   contractSizer: {

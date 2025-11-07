@@ -45,15 +45,24 @@ export async function getChainForCurrentNetwork(hre: HardhatRuntimeEnvironment):
         throw new Error(`No RPC URL defined for network: ${networkName}`);
     }
 
+    let nativeCurrency = {
+        decimals: 18,
+        name: "Ether",
+        symbol: "ETH",
+    };
+
+    if (chainId === 5042002) {
+        // Arc Testnet specific configuration
+        nativeCurrency.decimals = 6;
+        nativeCurrency.name = "USDC";
+        nativeCurrency.symbol = "USDC";
+    }
+
     // Define a custom chain
     return defineChain({
         id: chainId,
         name: networkName,
-        nativeCurrency: {
-            decimals: 18,
-            name: "Ether", // Default, can be overridden if needed
-            symbol: "ETH",
-        },
+        nativeCurrency,
         rpcUrls: {
             default: {
                 http: [rpcUrl as string],

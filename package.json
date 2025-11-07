@@ -14,6 +14,7 @@
     "deploy:tenderly": "hardhat run script/deployTenderly.ts --network tenderlyMainnetCustomId",
     "deploy:sepolia": "hardhat run script/deploy.ts --network ethereumSepolia",
     "deploy:veilnyx": "hardhat run script/deploy.ts --network veilnyxTestnet",
+    "deploy:arc": "hardhat run script/deployP-2-P.ts --network arcTestnet",
     "upgrade:ethSepolia": "hardhat run script/upgradePool.ts --network ethereumSepolia",
     "upgradeMempool:ethSepolia": "hardhat run script/upgradeMempool.ts --network ethereumSepolia",
     "upgrade:opSepolia": "hardhat run script/upgrade.ts --network optimismSepolia",
