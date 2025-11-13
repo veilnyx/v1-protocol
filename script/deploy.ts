@@ -22,66 +22,66 @@ const PROOF_SUB_MEMPOOL_EXIT_FEES: bigint = BigInt(75_000_000_000_0000); // 375k
 const verificationTrackerService = `0x${"75a4dA1697aF884c99724474d26F2EAe23cc58Bc"}` as `0x${string}`;
 const nebraVerifierSepolia = `0x${"3B946743DEB7B6C97F05B7a31B23562448047E3E"}` as `0x${string}`;
 
-  const deployMempoolImplAndProxy = async (pool: `0x${string}`, shieldedTransactionLogicAddr: `0x${string}`, gateway: `0x${string}`) => {
-    console.log("Starting to deploy new Mempool");
+const deployMempoolImplAndProxy = async (pool: `0x${string}`, shieldedTransactionLogicAddr: `0x${string}`, gateway: `0x${string}`) => {
+  console.log("Starting to deploy new Mempool");
 
-    // deploy MempoolValidator
-    const mempoolValidator = await hre.viem.deployContract("MempoolValidator", [], {
-      libraries: {
-        ShieldedTransactionLogic: shieldedTransactionLogicAddr
-      }
-    });
-    console.log("MempoolValidator deployed:", mempoolValidator.address);
+  // deploy MempoolValidator
+  const mempoolValidator = await hre.viem.deployContract("MempoolValidator", [], {
+    libraries: {
+      ShieldedTransactionLogic: shieldedTransactionLogicAddr
+    }
+  });
+  console.log("MempoolValidator deployed:", mempoolValidator.address);
 
-    const args = [
-      pool,
-      PROOF_SUB_MEMPOOL_EXIT_FEES,
-      verificationTrackerService,
-      nebraVerifierSepolia,
-      gateway
-    ];
+  const args = [
+    pool,
+    PROOF_SUB_MEMPOOL_EXIT_FEES,
+    verificationTrackerService,
+    nebraVerifierSepolia,
+    gateway
+  ];
 
-    // deploying using Hardhat Proxy deploy plugin
-    const mempoolImpl = await ethers.getContractFactory("Mempool", {
-      libraries: {
-        MempoolValidator: mempoolValidator.address
-      }
-    });
+  // deploying using Hardhat Proxy deploy plugin
+  const mempoolImpl = await ethers.getContractFactory("Mempool", {
+    libraries: {
+      MempoolValidator: mempoolValidator.address
+    }
+  });
 
-    const mempoolProxy = await upgrades.deployProxy(mempoolImpl, args, {
-      kind: "uups",
-      unsafeAllow: ["external-library-linking"]
-    });
-    await mempoolProxy.waitForDeployment();
-    const mempoolProxyAddr = await mempoolProxy.getAddress();
-    console.log("MempoolProxy deployed:", mempoolProxyAddr);
-    return mempoolProxyAddr;
-  }
+  const mempoolProxy = await upgrades.deployProxy(mempoolImpl, args, {
+    kind: "uups",
+    unsafeAllow: ["external-library-linking"]
+  });
+  await mempoolProxy.waitForDeployment();
+  const mempoolProxyAddr = await mempoolProxy.getAddress();
+  console.log("MempoolProxy deployed:", mempoolProxyAddr);
+  return mempoolProxyAddr;
+}
 
-  const updateGatewayAndPoolInMempool = async (deployConfig, mempool: `0x${string}`, gateway: `0x${string}`, pool: `0x${string}`) => {
+const updateGatewayAndPoolInMempool = async (deployConfig, mempool: `0x${string}`, gateway: `0x${string}`, pool: `0x${string}`) => {
 
-    // @ts-ignore
-    const updatePoolTxHash = await deployConfig.client.wallet.writeContract({
-      address: mempool,
-      abi: mempoolAbi,
-      functionName: "updatePoolAddress",
-      args: [pool]
-    });
+  // @ts-ignore
+  const updatePoolTxHash = await deployConfig.client.wallet.writeContract({
+    address: mempool,
+    abi: mempoolAbi,
+    functionName: "updatePoolAddress",
+    args: [pool]
+  });
 
-    const upgradePoolRct = await deployConfig.client.public.waitForTransactionReceipt({ hash: updatePoolTxHash });
-    console.log("rct:updatePoolAddress in Mempool", upgradePoolRct.status);
+  const upgradePoolRct = await deployConfig.client.public.waitForTransactionReceipt({ hash: updatePoolTxHash });
+  console.log("rct:updatePoolAddress in Mempool", upgradePoolRct.status);
 
-    // @ts-ignore
-    const updateGatewayHash = await deployConfig.client.wallet.writeContract({
-      address: mempool,
-      abi: mempoolAbi,
-      functionName: "updateGatewayContract",
-      args: [gateway]
-    });
+  // @ts-ignore
+  const updateGatewayHash = await deployConfig.client.wallet.writeContract({
+    address: mempool,
+    abi: mempoolAbi,
+    functionName: "updateGatewayContract",
+    args: [gateway]
+  });
 
-    const upgradeGatewayRct = await deployConfig.client.public.waitForTransactionReceipt({ hash: updateGatewayHash });
-    console.log("rct:updateGatewayContract in Mempool", upgradeGatewayRct.status);
-  }
+  const upgradeGatewayRct = await deployConfig.client.public.waitForTransactionReceipt({ hash: updateGatewayHash });
+  console.log("rct:updateGatewayContract in Mempool", upgradeGatewayRct.status);
+}
 
 const main = async () => {
   // Get the appropriate chain definition for the current network
@@ -171,9 +171,9 @@ const main = async () => {
     const verifier = await deployVerifier(deployConfig);
 
     const initAddressParams = {
-      mempool: zeroAddress,
+      mempool: mempoolProxy,
       verifier: verifier,
-      adaptorHandler: zeroAddress,
+      adaptorHandler: adaptorHandler.address,
       screener: chainParams.sanctionsList,
       hasher: hasher,
       verificationTrackerService: verificationTrackerService
