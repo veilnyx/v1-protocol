@@ -4,15 +4,16 @@ import {
   encodeAbiParameters,
   encodeFunctionData,
   parseAbiParameters,
+  zeroAddress
 } from "viem";
-import { DeployContractConfig } from '@nomicfoundation/hardhat-viem/types';
-import poolModule from "../ignition/modules/pool";
+import { DeployContractConfig, KeyedClient } from '@nomicfoundation/hardhat-viem/types';
 import { loadConfigs, ChainParams, CommonParams } from "./configs";
 import { deployHasher } from "./hasher";
 import { deployVerifier } from "./verifier";
 import { deployErc4337Infra } from "./erc4337Infra";
 import { registerCircuitsOnNebra } from "./registerCircuitsOnNebra";
-import { addInitialAssets, registerRevokers } from "./setup";
+import { getChainForCurrentNetwork } from "./utils/chainUtils";
+// import { addInitialAssets, registerRevokers } from "./setup";
 
 const config = loadConfigs();
 const poolAbi = hre.artifacts.readArtifactSync("Pool").abi;
@@ -20,7 +21,6 @@ const mempoolAbi = hre.artifacts.readArtifactSync("Mempool").abi;
 const PROOF_SUB_MEMPOOL_EXIT_FEES: bigint = BigInt(75_000_000_000_0000); // 375k gas @ 2 gwei = 0.00075 ETH
 const verificationTrackerService = `0x${"75a4dA1697aF884c99724474d26F2EAe23cc58Bc"}` as `0x${string}`;
 const nebraVerifierSepolia = `0x${"3B946743DEB7B6C97F05B7a31B23562448047E3E"}` as `0x${string}`;
-const zeroAddr = "0x0000000000000000000000000000000000000000" as `0x${string}`;
 
 const deployMempoolImplAndProxy = async (pool: `0x${string}`, shieldedTransactionLogicAddr: `0x${string}`, gateway: `0x${string}`) => {
   console.log("Starting to deploy new Mempool");
@@ -83,30 +83,37 @@ const updateGatewayAndPoolInMempool = async (deployConfig, mempool: `0x${string}
   console.log("rct:updateGatewayContract in Mempool", upgradeGatewayRct.status);
 }
 
-const main1 = async () => {
-  const client = await hre.viem.getPublicClient();
-  const chainId = await client.getChainId();
-  const commonParams = config.common as CommonParams;
-  const chainParams = config[chainId] as ChainParams;
+const main = async () => {
+  // Get the appropriate chain definition for the current network
 
-  const wallets = await hre.viem.getWalletClients();
+  const chain = await getChainForCurrentNetwork(hre);
+  console.log("Deploying to chain:", chain);
+
+  // Use the chain definition when creating clients
+  const client = await hre.viem.getPublicClient({ chain });
+  const wallets = await hre.viem.getWalletClients({ chain });
   const wallet = wallets[0];
-  const [walletAddress] = await wallet.getAddresses();
+
+  const commonParams = config.common as CommonParams;
+  const chainParams = config[chain.id] as ChainParams;
+
   const deployConfig: DeployContractConfig = {
     client: {
       public: client,
       wallet: wallet
-    }
+    } as KeyedClient
   }
 
-  const eip712 = await hre.viem.deployContract("EIP712");
+  const eip712 = await hre.viem.deployContract("EIP712", [], deployConfig);
   console.log("EIP712 deployed:", eip712.address);
-  const asset = await hre.viem.deployContract("AssetLogic");
+  const asset = await hre.viem.deployContract("AssetLogic", [], deployConfig);
   console.log("AssetLogic deployed:", asset.address);
-  const merkleTree = await hre.viem.deployContract("MerkleTreeLogic");
+  const merkleTree = await hre.viem.deployContract("MerkleTreeLogic", [], deployConfig);
   console.log("MerkleTreeLogic deployed:", merkleTree.address);
   const queuedMerkleTree = await hre.viem.deployContract(
-    "QueuedMerkleTreeLogic"
+    "QueuedMerkleTreeLogic",
+    [],
+    deployConfig
   );
   console.log("QueuedMerkleTreeLogic deployed:", queuedMerkleTree.address);
 
@@ -117,6 +124,7 @@ const main1 = async () => {
       libraries: {
         MerkleTreeLogic: merkleTree.address,
       },
+      ...deployConfig
     }
   );
   console.log("ShieldedAddressLogic deployed:", shieldedAddress.address);
@@ -130,7 +138,8 @@ const main1 = async () => {
         MerkleTreeLogic: merkleTree.address,
         QueuedMerkleTreeLogic: queuedMerkleTree.address,
       },
-    }
+      ...deployConfig
+    },
   );
   console.log("ShieldedTransactionLogic deployed:", shieldedTransaction.address);
 
@@ -138,7 +147,7 @@ const main1 = async () => {
   console.log("AdaptorHandler deployed: ", adaptorHandler.address);
 
   // Pool and Gateway contract addr will be updated at the end
-  const mempoolProxy = await deployMempoolImplAndProxy(zeroAddr, shieldedTransaction.address, zeroAddr);
+  const mempoolProxy = await deployMempoolImplAndProxy(zeroAddress, shieldedTransaction.address, zeroAddress);
 
   // POOL DEPLOYMENT
   let poolProxy;
@@ -152,6 +161,7 @@ const main1 = async () => {
         ShieldedAddressLogic: shieldedAddress.address,
         ShieldedTransactionLogic: shieldedTransaction.address,
       },
+      ...deployConfig
     });
     console.log("Pool deployed:", poolImpl.address);
 
@@ -186,7 +196,7 @@ const main1 = async () => {
     poolProxy = await hre.viem.deployContract("PoolProxy", [
       poolImpl.address,
       initData,
-    ]);
+    ], deployConfig);
     console.log("PoolProxy deployed:", poolProxy.address);
   }
 
@@ -231,40 +241,46 @@ const main1 = async () => {
   // ERC4337 infra
   const erc4337Contracts = await deployErc4337Infra(chainParams, poolProxy.address, mempoolProxy, deployConfig);
 
-  await updateGatewayAndPoolInMempool(deployConfig, mempoolProxy, erc4337Contracts.gateway, poolProxy.address);
+  await updateGatewayAndPoolInMempool(deployConfig, mempoolProxy as `0x${string}`, erc4337Contracts.gateway, poolProxy.address);
 
   // Register Labyrinth's circuits with Nebra
   await registerCircuitsOnNebra();
 };
 
-const main = async () => {
-  const client = await hre.viem.getPublicClient();
-  const wallets = await hre.viem.getWalletClients();
-  const wallet = wallets[0];
-  const [walletAddress] = await wallet.getAddresses();
-  const chainId = await client.getChainId();
-  const commonParams = config.common as CommonParams;
-  const chainParams = config[chainId] as ChainParams;
+/**
+  const main1 = async () => {
+    // Get the appropriate chain definition for the current network
+    const chain = await getChainForCurrentNetwork(hre);
+    
+    // Use the chain definition when creating clients
+    const client = await hre.viem.getPublicClient({ chain });
+    const wallets = await hre.viem.getWalletClients({ chain });
+    const wallet = wallets[0];
+    const [walletAddress] = await wallet.getAddresses();
+    const chainId = await client.getChainId();
+    const commonParams = config.common as CommonParams;
+    const chainParams = config[chainId] as ChainParams;
 
-  console.log("Running deployment on chain:", chainId);
-  console.log("Deployer address:", walletAddress);
+    console.log("Running deployment on chain:", chainId);
+    console.log("Deployer address:", walletAddress);
 
-  const deployConfig: DeployContractConfig = {
-    client: {
-      public: client,
-      wallet: wallet
+    const deployConfig: DeployContractConfig = {
+      client: {
+        public: client,
+        wallet: wallet
+      }
     }
-  }
 
-  // const mempoolProxy = await deployMempoolImplAndProxy(`0x0369cb46f2cbe32c775a2f00177d8dbf84fcb4af` as `0x${string}`, `0xb28096f5fe1463dd806947603d8269759b807c04` as `0x${string}`, `0xf0335a55ef61a57cd4d726a1a53e0143835168b0` as `0x${string}`);
+    // const mempoolProxy = await deployMempoolImplAndProxy(`0x0369cb46f2cbe32c775a2f00177d8dbf84fcb4af` as `0x${string}`, `0xb28096f5fe1463dd806947603d8269759b807c04` as `0x${string}`, `0xf0335a55ef61a57cd4d726a1a53e0143835168b0` as `0x${string}`);
 
-  const mempoolProxy = `0x9642346eE64cf65D67f324Ff7Ec24AfF903Fbe2d` as `0x${string}`;
-  const poolProxy = `0x0369cb46f2cbe32c775a2f00177d8dbf84fcb4af` as `0x${string}`;
-  // ERC4337 infra
-  const erc4337Contracts = await deployErc4337Infra(chainParams, poolProxy, mempoolProxy, deployConfig);
+    const mempoolProxy = `0x9642346eE64cf65D67f324Ff7Ec24AfF903Fbe2d` as `0x${string}`;
+    const poolProxy = `0x0369cb46f2cbe32c775a2f00177d8dbf84fcb4af` as `0x${string}`;
+    // ERC4337 infra
+    const erc4337Contracts = await deployErc4337Infra(chainParams, poolProxy, mempoolProxy, deployConfig);
 
-  await updateGatewayAndPoolInMempool(deployConfig, mempoolProxy, erc4337Contracts.gateway, poolProxy);
+    await updateGatewayAndPoolInMempool(deployConfig, mempoolProxy, erc4337Contracts.gateway, poolProxy);
 
-};
+  };
+*/
 
-main1().catch(console.error);
+main().catch(console.error);
