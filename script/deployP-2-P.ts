@@ -1,3 +1,9 @@
+// The purpose of this script is to deploy the Veilnyx protocol core features focused on P-2-P transactions using Stable coins only.
+// This deploy script will skip:
+// 1. Proof aggregation features
+// 2. Integration adaptors
+// 3. Any tokens apart from gas and stable coins will be skipped
+
 import hre from "hardhat";
 import {
     encodeAbiParameters,
@@ -5,24 +11,16 @@ import {
     parseAbiParameters,
     zeroAddress
 } from "viem";
-import { privateKeyToAccount } from "viem/accounts";
 import { DeployContractConfig, KeyedClient } from '@nomicfoundation/hardhat-viem/types';
-import poolModule from "../ignition/modules/pool";
 import { loadConfigs, ChainParams, CommonParams } from "./configs";
 import { deployHasher } from "./hasher";
 import { deployVerifier } from "./verifier";
 import { deployErc4337Infra } from "./erc4337Infra";
-import { registerCircuitsOnNebra } from "./registerCircuitsOnNebra";
-import { addInitialAssets, registerRevokers } from "./setup";
 import { getChainForCurrentNetwork } from "./utils/chainUtils";
 
 const config = loadConfigs();
 const poolAbi = hre.artifacts.readArtifactSync("Pool").abi;
-const mempoolAbi = hre.artifacts.readArtifactSync("Mempool").abi;
-const PROOF_SUB_MEMPOOL_EXIT_FEES: bigint = BigInt(75_000_000_000_0000); // 375k gas @ 2 gwei = 0.00075 ETH
 const verificationTrackerService = `0x${"75a4dA1697aF884c99724474d26F2EAe23cc58Bc"}` as `0x${string}`;
-const nebraVerifierSepolia = `0x${"3B946743DEB7B6C97F05B7a31B23562448047E3E"}` as `0x${string}`;
-const zeroAddr = "0x0000000000000000000000000000000000000000" as `0x${string}`;
 
 const main = async () => {
     // Get the appropriate chain definition for the current network
