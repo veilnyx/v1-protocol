@@ -40,7 +40,11 @@ contract EthenaAdaptorTest is PoolTest {
         address[] memory assetAddresses = new address[](2);
         assetAddresses[0] = USDe;
         assetAddresses[1] = ETHENA;
-        pool.addAssets(assetType, assetAddresses);
+
+        uint8[] memory assetsPrecision = new uint8[](2);
+        assetsPrecision[0] = 6;
+        assetsPrecision[1] = 6;
+        pool.addAssets(assetType, assetAddresses, assetsPrecision);
         
         vm.stopPrank();
     }

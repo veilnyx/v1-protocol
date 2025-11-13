@@ -27,7 +27,9 @@ contract PoolAdaptorTest is PoolTest {
         AssetType assetType = AssetType.ERC20;
         address[] memory addresses = new address[](1);
         addresses[0] = address(mockDefi);
-        pool.addAssets(assetType, addresses);
+        uint8[] memory precisions = new uint8[](1);
+        precisions[0] = 18;
+        pool.addAssets(assetType, addresses, precisions);
     }
 
     function test_supportAdaptor() public view {

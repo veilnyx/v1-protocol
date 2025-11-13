@@ -103,14 +103,16 @@ contract Pool is
 
     function addAssets(
         AssetType assetType,
-        address[] calldata assetAddresses
+        address[] calldata assetAddresses,
+        uint8[] calldata assetPrecision
     ) external onlyOwner {
         _assetCounts[assetType] = AssetLogic.addAssets({
             assetIds: _assetIds,
             assets: _assets,
             counter: _assetCounts[assetType],
             assetType: assetType,
-            assetAddresses: assetAddresses
+            assetAddresses: assetAddresses,
+            assetsPrecision: assetPrecision
         });
     }
 

@@ -19,7 +19,7 @@ export const reqs = {
 		paymaster:
 			`0x${"C141A1Fc167930FA8E1448BdC7Cea9C7a13C1021"}` as `0x${string}`, // make sure this matches the Paymaster address from solidity test setup
 		feeAssetId: weth,
-		revokerId: 0,
+		revokerId: 0
 	}
 	/**,
 	transfer_20_weth_without_fee: {
@@ -58,7 +58,7 @@ export const reqs = {
 };
 
 export const genTestTransfers = async (sdk: Core) => {
-	await mockNotes("deposit_weth_tx", sdk);
+	await mockNotes("deposit_pre_tx", sdk);
 	await generateTestTransactions(reqs, sdk);
 };
 

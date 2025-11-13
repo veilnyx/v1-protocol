@@ -85,7 +85,9 @@ const deployAave = async (aaveParams, pool, tenderlyDeployConfig) => {
   await addAdpatorSupport(pool, aave.address, true, tenderlyDeployConfig.client.wallet, tenderlyDeployConfig.client.public);
 
   const assets = [aaveParams.assets.staticAWeth, aaveParams.assets.staticAUsdc];
-  await addAssets(assets, 1, pool, tenderlyDeployConfig.client.wallet, tenderlyDeployConfig.client.public);
+  const assetsPrecision = [aaveParams.assetsPrecision.staticAWeth, aaveParams.assetsPrecision.staticAUsdc];
+
+  await addAssets(assets, assetsPrecision, 1, pool, tenderlyDeployConfig.client.wallet, tenderlyDeployConfig.client.public);
 }
 
 const deployLido = async (lidoParams, pool, tenderlyDeployConfig) => {
@@ -101,7 +103,9 @@ const deployLido = async (lidoParams, pool, tenderlyDeployConfig) => {
   await addAdpatorSupport(pool, lido.address, true, tenderlyDeployConfig.client.wallet, tenderlyDeployConfig.client.public);
 
   const assets = [lidoParams.assets.wstEth];
-  await addAssets(assets, 1, pool, tenderlyDeployConfig.client.wallet, tenderlyDeployConfig.client.public);
+  const assetsPrecision = [lidoParams.assetsPrecision.wstEth];
+
+  await addAssets(assets, assetsPrecision, 1, pool, tenderlyDeployConfig.client.wallet, tenderlyDeployConfig.client.public);
 }
 
 const deployCurve = async (curveParams, pool, tenderlyDeployConfig) => {
@@ -112,7 +116,9 @@ const deployCurve = async (curveParams, pool, tenderlyDeployConfig) => {
   await addAdpatorSupport(pool, curve.address, true, tenderlyDeployConfig.client.wallet, tenderlyDeployConfig.client.public);
 
   const assets = [curveParams.assets.usdt, curveParams.assets.crvUsd, curveParams.assets.crvUsdUsdtLPToken, curveParams.assets.crvUsdSusdeLPToken];
-  await addAssets(assets, 1, pool, tenderlyDeployConfig.client.wallet, tenderlyDeployConfig.client.public);
+  const assetsPrecision = [curveParams.assetsPrecision.usdt, curveParams.assetsPrecision.crvUsd, curveParams.assetsPrecision.crvUsdUsdtLPToken, curveParams.assetsPrecision.crvUsdSusdeLPToken];
+
+  await addAssets(assets, assetsPrecision, 1, pool, tenderlyDeployConfig.client.wallet, tenderlyDeployConfig.client.public);
 }
 
 const deployEthena = async (ethenaParams, pool, tenderlyDeployConfig) => {
@@ -125,7 +131,8 @@ const deployEthena = async (ethenaParams, pool, tenderlyDeployConfig) => {
   await addAdpatorSupport(pool, ethena.address, true, tenderlyDeployConfig.client.wallet, tenderlyDeployConfig.client.public);
 
   const assets = [ethenaParams.assets.usde, ethenaParams.assets.sUsde];
-  await addAssets(assets, 1, pool, tenderlyDeployConfig.client.wallet, tenderlyDeployConfig.client.public);
+  const assetsPrecision = [ethenaParams.assetsPrecision.usde, ethenaParams.assetsPrecision.sUsde];
+  await addAssets(assets, assetsPrecision, 1, pool, tenderlyDeployConfig.client.wallet, tenderlyDeployConfig.client.public);
 }
 
 const deployBeefy = async (beefyParams, pool, tenderlyDeployConfig) => {
@@ -136,7 +143,9 @@ const deployBeefy = async (beefyParams, pool, tenderlyDeployConfig) => {
   await addAdpatorSupport(pool, beefy.address, true, tenderlyDeployConfig.client.wallet, tenderlyDeployConfig.client.public);
 
   const assets = [beefyParams.assets.mooCurveCrvUSDsUSDe];
-  await addAssets(assets, 1, pool, tenderlyDeployConfig.client.wallet, tenderlyDeployConfig.client.public);
+  const assetsPrecision = [beefyParams.assetsPrecision.mooCurveCrvUSDsUSDe];
+
+  await addAssets(assets, assetsPrecision, 1, pool, tenderlyDeployConfig.client.wallet, tenderlyDeployConfig.client.public);
 }
 
 const deployMorpho = async (morphoParams, pool, tenderlyDeployConfig) => {
@@ -147,7 +156,9 @@ const deployMorpho = async (morphoParams, pool, tenderlyDeployConfig) => {
   await addAdpatorSupport(pool, morpho.address, true, tenderlyDeployConfig.client.wallet, tenderlyDeployConfig.client.public);
 
   const assets = [morphoParams.assets.gauntletWETHPrimeVault];
-  await addAssets(assets, 1, pool, tenderlyDeployConfig.client.wallet, tenderlyDeployConfig.client.public);
+  const assetsPrecision = [morphoParams.assetsPrecision.gauntletWETHPrimeVault];
+
+  await addAssets(assets, assetsPrecision, 1, pool, tenderlyDeployConfig.client.wallet, tenderlyDeployConfig.client.public);
 }
 
 const deployOneInch = async (pool, tenderlyDeployConfig) => {
@@ -169,7 +180,9 @@ const deployRocketPool = async (rocketPoolParams, pool, tenderlyDeployConfig) =>
   await addAdpatorSupport(pool, rocketPool.address, true, tenderlyDeployConfig.client.wallet, tenderlyDeployConfig.client.public);
 
   const assets = [rocketPoolParams.assets.rETH];
-  await addAssets(assets, 1, pool, tenderlyDeployConfig.client.wallet, tenderlyDeployConfig.client.public);
+  const assetsPrecision = [rocketPoolParams.assetsPrecision.rETH];
+
+  await addAssets(assets, assetsPrecision, 1, pool, tenderlyDeployConfig.client.wallet, tenderlyDeployConfig.client.public);
 }
 
 const deployAdaptors = async (pool, adpParams, tenderlyDeployConfig) => {
@@ -244,7 +257,7 @@ const fundPaymaster = async (paymaster, amount, wallet, client) => {
   }
 }
 
-const addAssets = async (assets, assetType, poolAddr, wallet, client) => {
+const addAssets = async (assets, assetsPrecision, assetType, poolAddr, wallet, client) => {
   console.log("Adding assets:", assets);
   try {
     //@ts-ignore
@@ -252,7 +265,7 @@ const addAssets = async (assets, assetType, poolAddr, wallet, client) => {
       address: poolAddr,
       abi: poolAbi,
       functionName: "addAssets",
-      args: [assetType, assets],
+      args: [assetType, assets, assetsPrecision],
     });
 
     const rct = await client.waitForTransactionReceipt({ hash });
@@ -269,7 +282,7 @@ const addAssetsAndRevokers = async (poolProxy, chainParams, commonParams, client
       address: poolProxy,
       abi: poolAbi,
       functionName: "addAssets",
-      args: [chainParams.initAssetType, chainParams.initAssetAddresses],
+      args: [chainParams.initAssetType, chainParams.initAssetAddresses, chainParams.initAssetsPrecision],
     });
 
     const rct = await client.waitForTransactionReceipt({ hash });

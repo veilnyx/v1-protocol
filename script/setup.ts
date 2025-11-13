@@ -14,6 +14,7 @@ export const addInitialAssets = async (poolAddress: Hex) => {
 
   const assetType = chainParams.initAssetType;
   const assetAddresses = chainParams.initAssetAddresses;
+  const assetsPrecision = chainParams.initAssetsPrecision;
 
   console.log(`Adding ${assetAddresses.length} assets to pool...`);
 
@@ -22,7 +23,7 @@ export const addInitialAssets = async (poolAddress: Hex) => {
     address: poolAddress,
     abi: poolAbi,
     functionName: "addAssets",
-    args: [assetType, assetAddresses],
+    args: [assetType, assetAddresses, assetsPrecision],
   });
 
   const receipt = await client.waitForTransactionReceipt({ hash });

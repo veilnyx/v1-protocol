@@ -27,7 +27,7 @@ export const reqs = {
         revokerId: 0,
         viaBundler: true,
         paymaster:
-            `0x${"03E98aE18908eBc2Fe82e646E4DFB628963383c1"}` as `0x${string}`,
+            `0x${"03E98aE18908eBc2Fe82e646E4DFB628963383c1"}` as `0x${string}`
     }
     /**
     withdraw_2_morphoLoanToken: {

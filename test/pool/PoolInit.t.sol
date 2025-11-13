@@ -30,7 +30,10 @@ contract PoolInitTest is PoolTest {
         address[] memory assetAddresses = new address[](1);
         assetAddresses[0] = assetAddress;
 
-        pool.addAssets(assetType, assetAddresses);
+        uint8[] memory assetsPrecision = new uint8[](1);
+        assetsPrecision[0] = 18;
+
+        pool.addAssets(assetType, assetAddresses, assetsPrecision);
 
         // bool isAssetActive = pool.isAssetActive(assetAddress);
         Asset memory newAsset = pool.getAsset(assetAddress);

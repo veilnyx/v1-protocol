@@ -200,7 +200,7 @@ const main = async () => {
     const commonLibs = await deployCommonLibs();
 
     // Mempool Proxy
-    /// @dev The gateway contract address will be a zero addr, but will be updated using MempoolProxy::updateGatewayContract() function after the deployment of the ERC4337 infrastructure. This is due to a circular dependency between the mempool and the ERC4337 infrastructure. The mempool needs to be deployed first, and then the ERC4337 infrastructure can be deployed with Gateway => Mempool. Lastly, the mempool can be updated with the Gateway address.
+    /// @dev The gateway contract address will be a zero addr, but will be updated using MempoolProxy::updateGatewayContract() function after the deployment of the ERC4337 infrastructure. This is due to a circular dependency between the mempool and the ERC4337 infrastructure. The mempool needs to be deployed first, and then the ERC4337 infrastructure can be deployed with Gateway => Mempool. Finally, the mempool needs to be updated with the Gateway contract address.
     const mempoolProxy = await deployMempoolImplAndProxy(commonLibs.shieldedTransaction, commonLibs.asset, "0x0000000000000000000000000000000000000000" as `0x${string}`);
 
     // ERC4337 infra

@@ -8,6 +8,7 @@ contract PaymasterDeploy is BaseScript {
     function run() external broadcast {
         address entryPoint = _config.entryPoint();
         address gateway = _getContract("Gateway");
-        new Paymaster(entryPoint, gateway);
+        address pool = _getContract("Pool");
+        new Paymaster(entryPoint, gateway, pool);
     }
 }

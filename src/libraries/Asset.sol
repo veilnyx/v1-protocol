@@ -19,6 +19,7 @@ struct Asset {
     AssetType assetType;
     address assetAddress;
     bool isActive;
+    uint8 precision;
 }
 
 library AssetLogic {
@@ -41,7 +42,8 @@ library AssetLogic {
         mapping(uint24 => Asset) storage assets,
         uint16 counter,
         AssetType assetType,
-        address assetAddress
+        address assetAddress,
+        uint8 assetPrecision
     ) public returns (uint16) {
         if (_isAssetAdded(assetIds, assetAddress)) {
             revert IPool.DuplicateAsset(assetAddress);
@@ -64,7 +66,8 @@ library AssetLogic {
             id: newAssetId,
             assetType: assetType,
             assetAddress: assetAddress,
-            isActive: true
+            isActive: true,
+            precision: assetPrecision
         });
 
         emit IPool.AssetAdded(assetAddress, newAssetId);
@@ -76,7 +79,8 @@ library AssetLogic {
         mapping(uint24 => Asset) storage assets,
         uint16 counter,
         AssetType assetType,
-        address[] calldata assetAddresses
+        address[] calldata assetAddresses,
+        uint8[] calldata assetsPrecision
     ) external returns (uint16) {
         for (uint8 i = 0; i < assetAddresses.length; ) {
             counter = addAsset(
@@ -84,7 +88,8 @@ library AssetLogic {
                 assets,
                 counter,
                 assetType,
-                assetAddresses[i]
+                assetAddresses[i],
+                assetsPrecision[i]
             );
 
             unchecked {
