@@ -164,7 +164,7 @@ contract Paymaster is IPaymaster, Ownable {
     ///     - sender should be the Gateway contract
     ///     - specified paymaster is this contract only (guarantee to receive fee to this contract)
     ///     - specified fee is sufficient
-    /// Since this paymaster is only used by and meant for Labyrinth pool and the pool's `validateUserOp` already checks
+    /// Since this paymaster is only used by and meant for Veilnyx pool and the pool's `validateUserOp` already checks
     /// for validity of tx (so that it does not revert when called), we don't need to check those here.
     /// This paymaster must always maintain sufficient deposit in the `EntryPoint` contract to pay for gas.
     /// Note that it always reverts for invalid operations rather than returning.

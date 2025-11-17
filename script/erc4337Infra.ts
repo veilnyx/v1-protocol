@@ -2,7 +2,7 @@ import hre from "hardhat";
 import { parseEther, parseUnits } from "viem";
 
 /// @todo: Gas cost to be made dynamic
-// Estimated values based on gas profiling and current gas prices of 2 gwei. Ref. the Labyrinth Fee Types sheet for working.
+// Estimated values based on gas profiling and current gas prices of 2 gwei. Ref. the Veilnyx Fee Types sheet for working.
 // const PAYMASTER_FEE_INSTANT_TX_ETH = parseEther("0.001467726");
 // const PAYMASTER_FEE_INSTANT_TX_USDC = parseUnits("2.62", 6);
 // const PAYMASTER_FEE_PREVERIFIED_TX_ETH = parseEther("0.001063");
@@ -27,7 +27,7 @@ export const deployErc4337Infra = async (chainParams, poolAddress, mempoolAddres
     console.log("Paymaster deployed:", paymaster.address);
 
     // Set up Chainlink feeds for paymaster
-    chainParams.initAssetIdsLabyrinth.forEach(async (assetId, index) => {
+    chainParams.initAssetIdsVeilnyx.forEach(async (assetId, index) => {
         await setAssetChainlinkFeedInPaymaster(paymaster.address, assetId, chainParams.initAssetChainlinkFeeds[index], deployConfig.client.wallet, deployConfig.client.public);
     });
 

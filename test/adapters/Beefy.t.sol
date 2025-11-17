@@ -37,7 +37,7 @@ contract BeefyAdaptorTest is PoolTest {
         /// @dev update convert req fixture with this adaptor addr as `to`
         console.log("Beefy adaptor deployed:", address(beefyAdp));
 
-        // Adaptor support on Labyrinth Protocol
+        // Adaptor support on Veilnyx Protocol
         address poolOwner = pool.owner();
         vm.startPrank(poolOwner);
         pool.addAdaptorSupport(address(beefyAdp), true);

@@ -138,7 +138,7 @@ const upgradePoolProxy = async (newPoolImpl: `0x${string}`) => {
     });
 
     const upgradeRct = await client.waitForTransactionReceipt({ hash: upgradeCallHash });
-    console.log("rct:Labyrinth Upgraded!!!!!", upgradeRct.status);
+    console.log("rct:Veilnyx Upgraded!!!!!", upgradeRct.status);
 }
 
 const deployCommonLibs = async () => {

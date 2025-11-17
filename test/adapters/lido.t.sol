@@ -50,7 +50,7 @@ contract LidoAdaptorTest is PoolTest {
         /// @dev update convert req fixture with this adaptor addr as `to`
         console.log("Lido adaptor deployed:", address(lidoAdaptor));
 
-        // Asset & Adaptor support on Labyrinth Protocol
+        // Asset & Adaptor support on Veilnyx Protocol
         address poolOwner = pool.owner();
         vm.prank(poolOwner);
         pool.addAdaptorSupport(address(lidoAdaptor), true);
@@ -101,10 +101,10 @@ contract LidoAdaptorTest is PoolTest {
         assert(poolwstETHBalPostStake > poolwstETHBalBeforeStaking);
     }
 
-    /// @dev This test bypasses the Labyrinth protocol and directly tests the Lido integration from the LidoAdaptor.
+    /// @dev This test bypasses the Veilnyx protocol and directly tests the Lido integration from the LidoAdaptor.
     /// @dev Pls uncomment the `receive()` on the LidoAdaptor to enable this test.
     /// @dev Will only run on Holesky testnet.
-    function testWstEthUnStakingOnLidoBypassingLabyrinth() public {
+    function testWstEthUnStakingOnLidoBypassingVeilnyx() public {
         deal(address(lidoAdaptor), INITIAL_SUPPLY);
         vm.prank(address(lidoAdaptor));
         IWToken(WETH).deposit{value: INITIAL_SUPPLY}();

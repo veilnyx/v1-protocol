@@ -31,7 +31,7 @@ contract EthenaAdaptorTest is PoolTest {
         /// @dev update convert req fixture with this adaptor addr as `to`
         console.log("Ethena adaptor deployed:", address(ethenaAdaptor));
 
-        // Adaptor support on Labyrinth Protocol
+        // Adaptor support on Veilnyx Protocol
         address poolOwner = pool.owner();
         vm.startPrank(poolOwner);
         pool.addAdaptorSupport(address(ethenaAdaptor), true);
@@ -45,7 +45,7 @@ contract EthenaAdaptorTest is PoolTest {
         assetsPrecision[0] = 6;
         assetsPrecision[1] = 6;
         pool.addAssets(assetType, assetAddresses, assetsPrecision);
-        
+
         vm.stopPrank();
     }
 

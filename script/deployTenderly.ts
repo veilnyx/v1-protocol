@@ -219,7 +219,7 @@ const addAdpatorSupport = async (pool, adpAddress, enable, wallet, client) => {
 
 const createTenderlyChain = (): Chain => {
   const tenderlyChain = defineChain({
-    name: "Labyrinth Mainnet Simulation v1.0",
+    name: "Veilnyx Mainnet Simulation v1.0",
     id: 7800,
     nativeCurrency: {
       decimals: 18,

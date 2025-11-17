@@ -243,7 +243,7 @@ const main = async () => {
 
   await updateGatewayAndPoolInMempool(deployConfig, mempoolProxy as `0x${string}`, erc4337Contracts.gateway, poolProxy.address);
 
-  // Register Labyrinth's circuits with Nebra
+  // Register Veilnyx's circuits with Nebra
   await registerCircuitsOnNebra();
 };
 
