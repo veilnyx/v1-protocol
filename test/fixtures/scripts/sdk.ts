@@ -113,9 +113,10 @@ export const getSDKInstance = async () => {
 
   // zkfi.getPaymasterFee = async () => BigInt(parseEther("0.002"));
 
+  // bypassing fee calculation (in selected asset) call to Paymaster for testing purpose
   zkfi.getUserOpFee = async (options: TransactionOptions, feeAssetId: number, client: any): Promise<bigint> => {
     const requiredPrefundInETH = options.requiredPrefundEth;
-    const ethInUSD: bigint = parseUnits("2000", 6);
+    const ethInUSD: bigint = parseUnits("4000", 6);
 
     console.log("getUserOpFee:: requiredPrefundInETH", requiredPrefundInETH.toString());
     console.log("getUserOpFee:: requiredPrefundInETHInUSDC", ((requiredPrefundInETH * ethInUSD) / parseEther("1")));
