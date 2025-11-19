@@ -83,6 +83,7 @@ contract PaymasterTest is PoolTest {
 
         // Setting chainlink feed address to fetch prices
         paymaster.setChainlinkFeed(asset1.id, address(0));
+
         // asset 2 (USDC)
         if (block.chainid == ETH_SEPOLIA) {
             // Sepolia
@@ -95,7 +96,7 @@ contract PaymasterTest is PoolTest {
         }
     }
 
-    function test_convertFeeFromEthToUSDC() public {
+    function test_convertFeeFromGasTokenToUSDC() public {
         if (block.chainid != ETH_SEPOLIA) {
             vm.skip(true);
         }
@@ -103,7 +104,7 @@ contract PaymasterTest is PoolTest {
         uint256 feeValueInEth = 2e18;
         uint24 feeAssetIdUSDC = 65538; // USDC
 
-        uint256 feeValueInUSDC = paymaster.convertFeeFromEthToFeeAsset(
+        uint256 feeValueInUSDC = paymaster.convertFeeFromGasTokenToFeeAsset(
             feeValueInEth,
             feeAssetIdUSDC
         );
@@ -118,6 +119,46 @@ contract PaymasterTest is PoolTest {
         uint256 expectedFeeValueInUSDC = ((feeValueInEth * uint256(ethInUSDC)) /
             10 ** (ETH_DECIMALS + feedDecimals)) * 10 ** USDC_DECIMALS;
         assertEq(feeValueInUSDC, expectedFeeValueInUSDC);
+    }
+
+    function test_convertFeeFromGasTokenToFeeAsset_whenFeeAssetIsGasTokenItself()
+        public
+        view
+    {
+        uint256 feeInEth = 5 ether;
+
+        uint256 feeInGasToken = paymaster.convertFeeFromGasTokenToFeeAsset(
+            feeInEth,
+            feeAssetId
+        );
+
+        assertEq(feeInGasToken, feeInEth);
+    }
+
+    function test_revert_convertFeeFromGasTokenToFeeAsset_whenFeeAssetInactive()
+        public
+    {
+        uint24 invalidFeeAssetId = 99999;
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                Paymaster.FeeAssetNotSupportedByVeilnyx.selector,
+                invalidFeeAssetId
+            )
+        );
+        paymaster.convertFeeFromGasTokenToFeeAsset(1 ether, invalidFeeAssetId);
+    }
+
+    function test_revert_convertFeeFromGasTokenToFeeAsset_whenFeeAssetNotSupport()
+        public
+    {
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                Paymaster.AssetNotSupportedAsFeeAsset.selector,
+                asset2.id
+            )
+        );
+        paymaster.convertFeeFromGasTokenToFeeAsset(1 ether, asset2.id);
     }
 
     function test_depositAndWithdrawEntryPoint() public {
@@ -349,7 +390,7 @@ contract PaymasterTest is PoolTest {
         vm.prank(entryPoint);
         vm.expectRevert(
             abi.encodeWithSelector(
-                Paymaster.FeeAssetInactive.selector,
+                Paymaster.FeeAssetNotSupportedByVeilnyx.selector,
                 uint24(0)
             )
         );

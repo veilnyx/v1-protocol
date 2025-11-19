@@ -17,7 +17,7 @@ import {IPool} from "../interfaces/IPool.sol";
 
 contract Paymaster is IPaymaster, Ownable {
     uint256 public constant VALIDATION_SUCCESS = 0;
-    uint24 public constant ETH_ASSET_ID = 65537;
+    uint24 public constant GAS_ASSET_ID = 65537;
     uint8 public constant ETH_DECIMALS = 18;
     IEntryPoint public immutable entryPoint;
     address public immutable sender;
@@ -30,7 +30,8 @@ contract Paymaster is IPaymaster, Ownable {
     error InvalidSender(address sender);
     error InvalidCallData();
     error InsufficientFee(uint256 given, uint256 required);
-    error FeeAssetInactive(uint24 asset);
+    error FeeAssetNotSupportedByVeilnyx(uint24 assetId);
+    error AssetNotSupportedAsFeeAsset(uint24 assetId);
     error ChainlinkPriceFeedNotFound(uint24 assetId);
     error ChainlinkPriceInvalid(int256 price);
     error MaxCostEthToAssetConversionFailed(uint24 assetId);
@@ -123,17 +124,24 @@ contract Paymaster is IPaymaster, Ownable {
     }
 
     /// @notice Returns the `maxCostEth` value in fee asset using Chainlink's price feeds.
-    function convertFeeFromEthToFeeAsset(
+    function convertFeeFromGasTokenToFeeAsset(
         uint256 maxCostEth,
         uint24 feeAssetId
     ) public view returns (uint256 feeInAsset) {
         Asset memory feeAsset = pool.getAsset(feeAssetId);
+        Asset memory gasAsset = pool.getAsset(GAS_ASSET_ID);
+
         if (!feeAsset.isActive) {
-            revert FeeAssetInactive(feeAssetId);
+            revert FeeAssetNotSupportedByVeilnyx(feeAssetId);
         }
 
         // if chainlink feed for assetId not found, return maxCostEth
-        if (assetIdToChainlinkFeed[feeAssetId] == address(0)) {
+        if (assetIdToChainlinkFeed[feeAssetId] == address(0) && feeAssetId != GAS_ASSET_ID) {
+            revert AssetNotSupportedAsFeeAsset(feeAssetId);
+        }
+
+        if(assetIdToChainlinkFeed[feeAssetId] == address(0) && feeAssetId == GAS_ASSET_ID) {
+            // fee asset is GAS_TOKEN itself, returning default value
             return maxCostEth;
         }
 
@@ -148,9 +156,10 @@ contract Paymaster is IPaymaster, Ownable {
         // for conversion we assume price fetching of assetId in ETH only since maxCostEth is in ETH
         uint8 feedDecimals = feed.decimals();
 
+        // returns fees in feeAsset's precision
         feeInAsset =
             ((maxCostEth * uint256(priceETHInAsset)) /
-                10 ** (ETH_DECIMALS + feedDecimals)) *
+                10 ** (gasAsset.precision + feedDecimals)) *
             10 ** feeAsset.precision;
 
         if (feeInAsset == 0) {
@@ -226,7 +235,7 @@ contract Paymaster is IPaymaster, Ownable {
         uint24 feeAssetId,
         uint256 maxCostEth
     ) internal view returns (uint256 feeInAsset) {
-        feeInAsset = convertFeeFromEthToFeeAsset(maxCostEth, feeAssetId);
+        feeInAsset = convertFeeFromGasTokenToFeeAsset(maxCostEth, feeAssetId);
         return feeInAsset;
     }
 
