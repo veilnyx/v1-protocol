@@ -13,7 +13,7 @@ library MempoolValidator {
 
     error InvalidStx();
     error DuplicateStx(uint256 stxHash);
-    error LabyrinthPoolAddrNotInitialized();
+    error VeilnyxPoolAddrNotInitialized();
     error NonDepositTxReceivedFromPublicAddr(address sender);
     error InsufficientFee(uint256 given, uint256 required);
     error ZeroValue();
@@ -36,7 +36,7 @@ library MempoolValidator {
             storage depositBalance
     ) public {
         if (address(pool) == address(0)) {
-            revert LabyrinthPoolAddrNotInitialized();
+            revert VeilnyxPoolAddrNotInitialized();
         }
 
         // validate the correlation btw the stx and public inputs

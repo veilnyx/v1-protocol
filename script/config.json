@@ -91,7 +91,7 @@
       "0x0000000000000000000000000000000000000000",
       "0x0000000000000000000000000000000000000000"
     ],
-    "initAssetIdsLabyrinth": [
+    "initAssetIdsVeilnyx": [
       65537,
       65538
     ]
@@ -128,7 +128,7 @@
       "0x0000000000000000000000000000000000000000",
       "0x0000000000000000000000000000000000000000"
     ],
-    "initAssetIdsLabyrinth": [
+    "initAssetIdsVeilnyx": [
       65537,
       65538,
       65539,
@@ -159,7 +159,7 @@
       "0x0000000000000000000000000000000000000000",
       "0x61Ec26aA57019C486B10502285c5A3D4A4750AD7"
     ],
-    "initAssetIdsLabyrinth": [
+    "initAssetIdsVeilnyx": [
       65537,
       65538
     ]
@@ -187,7 +187,7 @@
       "0x0000000000000000000000000000000000000000",
       "0xF0d50568e3A7e8259E16663972b11910F89BD8e7"
     ],
-    "initAssetIdsLabyrinth": [
+    "initAssetIdsVeilnyx": [
       65537,
       65538
     ]
@@ -215,13 +215,13 @@
       "0x0000000000000000000000000000000000000000",
       "0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419"
     ],
-    "initAssetIdsLabyrinth": [
+    "initAssetIdsVeilnyx": [
       65537,
       65538
     ]
   },
   "7800": {
-    "chain": "labyrinth-mainnet-simulation",
+    "chain": "veilnyx-mainnet-simulation",
     "entryPoint": "0x0000000071727De22E5E9d8BAf0edAc6f37da032",
     "gateway": "0x0000000000000000000000000000000000000000",
     "paymaster": "0x0000000000000000000000000000000000000000",
@@ -243,7 +243,7 @@
       "0x0000000000000000000000000000000000000000",
       "0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419"
     ],
-    "initAssetIdsLabyrinth": [
+    "initAssetIdsVeilnyx": [
       65537,
       65538
     ]
@@ -276,7 +276,7 @@
       "0x0000000000000000000000000000000000000000",
       "0x0000000000000000000000000000000000000000"
     ],
-    "initAssetIdsLabyrinth": [
+    "initAssetIdsVeilnyx": [
       65537,
       65538,
       65539

@@ -15,7 +15,7 @@ export type ChainParams = {
   initAssetAddresses: Hex[];
   initAssetsPrecision: number[];
   initAssetChainlinkFeeds: Hex[];
-  initAssetIdsLabyrinth: number[];
+  initAssetIdsVeilnyx: number[];
 };
 
 export type AdaptorParams = {
@@ -191,7 +191,7 @@ export function loadConfigs() {
       initAssetAddresses,
       initAssetsPrecision,
       initAssetChainlinkFeeds,
-      initAssetIdsLabyrinth
+      initAssetIdsVeilnyx
     } = params;
 
     chainParams[Number(chainId)] = {
@@ -204,7 +204,7 @@ export function loadConfigs() {
       initAssetAddresses: initAssetAddresses.map(getHex),
       initAssetsPrecision: initAssetsPrecision.map(p => Number(p)),
       initAssetChainlinkFeeds: initAssetChainlinkFeeds.map(getHex),
-      initAssetIdsLabyrinth: initAssetIdsLabyrinth.map(assetId => Number(assetId)),
+      initAssetIdsVeilnyx: initAssetIdsVeilnyx.map(assetId => Number(assetId)),
     };
   }
 

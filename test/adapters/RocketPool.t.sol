@@ -50,7 +50,7 @@ contract LidoAdaptorTest is PoolTest {
         /// @dev update convert req fixture with this adaptor addr as `to`
         console.log("RocketPool adaptor deployed:", address(rocketPoolAdp));
 
-        // Asset & Adaptor support on Labyrinth Protocol
+        // Asset & Adaptor support on Veilnyx Protocol
         address poolOwner = pool.owner();
         vm.prank(poolOwner);
         pool.addAdaptorSupport(address(rocketPoolAdp), true);

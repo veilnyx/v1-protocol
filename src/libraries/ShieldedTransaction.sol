@@ -646,7 +646,7 @@ library ShieldedTransactionLogic {
 
         if (feeValue != 0) {
             if (isPreVerified) {
-                // Allot 65% percentage of fee to the verification tracker service for exiting tx out of mempool to the Labyrinth pool and the balance (35%) to the paymaster for adding tx to the Mempool.
+                // Allot 65% percentage of fee to the verification tracker service for exiting tx out of mempool to the Veilnyx pool and the balance (35%) to the paymaster for adding tx to the Mempool.
                 uint256 gasFeeAddMempool = (feeValue * 35) / 100;
                 uint256 gasFeeExitMempool = feeValue - gasFeeAddMempool;
 

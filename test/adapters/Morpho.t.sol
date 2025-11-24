@@ -35,7 +35,7 @@ contract MorphoAdaptorTest is PoolTest {
         /// @dev update convert req fixture with this adaptor addr as `to`
         console.log("Morpho adaptor deployed:", address(morphoAdp));
 
-        // Adaptor & asset support on Labyrinth Protocol
+        // Adaptor & asset support on Veilnyx Protocol
         address poolOwner = pool.owner();
         vm.startPrank(poolOwner);
         pool.addAdaptorSupport(address(morphoAdp), true);

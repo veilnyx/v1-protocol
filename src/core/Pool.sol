@@ -88,7 +88,7 @@ contract Pool is
             verifier
         );
     }
-    
+
     /////////////////////////////////////////
     //         ADMIN WRITE METHODS         //
     ////////////////////////////////////////
@@ -192,6 +192,13 @@ contract Pool is
         address verificationTrackerService_
     ) external onlyOwner {
         verificationTrackerService = verificationTrackerService_;
+    }
+
+    function updateEIP712Domain(
+        string memory name,
+        string memory version
+    ) external onlyOwner {
+        EIP712.init(name, version);
     }
 
     /////////////////////////////////////////
@@ -312,7 +319,7 @@ contract Pool is
     }
      */
 
-    function getLabyrinthVersion() external view returns (uint64) {
+    function getVeilnyxVersion() external view returns (uint64) {
         return version;
     }
 

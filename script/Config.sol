@@ -28,7 +28,7 @@ contract Config is Script {
     AssetType public immutable initAssetType;
     address[] internal _initAssetAddresses;
     uint8[] internal _initAssetsPrecision;
-    uint24[] internal _initAssetIdsLabyrinth;
+    uint24[] internal _initAssetIdsVeilnyx;
 
     constructor() {
         string memory path = string.concat(
@@ -119,12 +119,12 @@ contract Config is Script {
 
         uint256[] memory initAssetIdsUint256 = vm.parseJsonUintArray(
             configJson,
-            string.concat(chainPrefix, ".initAssetIdsLabyrinth")
+            string.concat(chainPrefix, ".initAssetIdsVeilnyx")
         );
-        _initAssetIdsLabyrinth = new uint24[](initAssetIdsUint256.length);
+        _initAssetIdsVeilnyx = new uint24[](initAssetIdsUint256.length);
 
         for (uint i = 0; i < initAssetIdsUint256.length; i++) {
-            _initAssetIdsLabyrinth[i] = uint24(initAssetIdsUint256[i]);
+            _initAssetIdsVeilnyx[i] = uint24(initAssetIdsUint256[i]);
         }
     }
 

@@ -28,8 +28,8 @@ contract RocketPoolAdaptor is AdaptorBase {
         address rocketPoolRouter_,
         address rEth_,
         address wEth_,
-        address labyrinthPool_
-    ) AdaptorBase(labyrinthPool_) {
+        address veilnyxPool_
+    ) AdaptorBase(veilnyxPool_) {
         rocketSwapRouter = IRocketSwapRouter(rocketPoolRouter_);
         rETH = rEth_;
         WETH = wEth_;
@@ -156,7 +156,7 @@ contract RocketPoolAdaptor is AdaptorBase {
         outAssetIds = new uint24[](1);
 
         outValues[0] = ethBalAfterUnstaking - ethBalBeforeUnstaking;
-        // wrapping the received ETH to return to Labyrinth
+        // wrapping the received ETH to return to Veilnyx
         IWToken(WETH).deposit{value: outValues[0]}();
         outAssetIds[0] = getAsset(WETH).id;
     }
