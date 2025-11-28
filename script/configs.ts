@@ -4,7 +4,6 @@ import adaptorConfig from "./adaptorConfig.json";
 
 const { env, common, ...chains } = configJson;
 
-
 export type ChainParams = {
   entryPoint: Hex;
   wToken: Hex;
@@ -192,7 +191,7 @@ export function loadConfigs() {
       initAssetsPrecision,
       initAssetChainlinkFeeds,
       initAssetIdsVeilnyx
-    } = params;
+    } = params as ChainParams;
 
     chainParams[Number(chainId)] = {
       entryPoint: getHex(entryPoint),

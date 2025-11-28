@@ -166,5 +166,89 @@
                 "rETH": 18
             }
         }
+    },
+    "11155111": {
+        "uniswap": {
+            "uniswapSwapRouter02": "0x3bFA4769FB09eefC5a80d6E87c3B9C650f7Ae48E"
+        },
+        "aave": {
+            "aave": "0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2",
+            "aaveStaticTokenFactory": "0xd210dFB43B694430B8d31762B5199e30c31266C8",
+            "aWETH": "0xC558DBdd856501FCd9aaF1E62eae57A9F0629a3c",
+            "aUSDC": "0x94a9D9AC8a22534E3FaCa9F4e7F2E2cf85d5E4C8",
+            "assets": {
+                "staticAWeth": "0x162B500569F42D9eCe937e6a61EDfef660A12E98",
+                "staticAUsdc": "0x8A88124522dbBF1E56352ba3DE1d9F78C143751e"
+            },
+            "assetsPrecision": {
+                "staticAWeth": 18,
+                "staticAUsdc": 6
+            }
+        },
+        "lido": {
+            "lido": "0x3e3FE7dBc6B4C189E7128855dD526361c49b40Af",
+            "withdrawalQueueERC721": "0x1583C7b3f4C3B008720E6BcE5726336b0aB25fdd",
+            "wETH": "0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14",
+            "stETH": "0x3e3FE7dBc6B4C189E7128855dD526361c49b40Af",
+            "wstETH": "0xB82381A3fBD3FaFA77B3a7bE693342618240067b",
+            "assets": {
+                "wstEth": "0xB82381A3fBD3FaFA77B3a7bE693342618240067b"
+            },
+            "assetsPrecision": {
+                "wstEth": 18
+            }
+        },
+        "curve": {
+            "assets": {
+                "usdt": "0x0000000000000000000000000000000000000000",
+                "crvUsd": "0x0000000000000000000000000000000000000000",
+                "crvUsdUsdtLPToken": "0x0000000000000000000000000000000000000000",
+                "crvUsdSusdeLPToken": "0x0000000000000000000000000000000000000000"
+            },
+            "assetsPrecision": {
+                "usdt": 6,
+                "crvUsd": 6,
+                "crvUsdUsdtLPToken": 6,
+                "crvUsdSusdeLPToken": 6
+            }
+        },
+        "ethena": {
+            "ethena": "0x0000000000000000000000000000000000000000",
+            "usde": "0x0000000000000000000000000000000000000000",
+            "assets": {
+                "usde": "0x0000000000000000000000000000000000000000",
+                "sUsde": "0x0000000000000000000000000000000000000000"
+            },
+            "assetsPrecision": {
+                "usde": 6,
+                "sUsde": 6
+            }
+        },
+        "beefy": {
+            "assets": {
+                "mooCurveCrvUSDsUSDe": "0x0000000000000000000000000000000000000000"
+            },
+            "assetsPrecision": {
+                "mooCurveCrvUSDsUSDe": 18
+            }
+        },
+        "morpho": {
+            "assets": {
+                "gauntletWETHPrimeVault": "0x0000000000000000000000000000000000000000"
+            },
+            "assetsPrecision": {
+                "gauntletWETHPrimeVault": 18
+            }
+        },
+        "rocketPool": {
+            "rocketSwapRouter": "0x0000000000000000000000000000000000000000",
+            "wETH": "0x0000000000000000000000000000000000000000",
+            "assets": {
+                "rETH": "0x0000000000000000000000000000000000000000"
+            },
+            "assetsPrecision": {
+                "rETH": 18
+            }
+        }
     }
 }

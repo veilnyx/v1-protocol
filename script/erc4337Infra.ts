@@ -7,7 +7,7 @@ import { parseEther, parseUnits } from "viem";
 // const PAYMASTER_FEE_INSTANT_TX_USDC = parseUnits("2.62", 6);
 // const PAYMASTER_FEE_PREVERIFIED_TX_ETH = parseEther("0.001063");
 // const PAYMASTER_FEE_PREVERIFIED_TX_USDC = parseUnits("1.89", 6);
-const PAYMASTER_FUNDING_AMT = parseEther("0.005"); // 0.005 ETH
+const PAYMASTER_FUNDING_AMT = parseEther("2");
 
 export const deployErc4337Infra = async (chainParams, poolAddress, mempoolAddress, deployConfig) => {
     // ERC4337 infra setup
@@ -26,15 +26,17 @@ export const deployErc4337Infra = async (chainParams, poolAddress, mempoolAddres
     ], deployConfig);
     console.log("Paymaster deployed:", paymaster.address);
 
-    // Set up Chainlink feeds for paymaster
-    chainParams.initAssetIdsVeilnyx.forEach(async (assetId, index) => {
+    // Set up Chainlink feeds for paymaster (sequential to avoid nonce conflicts)
+    for (let index = 0; index < chainParams.initAssetIdsVeilnyx.length; index++) {
+        const assetId = chainParams.initAssetIdsVeilnyx[index];
         await setAssetChainlinkFeedInPaymaster(paymaster.address, assetId, chainParams.initAssetChainlinkFeeds[index], deployConfig.client.wallet, deployConfig.client.public);
-    });
+    }
 
     await fundPaymaster(paymaster.address, deployConfig.client.wallet, deployConfig.client.public);
+
     return {
         paymaster: paymaster.address,
-        gateway: gateway.address
+        gateway: gateway.address,
     };
 }
 
@@ -63,6 +65,7 @@ const setAssetChainlinkFeedInPaymaster = async (paymaster, assetId, chainlinkFee
     const paymasterAbi = hre.artifacts.readArtifactSync("Paymaster").abi;
     let rct;
     try {
+        console.log(`Setting Chainlink feed for asset ${assetId}...`);
         const hash = await wallet.writeContract({
             address: paymaster,
             abi: paymasterAbi,
@@ -71,10 +74,13 @@ const setAssetChainlinkFeedInPaymaster = async (paymaster, assetId, chainlinkFee
         });
 
         rct = await client.waitForTransactionReceipt({ hash });
-        console.log("rct:ChainlinkFeedForAssetSet", rct.status);
+        console.log(`✅ Chainlink feed set for asset ${assetId}, status:`, rct.status);
     } catch (error) {
-        console.log("Error setting chainlink feed for asset");
-        console.log(error.message);
-        console.log("Error rct:", rct);
+        console.log(`❌ Error setting chainlink feed for asset ${assetId}`);
+        console.log("Error message:", error.message);
+        if (rct) {
+            console.log("Error rct:", rct);
+        }
+        throw error; // Re-throw to stop execution on failure
     }
 }

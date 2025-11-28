@@ -110,9 +110,9 @@
     "initAssetAddresses": [
       "0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14",
       "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238",
-      "0xB82381A3fBD3FaFA77B3a7bE693342618240067b",
+      "0x3e3FE7dBc6B4C189E7128855dD526361c49b40Af",
       "0xC558DBdd856501FCd9aaF1E62eae57A9F0629a3c",
-      "0x162B500569F42D9eCe937e6a61EDfef660A12E98"
+      "0x94a9D9AC8a22534E3FaCa9F4e7F2E2cf85d5E4C8"
     ],
     "initAssetsPrecision": [
       18,
@@ -296,6 +296,18 @@
     "initAssetAddresses": [
       "0xC047cfabBbDD41F382DE565A0F8239EC5B6E1893",
       "0x9aB19B1E375624b9A79aF4d2c728bf4d0feee30e"
+    ],
+    "initAssetsPrecision": [
+      18,
+      6
+    ],
+    "initAssetChainlinkFeeds": [
+      "0x0000000000000000000000000000000000000000",
+      "0x0000000000000000000000000000000000000000"
+    ],
+    "initAssetIdsVeilnyx": [
+      65537,
+      65538
     ]
   },
   "5042002": {
@@ -311,6 +323,15 @@
     "initAssetType": 1,
     "initAssetAddresses": [
       "0x3600000000000000000000000000000000000000"
+    ],
+    "initAssetsPrecision": [
+      6
+    ],
+    "initAssetChainlinkFeeds": [
+      "0x0000000000000000000000000000000000000000"
+    ],
+    "initAssetIdsVeilnyx": [
+      65537
     ]
   }
 }
