@@ -50,7 +50,7 @@ contract LidoAdaptorTest is PoolTest {
         /// @dev update convert req fixture with this adaptor addr as `to`
         console.log("RocketPool adaptor deployed:", address(rocketPoolAdp));
 
-        // Asset & Adaptor support on Labyrinth Protocol
+        // Asset & Adaptor support on Veilnyx Protocol
         address poolOwner = pool.owner();
         vm.prank(poolOwner);
         pool.addAdaptorSupport(address(rocketPoolAdp), true);
@@ -58,7 +58,10 @@ contract LidoAdaptorTest is PoolTest {
         AssetType assetType = AssetType.ERC20;
         address[] memory assetAddresses = new address[](1);
         assetAddresses[0] = rETH;
-        pool.addAssets(assetType, assetAddresses);
+
+        uint8[] memory assetsPrecision = new uint8[](1);
+        assetsPrecision[0] = 18;
+        pool.addAssets(assetType, assetAddresses, assetsPrecision);
 
         deal(WETH, user, INITIAL_SUPPLY);
         deal(rETH, user, INITIAL_SUPPLY);

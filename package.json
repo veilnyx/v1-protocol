@@ -11,8 +11,15 @@
     "genAdpPayload": "forge script script/setup/GenerateAdaptorPayload.s.sol:GenerateAdaptorPayload",
     "deploy:test": "cross-env HARDHAT_FORK=true hardhat run script/deploy.ts --network hardhat",
     "upgrade:test": "cross-env HARDHAT_FORK=true HARDHAT_SHOW_STACK_TRACES=true HARDHAT_VERBOSE=true DEBUG=hardhat:* hardhat --verbose run script/upgrade.ts --network hardhat",
-    "deploy:tenderly": "hardhat run script/deployTenderly.ts --network tenderlyMainnetCustomId",
-    "deploy:sepolia": "hardhat run script/deploy.ts --network ethereumSepolia",
+    
+    "deployCoreWithAdp:tenderly": "hardhat run script/deployCoreWithAdp.ts --network tenderlyMainnetCustomId",
+    
+    "deployCoreWithAdp:sepolia": "hardhat run script/deployCoreWithAdp.ts --network ethereumSepolia",
+    "deployCoreWithProofAggrInfra:sepolia": "hardhat run script/deployCoreWithProofAggrInfra.ts --network ethereumSepolia",
+    
+    "deployP-2-P:veilnyx": "hardhat run script/deployP-2-P.ts --network veilnyxTestnet",
+    "deployP-2-P:arc": "hardhat run script/deployP-2-P.ts --network arcTestnet",
+    
     "upgrade:ethSepolia": "hardhat run script/upgradePool.ts --network ethereumSepolia",
     "upgradeMempool:ethSepolia": "hardhat run script/upgradeMempool.ts --network ethereumSepolia",
     "upgrade:opSepolia": "hardhat run script/upgrade.ts --network optimismSepolia",
@@ -24,6 +31,7 @@
   "author": "zkFi Team",
   "dependencies": {
     "@account-abstraction/contracts": "^0.7.0",
+    "@chainlink/contracts": "^1.3.0",
     "@openzeppelin/contracts": "^5.0.2",
     "@openzeppelin/contracts-upgradeable": "^5.0.2",
     "poseidon-solidity": "^0.0.5"
@@ -55,10 +63,10 @@
     "forge-std": "github:foundry-rs/forge-std#v1.8.2",
     "hardhat": "^2.22.8",
     "hardhat-contract-sizer": "^2.10.0",
+    "permissionless": "^0.1.29",
     "snarkjs": "^0.7.4",
     "ts-node": "^10.9.2",
     "typescript": "^5.3.3",
-    "viem": "^2.19.7",
-    "permissionless": "^0.1.29"
+    "viem": "^2.19.7"
   }
 }

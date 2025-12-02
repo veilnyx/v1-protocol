@@ -11,22 +11,17 @@ import {IPaymaster} from "@account-abstraction/contracts/interfaces/IPaymaster.s
 import {IEntryPoint} from "@account-abstraction/contracts/interfaces/IEntryPoint.sol";
 import {PackedUserOperation} from "@account-abstraction/contracts/interfaces/PackedUserOperation.sol";
 import {ShieldedTransaction} from "../libraries/ShieldedTransaction.sol";
+import {Asset, AssetLogic} from "../libraries/Asset.sol";
 import {PreVerificationDetails} from "../interfaces/IMempool.sol";
 import {IPool} from "../interfaces/IPool.sol";
 
 contract Paymaster is IPaymaster, Ownable {
     uint256 public constant VALIDATION_SUCCESS = 0;
-    uint24 public constant ETH_ASSET_ID = 65537;
+    uint24 public constant GAS_ASSET_ID = 65537;
     uint8 public constant ETH_DECIMALS = 18;
     IEntryPoint public immutable entryPoint;
     address public immutable sender;
-
-    /**
-     * @dev Mapping from assetId to fee value.
-     */
-    mapping(uint24 => uint256) private _assetFees;
-    /// @dev Mapping from assetId to fee value for outsourced verification tx. The gas cost for such tx will be lower due to the ZK proof verification being outsourced.
-    mapping(uint24 => uint256) private _assetFeesForPreVerifiedTx;
+    IPool public immutable pool;
 
     mapping(uint24 => address) public assetIdToChainlinkFeed;
 
@@ -35,40 +30,24 @@ contract Paymaster is IPaymaster, Ownable {
     error InvalidSender(address sender);
     error InvalidCallData();
     error InsufficientFee(uint256 given, uint256 required);
-    error UnsupportedFeeAsset(uint24 asset);
+    error FeeAssetNotSupportedByVeilnyx(uint24 assetId);
+    error AssetNotSupportedAsFeeAsset(uint24 assetId);
     error ChainlinkPriceFeedNotFound(uint24 assetId);
     error ChainlinkPriceInvalid(int256 price);
-    error ChainlinkDecimalsInvalid(uint24 assetId);
     error MaxCostEthToAssetConversionFailed(uint24 assetId);
 
     /**
      * params entryPoint_: Address of the entry point contract.
      * params sender_: Address of the gateway contract.
      */
-    constructor(address entryPoint_, address sender_) Ownable(msg.sender) {
+    constructor(
+        address entryPoint_,
+        address sender_,
+        address pool_
+    ) Ownable(msg.sender) {
         entryPoint = IEntryPoint(entryPoint_);
         sender = sender_;
-    }
-
-    /**
-     * Sets fee value for an asset.
-     * @param assetId  - Asset id to update fee for.
-     * @param feeValue - Fee value to set.
-     */
-    function setAssetFee(uint24 assetId, uint256 feeValue) external onlyOwner {
-        _assetFees[assetId] = feeValue;
-    }
-
-    /**
-     * Sets fee value for an asset for outsourced verification tx.
-     * @param assetId  - Asset id to update fee for.
-     * @param feeValue - Fee value to set.
-     */
-    function setAssetFeeForPreVerifiedTx(
-        uint24 assetId,
-        uint256 feeValue
-    ) external onlyOwner {
-        _assetFeesForPreVerifiedTx[assetId] = feeValue;
+        pool = IPool(pool_);
     }
 
     /**
@@ -144,69 +123,57 @@ contract Paymaster is IPaymaster, Ownable {
         return entryPoint.balanceOf(address(this));
     }
 
-    /**
-     * Return fee value for an asset.
-     */
-    function getAssetFee(uint24 assetId) external view returns (uint256) {
-        return _assetFees[assetId];
-    }
-
-    /**
-     * Return fee value for an asset for outsourced verification tx.
-     */
-    function getAssetFeeForPreVerifiedTx(
-        uint24 assetId
-    ) external view returns (uint256) {
-        return _assetFeesForPreVerifiedTx[assetId];
-    }
-
     /// @notice Returns the `maxCostEth` value in fee asset using Chainlink's price feeds.
-    function convertFeeFromEthToFeeAsset(
+    function convertFeeFromGasTokenToFeeAsset(
         uint256 maxCostEth,
-        uint24 assetId
+        uint24 feeAssetId
     ) public view returns (uint256 feeInAsset) {
-        if (assetIdToChainlinkFeed[assetId] == address(0)) {
-            revert ChainlinkPriceFeedNotFound(assetId);
+        Asset memory feeAsset = pool.getAsset(feeAssetId);
+        Asset memory gasAsset = pool.getAsset(GAS_ASSET_ID);
+
+        if (!feeAsset.isActive) {
+            revert FeeAssetNotSupportedByVeilnyx(feeAssetId);
+        }
+
+        // if chainlink feed for assetId not found, return maxCostEth
+        if (assetIdToChainlinkFeed[feeAssetId] == address(0) && feeAssetId != GAS_ASSET_ID) {
+            revert AssetNotSupportedAsFeeAsset(feeAssetId);
+        }
+
+        if(assetIdToChainlinkFeed[feeAssetId] == address(0) && feeAssetId == GAS_ASSET_ID) {
+            // fee asset is GAS_TOKEN itself, returning default value
+            return maxCostEth;
         }
 
         AggregatorV3Interface feed = AggregatorV3Interface(
-            assetIdToChainlinkFeed[assetId]
+            assetIdToChainlinkFeed[feeAssetId]
         );
-        (, int256 price, , , ) = feed.latestRoundData();
-        if (price <= 0) {
-            revert ChainlinkPriceInvalid(price);
+        (, int256 priceETHInAsset, , , ) = feed.latestRoundData();
+        if (priceETHInAsset <= 0) {
+            revert ChainlinkPriceInvalid(priceETHInAsset);
         }
 
         // for conversion we assume price fetching of assetId in ETH only since maxCostEth is in ETH
-        uint8 decimals = feed.decimals();
-        if (decimals != ETH_DECIMALS) {
-            revert ChainlinkDecimalsInvalid(assetId);
-        }
+        uint8 feedDecimals = feed.decimals();
 
-        feeInAsset = maxCostEth / uint256(price);
+        // returns fees in feeAsset's precision
+        feeInAsset =
+            ((maxCostEth * uint256(priceETHInAsset)) /
+                10 ** (gasAsset.precision + feedDecimals)) *
+            10 ** feeAsset.precision;
 
         if (feeInAsset == 0) {
-            revert MaxCostEthToAssetConversionFailed(assetId);
+            revert MaxCostEthToAssetConversionFailed(feeAssetId);
         }
 
         return feeInAsset;
-    }
-
-    function isAssetFeeSupported(uint24 assetId) external view returns (bool) {
-        return _assetFees[assetId] > 0;
-    }
-
-    function isAssetFeeSupportedForPreVerifiedTx(
-        uint24 assetId
-    ) external view returns (bool) {
-        return _assetFeesForPreVerifiedTx[assetId] > 0;
     }
 
     /// @dev The only requirements for validation are
     ///     - sender should be the Gateway contract
     ///     - specified paymaster is this contract only (guarantee to receive fee to this contract)
     ///     - specified fee is sufficient
-    /// Since this paymaster is only used by and meant for Labyrinth pool and the pool's `validateUserOp` already checks
+    /// Since this paymaster is only used by and meant for Veilnyx pool and the pool's `validateUserOp` already checks
     /// for validity of tx (so that it does not revert when called), we don't need to check those here.
     /// This paymaster must always maintain sufficient deposit in the `EntryPoint` contract to pay for gas.
     /// Note that it always reverts for invalid operations rather than returning.
@@ -268,11 +235,7 @@ contract Paymaster is IPaymaster, Ownable {
         uint24 feeAssetId,
         uint256 maxCostEth
     ) internal view returns (uint256 feeInAsset) {
-        if (feeAssetId == ETH_ASSET_ID) {
-            return maxCostEth;
-        }
-
-        feeInAsset = convertFeeFromEthToFeeAsset(maxCostEth, feeAssetId);
+        feeInAsset = convertFeeFromGasTokenToFeeAsset(maxCostEth, feeAssetId);
         return feeInAsset;
     }
 

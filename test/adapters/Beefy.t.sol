@@ -37,7 +37,7 @@ contract BeefyAdaptorTest is PoolTest {
         /// @dev update convert req fixture with this adaptor addr as `to`
         console.log("Beefy adaptor deployed:", address(beefyAdp));
 
-        // Adaptor support on Labyrinth Protocol
+        // Adaptor support on Veilnyx Protocol
         address poolOwner = pool.owner();
         vm.startPrank(poolOwner);
         pool.addAdaptorSupport(address(beefyAdp), true);
@@ -45,7 +45,12 @@ contract BeefyAdaptorTest is PoolTest {
         address[] memory assetAddresses = new address[](2);
         assetAddresses[0] = wantLPToken;
         assetAddresses[1] = mooToken;
-        pool.addAssets(assetType, assetAddresses);
+
+        uint8[] memory assetsPrecision = new uint8[](2);
+        assetsPrecision[0] = 6;
+        assetsPrecision[1] = 18;
+
+        pool.addAssets(assetType, assetAddresses, assetsPrecision);
         vm.stopPrank();
     }
 
@@ -116,8 +121,8 @@ contract BeefyAdaptorTest is PoolTest {
 
         // Supplying
         (
-            /* uint24[] memory outAssetIds */,
-            uint256[] memory outAssetValues
+            ,
+            /* uint24[] memory outAssetIds */ uint256[] memory outAssetValues
         ) = beefyAdp.handleAssets({
                 inAssetIds: inAssetIds,
                 inValues: inValues,

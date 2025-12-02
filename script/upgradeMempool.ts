@@ -71,7 +71,7 @@ const main = async () => {
     });
 
     const upgradeRct = await client.waitForTransactionReceipt({ hash: upgradeCallHash });
-    console.log("rct:Labyrinth MEMPOOL Upgraded!!!!!", upgradeRct.status);
+    console.log("rct:Veilnyx MEMPOOL Upgraded!!!!!", upgradeRct.status);
 }
 
 main().catch((err) => { console.log(err) });

@@ -5,8 +5,6 @@ import { genTestTransfers, genTestTransfersWithOutsourceProofVerification, genTr
 import { genTestCallAdaptors } from './genTestCallAdaptor';
 
 import { getSDKInstance } from "./sdk";
-import { Point, poseidonHash } from "@labyrinthac/babyjubjub";
-import { randomBigInt } from "@labyrinthac/utils";
 import {
 	genTreeUpdateData,
 	genTreeUpdateDataWithPartialQueue,
@@ -14,16 +12,18 @@ import {
 
 const main = async () => {
 	const { sdk, nebraClient } = await getSDKInstance();
-	// await genTestDeposits(sdk);
+	await genTestDeposits(sdk);
+	// await genTestDepositsWithOutsourceProofVerification(sdk, nebraClient);
 	// await genTestTransfers(sdk);
+	// await genTestTransfersWithOutsourceProofVerification(sdk, nebraClient);
 	// await genTransferPackedUserOp(sdk, nebraClient);
 	// await genTransferPackedUserOpPreVerified(sdk, nebraClient);
 	// await genAddressRegistrations(sdk);
 	// await genAddrRegWithOutsourceProofVerification(sdk, nebraClient);
-	await genTestDepositsWithOutsourceProofVerification(sdk, nebraClient);
+	// await genTestDepositsWithOutsourceProofVerification(sdk, nebraClient);
 	// await genTestTransfersWithOutsourceProofVerification(sdk, nebraClient);
 	// await genTestWithdrawals(sdk);
-	// await genTestCallAdaptors(sdk);
+	await genTestCallAdaptors(sdk);
 	// await genTreeUpdateData(sdk);
 	// await genTreeUpdateDataWithPartialQueue(sdk);
 };

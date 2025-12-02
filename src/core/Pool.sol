@@ -8,11 +8,11 @@ import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/ut
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 import {EIP712} from "../libraries/EIP712.sol";
-import {EIP712_DOMAIN_NAME, EIP712_DOMAIN_VERSION} from "../base/Constants.sol";
 import {IVerifier} from "../interfaces/IVerifier.sol";
 import {IPool} from "../interfaces/IPool.sol";
 import {IAdaptorHandler} from "../interfaces/IAdaptorHandler.sol";
 import {IScreener} from "../interfaces/IScreener.sol";
+import {EIP712_DOMAIN_NAME, EIP712_DOMAIN_VERSION} from "../base/Constants.sol";
 import {PoolStorage} from "../base/PoolStorage.sol";
 import {Asset, AssetType, AssetLogic} from "../libraries/Asset.sol";
 import {MerkleTree, MerkleTreeLogic} from "../libraries/MerkleTree.sol";
@@ -88,7 +88,7 @@ contract Pool is
             verifier
         );
     }
-    
+
     /////////////////////////////////////////
     //         ADMIN WRITE METHODS         //
     ////////////////////////////////////////
@@ -103,14 +103,16 @@ contract Pool is
 
     function addAssets(
         AssetType assetType,
-        address[] calldata assetAddresses
+        address[] calldata assetAddresses,
+        uint8[] calldata assetPrecision
     ) external onlyOwner {
         _assetCounts[assetType] = AssetLogic.addAssets({
             assetIds: _assetIds,
             assets: _assets,
             counter: _assetCounts[assetType],
             assetType: assetType,
-            assetAddresses: assetAddresses
+            assetAddresses: assetAddresses,
+            assetsPrecision: assetPrecision
         });
     }
 
@@ -190,6 +192,13 @@ contract Pool is
         address verificationTrackerService_
     ) external onlyOwner {
         verificationTrackerService = verificationTrackerService_;
+    }
+
+    function updateEIP712Domain(
+        string memory name,
+        string memory version
+    ) external onlyOwner {
+        EIP712.init(name, version);
     }
 
     /////////////////////////////////////////
@@ -310,7 +319,7 @@ contract Pool is
     }
      */
 
-    function getLabyrinthVersion() external view returns (uint64) {
+    function getVeilnyxVersion() external view returns (uint64) {
         return version;
     }
 

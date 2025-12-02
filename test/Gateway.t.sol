@@ -8,6 +8,7 @@ import {PackedUserOperation} from "@account-abstraction/contracts/interfaces/Pac
 import {Gateway} from "src/core/Gateway.sol";
 import {Paymaster} from "src/core/Paymaster.sol";
 import {IWToken} from "src/interfaces/IWToken.sol";
+import {Asset, AssetType} from "src/libraries/Asset.sol";
 import {ShieldedTransaction, ShieldedTransactionType} from "src/libraries/ShieldedTransaction.sol";
 import {PreVerificationDetails, Mempool} from "src/core/Mempool.sol";
 import {MockWToken} from "test/mocks/MockWToken.sol";
@@ -18,6 +19,18 @@ contract MockPool {
         for (uint256 i = 0; i < 10; i++) {
             new MockWToken();
         }
+    }
+
+    function getAsset(uint24 assetId) external returns (Asset memory) {
+        Asset memory feeAsset = Asset({
+            id: 65537,
+            assetType: AssetType.ERC20,
+            assetAddress: address(0),
+            isActive: true,
+            precision: 6
+        });
+
+        return feeAsset;
     }
 }
 
@@ -40,7 +53,7 @@ contract GatewayTest is Test {
     address wToken;
     address payable beneficiary = payable(address(0x123));
 
-    uint128 baseFee = 25 gwei;
+    uint128 baseFee = 2 gwei;
     uint24 assetId = 65537;
     uint256 paymasterFeeValue = 0.1 ether;
 
@@ -55,12 +68,16 @@ contract GatewayTest is Test {
             address(pool),
             address(mempool)
         );
-        paymaster = new Paymaster(address(entryPoint), address(gateway));
+        paymaster = new Paymaster(
+            address(entryPoint),
+            address(gateway),
+            address(pool)
+        );
 
         // Deposit to entry point
         vm.deal(address(this), 100 ether);
         paymaster.depositToEntryPoint{value: 100 ether}();
-        paymaster.setAssetFee(assetId, paymasterFeeValue);
+        paymaster.setChainlinkFeed(assetId, address(0));
     }
 
     function test_handleWrapAndDeposit() public {
@@ -84,18 +101,6 @@ contract GatewayTest is Test {
             )
         );
 
-        stx.pubAssets = pubAssets;
-        stx.feeData = uint256(
-            bytes32(
-                bytes.concat(
-                    bytes20(address(paymaster)),
-                    bytes12(uint96(paymasterFeeValue))
-                )
-            )
-        );
-
-        preVerificationDetails.isPreVerified = false;
-
         uint128 callGasLimit = uint128(2_000_000);
         uint128 verificationGasLimit = uint128(50_000);
         uint256 preVerificationGas = uint256(10_000);
@@ -103,6 +108,29 @@ contract GatewayTest is Test {
         uint128 maxPriorityFeePerGas = baseFee;
         uint128 paymasterVerificationGasLimit = uint128(50_000);
         uint128 paymasterPostOpGasLimit = uint128(10_000);
+
+        uint256 requiredGas = verificationGasLimit +
+            callGasLimit +
+            paymasterVerificationGasLimit +
+            paymasterPostOpGasLimit +
+            preVerificationGas;
+
+        uint256 requiredPrefundEth = requiredGas * maxFeePerGas;
+        console2.log("required preFundEth uint256:", requiredPrefundEth);
+        console2.log("required preFundEth uint96:", uint96(requiredPrefundEth));
+
+        stx.pubAssets = pubAssets;
+        stx.feeData = uint256(
+            bytes32(
+                bytes.concat(
+                    bytes20(address(paymaster)),
+                    bytes3(assetId),
+                    bytes9(uint72(requiredPrefundEth))
+                )
+            )
+        );
+
+        preVerificationDetails.isPreVerified = false;
 
         PackedUserOperation memory userOp;
         userOp.sender = address(gateway);

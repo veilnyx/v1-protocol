@@ -35,7 +35,7 @@ contract CurveAdaptorTest is PoolTest {
         /// @dev update convert req fixture with this adaptor addr as `to`
         console.log("Curve adaptor deployed:", address(curveAdaptor));
 
-        // Adaptor support on Labyrinth Protocol
+        // Adaptor support on Veilnyx Protocol
         address poolOwner = pool.owner();
         vm.startPrank(poolOwner);
         pool.addAdaptorSupport(address(curveAdaptor), true);
@@ -45,8 +45,13 @@ contract CurveAdaptorTest is PoolTest {
         assetAddresses[0] = USDT;
         assetAddresses[1] = crvUSD;
         assetAddresses[2] = crvUSD_USDT_Pool;
-        pool.addAssets(assetType, assetAddresses);
-        
+
+        uint8[] memory assetsPrecision = new uint8[](3);
+        assetsPrecision[0] = 6;
+        assetsPrecision[1] = 6;
+        assetsPrecision[2] = 6;
+        pool.addAssets(assetType, assetAddresses, assetsPrecision);
+
         vm.stopPrank();
 
         deal(USDT, user, INITIAL_SUPPLY_USDT);
@@ -335,10 +340,10 @@ contract CurveAdaptorTest is PoolTest {
 
     /**
      * 
-    /// @dev This test bypasses the Labyrinth protocol and directly tests the Lido integration from the CurveAdaptor.
+    /// @dev This test bypasses the Veilnyx protocol and directly tests the Lido integration from the CurveAdaptor.
     /// @dev Pls uncomment the `receive()` on the CurveAdaptor to enable this test.
     /// @dev Will only run on Holesky testnet.
-    function testWstEthUnStakingOnLidoBypassingLabyrinth() public {
+    function testWstEthUnStakingOnLidoBypassingVeilnyx() public {
         require(
             block.chainid == 17000,
             "Unstaking test only on Holesky testnet"

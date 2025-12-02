@@ -25,7 +25,10 @@ contract PoolReentrancyTest is PoolTest {
         AssetType assetType = AssetType.ERC20;
         address[] memory assetAddresses = new address[](1);
         assetAddresses[0] = address(tokenReent);
-        pool.addAssets(assetType, assetAddresses);
+        uint8[] memory assetsPrecision = new uint8[](1);
+        assetsPrecision[0] = 18;
+
+        pool.addAssets(assetType, assetAddresses, assetsPrecision);
         assetReent = pool.getAsset(address(tokenReent));
 
         _mintAsset(assetReent, address(this), INITIAL_DEPOSIT);

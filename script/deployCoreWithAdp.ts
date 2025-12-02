@@ -9,34 +9,35 @@ import {
   http,
   createWalletClient,
   Chain,
-  Hex
+  zeroAddress
 } from "viem";
 
-import { DeployContractConfig } from '@nomicfoundation/hardhat-viem/types';
+import { DeployContractConfig, KeyedClient } from '@nomicfoundation/hardhat-viem/types';
 import { loadConfigs, ChainParams, AdaptorParams, CommonParams } from "./configs";
 import { deployHasher } from "./hasher";
-import { privateKeyToAccount } from 'viem/accounts';
+import { getChainForCurrentNetwork } from "./utils/chainUtils";
+import { deployErc4337Infra } from "./erc4337Infra";
 
 const config = loadConfigs();
-const privateKey = process.env.PRIVATE_KEY as `0x{string}`;
+
+// ABIs
 const poolAbi = hre.artifacts.readArtifactSync("Pool").abi;
-const paymasterAbi = hre.artifacts.readArtifactSync("Paymaster").abi;
 const verifier21Abi = hre.artifacts.readArtifactSync("VerifierTransact21").abi;
 const verifier22Abi = hre.artifacts.readArtifactSync("VerifierTransact22").abi;
 
 
-const deployVerifier = async (tenderlyDeployConfig) => {
-  const verifierRegister = await hre.viem.deployContract("VerifierRegister", [], tenderlyDeployConfig);
+const deployVerifier = async (deployConfig) => {
+  const verifierRegister = await hre.viem.deployContract("VerifierRegister", [], deployConfig);
   console.log("VerifierRegister deployed:", verifierRegister.address);
 
-  const verifierTreeUpdate = await hre.viem.deployContract("VerifierTreeUpdate", [], tenderlyDeployConfig);
+  const verifierTreeUpdate = await hre.viem.deployContract("VerifierTreeUpdate", [], deployConfig);
   console.log("VerifierTreeUpdate deployed:", verifierTreeUpdate.address);
 
   // Tx Verifiers
-  const verifierTransact21 = await hre.viem.deployContract("VerifierTransact21", [], tenderlyDeployConfig);
+  const verifierTransact21 = await hre.viem.deployContract("VerifierTransact21", [], deployConfig);
   console.log("VerifierTransact21 deployed:", verifierTransact21.address);
 
-  const verifierTransact22 = await hre.viem.deployContract("VerifierTransact22", [], tenderlyDeployConfig);
+  const verifierTransact22 = await hre.viem.deployContract("VerifierTransact22", [], deployConfig);
   console.log("VerifierTransact22 deployed:", verifierTransact22.address);
 
   // Prepare the TransactionVerifierInfo array
@@ -59,36 +60,38 @@ const deployVerifier = async (tenderlyDeployConfig) => {
     verifierRegister.address,
     verifierTreeUpdate.address,
   ],
-    tenderlyDeployConfig
+    deployConfig
   );
   console.log("Verifier deployed:", verifier.address);
 
   return verifier.address;
 }
 
-const deployUniswap = async (uniswapParams, pool, tenderlyDeployConfig) => {
+const deployUniswap = async (uniswapParams, pool, deployConfig) => {
   const uniswap = await hre.viem.deployContract("UniswapV3Adapter", [
     uniswapParams.uniswapSwapRouter02,
     pool
-  ], tenderlyDeployConfig)
+  ], deployConfig)
   console.log("UniswapV3Adapter deployed:", uniswap.address);
-  await addAdpatorSupport(pool, uniswap.address, true, tenderlyDeployConfig.client.wallet, tenderlyDeployConfig.client.public);
+  await addAdpatorSupport(pool, uniswap.address, true, deployConfig.client.wallet, deployConfig.client.public);
 }
 
-const deployAave = async (aaveParams, pool, tenderlyDeployConfig) => {
+const deployAave = async (aaveParams, pool, deployConfig) => {
   const aave = await hre.viem.deployContract("AaveV3Adaptor", [
     aaveParams.aave,
     pool,
     aaveParams.aaveStaticTokenFactory
-  ], tenderlyDeployConfig);
+  ], deployConfig);
   console.log("AaveV3Adapter deployed:", aave.address);
-  await addAdpatorSupport(pool, aave.address, true, tenderlyDeployConfig.client.wallet, tenderlyDeployConfig.client.public);
+  await addAdpatorSupport(pool, aave.address, true, deployConfig.client.wallet, deployConfig.client.public);
 
   const assets = [aaveParams.assets.staticAWeth, aaveParams.assets.staticAUsdc];
-  await addAssets(assets, 1, pool, wallet, client);
+  const assetsPrecision = [aaveParams.assetsPrecision.staticAWeth, aaveParams.assetsPrecision.staticAUsdc];
+
+  await addAssets(assets, assetsPrecision, 1, pool, deployConfig.client.wallet, deployConfig.client.public);
 }
 
-const deployLido = async (lidoParams, pool, tenderlyDeployConfig) => {
+const deployLido = async (lidoParams, pool, deployConfig) => {
   const lido = await hre.viem.deployContract("LidoAdaptor", [
     lidoParams.lido,
     lidoParams.wETH, // wETH
@@ -96,94 +99,105 @@ const deployLido = async (lidoParams, pool, tenderlyDeployConfig) => {
     lidoParams.wstETH, // wstETH
     lidoParams.withdrawalQueueERC721,
     pool
-  ], tenderlyDeployConfig);
+  ], deployConfig);
   console.log("LidoAdapter deployed:", lido.address);
-  await addAdpatorSupport(pool, lido.address, true, tenderlyDeployConfig.client.wallet, tenderlyDeployConfig.client.public);
+  await addAdpatorSupport(pool, lido.address, true, deployConfig.client.wallet, deployConfig.client.public);
 
   const assets = [lidoParams.assets.wstEth];
-  await addAssets(assets, 1, pool, tenderlyDeployConfig.client.wallet, tenderlyDeployConfig.client.public);
+  const assetsPrecision = [lidoParams.assetsPrecision.wstEth];
+
+  await addAssets(assets, assetsPrecision, 1, pool, deployConfig.client.wallet, deployConfig.client.public);
 }
 
-const deployCurve = async (curveParams, pool, tenderlyDeployConfig) => {
+const deployCurve = async (curveParams, pool, deployConfig) => {
   const curve = await hre.viem.deployContract("CurveNGAdaptor", [
     pool
-  ], tenderlyDeployConfig);
+  ], deployConfig);
   console.log("CurveNGAdp deployed:", curve.address);
-  await addAdpatorSupport(pool, curve.address, true, tenderlyDeployConfig.client.wallet, tenderlyDeployConfig.client.public);
+  await addAdpatorSupport(pool, curve.address, true, deployConfig.client.wallet, deployConfig.client.public);
 
   const assets = [curveParams.assets.usdt, curveParams.assets.crvUsd, curveParams.assets.crvUsdUsdtLPToken, curveParams.assets.crvUsdSusdeLPToken];
-  await addAssets(assets, 1, pool, tenderlyDeployConfig.client.wallet, tenderlyDeployConfig.client.public);
+  const assetsPrecision = [curveParams.assetsPrecision.usdt, curveParams.assetsPrecision.crvUsd, curveParams.assetsPrecision.crvUsdUsdtLPToken, curveParams.assetsPrecision.crvUsdSusdeLPToken];
+
+  await addAssets(assets, assetsPrecision, 1, pool, deployConfig.client.wallet, deployConfig.client.public);
 }
 
-const deployEthena = async (ethenaParams, pool, tenderlyDeployConfig) => {
+const deployEthena = async (ethenaParams, pool, deployConfig) => {
   const ethena = await hre.viem.deployContract("EthenaAdaptor", [
     ethenaParams.ethena,
     ethenaParams.usde,
     pool
-  ], tenderlyDeployConfig);
+  ], deployConfig);
   console.log("Ethena deployed:", ethena.address);
-  await addAdpatorSupport(pool, ethena.address, true, tenderlyDeployConfig.client.wallet, tenderlyDeployConfig.client.public);
+  await addAdpatorSupport(pool, ethena.address, true, deployConfig.client.wallet, deployConfig.client.public);
 
   const assets = [ethenaParams.assets.usde, ethenaParams.assets.sUsde];
-  await addAssets(assets, 1, pool, tenderlyDeployConfig.client.wallet, tenderlyDeployConfig.client.public);
+  const assetsPrecision = [ethenaParams.assetsPrecision.usde, ethenaParams.assetsPrecision.sUsde];
+  await addAssets(assets, assetsPrecision, 1, pool, deployConfig.client.wallet, deployConfig.client.public);
 }
 
-const deployBeefy = async (beefyParams, pool, tenderlyDeployConfig) => {
+const deployBeefy = async (beefyParams, pool, deployConfig) => {
   const beefy = await hre.viem.deployContract("BeefyV7Adaptor", [
     pool
-  ], tenderlyDeployConfig);
+  ], deployConfig);
   console.log("Beefy deployed:", beefy.address);
-  await addAdpatorSupport(pool, beefy.address, true, tenderlyDeployConfig.client.wallet, tenderlyDeployConfig.client.public);
+  await addAdpatorSupport(pool, beefy.address, true, deployConfig.client.wallet, deployConfig.client.public);
 
   const assets = [beefyParams.assets.mooCurveCrvUSDsUSDe];
-  await addAssets(assets, 1, pool, tenderlyDeployConfig.client.wallet, tenderlyDeployConfig.client.public);
+  const assetsPrecision = [beefyParams.assetsPrecision.mooCurveCrvUSDsUSDe];
+
+  await addAssets(assets, assetsPrecision, 1, pool, deployConfig.client.wallet, deployConfig.client.public);
 }
 
-const deployMorpho = async (morphoParams, pool, tenderlyDeployConfig) => {
+const deployMorpho = async (morphoParams, pool, deployConfig) => {
   const morpho = await hre.viem.deployContract("MorphoVaultAdaptor", [
     pool
-  ], tenderlyDeployConfig);
+  ], deployConfig);
   console.log("Morpho deployed:", morpho.address);
-  await addAdpatorSupport(pool, morpho.address, true, tenderlyDeployConfig.client.wallet, tenderlyDeployConfig.client.public);
+  await addAdpatorSupport(pool, morpho.address, true, deployConfig.client.wallet, deployConfig.client.public);
 
   const assets = [morphoParams.assets.gauntletWETHPrimeVault];
-  await addAssets(assets, 1, pool, tenderlyDeployConfig.client.wallet, tenderlyDeployConfig.client.public);
+  const assetsPrecision = [morphoParams.assetsPrecision.gauntletWETHPrimeVault];
+
+  await addAssets(assets, assetsPrecision, 1, pool, deployConfig.client.wallet, deployConfig.client.public);
 }
 
-const deployOneInch = async (pool, tenderlyDeployConfig) => {
+const deployOneInch = async (pool, deployConfig) => {
   const oneInch = await hre.viem.deployContract("OneInchAdaptor", [
     pool
-  ], tenderlyDeployConfig);
+  ], deployConfig);
   console.log("OneInch deployed:", oneInch.address);
-  await addAdpatorSupport(pool, oneInch.address, true, tenderlyDeployConfig.client.wallet, tenderlyDeployConfig.client.public);
+  await addAdpatorSupport(pool, oneInch.address, true, deployConfig.client.wallet, deployConfig.client.public);
 }
 
-const deployRocketPool = async (rocketPoolParams, pool, tenderlyDeployConfig) => {
+const deployRocketPool = async (rocketPoolParams, pool, deployConfig) => {
   const rocketPool = await hre.viem.deployContract("RocketPoolAdaptor", [
     rocketPoolParams.rocketSwapRouter,
     rocketPoolParams.assets.rETH,
     rocketPoolParams.wETH,
     pool
-  ], tenderlyDeployConfig);
+  ], deployConfig);
   console.log("RocketPool deployed:", rocketPool.address);
-  await addAdpatorSupport(pool, rocketPool.address, true, tenderlyDeployConfig.client.wallet, tenderlyDeployConfig.client.public);
+  await addAdpatorSupport(pool, rocketPool.address, true, deployConfig.client.wallet, deployConfig.client.public);
 
   const assets = [rocketPoolParams.assets.rETH];
-  await addAssets(assets, 1, pool, tenderlyDeployConfig.client.wallet, tenderlyDeployConfig.client.public);
+  const assetsPrecision = [rocketPoolParams.assetsPrecision.rETH];
+
+  await addAssets(assets, assetsPrecision, 1, pool, deployConfig.client.wallet, deployConfig.client.public);
 }
 
-const deployAdaptors = async (pool, adpParams, tenderlyDeployConfig) => {
+const deployAdaptors = async (pool, adpParams, deployConfig) => {
   const { uniswap: uniswapParams, aave: aaveParams, lido: lidoParams, curve: curveParams, ethena: ethenaParams, beefy: beefyParams, morpho: morphoParams, rocketPool: rocketPoolParams } = adpParams;
 
-  await deployUniswap(uniswapParams, pool, tenderlyDeployConfig);
-  await deployAave(aaveParams, pool, tenderlyDeployConfig);
-  await deployLido(lidoParams, pool, tenderlyDeployConfig);
-  await deployCurve(curveParams, pool, tenderlyDeployConfig);
-  await deployEthena(ethenaParams, pool, tenderlyDeployConfig);
-  await deployBeefy(beefyParams, pool, tenderlyDeployConfig);
-  await deployMorpho(morphoParams, pool, tenderlyDeployConfig);
-  await deployOneInch(pool, tenderlyDeployConfig);
-  await deployRocketPool(rocketPoolParams, pool, tenderlyDeployConfig);
+  await deployUniswap(uniswapParams, pool, deployConfig);
+  await deployAave(aaveParams, pool, deployConfig);
+  await deployLido(lidoParams, pool, deployConfig);
+  // await deployCurve(curveParams, pool, deployConfig);
+  // await deployEthena(ethenaParams, pool, deployConfig);
+  // await deployBeefy(beefyParams, pool, deployConfig);
+  // await deployMorpho(morphoParams, pool, deployConfig);
+  // await deployOneInch(pool, deployConfig);
+  // await deployRocketPool(rocketPoolParams, pool, deployConfig);
 }
 
 const addAdpatorSupport = async (pool, adpAddress, enable, wallet, client) => {
@@ -204,47 +218,7 @@ const addAdpatorSupport = async (pool, adpAddress, enable, wallet, client) => {
   }
 }
 
-const createTenderlyChain = (): Chain => {
-  const tenderlyChain = defineChain({
-    name: "Labyrinth Mainnet Simulation v1.0",
-    id: 7800,
-    nativeCurrency: {
-      decimals: 18,
-      name: 'Ether',
-      symbol: 'ETH',
-    },
-    rpcUrls: {
-      default: {
-        http: [process.env.RPC_TENDERLY_MAINNET_CUSTOM_ID as string]
-      },
-    },
-  });
-
-  return tenderlyChain;
-}
-
-const fundPaymaster = async (paymaster, amount, wallet, client) => {
-  let rct;
-  try {
-    //@ts-ignore
-    const hash = await wallet.writeContract({
-      address: paymaster,
-      abi: paymasterAbi,
-      functionName: "depositToEntryPoint",
-      args: [],
-      value: parseEther('20'),
-    });
-
-    rct = await client.waitForTransactionReceipt({ hash });
-    console.log("rct:paymasterFunded", rct.status);
-  } catch (error) {
-    console.log("Error funding paymaster");
-    console.log(error.message);
-    console.log("Error rct:", rct);
-  }
-}
-
-const addAssets = async (assets, assetType, poolAddr, wallet, client) => {
+const addAssets = async (assets, assetsPrecision, assetType, poolAddr, wallet, client) => {
   console.log("Adding assets:", assets);
   try {
     //@ts-ignore
@@ -252,7 +226,7 @@ const addAssets = async (assets, assetType, poolAddr, wallet, client) => {
       address: poolAddr,
       abi: poolAbi,
       functionName: "addAssets",
-      args: [assetType, assets],
+      args: [assetType, assets, assetsPrecision],
     });
 
     const rct = await client.waitForTransactionReceipt({ hash });
@@ -269,7 +243,7 @@ const addAssetsAndRevokers = async (poolProxy, chainParams, commonParams, client
       address: poolProxy,
       abi: poolAbi,
       functionName: "addAssets",
-      args: [chainParams.initAssetType, chainParams.initAssetAddresses],
+      args: [chainParams.initAssetType, chainParams.initAssetAddresses, chainParams.initAssetsPrecision],
     });
 
     const rct = await client.waitForTransactionReceipt({ hash });
@@ -302,23 +276,19 @@ const addAssetsAndRevokers = async (poolProxy, chainParams, commonParams, client
 }
 
 const main = async () => {
-  const tenderlyChain = createTenderlyChain();
-  const client = await hre.viem.getPublicClient({
-    chain: tenderlyChain
-  });
-  const chainId = await client.getChainId();
-  const wallet = createWalletClient({
-    chain: tenderlyChain,
-    transport: http(tenderlyChain.rpcUrls.default.http[0]),
-    account: privateKeyToAccount(privateKey)
-  });
+  const chain = await getChainForCurrentNetwork(hre);
+  console.log("Deploying to chain:", chain);
 
-  const tenderlyDeployConfig: DeployContractConfig = {
-    //@ts-ignore
+  const client = await hre.viem.getPublicClient({ chain });
+
+  const chainId = await client.getChainId();
+  const wallets = await hre.viem.getWalletClients({ chain });
+
+  const deployConfig: DeployContractConfig = {
     client: {
       public: client,
-      wallet: wallet
-    }
+      wallet: wallets[0]
+    } as KeyedClient
   }
 
   const commonParams = config.common as CommonParams;
@@ -326,20 +296,22 @@ const main = async () => {
   const chainParams = config[chainId] as ChainParams;
 
   // Add assets
-  // addAssets(["0x9AbD7F0782CDe1DBd1F0519C35c961b6A724c2a5" as Hex], 1, "0x9163043b553aDeF9fE44b088922560cfBFdEC51b" as Hex, wallet, client);
+  // addAssets([`0x94a9D9AC8a22534E3FaCa9F4e7F2E2cf85d5E4C8` as `0x${string}`], [18], 1, `0x62e7485535ea31382dcc3bbfc399ddd6b9c9b27f` as `0x${string}`, wallets[0], client);
 
   // individual adp deployment
-  // deployMorpho(adpParams.morpho, "0x9163043b553aDeF9fE44b088922560cfBFdEC51b" as Hex, tenderlyDeployConfig);
+  // deployMorpho(adpParams.morpho, "0x9163043b553aDeF9fE44b088922560cfBFdEC51b" as Hex, deployConfig);
 
-  const eip712 = await hre.viem.deployContract("EIP712", [], tenderlyDeployConfig);
+  const eip712 = await hre.viem.deployContract("EIP712", [], deployConfig);
   console.log("EIP712 deployed:", eip712.address);
 
-  const asset = await hre.viem.deployContract("AssetLogic", [], tenderlyDeployConfig);
+  const asset = await hre.viem.deployContract("AssetLogic", [], deployConfig);
   console.log("AssetLogic deployed:", asset.address);
-  const merkleTree = await hre.viem.deployContract("MerkleTreeLogic", [], tenderlyDeployConfig);
+
+  const merkleTree = await hre.viem.deployContract("MerkleTreeLogic", [], deployConfig);
   console.log("MerkleTreeLogic deployed:", merkleTree.address);
+
   const queuedMerkleTree = await hre.viem.deployContract(
-    "QueuedMerkleTreeLogic", [], tenderlyDeployConfig
+    "QueuedMerkleTreeLogic", [], deployConfig
   );
   console.log("QueuedMerkleTreeLogic deployed:", queuedMerkleTree.address);
 
@@ -347,7 +319,7 @@ const main = async () => {
     "ShieldedAddressLogic",
     [],
     {
-      client: tenderlyDeployConfig.client,
+      client: deployConfig.client,
       libraries: {
         MerkleTreeLogic: merkleTree.address,
       },
@@ -359,7 +331,7 @@ const main = async () => {
     "ShieldedTransactionLogic",
     [],
     {
-      client: tenderlyDeployConfig.client,
+      client: deployConfig.client,
       libraries: {
         AssetLogic: asset.address,
         MerkleTreeLogic: merkleTree.address,
@@ -368,11 +340,12 @@ const main = async () => {
     }
   );
   console.log("ShieldedTransactionLogic deployed:", shieldedTransaction.address);
-  const adaptorHandler = await hre.viem.deployContract("AdaptorHandler", [], tenderlyDeployConfig);
+
+  const adaptorHandler = await hre.viem.deployContract("AdaptorHandler", [], deployConfig);
   console.log("AdaptorHandler deployed: ", adaptorHandler.address);
 
   const poolImpl = await hre.viem.deployContract("Pool", [], {
-    client: tenderlyDeployConfig.client,
+    client: deployConfig.client,
     libraries: {
       EIP712: eip712.address,
       AssetLogic: asset.address,
@@ -384,19 +357,25 @@ const main = async () => {
   });
   console.log("Pool deployed:", poolImpl.address);
 
-  const { hasher } = await deployHasher(wallet, client, tenderlyDeployConfig);
+  const { hasher } = await deployHasher(deployConfig.client.wallet, client, deployConfig);
   console.log("Hasher deployed:", hasher);
 
-  const verifier = await deployVerifier(tenderlyDeployConfig);
+  const verifier = await deployVerifier(deployConfig);
+
+  const initAddressParams = {
+    mempool: zeroAddress,
+    verifier: verifier,
+    adaptorHandler: zeroAddress,
+    screener: chainParams.sanctionsList,
+    hasher: hasher,
+    verificationTrackerService: zeroAddress
+  }
 
   const args = [
     commonParams.addressTreeDepth,
     commonParams.commitmentTreeDepth,
     commonParams.commitmentTreeQueueSize,
-    verifier,
-    adaptorHandler.address,
-    chainParams.sanctionsList,
-    hasher,
+    initAddressParams,
     BigInt(commonParams.withdrawFeeBps),
   ];
 
@@ -409,32 +388,17 @@ const main = async () => {
   const poolProxy = await hre.viem.deployContract("PoolProxy", [
     poolImpl.address,
     initData,
-  ], tenderlyDeployConfig);
+  ], deployConfig);
   console.log("PoolProxy deployed:", poolProxy.address);
 
   // Deploy Adaptors 
-  await deployAdaptors(poolProxy.address, adpParams, tenderlyDeployConfig);
+  await deployAdaptors(poolProxy.address, adpParams, deployConfig);
 
   // ERC4337 infra setup
-  const gateway = await hre.viem.deployContract("Gateway", [
-    chainParams.entryPoint,
-    chainParams.wToken,
-    poolProxy.address,
-  ], tenderlyDeployConfig);
-  console.log("Gateway deployed:", gateway.address);
-
-  const paymaster = await hre.viem.deployContract("Paymaster", [
-    chainParams.entryPoint,
-    gateway.address,
-  ], tenderlyDeployConfig);
-  console.log("Paymaster deployed:", paymaster.address);
-
-  // skipping funding of paymaster on Tenderly
-  /// @todo: uncomment for other networks
-  // await fundPaymaster(paymaster.address, "20", wallet, client);
+  await deployErc4337Infra(chainParams, poolProxy.address, zeroAddress, deployConfig);
 
   // Asset & Revoker Setup
-  await addAssetsAndRevokers(poolProxy.address, chainParams, commonParams, client, wallet);
+  await addAssetsAndRevokers(poolProxy.address, chainParams, commonParams, client, deployConfig.client.wallet);
 };
 
 main().catch(console.error);

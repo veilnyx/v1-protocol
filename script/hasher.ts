@@ -64,7 +64,7 @@ export const deployHasher = async (wallet, client, tenderlyDeployConfig) => {
   console.log("PoseidonT4 deployed:", poseidonT4);
 
   const poseidonT5 = receiptPT5.contractAddress;
-  console.log("PoseidonT3 deployed:", poseidonT5);
+  console.log("PoseidonT5 deployed:", poseidonT5);
 
 
   const hasher = await hre.viem.deployContract("Hasher", [

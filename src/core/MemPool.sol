@@ -197,7 +197,7 @@ contract Mempool is
         gateway = newAddr;
     }
 
-    /// @notice Needs to be called immediately after the Labyrinth pool is deployed/upgraded, for the mempool to be able to interact with the pool
+    /// @notice Needs to be called immediately after the Veilnyx pool is deployed/upgraded, for the mempool to be able to interact with the pool
     function updatePoolAddress(address newPool) external onlyOwner {
         pool = IPool(newPool);
     }

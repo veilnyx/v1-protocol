@@ -87,9 +87,11 @@ interface IPool {
     /// @notice Can only be called by the owner.
     /// @param assetType The type of the asset to be added.
     /// @param assetAddresses The addresses of the assets.
+    /// @param assetsPrecision The precision (decimals) of the assets.
     function addAssets(
         AssetType assetType,
-        address[] memory assetAddresses
+        address[] calldata assetAddresses,
+        uint8[] calldata assetsPrecision
     ) external;
 
     /// @notice Adds support for an external adaptor to a DeFi protocol.

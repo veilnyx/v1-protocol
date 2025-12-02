@@ -44,16 +44,19 @@ contract AaveAdaptorTest is PoolTest {
         /// @dev update convert req fixture with this adaptor addr as `to`
         console.log("Aave adaptor deployed:", address(aaveAdaptor));
 
-        // Asset & Adaptor support on Labyrinth Protocol
+        // Asset & Adaptor support on Veilnyx Protocol
         address poolOwner = pool.owner();
         vm.startPrank(poolOwner);
         pool.addAdaptorSupport(address(aaveAdaptor), true);
 
         AssetType assetType = AssetType.ERC20;
         address[] memory assetAddresses = new address[](1);
+        uint8[] memory assetsPrecision = new uint8[](1);
+
         // assetAddresses[0] = WETH_AAVE_UNDERLYING; // already added to the pool
         assetAddresses[0] = WETH_STATIC_A_TOKEN;
-        pool.addAssets(assetType, assetAddresses);
+        assetsPrecision[0] = 18;
+        pool.addAssets(assetType, assetAddresses, assetsPrecision);
         vm.stopPrank();
 
         deal(WETH_AAVE_UNDERLYING, user, INITIAL_SUPPLY);
@@ -141,9 +144,9 @@ contract AaveAdaptorTest is PoolTest {
         assertEq(IERC20(USDC).balanceOf(address(pool)), INITIAL_SUPPLY_USDC);
     }
 
-    /// @dev This test bypasses the Labyrinth protocol and directly tests the Aave integration from the Aave adaptor.
+    /// @dev This test bypasses the Veilnyx protocol and directly tests the Aave integration from the Aave adaptor.
     /// @dev Pls uncomment the `receive()` on the Aave adp to enable this test.
-    function testWEthLendingAndUnLendingOnAaveBypassingLabyrinth() public {
+    function testWEthLendingAndUnLendingOnAaveBypassingVeilnyx() public {
         uint256 initialDeposit = 10 ether;
         vm.deal(address(aaveAdaptor), initialDeposit);
         vm.prank(address(aaveAdaptor));

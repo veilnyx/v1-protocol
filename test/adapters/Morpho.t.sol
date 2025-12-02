@@ -35,7 +35,7 @@ contract MorphoAdaptorTest is PoolTest {
         /// @dev update convert req fixture with this adaptor addr as `to`
         console.log("Morpho adaptor deployed:", address(morphoAdp));
 
-        // Adaptor & asset support on Labyrinth Protocol
+        // Adaptor & asset support on Veilnyx Protocol
         address poolOwner = pool.owner();
         vm.startPrank(poolOwner);
         pool.addAdaptorSupport(address(morphoAdp), true);
@@ -43,7 +43,12 @@ contract MorphoAdaptorTest is PoolTest {
         address[] memory assetAddresses = new address[](1);
         // assetAddresses[0] = loanToken;
         assetAddresses[0] = vaultToken;
-        pool.addAssets(assetType, assetAddresses);
+
+        uint8[] memory assetsPrecision = new uint8[](1);
+        // assetAddresses[0] = loanToken;
+        assetsPrecision[0] = 18;
+
+        pool.addAssets(assetType, assetAddresses, assetsPrecision);
         vm.stopPrank();
     }
 
