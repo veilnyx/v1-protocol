@@ -20,3 +20,6 @@ runs = 10_000
 tenderly = "${RPC_TENDERLY}"
 op_sepolia = "${RPC_OPTIMISM_SEPOLIA}"
 polygon_amoy = "${RPC_POLYGON_AMOY}"
+
+[lint]
+lint_on_build = false
