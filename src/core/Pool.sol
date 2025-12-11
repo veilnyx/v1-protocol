@@ -6,8 +6,8 @@ import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Ini
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
-import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
-import {EIP712} from "../libraries/EIP712.sol";
+import {EIP712Upgradeable} from "@openzeppelin/contracts-upgradeable/utils/cryptography/EIP712Upgradeable.sol";
+
 import {IVerifier} from "../interfaces/IVerifier.sol";
 import {IPool} from "../interfaces/IPool.sol";
 import {IAdaptorHandler} from "../interfaces/IAdaptorHandler.sol";
@@ -39,6 +39,7 @@ contract Pool is
     Initializable,
     UUPSUpgradeable,
     OwnableUpgradeable,
+    EIP712Upgradeable,
     ReentrancyGuardUpgradeable,
     PausableUpgradeable,
     PoolStorage
@@ -69,7 +70,10 @@ contract Pool is
         __UUPSUpgradeable_init();
         __ReentrancyGuard_init();
         __Pausable_init();
-        EIP712.init(EIP712_DOMAIN_NAME, EIP712_DOMAIN_VERSION);
+        EIP712Upgradeable.__EIP712_init(
+            EIP712_DOMAIN_NAME,
+            EIP712_DOMAIN_VERSION
+        );
 
         mempool = initAddressParams.mempool;
         verifier = initAddressParams.verifier;
@@ -194,13 +198,6 @@ contract Pool is
         verificationTrackerService = verificationTrackerService_;
     }
 
-    function updateEIP712Domain(
-        string memory name,
-        string memory version
-    ) external onlyOwner {
-        EIP712.init(name, version);
-    }
-
     /////////////////////////////////////////
     //        PUBLIC WRITE METHODS         //
     ////////////////////////////////////////
@@ -211,7 +208,7 @@ contract Pool is
         bytes32 hashStruct = ShieldedAddressLogic.hashRegsiterAddressStruct(
             addressRegData.shieldedAddress
         );
-        bytes32 hashTypedData = EIP712.hashTypedDataV4(hashStruct);
+        bytes32 hashTypedData = _hashTypedDataV4(hashStruct);
 
         addressRegData.register({
             addressTree: _addressTree,
