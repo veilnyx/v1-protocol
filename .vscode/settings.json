@@ -1,0 +1,6 @@
+{
+  "files.exclude": {
+    "out/": false
+  },
+  "explorer.excludeGitIgnore": false
+}
