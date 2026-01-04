@@ -1,7 +1,7 @@
 # Audit Scope - Veilnyx
 
 ## Overview
-Veilnyx is a compliant-privacy protocol enabled by ZK and threshold cryptography at its core.
+Veilnyx is a privacy protocol with built-in compliance, enabled by Selective De-Anonymization, Zero-Knowledge (ZK), and Multi-Party Computation (MPC).
 
 ### Key Features
 1. Multi-asset privacy pool
