@@ -10,6 +10,7 @@ import {IVerifier} from "../interfaces/IVerifier.sol";
 import {IHasher} from "../interfaces/IHasher.sol";
 import {IAdaptorHandler} from "../interfaces/IAdaptorHandler.sol";
 import {INebraUpa} from "../interfaces/INebraUpa.sol";
+import {IScreener} from "../interfaces/IScreener.sol";
 
 /// @title ShieldedTransactionType enum representing types of shielded transactions
 enum ShieldedTransactionType {
@@ -151,11 +152,21 @@ library ShieldedTransactionLogic {
         MerkleTree storage addressTree,
         QueuedMerkleTree storage commitmentTree,
         address verifier,
+        address screener,
         mapping(uint256 => uint32) storage markedNullifiers,
         mapping(address => bool) storage supportedAdaptors,
         mapping(uint256 => RevokerData) storage revokerDataMap
     ) external {
         RevokerData memory revokerData = revokerDataMap[stx.revokerId];
+
+        if (
+            stx.txType == ShieldedTransactionType.DEPOSIT &&
+            screener != address(0)
+        ) {
+            if (IScreener(screener).isSanctioned(msg.sender)) {
+                revert IScreener.SanctionedAddress(msg.sender);
+            }
+        }
 
         if (!revokerData.isActive) {
             revert IPool.InvalidRevoker(stx.revokerId);
