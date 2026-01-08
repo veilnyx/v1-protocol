@@ -1,6 +1,6 @@
 # v1 Protocol
 
-Smart contracts for zkFi v1 protocol
+Smart contracts for Veilnyx v1 protocol
 
 ## Test Coverage
 `pnpm run coverage`
