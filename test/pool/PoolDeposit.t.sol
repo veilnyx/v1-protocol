@@ -3,8 +3,10 @@ pragma solidity ^0.8.24;
 
 import {ShieldedTransaction} from "src/libraries/ShieldedTransaction.sol";
 import {IPool} from "src/interfaces/IPool.sol";
+import {IScreener} from "src/interfaces/IScreener.sol";
 import {ZERO_LEAF} from "src/base/Constants.sol";
 import {PoolTest} from "test/fixtures/PoolTest.sol";
+import {Screener} from "src/core/Screener.sol";
 
 contract PoolDepositTest is PoolTest {
     function setUp() public {
@@ -62,6 +64,30 @@ contract PoolDepositTest is PoolTest {
                 stx.nullifiers[0]
             )
         );
+        pool.transact(stx, false);
+    }
+
+    function test_revertOnSanctionedDepositAddr() external {
+        address chainAnalysisScreenerMainnetOracle = 0x40C57923924B5c5c5455c48D93317139ADDaC8fb;
+        address sanctionedAddr = 0xd5ED34b52AC4ab84d8FA8A231a3218bbF01Ed510; // Example sanctioned address
+
+        Screener chainAnalysisScreenerMainnet = new Screener(
+            chainAnalysisScreenerMainnetOracle
+        );
+
+        pool.setScreener(address(chainAnalysisScreenerMainnet));
+        // Attempt to deposit from a sanctioned address
+        ShieldedTransaction memory stx = _loadShieldedTransaction(
+            "deposit_pre_tx"
+        );
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IScreener.SanctionedAddress.selector,
+                sanctionedAddr
+            )
+        );
+        vm.prank(sanctionedAddr);
         pool.transact(stx, false);
     }
 }

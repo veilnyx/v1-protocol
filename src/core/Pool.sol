@@ -247,6 +247,7 @@ contract Pool is
             addressTree: _addressTree,
             commitmentTree: _commitmentTree,
             verifier: verifier,
+            screener: screener,
             markedNullifiers: _markedNullifiers,
             supportedAdaptors: _adaptors,
             revokerDataMap: _revokers
@@ -382,6 +383,14 @@ contract Pool is
         }
 
         return markedArr;
+    }
+
+    function isDepositAddrSanctioned(address addr) external view returns (bool) {
+        if(screener == address(0)) {
+            return false;
+        }
+
+        return IScreener(screener).isSanctioned(addr);
     }
 
     function getCommitmentTreeState()
