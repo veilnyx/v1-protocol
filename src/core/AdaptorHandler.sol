@@ -12,6 +12,8 @@ import {PubAsset} from "../libraries/ShieldedTransaction.sol";
 contract AdaptorHandler is IAdaptorHandler {
     using SafeERC20 for IERC20;
 
+    /// @custom:invariant ADP-2: Output assets should be whitelisted in the protocol
+    /// @custom:invariant ADP-3: Output value of each asset should be equal or less than the balance of that asset in this contract
     function handleAdaptor(
         address target,
         PubAsset[] calldata pubAssets,

@@ -145,6 +145,8 @@ library ShieldedTransactionLogic {
 
     /// @notice Validates a shielded transaction
     /// @param stx ShieldedTransaction to be executed
+    /// @custom:invariant ACCESS-4 Revoker must be active to be used in transaction
+    /// @custom:invariant ADP-1: Adaptor should be supported by the protocol to be used in CALL_ADAPTOR transaction
     function validate(
         ShieldedTransaction calldata stx,
         bool isPreVerified,
@@ -721,7 +723,11 @@ library ShieldedTransactionLogic {
         }
     }
 
-    /// @dev This also prevents any duplicate nullifiers
+    /// @notice Marks nullifiers to prevent double-spending
+    /// @param stx The shielded transaction containing nullifiers
+    /// @custom:invariant NULL-1: Each nullifier can only be marked once per lifetime
+    /// @custom:invariant NULL-2: markedNullifiers[n] = 0 means nullifier is unused
+    /// @custom:invariant NULL-3: markedNullifiers[n] = nextIdx + 1 (never 0 for marked)
     function _checkAndMarkNullifiers(
         ShieldedTransaction calldata stx,
         QueuedMerkleTree storage commitmentTree,
@@ -736,7 +742,6 @@ library ShieldedTransactionLogic {
                 revert IPool.DoubleSpend(nullifier);
             }
 
-            /// @dev adding 1 to nextIdx to avoid marking the first nullifier as 0, as 0 means nullifier is not marked
             markedNullifiers[nullifier] = nextIdx + 1;
             emit IPool.NullifierMarked(nullifier, markedNullifiers[nullifier]);
 
@@ -811,7 +816,7 @@ library ShieldedTransactionLogic {
             // Extract last 28 bytes value
             params.pubAssets[i].value = uint224(stx.pubAssets[i]);
 
-            /// @dev since feeAsset pushed into pubAssets, for transfer tx, the pubAssets value will become 0, but thats fine as pubAssets is not used in transfer tx. Only used in other types tx to move assets.
+            /// Since feeAsset pushed into pubAssets, for transfer tx, the pubAssets value will become 0, but thats fine as pubAssets is not used in transfer tx. Only used in other types tx to move assets.
             if (params.pubAssets[i].id == params.feeAssetId) {
                 params.pubAssets[i].value =
                     params.pubAssets[i].value -

@@ -75,7 +75,8 @@ Veilnyx is a privacy protocol with built-in compliance, enabled by Selective De-
 - UTXO algorithm
 - ZK proof verification
 - Compliance logic
-- Complex logic sections
+- Complex logic 
+- Protocol invariants have been marked with Natspec tag `@custom:invariant` across the codebase. We need to make sure they hold true throughout the functioning of the protocol.
 
 ## Setup & Testing
 

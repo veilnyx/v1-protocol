@@ -34,6 +34,8 @@ library QueuedMerkleTreeLogic {
 
     uint8 public constant ROOT_HISTORY_SIZE = 50;
 
+    /// @custom:invariant QMT-1: queueStartIndex <= queueEndIndex always
+    /// @custom:invariant QMT-2: queueEndIndex - queueStartIndex <= total leaves queued at all times
     function init(
         QueuedMerkleTree storage self,
         uint8 depth,
@@ -113,6 +115,7 @@ library QueuedMerkleTreeLogic {
         return leaves;
     }
 
+    /// @custom:invariant QMT-3: `nextLeafIndex` advances by exactly min(batchSize, queueSize) per update
     function update(
         QueuedMerkleTree storage self,
         TreeUpdateData calldata data
@@ -243,6 +246,12 @@ library QueuedMerkleTreeLogic {
         uint256[] memory lastSubtrees = _getSubtrees(self);
         uint32 nextLeafIndex = self.nextLeafIndex;
         uint256 lastRoot = self.roots[self.currentRootIndex];
-        return (leaves, lastSubtrees, lastRoot, self.currentRootIndex, nextLeafIndex);
+        return (
+            leaves,
+            lastSubtrees,
+            lastRoot,
+            self.currentRootIndex,
+            nextLeafIndex
+        );
     }
 }

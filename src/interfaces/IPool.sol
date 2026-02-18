@@ -70,6 +70,7 @@ interface IPool {
     error DuplicateRevoker(uint256[2] publicKey);
     error NoFeeToClaim(address paymaster, uint24 assetId);
     error InvalidSenderForPreverifiedSTX(address sender, address mempool);
+    error InvalidWithdrawFeeBps(uint256 feeBps);
 
     /////////////////////////////////////////
     //         ADMIN WRITE METHODS         //
