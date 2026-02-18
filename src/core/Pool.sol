@@ -92,7 +92,7 @@ contract Pool is
     /////////////////////////////////////////
     //         ADMIN WRITE METHODS         //
     ////////////////////////////////////////
-
+    /// @custom:invariant ACCESS-1 Owner can upgrade, pause, add assets/adaptors, register revokers
     function pause() external onlyOwner {
         _pause();
     }
@@ -184,7 +184,11 @@ contract Pool is
         screener = screener_;
     }
 
+    /// @custom:invariant FEE-1: withdrawFeeBps cannot be set above 10000 (100%)
     function setWithdrawFeeBips(uint256 feeBps) external onlyOwner {
+        if (feeBps > 10000) {
+            revert InvalidWithdrawFeeBps(feeBps);
+        }
         withdrawFeeBps = feeBps;
     }
 
@@ -228,6 +232,7 @@ contract Pool is
         _commitmentTree.update(treeUpdateData);
     }
 
+    /// @custom:invariant ACCESS-2: Only mempool contract can submit pre-verified STX
     function transact(
         ShieldedTransaction calldata stx,
         bool isPreVerified
@@ -265,6 +270,7 @@ contract Pool is
         });
     }
 
+    /// @custom:invariant ACCESS-3: Only paymasters can withdraw their accumulated fees
     function withdrawPaymasterFee(
         uint24 assetId,
         address to

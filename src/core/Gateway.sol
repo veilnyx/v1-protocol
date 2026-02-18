@@ -23,6 +23,7 @@ contract Gateway is IGateway, Ownable {
 
     error InvalidEntryPoint(address entryPoint);
 
+    /// @custom:invariant ACCESS-5 Entrypoint to be the only caller of `validateUserOp` and `handleUserOp`
     modifier onlyEntryPoint() {
         if (msg.sender != entryPoint) {
             revert InvalidEntryPoint(msg.sender);

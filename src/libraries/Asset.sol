@@ -26,6 +26,7 @@ library AssetLogic {
     using SafeERC20 for IERC20;
 
     error ZeroAddress();
+    error PrecisionMismatch();
 
     function getAssetOrRevert(
         mapping(uint24 => Asset) storage assets,
@@ -37,6 +38,8 @@ library AssetLogic {
         }
     }
 
+    /// @custom:invariant Asset IDs are 3 bytes: 1 byte type + 2 bytes UID (asset counter)
+    /// @custom:invariant Only active assets can be transferred/received
     function addAsset(
         mapping(address => uint24) storage assetIds,
         mapping(uint24 => Asset) storage assets,
@@ -51,6 +54,10 @@ library AssetLogic {
 
         if (assetAddress == address(0)) {
             revert ZeroAddress();
+        }
+
+        if (IERC20(assetAddress).decimals() != assetPrecision) {
+            revert PrecisionMismatch();
         }
 
         // Uid of added asset

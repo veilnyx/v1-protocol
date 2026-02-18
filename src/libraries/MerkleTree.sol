@@ -27,6 +27,9 @@ library MerkleTreeLogic {
         _;
     }
 
+    /// @custom:invariant MT-1: Leaves can only be appended, never modified
+    /// @custom:invariant MT-2: roots[] is circular buffer of size ROOT_HISTORY_SIZE
+    /// @custom:invariant MT-3: nextLeafIndex < capacity at all times
     function init(MerkleTree storage self, uint8 depth, address hasher) public {
         self.depth = depth;
         self.hasher = hasher;
@@ -206,6 +209,7 @@ library MerkleTreeLogic {
         return self.nextLeafIndex;
     }
 
+    /// @custom:invariant MT-3: Any valid root from last 100 insertions is accepted
     function isKnownRoot(
         MerkleTree storage self,
         uint256 _root

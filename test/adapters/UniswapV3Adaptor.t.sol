@@ -2,6 +2,7 @@
 pragma solidity 0.8.24;
 pragma abicoder v2;
 
+import {PoolImplDeploy as VeilnyxDeployer} from "script/deploy/PoolImpl.s.sol";
 import {BaseScript} from "script/BaseScript.sol";
 import {PoolTest} from "test/fixtures/PoolTest.sol";
 import {Pool} from "src/core/Pool.sol";
@@ -27,6 +28,9 @@ contract UniswapV3AdaptorTest is PoolTest {
     address public user = 0x689EcF264657302052c3dfBD631e4c20d3ED0baB;
 
     function setUp() external {
+        VeilnyxDeployer poolImplDeployer = new VeilnyxDeployer();
+        poolImplDeployer.run();
+
         require(shouldTestRun(), "UniswapV3AdaptorTest: Chain not supported");
         _setUp();
 
@@ -39,7 +43,6 @@ contract UniswapV3AdaptorTest is PoolTest {
         );
 
         // uniswapV3Adapter = 0x14992438240Be80bE2077DCb6615805C2E72362d;
-        
         /// @dev update convert req fixture with this adaptor addr as `to`
         console.log("Uniswap adaptor:", address(uniswapV3Adapter));
 
