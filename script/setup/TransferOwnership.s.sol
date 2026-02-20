@@ -5,9 +5,9 @@ import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "forge-std/Script.sol";
 
 contract TransferOwnership is Script {
-    address public newOwner = 0x8f9Af25A446b8fF4aFBb52438e5B60512510fa63;
+    address public newOwner = 0x53315b2b31f3301D6f2145D634E4Bdba7E118471; // Multisig addr SAFE
     address public ownableContractAddress =
-        0x7E53C283730C0Fa9d38f263BD1f51cB6B4D68efE;
+        0x62E7485535ea31382dcc3Bbfc399Ddd6B9c9b27F;
 
     function run() external {
         uint256 privateKey = vm.envUint("PRIVATE_KEY");
