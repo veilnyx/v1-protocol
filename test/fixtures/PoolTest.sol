@@ -128,9 +128,9 @@ contract PoolTest is PoolBaseTest, BaseScript {
         assetAddresses[2] = address(tokenReent);
 
         uint8[] memory assetsPrecision = new uint8[](3 + initAssetLength);
-        assetsPrecision[0] = 18;
-        assetsPrecision[1] = 6;
-        assetsPrecision[2] = 18;
+        assetsPrecision[0] = MockERC20(assetAddresses[0]).decimals();
+        assetsPrecision[1] = MockERC20(assetAddresses[1]).decimals();
+        assetsPrecision[2] = MockERC20(assetAddresses[2]).decimals();
 
         // adding support for testnet tokens if any to provide support of adaptor testing
         if (initAssetLength > 0) {

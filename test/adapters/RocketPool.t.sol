@@ -18,7 +18,7 @@ enum Action {
     UNSTAKE
 }
 
-contract LidoAdaptorTest is PoolTest {
+contract RocketPoolAdpTest is PoolTest {
     using SafeERC20 for IERC20;
 
     error CheckChainConfig();
@@ -36,12 +36,11 @@ contract LidoAdaptorTest is PoolTest {
     address public user = 0x689EcF264657302052c3dfBD631e4c20d3ED0baB;
 
     function setUp() external {
-        require(shouldTestRun(), "LidoAdaptorTest: Chain not supported");
+        require(shouldTestRun(), "RocketPoolAdpTest: Chain not supported");
         _setUp();
 
         // deploying Uniswap adaptor
         rocketPoolAdp = new RocketPoolAdaptor(
-            rocketSwapRouter,
             rETH,
             WETH,
             address(pool)

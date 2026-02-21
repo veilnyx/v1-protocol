@@ -32,10 +32,10 @@ abstract contract BaseTest is Test {
 
     function _setUp() internal virtual {
         fixture = FixtureLib.load(vm);
-        token1 = new MockERC20(address(this));
-        token2 = new MockERC20(address(this));
+        token1 = new MockERC20(address(this), 18);
+        token2 = new MockERC20(address(this), 6);
         // Deploying the ERC20 token for testing reentrancy attack
-        tokenReent = new MockERC20ForReentrancyTest(address(this));
+        tokenReent = new MockERC20ForReentrancyTest(address(this), 18);
         config = new Config();
     }
 

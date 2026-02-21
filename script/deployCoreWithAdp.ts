@@ -172,7 +172,6 @@ const deployOneInch = async (pool, deployConfig) => {
 
 const deployRocketPool = async (rocketPoolParams, pool, deployConfig) => {
   const rocketPool = await hre.viem.deployContract("RocketPoolAdaptor", [
-    rocketPoolParams.rocketSwapRouter,
     rocketPoolParams.assets.rETH,
     rocketPoolParams.wETH,
     pool
@@ -197,7 +196,7 @@ const deployAdaptors = async (pool, adpParams, deployConfig) => {
   // await deployBeefy(beefyParams, pool, deployConfig);
   // await deployMorpho(morphoParams, pool, deployConfig);
   // await deployOneInch(pool, deployConfig);
-  // await deployRocketPool(rocketPoolParams, pool, deployConfig);
+  // await deployRocketPool(pool, deployConfig);
 }
 
 const addAdpatorSupport = async (pool, adpAddress, enable, wallet, client) => {

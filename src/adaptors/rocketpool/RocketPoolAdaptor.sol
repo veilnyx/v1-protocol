@@ -19,18 +19,17 @@ enum Action {
 contract RocketPoolAdaptor is AdaptorBase {
     using SafeERC20 for IERC20;
 
-    IRocketSwapRouter public immutable rocketSwapRouter;
+    IRocketSwapRouter public immutable rocketSwapRouter =
+        IRocketSwapRouter(0x16D5A408e807db8eF7c578279BEeEe6b228f1c1C);
     address public immutable WETH;
     address public immutable rETH;
     uint256 public constant MINIMUM_DEPOSIT = 0.01 ether;
 
     constructor(
-        address rocketPoolRouter_,
         address rEth_,
         address wEth_,
         address veilnyxPool_
     ) AdaptorBase(veilnyxPool_) {
-        rocketSwapRouter = IRocketSwapRouter(rocketPoolRouter_);
         rETH = rEth_;
         WETH = wEth_;
     }
@@ -164,4 +163,8 @@ contract RocketPoolAdaptor is AdaptorBase {
     /// @dev only for enabling tests bypassing protocol. Pls comment this out for production use.
     // Allow RocketPool adaptor to receive unwrapped Ether, to send to Lido for staking
     // receive() external payable {}
+
+    function getRocketSwapRouterAddress() external view returns (address) {
+        return address(rocketSwapRouter);
+    }
 }
