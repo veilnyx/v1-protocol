@@ -24,6 +24,7 @@ const config = loadConfigs();
 const poolAbi = hre.artifacts.readArtifactSync("Pool").abi;
 const verifier21Abi = hre.artifacts.readArtifactSync("VerifierTransact21").abi;
 const verifier22Abi = hre.artifacts.readArtifactSync("VerifierTransact22").abi;
+const adaptorHandlerAbi = hre.artifacts.readArtifactSync("AdaptorHandler").abi;
 
 
 const deployVerifier = async (deployConfig) => {
@@ -364,7 +365,7 @@ const main = async () => {
   const initAddressParams = {
     mempool: zeroAddress,
     verifier: verifier,
-    adaptorHandler: zeroAddress,
+    adaptorHandler: adaptorHandler.address,
     screener: chainParams.sanctionsList,
     hasher: hasher,
     verificationTrackerService: zeroAddress
@@ -389,6 +390,16 @@ const main = async () => {
     initData,
   ], deployConfig);
   console.log("PoolProxy deployed:", poolProxy.address);
+
+  // @ts-ignore
+  const setPoolHash = await wallets[0].writeContract({
+    address: adaptorHandler.address,
+    abi: adaptorHandlerAbi,
+    functionName: "setVeilnyxPool",
+    args: [poolProxy.address],
+  });
+  await client.waitForTransactionReceipt({ hash: setPoolHash });
+  console.log("AdaptorHandler: veilnyxPool set to", poolProxy.address);
 
   // Deploy Adaptors 
   await deployAdaptors(poolProxy.address, adpParams, deployConfig);

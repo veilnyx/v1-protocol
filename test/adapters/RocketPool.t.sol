@@ -40,11 +40,7 @@ contract RocketPoolAdpTest is PoolTest {
         _setUp();
 
         // deploying Uniswap adaptor
-        rocketPoolAdp = new RocketPoolAdaptor(
-            rETH,
-            WETH,
-            address(pool)
-        );
+        rocketPoolAdp = new RocketPoolAdaptor(rETH, WETH, address(pool));
 
         /// @dev update convert req fixture with this adaptor addr as `to`
         console.log("RocketPool adaptor deployed:", address(rocketPoolAdp));
@@ -160,7 +156,7 @@ contract RocketPoolAdpTest is PoolTest {
     function shouldTestRun() internal view returns (bool) {
         if (block.chainid != 17000 && block.chainid != 1) {
             console.log(
-                "Skipping RocketPool adaptor tests on the current chain as RocketPool protocol may not be deployed. To run RocketPool tests, kindly run the tests on the Tenderly Mainnet fork where RocketPool is deployed."
+                "Skipping RocketPool adaptor tests on the current chain as RocketPool protocol may not be deployed. To run RocketPool tests, kindly run the tests on the Tenderly Mainnet/Mainnet fork where RocketPool is deployed."
             );
             return false;
         }
