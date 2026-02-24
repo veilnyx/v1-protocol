@@ -15,11 +15,26 @@ enum Action {
 }
 
 export const reqs = {
+    lend_1_aave_weth: {
+        type: TransactionType.CALL_ADAPTER,
+        assetIds: [testnetWeth],
+        values: [parseEther("1")],
+        feeAssetId: 0,
+        // adaptor to which the ZkFi AdaptorHandler will call to execute swap
+        to: "0xbF71c5Ae43827387dAAF7358acAB5C81642b74b8",
+        // payload:: action: 0 (supply)
+        payload: "0x0000000000000000000000000000000000000000000000000000000000000000" as `0x${string}`,
+        revokerId: 0,
+        viaBundler: false,
+        paymaster: zeroAddress,
+    }
+    /**
+    ,
     swap_1_testnet_weth_to_usdc_via_bundler: {
         type: TransactionType.CALL_ADAPTER,
         assetIds: [testnetWeth],
         values: [parseEther("1")],
-        to: "0xe8dc788818033232EF9772CB2e6622F1Ec8bc840", // adaptor to which the ZkFi Convertor will call to execute swap
+        to: "0xbF71c5Ae43827387dAAF7358acAB5C81642b74b8", // adaptor to which the ZkFi Convertor will call to execute swap
         revokerId: 0,
         feeAssetId: testnetWeth,
         viaBundler: true,
@@ -28,7 +43,6 @@ export const reqs = {
         payload:
             "0x000000000000000000000000000000000000000000000000000000000001000500000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000" as `0x${string}`, // refund: pool address (address(0))
     },
-    /**
     lend_1_aave_weth_through_bundler: {
         type: TransactionType.CALL_ADAPTER,
         assetIds: [testnetWeth],
@@ -105,19 +119,6 @@ export const reqs = {
         viaBundler: true,
         paymaster: "0x03E98aE18908eBc2Fe82e646E4DFB628963383c1" as `0x${string}`,
     },
-    lend_1_aave_weth: {
-        type: TransactionType.CALL_ADAPTER,
-        assetIds: [aaveWethUnderlying],
-        values: [parseEther("1")],
-        feeAssetId: 0,
-        // adaptor to which the ZkFi AdaptorHandler will call to execute swap
-        to: "0xbF71c5Ae43827387dAAF7358acAB5C81642b74b8",
-        // payload:: action: 0 (supply)
-        payload: "0x0000000000000000000000000000000000000000000000000000000000000000" as `0x${string}`,
-        revokerId: 0,
-        viaBundler: false,
-        paymaster: zeroAddress,
-    },
     supply_5_usdt_crvUsd_on_curve: {
         type: TransactionType.CALL_ADAPTER,
         assetIds: [testnetUsdt, testnetCrvUsd],
@@ -158,7 +159,8 @@ export const reqs = {
 */
 };
 
+// Uses notes from deposit_aaveWeth_testnetUsdc
 export const genTestCallAdaptors = async (sdk: Core) => {
-    await mockNotes("deposit_2_testnet_weth", sdk);
+    await mockNotes("deposit_aaveWeth_testnetUsdc", sdk);
     await generateTestTransactions(reqs, sdk);
 };

@@ -24,7 +24,7 @@ import {
   ENTRYPOINT_ADDRESS_V07,
 } from "permissionless";
 import { ShieldedAccount } from "@labyrinthac/account";
-import { Fp, Point, poseidonDecrypt } from "@labyrinthac/babyjubjub";
+import { Point, poseidonDecrypt, PointType } from "@labyrinthac/babyjubjub";
 import { randomBigInt, randomBytes, randomHex } from "@labyrinthac/utils";
 import {
   TransactionOptions,
@@ -62,14 +62,14 @@ const assets = {
   morphoVaultToken: config.assets.morphoVaultToken,
 };
 
-const revokerPublicKey = Point.fromArray([
-  BigInt(config.revokerPublicKey[0]),
-  BigInt(config.revokerPublicKey[1]),
-]);
-const encryptionPublicKey = Point.fromArray([
-  BigInt(config.encryptionPublicKey[0]),
-  BigInt(config.encryptionPublicKey[1]),
-]);
+const revokerPublicKey = Point.fromAffine({
+  x: BigInt(config.revokerPublicKey[0]),
+  y: BigInt(config.revokerPublicKey[1]),
+}) as PointType;
+const encryptionPublicKey = Point.fromAffine({
+  x: BigInt(config.encryptionPublicKey[0]),
+  y: BigInt(config.encryptionPublicKey[1]),
+}) as PointType;
 
 export const dirFixtureData = path.resolve(__dirname, "../data");
 
@@ -304,7 +304,7 @@ export async function mockNotes(depositName: string, sdk: Core) {
     }
   }
   console.log("Fixture::Notes decrypted: ", notes);
-  const z = Fp.from(BigInt(keccak256(stringToBytes("zero")))).val;
+
   for (let i = 0; i < notes.length; i++) {
     //@ts-ignore
     sdk.notesSource.mockNotes(notes[i].assetId, [notes[i]]);

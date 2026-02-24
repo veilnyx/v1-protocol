@@ -1,6 +1,6 @@
 import { Hex, hexToBigInt, keccak256, stringToBytes } from "viem";
 import MerkleTree from "fixed-merkle-tree";
-import { Fp } from "@labyrinthac/babyjubjub";
+import { fp } from "@labyrinthac/babyjubjub";
 import { ShieldedAddress } from "@labyrinthac/account";
 import {
   IAddressResolver,
@@ -48,7 +48,7 @@ export class MockTreeSource implements ITreeSource {
   }
 
   get zeroLeaf() {
-    return Fp.from(BigInt(keccak256(stringToBytes("zero")))).val;
+    return fp.create(BigInt(keccak256(stringToBytes("zero"))));
   }
 
   update(): void {

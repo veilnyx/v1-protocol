@@ -18,7 +18,7 @@ import {
 import { foundry } from "viem/chains";
 import { Core, CoreOptions } from "@labyrinthac/core";
 import MerkleTree from "fixed-merkle-tree";
-import { Fp, poseidonHash } from "@labyrinthac/babyjubjub";
+import { fp, poseidonHash } from "@labyrinthac/babyjubjub";
 import { UpaClient, UpaInstanceDescriptor } from "@nebrazkp/upa/sdk";
 import { toBigInt } from "@labyrinthac/utils";
 import {
@@ -42,7 +42,7 @@ dotenv.config({
   path: path.resolve(__dirname, '../../../.env')
 });
 
-const zeroElement = Fp.from(BigInt(keccak256(stringToBytes("zero")))).toHex();
+const zeroElement = fp.create(BigInt(keccak256(stringToBytes("zero")))).toString() as Hex;
 const hashFunction = (a: any, b: any) =>
   padHex(toHex(poseidonHash([toBigInt(a), toBigInt(b)])), { size: 32 });
 

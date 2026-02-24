@@ -35,10 +35,15 @@ contract CurveAdaptorTest is PoolTest {
         /// @dev update convert req fixture with this adaptor addr as `to`
         console.log("Curve adaptor deployed:", address(curveAdaptor));
 
+        // Whitelist the hardcoded adaptor address used in fixture ZK proofs
+        // and etch the dynamically deployed adaptor's runtime code at that address
+        address fixtureAdaptorAddr = 0xbF71c5Ae43827387dAAF7358acAB5C81642b74b8;
+        vm.etch(fixtureAdaptorAddr, address(curveAdaptor).code);
+
         // Adaptor support on Veilnyx Protocol
         address poolOwner = pool.owner();
         vm.startPrank(poolOwner);
-        pool.addAdaptorSupport(address(curveAdaptor), true);
+        pool.addAdaptorSupport(fixtureAdaptorAddr, true);
 
         AssetType assetType = AssetType.ERC20;
         address[] memory assetAddresses = new address[](3);

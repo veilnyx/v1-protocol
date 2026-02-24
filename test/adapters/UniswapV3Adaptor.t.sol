@@ -42,13 +42,17 @@ contract UniswapV3AdaptorTest is PoolTest {
             address(pool)
         );
 
-        // uniswapV3Adapter = 0x14992438240Be80bE2077DCb6615805C2E72362d;
         /// @dev update convert req fixture with this adaptor addr as `to`
         console.log("Uniswap adaptor:", address(uniswapV3Adapter));
 
+        // Whitelist the hardcoded adaptor address used in fixture ZK proofs
+        // and etch the dynamically deployed adaptor's runtime code at that address
+        address fixtureAdaptorAddr = 0xbF71c5Ae43827387dAAF7358acAB5C81642b74b8;
+        vm.etch(fixtureAdaptorAddr, address(uniswapV3Adapter).code);
+
         address poolOwner = pool.owner();
         vm.prank(poolOwner);
-        pool.addAdaptorSupport(address(uniswapV3Adapter), true);
+        pool.addAdaptorSupport(fixtureAdaptorAddr, true);
 
         vm.deal(user, INITIAL_SUPPLY * 2);
         vm.startPrank(user);
