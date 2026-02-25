@@ -136,11 +136,17 @@ contract Paymaster is IPaymaster, Ownable {
         }
 
         // if chainlink feed for assetId not found, return maxCostEth
-        if (assetIdToChainlinkFeed[feeAssetId] == address(0) && feeAssetId != GAS_ASSET_ID) {
+        if (
+            assetIdToChainlinkFeed[feeAssetId] == address(0) &&
+            feeAssetId != GAS_ASSET_ID
+        ) {
             revert AssetNotSupportedAsFeeAsset(feeAssetId);
         }
 
-        if(assetIdToChainlinkFeed[feeAssetId] == address(0) && feeAssetId == GAS_ASSET_ID) {
+        if (
+            assetIdToChainlinkFeed[feeAssetId] == address(0) &&
+            feeAssetId == GAS_ASSET_ID
+        ) {
             // fee asset is GAS_TOKEN itself, returning default value
             return maxCostEth;
         }
@@ -158,9 +164,8 @@ contract Paymaster is IPaymaster, Ownable {
 
         // returns fees in feeAsset's precision
         feeInAsset =
-            ((maxCostEth * uint256(priceETHInAsset)) /
-                10 ** (gasAsset.precision + feedDecimals)) *
-            10 ** feeAsset.precision;
+            (maxCostEth * uint256(priceETHInAsset) * 10 ** feeAsset.precision) /
+            (10 ** (gasAsset.precision + feedDecimals));
 
         if (feeInAsset == 0) {
             revert MaxCostEthToAssetConversionFailed(feeAssetId);
