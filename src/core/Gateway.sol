@@ -8,11 +8,13 @@ import {PackedUserOperation} from "@account-abstraction/contracts/interfaces/Pac
 import {ShieldedTransaction} from "../libraries/ShieldedTransaction.sol";
 import {PreVerificationDetails} from "./Mempool.sol";
 import {IWToken} from "../interfaces/IWToken.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IPool} from "../interfaces/IPool.sol";
 import {IMempool} from "../interfaces/IMempool.sol";
 import {IGateway} from "../interfaces/IGateway.sol";
 
 contract Gateway is IGateway, Ownable {
+    using SafeERC20 for IWToken;
     uint256 internal constant VALIDATION_SUCCEEDED = 0;
     uint256 internal constant VALIDATION_FAILED = 1;
 
@@ -68,7 +70,7 @@ contract Gateway is IGateway, Ownable {
         ShieldedTransaction calldata stx
     ) external payable {
         IWToken(wToken).deposit{value: msg.value}();
-        IWToken(wToken).approve(pool, msg.value);
+        IWToken(wToken).forceApprove(pool, msg.value);
         IPool(pool).transact(stx, false);
     }
 

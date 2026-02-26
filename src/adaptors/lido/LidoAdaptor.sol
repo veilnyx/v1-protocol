@@ -9,6 +9,7 @@ import {IWithdrawQueueERC721} from "./IWithdrawQueueERC721.sol";
 import {IWstEthToken} from "./IWstEthToken.sol";
 import {IWToken} from "../../interfaces/IWToken.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 enum Action {
     STAKE,
@@ -16,6 +17,8 @@ enum Action {
 }
 
 contract LidoAdaptor is AdaptorBase {
+    using SafeERC20 for IERC20;
+
     ILido public immutable iLido;
     IWithdrawQueueERC721 public immutable iWithdrawQueueERC721;
     address public immutable weth;
@@ -30,7 +33,7 @@ contract LidoAdaptor is AdaptorBase {
         address weth_,
         // represents the staked ETH token
         address stEth_,
-        // represents the share of stETH tokens in Lido (wrapping stETH -> wstETH)
+        // represents the share of stETH tokens in Lido (wrapping stETH -> wstETH). stETH is a rebasing token, wstETH is non-rebasing and will keep the balance of shares constant. This is required for easier integration with Veilnyx as it doesn't have to account for rebasing tokens.
         address wstEth_,
         address withdrawQueueERC721_,
         address pool_
@@ -42,6 +45,7 @@ contract LidoAdaptor is AdaptorBase {
         wstEth = wstEth_;
     }
 
+    /// @notice For unstaking from Lido, users will receive an NFT representing their withdrawal request as the unstaking process is queued on Lido's end. Once the unstaking process is complete on Lido's end, users can redeem their NFT for their staked ETH. This will leak privacy as the unstaking process is not atomic and will require a `withdrawAddress`. However, this is a constraint by Lido's design.
     function handleAssets(
         uint24[] calldata inAssetIds,
         uint256[] calldata inValues,
@@ -97,8 +101,8 @@ contract LidoAdaptor is AdaptorBase {
         // converting shares to stEth tokens (rebasing token)
         uint256 stEthTokens = iLido.getPooledEthByShares(stEthShares);
 
-        // wrapping into wstEth for keeping balances constant
-        IERC20(stEth).approve(wstEth, stEthTokens);
+        // wrapping into wstEth for keeping balances constant (non-rebasing)
+        IERC20(stEth).forceApprove(wstEth, stEthTokens);
         uint256 wstEthTokens = IWstEthToken(wstEth).wrap(stEthTokens);
 
         outValues = new uint256[](1);
@@ -137,7 +141,7 @@ contract LidoAdaptor is AdaptorBase {
         uint256[] memory amounts = new uint256[](1);
         amounts[0] = unstakeValue;
 
-        IWstEthToken(wstEth).approve(
+        IERC20(wstEth).forceApprove(
             address(iWithdrawQueueERC721),
             unstakeValue
         );

@@ -145,3 +145,112 @@ contract MaliciousERC20 {
 1. An `onlyPool` modifier restricts `handleAdaptor(..)` to calls from the registered `veilnyxPool` address, enforcing least privilege.
 2. `setVeilnyxPool(..)` is restricted to `onlyOwner` (OZ `Ownable`) to prevent front-running the pool registration on deployment.
 3. `AdaptorHandler` contract inherits OZ `ReentrancyGuard`; `handleAdaptor(..)` carries `nonReentrant` as a defence-in-depth measure against the low-risk hook reentrancy scenario.
+
+## **Finding 4:**
+### [L-02] `PoolStorage.version` is never initialized
+
+**File:** `src/base/PoolStorage.sol`
+
+**Finding:** `uint64 public version` is declared but never set. `getVeilnyxVersion()` always returns `0`.
+
+**Status:** Fixed
+
+**Fix:** Added `setVersion(uint64 version_)` function in `Pool.sol` with `onlyOwner` access control. The deploy scripts now call this function to set the initial protocol version after deployment.
+
+**Note on EIP-712 versioning:** Although EIP-712 includes a `version` field in the domain separator, we explicitly **do not use it for protocol versioning**. Changing the EIP-712 domain name or version would invalidate all existing signatures and permanently break all shielded accounts, as the signature is used as a seed for shielded account derivation.
+
+See [README.md — ⚠️ CRITICAL: Upgrade Safety Warning](../README.md#%EF%B8%8F-critical-upgrade-safety-warning) for full details on upgrade constraints.
+
+---
+
+## **Finding 5:**
+### [I-02] `payable` modifier unnecessary on `IAdaptor.handleAssets`
+
+**File:** `src/interfaces/IAdaptor.sol`
+
+**Finding:** The `payable` modifier on `handleAssets` function in `IAdaptor` is unnecessary since all adaptors are invoked via `delegatecall` from `AdaptorHandler.sol`.
+
+**Code:**
+```solidity
+function handleAssets(
+    uint24[] calldata inAssetIds,
+    uint256[] calldata inValues,
+    bytes calldata payload
+)
+    external
+    payable  // <-- unnecessary
+    virtual
+    returns (uint24[] memory outAssetIds, uint256[] memory outValues);
+```
+
+**Explanation:**
+- When using `delegatecall`, the adaptor code executes in the context of `AdaptorHandler`
+- `msg.value` from the original call is already accessible without the `payable` modifier
+- No ETH is actually "received" by the adaptor contract itself
+- The `payable` modifier was added to enable direct function calls during testing
+
+**Status:** Acknowledged
+
+**Recommendation:**
+1. Remove `payable` from `IAdaptor.handleAssets` and all implementing adaptor contracts after audit completion
+2. For test cases that require direct ETH transfers to adaptor contracts, activate the `receive()` function during test setup:
+   ```solidity
+   receive() external payable {}
+   ```
+
+**Affected Files:**
+- `src/interfaces/IAdaptor.sol`
+- `src/adaptors/aave-v3/AaveV3Adaptor.sol`
+- `src/adaptors/lido/LidoAdaptor.sol`
+- `src/adaptors/rocket-pool/RocketPoolAdaptor.sol`
+- `src/adaptors/uniswap/UniswapAdaptor.sol`
+- `src/adaptors/morpho/MorphoAdaptor.sol`
+
+---
+
+## **Finding 6:**
+### [M-02] Inverted `NCoins` assignment in `CurveNGAdaptor.getLPTokenCount`
+
+**File:** `src/adaptors/curveNG/CurveNGAdaptor.sol`
+
+**Finding:** The `try/catch` block that detects pool size in `getLPTokenCount` assigns `NCoins` with inverted values relative to the correct logic in `handleAssets`. A successful call to `coins(2)` proves the pool has at least 3 coins, but `getLPTokenCount` assigns `NCoins = 2` on success and `NCoins = 3` on revert — the opposite of what is correct.
+
+**Code (buggy):**
+```solidity
+// getLPTokenCount — WRONG
+try ICurvePool(pool).coins(2) returns (address) {
+    NCoins = 2; // coins(2) exists → pool has 3 coins, not 2
+} catch {
+    NCoins = 3; // coins(2) reverts → pool has 2 coins, not 3
+}
+```
+
+**Reference (correct logic in `handleAssets`):**
+```solidity
+try ICurvePool(decodedPayload.curvePool).coins(2) returns (address) {
+    NCoins = 3; // correct
+} catch {
+    NCoins = 2; // correct
+}
+```
+
+**Impact:** `getLPTokenCount` will always route 2-coin pools through `_calcLPTokens3CoinPool` and 3-coin pools through `_calcLPTokens2CoinPool`, producing incorrect LP token estimates for every pool type. Any off-chain or on-chain caller relying on this view function for slippage calculation or deposit sizing will receive wrong values.
+
+**Status:** Open — fix pending
+
+---
+
+## **Finding 7:**
+### [L-03] Bare `ERC20.approve()` used instead of `SafeERC20.forceApprove()` across adaptors and Gateway
+
+**Files:**
+- `src/adaptors/aave-v3/AaveV3Adaptor.sol`
+- `src/adaptors/ethena/EthenaAdaptor.sol`
+- `src/adaptors/lido/LidoAdaptor.sol`
+- `src/core/Gateway.sol`
+
+**Finding:** Multiple contracts called `IERC20.approve()` directly. Tokens with non-standard `approve` implementations (e.g. USDT, which requires resetting to 0 before re-approving) will revert, silently bricking adaptor operations for those assets.
+
+**Status:** Fixed — all instances replaced with `SafeERC20.forceApprove()`.
+
+---
