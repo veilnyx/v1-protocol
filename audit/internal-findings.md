@@ -296,3 +296,47 @@ try ICurvePool(decodedPayload.curvePool).coins(2) returns (address) {
 **Status:** Fixed — `ZeroAddress()` custom error added to each contract; constructor guards revert on any zero address before state is written.
 
 ---
+
+## **Finding 10:**
+### [L-06] Reentrancy in `Mempool` — cross-function attack via `addSTXToMempool` → `dropFromMempool`
+
+**File:** `src/core/MemPool.sol`
+> ⚠️ Mempool is out of scope for the primary audit. Documented here for the external auditor's attention due to direct interaction with in-scope Pool contract.
+
+**Finding:** `addSTXToMempool` makes an external call (`safeTransferFrom` inside `validityChecksBeforeAddingSTXToMempool`) without holding the `ReentrancyGuard` lock. An ERC777-compatible deposit token can fire a `tokensReceived` hook on the sender during this transfer. Since `dropFromMempool` carries its own `nonReentrant` guard (which is only engaged when `dropFromMempool` itself holds the lock, not during `addSTXToMempool`), it is callable during the hook window.
+
+**Attack sequence (ERC777 deposit token):**
+
+```
+1. Alice calls addSTXToMempool(stx, preVerDetails)
+2. stxProofIdSenderMap[stxHashPI][proofId] = Alice        ← state written (CEI fix applied)
+3. validityChecksBeforeAddingSTXToMempool(...)
+     → safeTransferFrom(Alice, Mempool, depositAmt)       ← ERC777 hook fires on Alice
+        → Alice re-enters: dropFromMempool(stxHash, stx, proofId)
+             stxSender = Alice ✓, proof not yet verified ✓
+             _handleDepositedAssets (`DROP`-case):
+               safeTransfer(Alice, depositAmt)            ← assets returned
+               Address.sendValue(Alice, exitFee - penalty) ← ETH fee returned
+             delete stxProofIdSenderMap[stxHash][proofId]  ← entry removed
+        ← hook returns
+     ← safeTransferFrom completes (tokens now in Mempool)
+4. emit STXDropped(stxHash, Alice, ...)                   ← drop event emitted first
+   (addSTXToMempool continues)
+5. emit STXAddedToMempool(stxHashPI, Alice, ...)          ← add event emitted after
+   emit LockNotes(stxHashPI, stx.nullifiers)
+```
+
+**Outcome — no Pool fund drain, attacker does not profit:**
+- `exitSTXFromMempool` for the same `stxHash/proofId` will always revert `STXProofIdMismatchOrSTXAbsent` — the Pool is never reached.
+- Attacker gets back their deposit assets and ETH fee **minus the 8% DROP penalty** — net loss for the attacker.
+
+**Actual damage is off-chain/accounting only:**
+1. `STXDropped` then `STXAddedToMempool` emitted out of order for the same `stxHash` — off-chain indexers permanently lock nullifiers that have no on-chain mempool entry to resolve them.
+2. Mempool retains orphaned ERC20 tokens (arrived via `safeTransferFrom` after the DROP cleared `depositBalance`) with no `depositBalance` accounting entry.
+3. `LockNotes` keeps nullifiers locked in off-chain state indefinitely.
+
+**Root cause:** `addSTXToMempool` held no reentrancy lock, so `dropFromMempool`'s own `nonReentrant` guard did not protect against cross-function re-entry initiated from within `addSTXToMempool`.
+
+**Status:** Fixed — CEI fix applied (state written before external call, preventing double-register on same `proofId`). Added `nonReentrant` to `addSTXToMempool`.
+
+---

@@ -68,7 +68,7 @@ contract Mempool is
     function addSTXToMempool(
         ShieldedTransaction calldata stx,
         PreVerificationDetails calldata preVerificationDetails
-    ) external payable whenNotPaused {
+    ) external payable whenNotPaused nonReentrant{
         uint256 stxHashPI = preVerificationDetails.publicInputs[2];
         bytes32 proofId = keccak256(
             abi.encodePacked(
@@ -77,6 +77,7 @@ contract Mempool is
             )
         );
 
+        stxProofIdSenderMap[stxHashPI][proofId] = msg.sender;
         stx.validityChecksBeforeAddingSTXToMempool(
             stxProofIdSenderMap,
             stxHashPI,
@@ -88,8 +89,6 @@ contract Mempool is
             depositBalance
         );
 
-        stxProofIdSenderMap[stxHashPI][proofId] = msg.sender;
-
         emit STXAddedToMempool(stxHashPI, msg.sender, proofId, block.timestamp);
         emit LockNotes(stxHashPI, stx.nullifiers);
     }
@@ -99,7 +98,7 @@ contract Mempool is
         uint256 stxHash,
         ShieldedTransaction calldata stx,
         bytes32 proofId
-    ) external {
+    ) external nonReentrant {
         // Check if the STX is in the mempool and ensures the proofId is corelated to the STX
         address stxSender = stxProofIdSenderMap[stxHash][proofId];
         if (stxSender == address(0)) {

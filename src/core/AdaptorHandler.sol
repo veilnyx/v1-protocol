@@ -72,7 +72,7 @@ contract AdaptorHandler is IAdaptorHandler, ReentrancyGuard, Ownable {
         PubAsset[] memory outPubAssets = new PubAsset[](outAssetIds.length);
 
         for (uint8 i = 0; i < outAssetIds.length; ) {
-            asset = IPool(msg.sender).getAsset(outAssetIds[i]);
+            asset = IPool(veilnyxPool).getAsset(outAssetIds[i]);
 
             if (!asset.isActive) {
                 revert IPool.InactiveAsset(asset.id);
@@ -87,7 +87,7 @@ contract AdaptorHandler is IAdaptorHandler, ReentrancyGuard, Ownable {
                 revert InvalidOutputValue();
             }
 
-            IERC20(asset.assetAddress).forceApprove(msg.sender, outValues[i]);
+            IERC20(asset.assetAddress).forceApprove(veilnyxPool, outValues[i]);
 
             outPubAssets[i] = PubAsset(outAssetIds[i], uint224(outValues[i]));
 
