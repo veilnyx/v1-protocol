@@ -10,5 +10,5 @@ export const genAddressRegistrations = async (sdk: Core) => {
 };
 
 export const genAddrRegWithOutsourceProofVerification = async (sdk: Core, nebraClient: any, registerCircuitId: `0x${string}`) => {
-  await generateTestAddrRegWithOutsourceProofVerifications(reqs, sdk, nebraClient, registerCircuitId);
+  await generateTestAddrRegWithOutsourceProofVerifications(reqs, sdk, nebraClient);
 };

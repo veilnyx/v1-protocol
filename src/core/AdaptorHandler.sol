@@ -3,14 +3,36 @@ pragma solidity ^0.8.24;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {IAdaptorHandler} from "../interfaces/IAdaptorHandler.sol";
 import {IAdaptor} from "../interfaces/IAdaptor.sol";
 import {IPool} from "../interfaces/IPool.sol";
 import {Asset, AssetType} from "../libraries/Asset.sol";
 import {PubAsset} from "../libraries/ShieldedTransaction.sol";
 
-contract AdaptorHandler is IAdaptorHandler {
+contract AdaptorHandler is IAdaptorHandler, ReentrancyGuard, Ownable {
     using SafeERC20 for IERC20;
+
+    address public veilnyxPool;
+
+    constructor() Ownable(msg.sender) {}
+
+    modifier onlyPool() {
+        if (veilnyxPool == address(0)) {
+            revert PoolNotSet();
+        }
+
+        if (msg.sender != veilnyxPool) {
+            revert OnlyPoolCanCall();
+        }
+        _;
+    }
+
+    function setVeilnyxPool(address _veilnyxPool) external onlyOwner {
+        require(veilnyxPool == address(0), "Veilnyx Pool address already set");
+        veilnyxPool = _veilnyxPool;
+    }
 
     /// @custom:invariant ADP-2: Output assets should be whitelisted in the protocol
     /// @custom:invariant ADP-3: Output value of each asset should be equal or less than the balance of that asset in this contract
@@ -18,7 +40,7 @@ contract AdaptorHandler is IAdaptorHandler {
         address target,
         PubAsset[] calldata pubAssets,
         bytes calldata targetPayload
-    ) external payable returns (PubAsset[] memory) {
+    ) external payable nonReentrant onlyPool returns (PubAsset[] memory) {
         uint24[] memory inAssetIds = new uint24[](pubAssets.length);
         uint256[] memory inValues = new uint256[](pubAssets.length);
         for (uint8 i = 0; i < pubAssets.length; ) {
@@ -50,7 +72,7 @@ contract AdaptorHandler is IAdaptorHandler {
         PubAsset[] memory outPubAssets = new PubAsset[](outAssetIds.length);
 
         for (uint8 i = 0; i < outAssetIds.length; ) {
-            asset = IPool(msg.sender).getAsset(outAssetIds[i]);
+            asset = IPool(veilnyxPool).getAsset(outAssetIds[i]);
 
             if (!asset.isActive) {
                 revert IPool.InactiveAsset(asset.id);
@@ -65,7 +87,7 @@ contract AdaptorHandler is IAdaptorHandler {
                 revert InvalidOutputValue();
             }
 
-            IERC20(asset.assetAddress).forceApprove(msg.sender, outValues[i]);
+            IERC20(asset.assetAddress).forceApprove(veilnyxPool, outValues[i]);
 
             outPubAssets[i] = PubAsset(outAssetIds[i], uint224(outValues[i]));
 

@@ -68,7 +68,7 @@ contract Mempool is
     function addSTXToMempool(
         ShieldedTransaction calldata stx,
         PreVerificationDetails calldata preVerificationDetails
-    ) external payable whenNotPaused {
+    ) external payable whenNotPaused nonReentrant{
         uint256 stxHashPI = preVerificationDetails.publicInputs[2];
         bytes32 proofId = keccak256(
             abi.encodePacked(
@@ -77,6 +77,7 @@ contract Mempool is
             )
         );
 
+        stxProofIdSenderMap[stxHashPI][proofId] = msg.sender;
         stx.validityChecksBeforeAddingSTXToMempool(
             stxProofIdSenderMap,
             stxHashPI,
@@ -88,8 +89,6 @@ contract Mempool is
             depositBalance
         );
 
-        stxProofIdSenderMap[stxHashPI][proofId] = msg.sender;
-
         emit STXAddedToMempool(stxHashPI, msg.sender, proofId, block.timestamp);
         emit LockNotes(stxHashPI, stx.nullifiers);
     }
@@ -99,7 +98,7 @@ contract Mempool is
         uint256 stxHash,
         ShieldedTransaction calldata stx,
         bytes32 proofId
-    ) external {
+    ) external nonReentrant {
         // Check if the STX is in the mempool and ensures the proofId is corelated to the STX
         address stxSender = stxProofIdSenderMap[stxHash][proofId];
         if (stxSender == address(0)) {
@@ -121,7 +120,6 @@ contract Mempool is
             _handleDepositedAssets({
                 pubAssets: stx.pubAssets,
                 stxSender: stxSender,
-                pool: address(pool),
                 action: Action.EXIT
             });
         }
@@ -162,7 +160,6 @@ contract Mempool is
             _handleDepositedAssets({
                 pubAssets: stx.pubAssets,
                 stxSender: stxSender,
-                pool: address(pool),
                 action: Action.DROP
             });
         }
@@ -206,6 +203,7 @@ contract Mempool is
         uint256 newFee
     ) external onlyOwner {
         proofSubAndMempoolExitFee = newFee;
+        emit ProofAggregationFeeUpdated(newFee);
     }
 
     //////////////////////////////
@@ -214,7 +212,6 @@ contract Mempool is
     function _handleDepositedAssets(
         uint248[] memory pubAssets,
         address stxSender,
-        address pool,
         Action action
     ) internal {
         for (uint i = 0; i < pubAssets.length; i++) {
@@ -223,13 +220,13 @@ contract Mempool is
             );
             Asset memory asset = MempoolValidator.checkIfAssetValid(
                 assetId,
-                IPool(pool)
+                pool
             );
 
             if (action == Action.DROP) {
                 IERC20(asset.assetAddress).safeTransfer(stxSender, value);
             } else {
-                IERC20(asset.assetAddress).forceApprove(pool, value);
+                IERC20(asset.assetAddress).forceApprove(address(pool), value);
             }
 
             // Update the deposit balance of the stx sender

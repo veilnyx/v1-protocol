@@ -18,7 +18,7 @@ enum Action {
     UNSTAKE
 }
 
-contract LidoAdaptorTest is PoolTest {
+contract RocketPoolAdpTest is PoolTest {
     using SafeERC20 for IERC20;
 
     error CheckChainConfig();
@@ -36,24 +36,24 @@ contract LidoAdaptorTest is PoolTest {
     address public user = 0x689EcF264657302052c3dfBD631e4c20d3ED0baB;
 
     function setUp() external {
-        require(shouldTestRun(), "LidoAdaptorTest: Chain not supported");
+        require(shouldTestRun(), "RocketPoolAdpTest: Chain not supported");
         _setUp();
 
         // deploying Uniswap adaptor
-        rocketPoolAdp = new RocketPoolAdaptor(
-            rocketSwapRouter,
-            rETH,
-            WETH,
-            address(pool)
-        );
+        rocketPoolAdp = new RocketPoolAdaptor(rETH, WETH, address(pool));
 
         /// @dev update convert req fixture with this adaptor addr as `to`
         console.log("RocketPool adaptor deployed:", address(rocketPoolAdp));
 
+        // Whitelist the hardcoded adaptor address used in fixture ZK proofs
+        // and etch the dynamically deployed adaptor's runtime code at that address
+        address fixtureAdaptorAddr = 0xbF71c5Ae43827387dAAF7358acAB5C81642b74b8;
+        vm.etch(fixtureAdaptorAddr, address(rocketPoolAdp).code);
+
         // Asset & Adaptor support on Veilnyx Protocol
         address poolOwner = pool.owner();
         vm.prank(poolOwner);
-        pool.addAdaptorSupport(address(rocketPoolAdp), true);
+        pool.addAdaptorSupport(fixtureAdaptorAddr, true);
 
         AssetType assetType = AssetType.ERC20;
         address[] memory assetAddresses = new address[](1);
@@ -161,7 +161,7 @@ contract LidoAdaptorTest is PoolTest {
     function shouldTestRun() internal view returns (bool) {
         if (block.chainid != 17000 && block.chainid != 1) {
             console.log(
-                "Skipping RocketPool adaptor tests on the current chain as RocketPool protocol may not be deployed. To run RocketPool tests, kindly run the tests on the Tenderly Mainnet fork where RocketPool is deployed."
+                "Skipping RocketPool adaptor tests on the current chain as RocketPool protocol may not be deployed. To run RocketPool tests, kindly run the tests on the Tenderly Mainnet/Mainnet fork where RocketPool is deployed."
             );
             return false;
         }

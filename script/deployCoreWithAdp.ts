@@ -24,6 +24,7 @@ const config = loadConfigs();
 const poolAbi = hre.artifacts.readArtifactSync("Pool").abi;
 const verifier21Abi = hre.artifacts.readArtifactSync("VerifierTransact21").abi;
 const verifier22Abi = hre.artifacts.readArtifactSync("VerifierTransact22").abi;
+const adaptorHandlerAbi = hre.artifacts.readArtifactSync("AdaptorHandler").abi;
 
 
 const deployVerifier = async (deployConfig) => {
@@ -172,7 +173,6 @@ const deployOneInch = async (pool, deployConfig) => {
 
 const deployRocketPool = async (rocketPoolParams, pool, deployConfig) => {
   const rocketPool = await hre.viem.deployContract("RocketPoolAdaptor", [
-    rocketPoolParams.rocketSwapRouter,
     rocketPoolParams.assets.rETH,
     rocketPoolParams.wETH,
     pool
@@ -197,7 +197,7 @@ const deployAdaptors = async (pool, adpParams, deployConfig) => {
   // await deployBeefy(beefyParams, pool, deployConfig);
   // await deployMorpho(morphoParams, pool, deployConfig);
   // await deployOneInch(pool, deployConfig);
-  // await deployRocketPool(rocketPoolParams, pool, deployConfig);
+  // await deployRocketPool(pool, deployConfig);
 }
 
 const addAdpatorSupport = async (pool, adpAddress, enable, wallet, client) => {
@@ -365,7 +365,7 @@ const main = async () => {
   const initAddressParams = {
     mempool: zeroAddress,
     verifier: verifier,
-    adaptorHandler: zeroAddress,
+    adaptorHandler: adaptorHandler.address,
     screener: chainParams.sanctionsList,
     hasher: hasher,
     verificationTrackerService: zeroAddress
@@ -390,6 +390,27 @@ const main = async () => {
     initData,
   ], deployConfig);
   console.log("PoolProxy deployed:", poolProxy.address);
+
+  // @ts-ignore
+  const setPoolHash = await wallets[0].writeContract({
+    address: adaptorHandler.address,
+    abi: adaptorHandlerAbi,
+    functionName: "setVeilnyxPool",
+    args: [poolProxy.address],
+  });
+  await client.waitForTransactionReceipt({ hash: setPoolHash });
+  console.log("AdaptorHandler: veilnyxPool set to", poolProxy.address);
+
+  // Set protocol version
+  // @ts-ignore
+  const setVersionHash = await wallets[0].writeContract({
+    address: poolProxy.address,
+    abi: poolAbi,
+    functionName: "setVersion",
+    args: [commonParams.protocolVersion],
+  });
+  await client.waitForTransactionReceipt({ hash: setVersionHash });
+  console.log("Pool: version set to", commonParams.protocolVersion);
 
   // Deploy Adaptors 
   await deployAdaptors(poolProxy.address, adpParams, deployConfig);

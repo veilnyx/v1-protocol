@@ -1,7 +1,7 @@
 const path = require("path");
 import { writeFileSync } from "fs";
 import { keccak256, stringToBytes } from "viem";
-import { Fp, poseidonHash } from "@labyrinthac/babyjubjub";
+import { fp, poseidonHash } from "@labyrinthac/babyjubjub";
 import { MerkleTreeState } from "@labyrinthac/zk-prover";
 import { Core } from "@labyrinthac/core";
 import { fixture } from "./fixture";
@@ -67,7 +67,8 @@ export const genTreeUpdateDataWithPartialQueue = async (sdk: Core) => {
 };
 
 export const getInitialTreeState = (): MerkleTreeState => {
-  let z = Fp.from(keccak256(stringToBytes("zero"))).val;
+  let z = fp.create(BigInt(keccak256(stringToBytes("zero"))));
+  
   const lastSubtree: bigint[] = [];
   const zeros: bigint[] = [];
   const treeDepth: number = fixture.commitmentTreeDepth;

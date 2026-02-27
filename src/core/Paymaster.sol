@@ -28,6 +28,7 @@ contract Paymaster is IPaymaster, Ownable {
     error InvalidPaymaster(address paymaster);
     error InvalidEntryPoint();
     error InvalidSender(address sender);
+    error ZeroAddress();
     error InvalidCallData();
     error InsufficientFee(uint256 given, uint256 required);
     error FeeAssetNotSupportedByVeilnyx(uint24 assetId);
@@ -45,6 +46,7 @@ contract Paymaster is IPaymaster, Ownable {
         address sender_,
         address pool_
     ) Ownable(msg.sender) {
+        if (entryPoint_ == address(0) || sender_ == address(0) || pool_ == address(0)) revert ZeroAddress();
         entryPoint = IEntryPoint(entryPoint_);
         sender = sender_;
         pool = IPool(pool_);
@@ -136,11 +138,17 @@ contract Paymaster is IPaymaster, Ownable {
         }
 
         // if chainlink feed for assetId not found, return maxCostEth
-        if (assetIdToChainlinkFeed[feeAssetId] == address(0) && feeAssetId != GAS_ASSET_ID) {
+        if (
+            assetIdToChainlinkFeed[feeAssetId] == address(0) &&
+            feeAssetId != GAS_ASSET_ID
+        ) {
             revert AssetNotSupportedAsFeeAsset(feeAssetId);
         }
 
-        if(assetIdToChainlinkFeed[feeAssetId] == address(0) && feeAssetId == GAS_ASSET_ID) {
+        if (
+            assetIdToChainlinkFeed[feeAssetId] == address(0) &&
+            feeAssetId == GAS_ASSET_ID
+        ) {
             // fee asset is GAS_TOKEN itself, returning default value
             return maxCostEth;
         }
@@ -158,9 +166,8 @@ contract Paymaster is IPaymaster, Ownable {
 
         // returns fees in feeAsset's precision
         feeInAsset =
-            ((maxCostEth * uint256(priceETHInAsset)) /
-                10 ** (gasAsset.precision + feedDecimals)) *
-            10 ** feeAsset.precision;
+            (maxCostEth * uint256(priceETHInAsset) * 10 ** feeAsset.precision) /
+            (10 ** (gasAsset.precision + feedDecimals));
 
         if (feeInAsset == 0) {
             revert MaxCostEthToAssetConversionFailed(feeAssetId);

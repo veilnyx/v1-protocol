@@ -2,6 +2,7 @@
 pragma solidity 0.8.24;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {AdaptorBase} from "../../base/AdaptorBase.sol";
 import {Asset, AssetType} from "../../libraries/Asset.sol";
 import {IWToken} from "../../interfaces/IWToken.sol";
@@ -11,6 +12,8 @@ import {IStaticATokenFactory} from "./IStaticATokenFactory.sol";
 import {IAToken} from "./IAToken.sol";
 
 contract AaveV3Adaptor is AdaptorBase {
+    using SafeERC20 for IERC20;
+
     IAave public immutable aave;
     address public immutable STATIC_A_TOKEN_FACTORY;
 
@@ -68,7 +71,7 @@ contract AaveV3Adaptor is AdaptorBase {
             revert ZeroValue();
         }
 
-        // underlying asset -> static aToken -> aToken
+        // underlying asset -> static aToken (non-rebasable) -> aToken (rebasable)
         // getting static aToken address for input token
         address underlyingToken = inAsset.assetAddress;
         address staticAToken = IStaticATokenFactory(STATIC_A_TOKEN_FACTORY)
@@ -85,7 +88,7 @@ contract AaveV3Adaptor is AdaptorBase {
             revert InsufficientBalance();
         }
 
-        IERC20(underlyingToken).approve(address(aave), lendValue);
+        IERC20(underlyingToken).forceApprove(address(aave), lendValue);
         aave.supply({
             asset: underlyingToken,
             amount: lendValue,
@@ -97,8 +100,8 @@ contract AaveV3Adaptor is AdaptorBase {
         // rebasable aTokens by Aave
         uint256 aTokensReceived = IERC20(aToken).balanceOf(address(this));
 
-        // Step 2: Convert aToken(rebasable) to static tokens as supported by Labyrith
-        IERC20(aToken).approve(staticAToken, aTokensReceived);
+        // Step 2: Convert aToken(rebasable) to static tokens as supported by Veilnyx (non-rebasing)
+        IERC20(aToken).forceApprove(staticAToken, aTokensReceived);
         uint256 staticATokenBal = IStaticAToken(staticAToken).deposit({
             assets: aTokensReceived,
             receiver: address(this),
@@ -117,7 +120,7 @@ contract AaveV3Adaptor is AdaptorBase {
         // Redeeming/Withdrawing
         Asset memory inAsset = getAsset(inAssetId);
 
-        // static aToken -> aToken -> underlying asset
+        // static aToken (non-rebasable) -> aToken (rebasable) -> underlying asset
         address staticAToken = inAsset.assetAddress;
         address aToken = IStaticAToken(staticAToken).aToken();
         address underlyingAsset = IAToken(aToken).UNDERLYING_ASSET_ADDRESS();
@@ -138,7 +141,7 @@ contract AaveV3Adaptor is AdaptorBase {
             withdrawFromAave: false
         });
 
-        IERC20(aToken).approve(address(aave), amountToWithdraw);
+        IERC20(aToken).forceApprove(address(aave), amountToWithdraw);
         uint256 underlyingAssetReceived = aave.withdraw({
             asset: underlyingAsset,
             amount: amountToWithdraw,

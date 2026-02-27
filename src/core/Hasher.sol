@@ -7,8 +7,11 @@ contract Hasher is IHasher {
     address internal immutable _poseidonT3;
     address internal immutable _poseidonT4;
     address internal immutable _poseidonT5;
-    
+
+    error ZeroAddress();
+
     constructor(address poseidonT3, address poseidonT4, address poseidonT5) {
+        if (poseidonT3 == address(0) || poseidonT4 == address(0) || poseidonT5 == address(0)) revert ZeroAddress();
         _poseidonT3 = poseidonT3;
         _poseidonT4 = poseidonT4;
         _poseidonT5 = poseidonT5;

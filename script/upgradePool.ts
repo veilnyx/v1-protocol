@@ -139,6 +139,17 @@ const upgradePoolProxy = async (newPoolImpl: `0x${string}`) => {
 
     const upgradeRct = await client.waitForTransactionReceipt({ hash: upgradeCallHash });
     console.log("rct:Veilnyx Upgraded!!!!!", upgradeRct.status);
+
+    // Set protocol version
+    // @ts-ignore
+    const setVersionHash = await wallet.writeContract({
+        address: existingPoolProxy,
+        abi: poolAbi,
+        functionName: "setVersion",
+        args: [commonParams.protocolVersion + 1], // incrementing version since upgrading
+    });
+    await client.waitForTransactionReceipt({ hash: setVersionHash });
+    console.log("Pool: version set to", commonParams.protocolVersion + 1);
 }
 
 const deployCommonLibs = async () => {

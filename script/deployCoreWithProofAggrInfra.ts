@@ -18,6 +18,7 @@ import { getChainForCurrentNetwork } from "./utils/chainUtils";
 const config = loadConfigs();
 const poolAbi = hre.artifacts.readArtifactSync("Pool").abi;
 const mempoolAbi = hre.artifacts.readArtifactSync("Mempool").abi;
+const adaptorHandlerAbi = hre.artifacts.readArtifactSync("AdaptorHandler").abi;
 const PROOF_SUB_MEMPOOL_EXIT_FEES: bigint = BigInt(75_000_000_000_0000); // 375k gas @ 2 gwei = 0.00075 ETH
 const verificationTrackerService = `0x${"75a4dA1697aF884c99724474d26F2EAe23cc58Bc"}` as `0x${string}`;
 const nebraVerifierSepolia = `0x${"3B946743DEB7B6C97F05B7a31B23562448047E3E"}` as `0x${string}`;
@@ -199,6 +200,27 @@ const main = async () => {
     ], deployConfig);
     console.log("PoolProxy deployed:", poolProxy.address);
   }
+
+  // @ts-ignore
+  const setPoolHash = await wallet.writeContract({
+    address: adaptorHandler.address,
+    abi: adaptorHandlerAbi,
+    functionName: "setVeilnyxPool",
+    args: [poolProxy.address],
+  });
+  await client.waitForTransactionReceipt({ hash: setPoolHash });
+  console.log("AdaptorHandler: veilnyxPool set to", poolProxy.address);
+
+  // Set protocol version
+  // @ts-ignore
+  const setVersionHash = await wallet.writeContract({
+    address: poolProxy.address,
+    abi: poolAbi,
+    functionName: "setVersion",
+    args: [commonParams.protocolVersion],
+  });
+  await client.waitForTransactionReceipt({ hash: setVersionHash });
+  console.log("Pool: version set to", commonParams.protocolVersion);
 
   // Asset support and Revoker registrations
   try {

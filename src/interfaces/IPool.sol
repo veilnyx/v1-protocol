@@ -25,6 +25,7 @@ interface IPool {
         bytes metadata
     );
     event RevokerStatusUpdated(uint256 indexed id, bool status);
+    event VersionUpdated(uint64 indexed version);
 
     event AssetAdded(address indexed assetAddress, uint24 assetId);
 

@@ -1,0 +1,7 @@
+{
+  "enabledPlugins": {
+    "audit-context-building@trailofbits": true,
+    "ask-questions-if-underspecified@trailofbits": true,
+    "building-secure-contracts@trailofbits": true
+  }
+}

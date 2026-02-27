@@ -5,6 +5,8 @@ import {PubAsset} from "../libraries/ShieldedTransaction.sol";
 
 interface IAdaptorHandler {
     error InvalidOutputValue();
+    error OnlyPoolCanCall();
+    error PoolNotSet();
 
     function handleAdaptor(
         address target,

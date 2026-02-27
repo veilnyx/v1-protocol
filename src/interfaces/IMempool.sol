@@ -43,6 +43,7 @@ interface IMempool {
 
     event LockNotes(uint256 indexed stxHash, uint256[] nullifiers);
     event UnlockNotes(uint256 indexed stxHash, uint256[] nullifiers);
+    event ProofAggregationFeeUpdated(uint256 newFee);
 
     function initialize(
         address pool_,
