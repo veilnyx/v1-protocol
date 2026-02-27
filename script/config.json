@@ -66,7 +66,8 @@
         ]
       }
     ],
-    "withdrawFeeBps": 5
+    "withdrawFeeBps": 5,
+    "protocolVersion": 1
   },
   "31337": {
     "chain": "local",

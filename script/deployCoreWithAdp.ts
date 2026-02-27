@@ -401,6 +401,17 @@ const main = async () => {
   await client.waitForTransactionReceipt({ hash: setPoolHash });
   console.log("AdaptorHandler: veilnyxPool set to", poolProxy.address);
 
+  // Set protocol version
+  // @ts-ignore
+  const setVersionHash = await wallets[0].writeContract({
+    address: poolProxy.address,
+    abi: poolAbi,
+    functionName: "setVersion",
+    args: [commonParams.protocolVersion],
+  });
+  await client.waitForTransactionReceipt({ hash: setVersionHash });
+  console.log("Pool: version set to", commonParams.protocolVersion);
+
   // Deploy Adaptors 
   await deployAdaptors(poolProxy.address, adpParams, deployConfig);
 

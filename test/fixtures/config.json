@@ -3,6 +3,7 @@
   "commitmentTreeQueueSize": 10,
   "addressTreeDepth": 20,
   "withdrawFeeBps": 5,
+  "protocolVersion": 1,
   "qmtBatchSize": 10,
   "zeroLeaf": "18632411485870166338768840581683239832943220854620341531184981674745539224232",
   "revokerPublicKey": [

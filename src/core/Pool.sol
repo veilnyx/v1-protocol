@@ -202,6 +202,15 @@ contract Pool is
         verificationTrackerService = verificationTrackerService_;
     }
 
+    /// @notice Sets the protocol version number.
+    /// @dev This is used to track the pool contract version since EIP-712 domain
+    ///      name and version MUST NOT be changed (see README for critical warnings).
+    /// @param version_ The new version number to set.
+    function setVersion(uint64 version_) external onlyOwner {
+        version = version_;
+        emit IPool.VersionUpdated(version_);
+    }
+
     /////////////////////////////////////////
     //        PUBLIC WRITE METHODS         //
     ////////////////////////////////////////

@@ -155,7 +155,7 @@ contract MaliciousERC20 {
 
 **Status:** Fixed
 
-**Fix:** Added `setVersion(uint64 version_)` function in `Pool.sol` with `onlyOwner` access control. The deploy scripts now call this function to set the initial protocol version after deployment.
+**Fix:** Added `setVersion(uint64 version_)` function in `Pool.sol` with `onlyOwner` access control. The deploy and upgrade scripts now call this function to set the protocol version.
 
 **Note on EIP-712 versioning:** Although EIP-712 includes a `version` field in the domain separator, we explicitly **do not use it for protocol versioning**. Changing the EIP-712 domain name or version would invalidate all existing signatures and permanently break all shielded accounts, as the signature is used as a seed for shielded account derivation.
 

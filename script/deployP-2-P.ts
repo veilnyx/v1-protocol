@@ -133,6 +133,17 @@ const main = async () => {
             initData,
         ], deployConfig);
         console.log("PoolProxy deployed:", poolProxy.address);
+
+        // Set protocol version
+        // @ts-ignore
+        const setVersionHash = await wallet.writeContract({
+            address: poolProxy.address,
+            abi: poolAbi,
+            functionName: "setVersion",
+            args: [commonParams.protocolVersion],
+        });
+        await client.waitForTransactionReceipt({ hash: setVersionHash });
+        console.log("Pool: version set to", commonParams.protocolVersion);
     }
 
     // Asset support and Revoker registrations
