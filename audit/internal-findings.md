@@ -254,3 +254,23 @@ try ICurvePool(decodedPayload.curvePool).coins(2) returns (address) {
 **Status:** Fixed — all instances replaced with `SafeERC20.forceApprove()`.
 
 ---
+
+## **Finding 8:**
+### [L-04] `shadowing-local` — local variables shadow inherited storage variables
+
+**Files:**
+- `src/core/MemPool.sol`
+- `src/core/Pool.sol`
+
+**Finding:** Two local variables shadowed inherited storage state:
+
+1. `Mempool._handleDepositedAssets(address pool, ...)` — the `pool` parameter shadowed `MempoolStorage.pool`, risking confusion over which `pool` address was being used.
+2. `Pool.updateEIP712Domain(string version, ...)` — the `version` parameter shadowed `PoolStorage.version`, creating ambiguity between the EIP-712 domain version string and the protocol version integer.
+
+**Status:** Fixed.
+
+**Fix:**
+1. The `pool` parameter was removed from `_handleDepositedAssets`; the function now references the `MempoolStorage.pool` storage variable directly.
+2. `updateEIP712Domain` was removed; the new `setVersion(uint64 version_)` function uses a trailing underscore convention to avoid shadowing `PoolStorage.version`.
+
+---

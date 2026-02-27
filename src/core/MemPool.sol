@@ -121,7 +121,6 @@ contract Mempool is
             _handleDepositedAssets({
                 pubAssets: stx.pubAssets,
                 stxSender: stxSender,
-                pool: address(pool),
                 action: Action.EXIT
             });
         }
@@ -162,7 +161,6 @@ contract Mempool is
             _handleDepositedAssets({
                 pubAssets: stx.pubAssets,
                 stxSender: stxSender,
-                pool: address(pool),
                 action: Action.DROP
             });
         }
@@ -214,7 +212,6 @@ contract Mempool is
     function _handleDepositedAssets(
         uint248[] memory pubAssets,
         address stxSender,
-        address pool,
         Action action
     ) internal {
         for (uint i = 0; i < pubAssets.length; i++) {
@@ -223,13 +220,13 @@ contract Mempool is
             );
             Asset memory asset = MempoolValidator.checkIfAssetValid(
                 assetId,
-                IPool(pool)
+                pool
             );
 
             if (action == Action.DROP) {
                 IERC20(asset.assetAddress).safeTransfer(stxSender, value);
             } else {
-                IERC20(asset.assetAddress).forceApprove(pool, value);
+                IERC20(asset.assetAddress).forceApprove(address(pool), value);
             }
 
             // Update the deposit balance of the stx sender
