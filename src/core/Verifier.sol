@@ -20,14 +20,19 @@ contract Verifier is IVerifier {
     address internal _addressVerifier;
     address internal _treeUpdateVerifier;
 
+    error ZeroAddress();
+
     constructor(
         TransactionVerifierInfo[] memory txvInfos,
         address addressVerifier,
         address treeUpdateVerifier
     ) {
+        if (addressVerifier == address(0) || treeUpdateVerifier == address(0)) revert ZeroAddress();
+
         uint256 len = txvInfos.length;
 
         for (uint8 i = 0; i < len; ) {
+            if (txvInfos[i].addr == address(0)) revert ZeroAddress();
             _transactionVerifiers[txvInfos[i].id] = txvInfos[i];
             unchecked {
                 ++i;

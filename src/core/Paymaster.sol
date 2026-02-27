@@ -28,6 +28,7 @@ contract Paymaster is IPaymaster, Ownable {
     error InvalidPaymaster(address paymaster);
     error InvalidEntryPoint();
     error InvalidSender(address sender);
+    error ZeroAddress();
     error InvalidCallData();
     error InsufficientFee(uint256 given, uint256 required);
     error FeeAssetNotSupportedByVeilnyx(uint24 assetId);
@@ -45,6 +46,7 @@ contract Paymaster is IPaymaster, Ownable {
         address sender_,
         address pool_
     ) Ownable(msg.sender) {
+        if (entryPoint_ == address(0) || sender_ == address(0) || pool_ == address(0)) revert ZeroAddress();
         entryPoint = IEntryPoint(entryPoint_);
         sender = sender_;
         pool = IPool(pool_);

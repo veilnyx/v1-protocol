@@ -204,6 +204,7 @@ contract Mempool is
         uint256 newFee
     ) external onlyOwner {
         proofSubAndMempoolExitFee = newFee;
+        emit ProofAggregationFeeUpdated(newFee);
     }
 
     //////////////////////////////

@@ -24,6 +24,7 @@ contract Gateway is IGateway, Ownable {
     address public immutable wToken;
 
     error InvalidEntryPoint(address entryPoint);
+    error ZeroAddress();
 
     /// @custom:invariant ACCESS-5 Entrypoint to be the only caller of `validateUserOp` and `handleUserOp`
     modifier onlyEntryPoint() {
@@ -39,6 +40,7 @@ contract Gateway is IGateway, Ownable {
         address pool_,
         address mempool_
     ) Ownable(msg.sender) {
+        if (entryPoint_ == address(0) || wToken_ == address(0) || pool_ == address(0) || mempool_ == address(0)) revert ZeroAddress();
         entryPoint = entryPoint_;
         pool = pool_;
         wToken = wToken_;

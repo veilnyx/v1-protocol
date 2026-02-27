@@ -274,3 +274,25 @@ try ICurvePool(decodedPayload.curvePool).coins(2) returns (address) {
 2. `updateEIP712Domain` was removed; the new `setVersion(uint64 version_)` function uses a trailing underscore convention to avoid shadowing `PoolStorage.version`.
 
 ---
+
+## **Finding 9:**
+### [L-05] Missing zero-address checks in constructors of core contracts
+
+**Files:**
+- `src/core/Hasher.sol`
+- `src/core/Verifier.sol`
+- `src/core/Gateway.sol`
+- `src/core/Paymaster.sol`
+
+**Finding:** Constructors across all four core contracts assigned critical immutable addresses without validating against `address(0)`. A deployment misconfiguration (e.g., a missing argument in a deploy script) would silently produce a permanently broken contract with no upgrade path.
+
+| Contract | Parameters at risk |
+|---|---|
+| `Hasher` | `poseidonT3`, `poseidonT4`, `poseidonT5` |
+| `Verifier` | `addressVerifier`, `treeUpdateVerifier`, each `txvInfos[i].addr` |
+| `Gateway` | `entryPoint_`, `wToken_`, `pool_`, `mempool_` |
+| `Paymaster` | `entryPoint_`, `sender_`, `pool_` |
+
+**Status:** Fixed — `ZeroAddress()` custom error added to each contract; constructor guards revert on any zero address before state is written.
+
+---
