@@ -53,9 +53,12 @@ contract CurveNGAdaptor is AdaptorBase {
     {
         Payload memory decodedPayload = abi.decode(payload, (Payload));
         uint256 NCoins;
+        // trying to access the third coin (index 2 of the coins array) to determine if it's a 2-coin or 3-coin pool
         try ICurvePool(decodedPayload.curvePool).coins(2) returns (address) {
+            // In Curve's Vyper contract: coins(2) is accessing address[2] which will be present for 3-coin pool (length of address array is 3)
             NCoins = 3;
         } catch {
+            // In Curve's Vyper contract: coins(2) is accessing address[2] which will be out of bounds for 2-coin pool (length of address array is 2), thus throwing an error which we catch here to set NCoins = 2
             NCoins = 2;
         }
 
@@ -323,10 +326,13 @@ contract CurveNGAdaptor is AdaptorBase {
         bool isDeposit
     ) external view returns (uint256) {
         uint256 NCoins;
+        // trying to access the third coin (index 2 of the coins array) to determine if it's a 2-coin or 3-coin pool
         try ICurvePool(pool).coins(2) returns (address) {
-            NCoins = 2;
-        } catch {
+            // In Curve's Vyper contract: coins(2) is accessing address[2] which will be present for 3-coin pool (length of address array is 3)
             NCoins = 3;
+        } catch {
+            // In Curve's Vyper contract: coins(2) is accessing address[2] which will be out of bounds for 2-coin pool (length of address array is 2), thus throwing an error which we catch here to set NCoins = 2
+            NCoins = 2;
         }
         if (underlyingTokenAmts.length != NCoins) {
             revert InvalidInput();

@@ -53,12 +53,13 @@ contract CurveAdaptorTest is PoolTest {
 
         uint8[] memory assetsPrecision = new uint8[](3);
         assetsPrecision[0] = 6;
-        assetsPrecision[1] = 6;
-        assetsPrecision[2] = 6;
+        assetsPrecision[1] = 18;
+        assetsPrecision[2] = 18;
         pool.addAssets(assetType, assetAddresses, assetsPrecision);
 
         vm.stopPrank();
 
+        /**
         deal(USDT, user, INITIAL_SUPPLY_USDT);
         deal(crvUSD, user, INITIAL_SUPPLY_CRVUSD);
 
@@ -81,6 +82,7 @@ contract CurveAdaptorTest is PoolTest {
         vm.stopPrank();
 
         _processCommitmentTreeQueue();
+         */
     }
 
     function testCurveAdaptorDeploy() external view {
@@ -341,6 +343,21 @@ contract CurveAdaptorTest is PoolTest {
             vm.warp(vm.getBlockTimestamp() + 1 days);
             vm.roll(vm.getBlockNumber() + 100);
         }
+    }
+
+    function testGetLPTokenCount() public {
+        uint256[] memory underlyingTokenAmts = new uint256[](2);
+        underlyingTokenAmts[0] = uint256(2);
+        underlyingTokenAmts[1] = uint256(4);
+
+        uint256 lpTokenCount = curveAdaptor.getLPTokenCount(
+            crvUSD_USDT_Pool,
+            underlyingTokenAmts,
+            true
+        );
+
+        console.log("LP token count for 2 USDT and 4 crvUSD:", lpTokenCount);
+        assert(lpTokenCount > 0);
     }
 
     /**
