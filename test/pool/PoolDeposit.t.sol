@@ -3,6 +3,7 @@ pragma solidity ^0.8.24;
 
 import {ShieldedTransaction} from "src/libraries/ShieldedTransaction.sol";
 import {IPool} from "src/interfaces/IPool.sol";
+import {IWToken} from "src/interfaces/IWToken.sol";
 import {ZERO_LEAF} from "src/base/Constants.sol";
 import {PoolTest} from "test/fixtures/PoolTest.sol";
 
@@ -25,6 +26,25 @@ contract PoolDepositTest is PoolTest {
         _checkEventEmits(stx);
 
         assertEq(token1.balanceOf(address(pool)), balance1 + deposit1);
+    }
+
+    function test_weth_testnet_deposit() public {
+        address testnet_weth = 0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14;
+        uint256 deposit1 = 2 ether;
+        uint256 balance1 = IWToken(testnet_weth).balanceOf(address(pool));
+
+        vm.deal(address(this), deposit1);
+        IWToken(testnet_weth).deposit{value: deposit1}();
+        IWToken(testnet_weth).approve(address(pool), deposit1);
+        ShieldedTransaction memory stx = _loadShieldedTransaction(
+            "deposit_2_testnet_weth"
+        );
+        _checkEventEmits(stx);
+
+        assertEq(
+            IWToken(testnet_weth).balanceOf(address(pool)),
+            balance1 + deposit1
+        );
     }
 
     function test_deposit() public {

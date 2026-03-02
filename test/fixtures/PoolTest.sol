@@ -121,27 +121,44 @@ contract PoolTest is PoolBaseTest, BaseScript {
         PoolBaseTest._setUp();
 
         AssetType assetType = AssetType.ERC20;
-        uint256 initAssetLength = _config.initAssetAddresses().length;
+        uint256 initAssetLength = block.chainid == 31337
+            ? 0
+            : _config.initAssetAddresses().length;
+
         address[] memory assetAddresses = new address[](3 + initAssetLength);
-        assetAddresses[0] = address(token1);
-        assetAddresses[1] = address(token2);
-        assetAddresses[2] = address(tokenReent);
-
         uint8[] memory assetsPrecision = new uint8[](3 + initAssetLength);
-        assetsPrecision[0] = MockERC20(assetAddresses[0]).decimals();
-        assetsPrecision[1] = MockERC20(assetAddresses[1]).decimals();
-        assetsPrecision[2] = MockERC20(assetAddresses[2]).decimals();
 
-        // adding support for testnet tokens if any to provide support of adaptor testing
-        if (initAssetLength > 0) {
+        // for local testing env, we deploy mock tokens and add them as supported assets in the pool. The script/config.json will showcase arrays for initAssetAddresses, etc, which should be considered dummies, except the initAssetIdsVeilnyx used by the SDK. For testnet/mainnet, we rely on mock + existing onchain tokens, so supporting both sets of assets configured in the script/config.json file, which should include the assets needed for adaptor testing.
+
+        // testnets/mainnet fork testing case
+        if (block.chainid != 31337) {
+            assetAddresses[0] = address(token1);
+            assetAddresses[1] = address(token2);
+            assetAddresses[2] = address(tokenReent);
+
+            assetsPrecision[0] = MockERC20(assetAddresses[0]).decimals();
+            assetsPrecision[1] = MockERC20(assetAddresses[1]).decimals();
+            assetsPrecision[2] = MockERC20(assetAddresses[2]).decimals();
+
             uint i = 0;
             do {
                 assetAddresses[3 + i] = _config.initAssetAddresses()[i];
                 assetsPrecision[3 + i] = _config.initAssetsPrecision()[i];
                 ++i;
             } while (i < initAssetLength);
+        } else {
+            // local testing case- only mock tokens are needed
+            assetAddresses[0] = address(token1);
+            assetAddresses[1] = address(token2);
+            assetAddresses[2] = address(tokenReent);
+            assetsPrecision[0] = MockERC20(assetAddresses[0]).decimals();
+            assetsPrecision[1] = MockERC20(assetAddresses[1]).decimals();
+            assetsPrecision[2] = MockERC20(assetAddresses[2]).decimals();
         }
+
+        // adding support for testnet tokens if any to provide support of adaptor testing
         pool.addAssets(assetType, assetAddresses, assetsPrecision);
+
         asset1 = pool.getAsset(assetAddresses[0]);
         asset2 = pool.getAsset(assetAddresses[1]);
 
