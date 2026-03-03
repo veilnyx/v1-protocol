@@ -12,7 +12,7 @@ import {
 
 const main = async () => {
 	const { sdk, nebraClient } = await getSDKInstance();
-	// await genTestDeposits(sdk);
+	await genTestDeposits(sdk);
 	// await genTestDepositsWithOutsourceProofVerification(sdk, nebraClient);
 	// await genTestTransfers(sdk);
 	// await genTestTransfersWithOutsourceProofVerification(sdk, nebraClient);

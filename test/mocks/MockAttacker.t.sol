@@ -25,10 +25,7 @@ contract MockAttacker is Test {
 
     function onTokenTransfer() external payable {
         console.logString("Initiating reentrancy attack");
-        if (
-            MockERC20ForReentrancyTest(tokenReent).balanceOf(address(pool)) >=
-            500 ether
-        ) {
+        if (tokenReent.balanceOf(address(pool)) >= 500 ether) {
             vm.expectRevert(
                 abi.encodeWithSelector(
                     ReentrancyGuardUpgradeable

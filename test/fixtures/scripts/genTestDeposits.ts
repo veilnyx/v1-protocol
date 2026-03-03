@@ -4,11 +4,22 @@ import { TransactionType } from "@labyrinthac/shared-types";
 import { fixture, generateTestTransactions, generateTestTxsWithOutsourcedProofVerification } from "./fixture";
 
 const {
-  assets: { weth, usdc, testnetWeth, testnetUsdc, morphoVaultToken },
+  assets: { weth, usdc, reentrantToken, testnetWeth, testnetUsdc, morphoVaultToken },
   sender: { account: senderAccount },
 } = fixture;
 
 export const reqs = {
+  deposit_1000_reentrantToken_without_fee: {
+    type: TransactionType.DEPOSIT,
+    assetIds: [reentrantToken],
+    values: [parseEther("1000")],
+    feeAssetId: 0,
+    to: senderAccount.shieldedAddress.pack(),
+    viaBundler: false,
+    paymaster: zeroAddress,
+    revokerId: 0,
+  }
+  /**,
   deposit_2_testnet_weth: {
     type: TransactionType.DEPOSIT,
     assetIds: [testnetWeth],
@@ -18,8 +29,7 @@ export const reqs = {
     viaBundler: false,
     paymaster: zeroAddress,
     revokerId: 0,
-  }
-  /**
+  },
   deposit_pre_tx: {
     type: TransactionType.DEPOSIT,
     assetIds: [weth, usdc],
@@ -84,16 +94,6 @@ deposit_1000_weth_usdc_without_fee: {
   type: TransactionType.DEPOSIT,
   assetIds: [weth, usdc],
   values: [parseEther("1000"), parseUnits("1000", 6)],
-  feeAssetId: 0,
-  to: senderAccount.shieldedAddress.pack(),
-  viaBundler: false,
-  paymaster: zeroAddress,
-  revokerId: 0,
-},
-deposit_1000_reentrantToken_without_fee: {
-  type: TransactionType.DEPOSIT,
-  assetIds: [reentrantToken],
-  values: [parseEther("1000")],
   feeAssetId: 0,
   to: senderAccount.shieldedAddress.pack(),
   viaBundler: false,

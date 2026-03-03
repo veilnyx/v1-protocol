@@ -2,6 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {Test, console} from "forge-std/Test.sol";
+import {StdCheats} from "forge-std/StdCheats.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {ShieldedTransaction} from "src/libraries/ShieldedTransaction.sol";
 import {PoolTest} from "test/fixtures/PoolTest.sol";
@@ -17,20 +18,13 @@ contract PoolReentrancyTest is PoolTest {
     MockAttacker attacker;
     Asset assetReent;
     uint256 constant INITIAL_DEPOSIT = 1000 ether;
+    address constant REENTRANCY_ATTACK_CONTRACT_FIXTURE =
+        0x8F2FbdFDa8BE4Da8B9454aE9F0301150932AE4b5;
 
     function setUp() public {
         _setUp();
-        _helperTree.init(fixture.commitmentTreeDepth, address(hasher));
 
-        AssetType assetType = AssetType.ERC20;
-        address[] memory assetAddresses = new address[](1);
-        assetAddresses[0] = address(tokenReent);
-        uint8[] memory assetsPrecision = new uint8[](1);
-        assetsPrecision[0] = 18;
-
-        pool.addAssets(assetType, assetAddresses, assetsPrecision);
         assetReent = pool.getAsset(address(tokenReent));
-
         _mintAsset(assetReent, address(this), INITIAL_DEPOSIT);
         _approveAsset(assetReent, address(pool), INITIAL_DEPOSIT);
 
@@ -39,6 +33,7 @@ contract PoolReentrancyTest is PoolTest {
                 "deposit_1000_reentrantToken_without_fee"
             );
         pool.transact(reentTokenDepositStx, false);
+        _processCommitmentTreeQueue();
 
         // `to` address will be that of the attacker contract which
         // will perform the reentrancy attack
@@ -46,38 +41,15 @@ contract PoolReentrancyTest is PoolTest {
             "withdraw_500_reentrantToken_to_attacker_contract"
         );
 
-        // will perform the reentrancy attack and test the revert
-        attacker = new MockAttacker(pool, attackerWithdrawStx, tokenReent);
-        console.log("Attacker address:", address(attacker));
+        StdCheats.deployCodeTo(
+            "MockAttacker.t.sol:MockAttacker",
+            abi.encode(pool, attackerWithdrawStx, tokenReent),
+            REENTRANCY_ATTACK_CONTRACT_FIXTURE
+        );
     }
 
     function test_reentrancyAttack() public {
-        _updateOnChainMT();
-
         // initiating the withdraw to attacker that will perform reentrancy attack and check the revert
         pool.transact(attackerWithdrawStx, false);
-    }
-
-    function _updateOnChainMT() internal {
-        // UPDATE QUEUE MT SERVICE
-        // service reading the queue and generating new merkle tree state on-chain
-        (uint256[] memory leaves, , , , ) = pool.getCommitmentTreeState();
-        for (uint8 i; i < leaves.length; ) {
-            _helperTree.insert(leaves[i]);
-            unchecked {
-                ++i;
-            }
-        }
-
-        (uint256[] memory lastSubtrees, uint256 lastRoot, , ) = _helperTree
-            .getState();
-
-        TreeUpdateData memory treeUpdateData = TreeUpdateData({
-            newRoot: lastRoot,
-            newSubtrees: lastSubtrees,
-            proof: bytes("")
-        });
-
-        pool.updateCommitmentTree(treeUpdateData);
     }
 }
