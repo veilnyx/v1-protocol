@@ -48,7 +48,7 @@ contract PoolTransferTest is PoolTest {
         uint256 balance2 = token2.balanceOf(address(pool));
 
         ShieldedTransaction memory stx = _loadShieldedTransaction(
-            "transfer_500_weth_with_usdc_fee"
+            "transfer_1000_weth_with_usdc_fee"
         );
         uint24 feeAssetId = uint24(stx.feeData >> 72);
         uint72 feeValue = uint72(stx.feeData);
