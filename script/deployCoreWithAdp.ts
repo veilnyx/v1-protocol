@@ -15,6 +15,7 @@ import {
 import { DeployContractConfig, KeyedClient } from '@nomicfoundation/hardhat-viem/types';
 import { loadConfigs, ChainParams, AdaptorParams, CommonParams } from "./configs";
 import { deployHasher } from "./hasher";
+import { deployVerifier } from "./verifier";
 import { getChainForCurrentNetwork } from "./utils/chainUtils";
 import { deployErc4337Infra } from "./erc4337Infra";
 
@@ -22,51 +23,7 @@ const config = loadConfigs();
 
 // ABIs
 const poolAbi = hre.artifacts.readArtifactSync("Pool").abi;
-const verifier21Abi = hre.artifacts.readArtifactSync("VerifierTransact21").abi;
-const verifier22Abi = hre.artifacts.readArtifactSync("VerifierTransact22").abi;
 const adaptorHandlerAbi = hre.artifacts.readArtifactSync("AdaptorHandler").abi;
-
-
-const deployVerifier = async (deployConfig) => {
-  const verifierRegister = await hre.viem.deployContract("VerifierRegister", [], deployConfig);
-  console.log("VerifierRegister deployed:", verifierRegister.address);
-
-  const verifierTreeUpdate = await hre.viem.deployContract("VerifierTreeUpdate", [], deployConfig);
-  console.log("VerifierTreeUpdate deployed:", verifierTreeUpdate.address);
-
-  // Tx Verifiers
-  const verifierTransact21 = await hre.viem.deployContract("VerifierTransact21", [], deployConfig);
-  console.log("VerifierTransact21 deployed:", verifierTransact21.address);
-
-  const verifierTransact22 = await hre.viem.deployContract("VerifierTransact22", [], deployConfig);
-  console.log("VerifierTransact22 deployed:", verifierTransact22.address);
-
-  // Prepare the TransactionVerifierInfo array
-  const txVerifierInfos = [
-    {
-      id: 21,
-      selector: toFunctionSelector(verifier21Abi[0]),
-      addr: verifierTransact21.address
-    },
-    {
-      id: 22,
-      selector: toFunctionSelector(verifier22Abi[0]),
-      addr: verifierTransact22.address
-    }
-    // Add more TransactionVerifierInfo structs as needed
-  ];
-
-  const verifier = await hre.viem.deployContract("Verifier", [
-    txVerifierInfos,
-    verifierRegister.address,
-    verifierTreeUpdate.address,
-  ],
-    deployConfig
-  );
-  console.log("Verifier deployed:", verifier.address);
-
-  return verifier.address;
-}
 
 const deployUniswap = async (uniswapParams, pool, deployConfig) => {
   const uniswap = await hre.viem.deployContract("UniswapV3Adapter", [
