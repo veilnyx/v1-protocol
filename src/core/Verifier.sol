@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {IVerifier} from "../interfaces/IVerifier.sol";
 import {VerifierRegister} from "../verifiers/VerifierRegister.sol";
 import {VerifierTreeUpdate} from "../verifiers/VerifierTreeUpdate.sol";
@@ -12,7 +13,7 @@ struct TransactionVerifierInfo {
     address addr;
 }
 
-contract Verifier is IVerifier {
+contract Verifier is IVerifier, Ownable {
     /**
      * @notice Verifier id to Verifier info mapping for transaction verifiers only
      */
@@ -20,14 +21,23 @@ contract Verifier is IVerifier {
     address internal _addressVerifier;
     address internal _treeUpdateVerifier;
 
+    event TransactionVerifierAdded(
+        uint16 indexed id,
+        bytes4 selector,
+        address addr
+    );
+    event TransactionVerifierRemoved(uint16 indexed id);
+
     error ZeroAddress();
+    error VerifierAlreadyExists(uint16 id);
 
     constructor(
         TransactionVerifierInfo[] memory txvInfos,
         address addressVerifier,
         address treeUpdateVerifier
-    ) {
-        if (addressVerifier == address(0) || treeUpdateVerifier == address(0)) revert ZeroAddress();
+    ) Ownable(msg.sender) {
+        if (addressVerifier == address(0) || treeUpdateVerifier == address(0))
+            revert ZeroAddress();
 
         uint256 len = txvInfos.length;
 
@@ -41,6 +51,64 @@ contract Verifier is IVerifier {
 
         _addressVerifier = addressVerifier;
         _treeUpdateVerifier = treeUpdateVerifier;
+    }
+
+    /// @notice Adds a new transaction verifier
+    /// @dev Only callable by owner
+    /// @param txvInfo The transaction verifier info to add
+    function addTransactionVerifier(
+        TransactionVerifierInfo calldata txvInfo
+    ) external onlyOwner {
+        if (txvInfo.addr == address(0)) revert ZeroAddress();
+        if (_transactionVerifiers[txvInfo.id].addr != address(0)) {
+            revert VerifierAlreadyExists(txvInfo.id);
+        }
+
+        _transactionVerifiers[txvInfo.id] = txvInfo;
+        emit TransactionVerifierAdded(
+            txvInfo.id,
+            txvInfo.selector,
+            txvInfo.addr
+        );
+    }
+
+    /// @notice Adds multiple transaction verifiers in batch
+    /// @dev Only callable by owner
+    /// @param txvInfos Array of transaction verifier infos to add
+    function addTransactionVerifiers(
+        TransactionVerifierInfo[] calldata txvInfos
+    ) external onlyOwner {
+        uint256 len = txvInfos.length;
+
+        for (uint256 i = 0; i < len; ) {
+            if (txvInfos[i].addr == address(0)) revert ZeroAddress();
+            if (_transactionVerifiers[txvInfos[i].id].addr != address(0)) {
+                revert VerifierAlreadyExists(txvInfos[i].id);
+            }
+
+            _transactionVerifiers[txvInfos[i].id] = txvInfos[i];
+            emit TransactionVerifierAdded(
+                txvInfos[i].id,
+                txvInfos[i].selector,
+                txvInfos[i].addr
+            );
+
+            unchecked {
+                ++i;
+            }
+        }
+    }
+
+    /// @notice Removes a transaction verifier
+    /// @dev Only callable by owner
+    /// @param vId The verifier ID to remove
+    function removeTransactionVerifier(uint16 vId) external onlyOwner {
+        if (_transactionVerifiers[vId].addr == address(0)) {
+            revert("Verifier: verifier not found");
+        }
+
+        delete _transactionVerifiers[vId];
+        emit TransactionVerifierRemoved(vId);
     }
 
     function verifyAddressProof(
