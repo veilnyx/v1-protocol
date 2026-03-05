@@ -200,7 +200,7 @@ const generateTestAddressRegistration = async (
   name: string,
   sdk: Core
 ) => {
-  const zaddrReg = await sdk.proveAddress("0x");
+  const zaddrReg = await sdk.proveAddress("0x"); // signature will be generated inside the protocol test setup `_getRegisterAddressSignature` function, so passing dummy data here
   const encoded = zaddrReg.encode();
   writeFileSync(`${dirFixtureData}/${name}.txt`, encoded);
 };

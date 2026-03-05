@@ -4,6 +4,7 @@ pragma solidity ^0.8.24;
 import {Test} from "forge-std/Test.sol";
 import {PoolTest} from "test/fixtures/PoolTest.sol";
 import {IPool} from "src/interfaces/IPool.sol";
+import {MockERC20} from "test/mocks/MockERC20.sol";
 import {AssetType, Asset} from "src/libraries/Asset.sol";
 import {MerkleTree} from "src/libraries/MerkleTree.sol";
 import {RevokerData} from "src/libraries/ShieldedTransaction.sol";
@@ -24,24 +25,23 @@ contract PoolInitTest is PoolTest {
         assertEq(addressTreeDepth, fixture.addressTreeDepth);
     }
 
-    function test_addAssets() external {
-        AssetType assetType = AssetType.ERC20;
-        address assetAddress = makeAddr("newAsset");
-        address[] memory assetAddresses = new address[](1);
-        assetAddresses[0] = assetAddress;
+    function test_addAsset() external {
+        MockERC20 testToken = new MockERC20(address(this), 18);
 
+        address[] memory assetAddresses = new address[](1);
+        assetAddresses[0] = address(testToken);
         uint8[] memory assetsPrecision = new uint8[](1);
         assetsPrecision[0] = 18;
+        AssetType assetType = AssetType.ERC20;
 
         pool.addAssets(assetType, assetAddresses, assetsPrecision);
 
         // bool isAssetActive = pool.isAssetActive(assetAddress);
-        Asset memory newAsset = pool.getAsset(assetAddress);
-
+        Asset memory newAsset = pool.getAsset(assetAddresses[0]);
         // assert(isAssetActive);
         assertNotEq(newAsset.id, 0);
         assert(newAsset.assetType == assetType);
-        assertEq(newAsset.assetAddress, assetAddress);
+        assertEq(newAsset.assetAddress, address(testToken));
     }
 
     ///////////////////////////

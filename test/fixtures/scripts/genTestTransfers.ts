@@ -10,6 +10,18 @@ const {
 } = fixture;
 
 export const reqs = {
+	transfer_500_weth_with_usdc_fee: {
+		type: TransactionType.TRANSFER,
+		assetIds: [weth],
+		values: [parseEther("500")], // transfer partial WETH note to gen 3rd change note (USDC change + WETH change + WETH receiver = 3 outputs = transact24/transact44 circuits test)
+		to: receiverAccount.shieldedAddress.pack(),
+		viaBundler: true,
+		paymaster:
+			`0x${"03E98aE18908eBc2Fe82e646E4DFB628963383c1"}` as `0x${string}`,
+		feeAssetId: usdc,
+		revokerId: 0,
+	}
+	/**,
 	transfer_500_weth_without_fee: {
 		type: TransactionType.TRANSFER,
 		assetIds: [weth],
@@ -20,7 +32,6 @@ export const reqs = {
 		paymaster: zeroAddress,
 		revokerId: 0,
 	},
-	/**,
 	transfer_1000_weth_with_usdc_fee: {
 		type: TransactionType.TRANSFER,
 		assetIds: [weth],
