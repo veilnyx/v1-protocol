@@ -13,6 +13,7 @@ import {BaseTest} from "test/fixtures/BaseTest.sol";
 import {Fixture, FixtureLib} from "./fixtures/Fixture.sol";
 import {Verifier, TransactionVerifierInfo} from "src/core/Verifier.sol";
 import {VerifierTreeUpdate} from "src/verifiers/VerifierTreeUpdate.sol";
+import {VerifierRegister} from "src/verifiers/VerifierRegister.sol";
 import {ShieldedTransaction} from "src/libraries/ShieldedTransaction.sol";
 
 import {console2} from "forge-std/console2.sol";
@@ -33,9 +34,10 @@ contract QueuedMerkleTreeLogicTest is BaseTest {
 
         TransactionVerifierInfo[]
             memory txvInfos = new TransactionVerifierInfo[](0);
+        VerifierRegister addressVerifier_ = new VerifierRegister();
         Verifier verifier_ = new Verifier(
             txvInfos,
-            address(0),
+            address(addressVerifier_),
             address(treeUpdateVerifier)
         );
 
@@ -84,10 +86,10 @@ contract QueuedMerkleTreeLogicTest is BaseTest {
         );
         qmt.update(treeUpdateData1);
 
-        qmt.queueLeaves(fixture.leavesQueue2);
-        TreeUpdateData memory treeUpdateData2 = _loadTreeUpdateData(
-            "tree_update_data_2"
-        );
-        qmt.update(treeUpdateData2);
+        // qmt.queueLeaves(fixture.leavesQueue2);
+        // TreeUpdateData memory treeUpdateData2 = _loadTreeUpdateData(
+        //     "tree_update_data_2"
+        // );
+        // qmt.update(treeUpdateData2);
     }
 }

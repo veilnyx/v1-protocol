@@ -9,6 +9,16 @@ const {
 } = fixture;
 
 export const reqs = {
+  deposit_weth_tx: {
+    type: TransactionType.DEPOSIT,
+    assetIds: [weth],
+    values: [parseEther("100")],
+    feeAssetId: 0,
+    to: senderAccount.shieldedAddress.pack(),
+    viaBundler: false,
+    paymaster: zeroAddress,
+    revokerId: 0,
+  }/**,
   deposit_1000_reentrantToken_without_fee: {
     type: TransactionType.DEPOSIT,
     assetIds: [reentrantToken],
@@ -18,8 +28,7 @@ export const reqs = {
     viaBundler: false,
     paymaster: zeroAddress,
     revokerId: 0,
-  }
-  /**,
+  },
   deposit_2_testnet_weth: {
     type: TransactionType.DEPOSIT,
     assetIds: [testnetWeth],
@@ -34,16 +43,6 @@ export const reqs = {
     type: TransactionType.DEPOSIT,
     assetIds: [weth, usdc],
     values: [parseEther("10000"), parseUnits("10000", 6)],
-    feeAssetId: 0,
-    to: senderAccount.shieldedAddress.pack(),
-    viaBundler: false,
-    paymaster: zeroAddress,
-    revokerId: 0,
-  },
-  deposit_weth_tx: {
-    type: TransactionType.DEPOSIT,
-    assetIds: [weth],
-    values: [parseEther("100")],
     feeAssetId: 0,
     to: senderAccount.shieldedAddress.pack(),
     viaBundler: false,
@@ -79,7 +78,7 @@ deposit_2_morphoVaultToken: {
   viaBundler: false,
   paymaster: zeroAddress,
   revokerId: 0,
-}, 
+},
 deposit_1000_weth_without_fee: {
   type: TransactionType.DEPOSIT,
   assetIds: [weth],

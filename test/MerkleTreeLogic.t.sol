@@ -106,9 +106,7 @@ contract MerkleTreeLogicTest is BaseTest {
         _addressTree.nextLeafIndex = uint32(2 ** addressTreeDepth);
         uint256 commitmentLeaf = uint256(keccak256(abi.encode("commitment")));
 
-        vm.expectRevert(
-            abi.encodeWithSelector(MerkleTreeLogic.MerkleTreeFull.selector)
-        );
+        vm.expectRevert(MerkleTreeLogic.MerkleTreeFull.selector);
         MerkleTreeLogic.insert(_addressTree, commitmentLeaf);
     }
 
@@ -170,12 +168,9 @@ contract MerkleTreeLogicTest is BaseTest {
     function test_revertWhenCommitmentTreeFull() external {
         _commitmentTree.nextLeafIndex = uint32(2 ** commitmentTreeDepth);
         uint256 commitmentLeaf = uint256(keccak256(abi.encode("commitment")));
-        commitments.push(commitmentLeaf);
 
-        vm.expectRevert(
-            abi.encodeWithSelector(MerkleTreeLogic.MerkleTreeFull.selector)
-        );
-        MerkleTreeLogic.insert(_commitmentTree, commitments);
+        vm.expectRevert(MerkleTreeLogic.MerkleTreeFull.selector);
+        MerkleTreeLogic.insert(_commitmentTree, commitmentLeaf);
     }
 
     function test_commitmentTreeDuoLeafInsertion() public {

@@ -11,6 +11,8 @@ import {ShieldedAccount} from "test/helpers/ShieldedAccount.sol";
 import {TreeUpdateData} from "src/libraries/QueuedMerkleTree.sol";
 
 struct Fixture {
+    address payable paymaster;
+    address payable gateway;
     uint8 addressTreeDepth;
     uint8 commitmentTreeDepth;
     uint8 commitmentTreeQueueSize;
@@ -34,6 +36,14 @@ library FixtureLib {
         string memory configJsonStr = vm.readFile(path);
 
         Fixture memory fixture;
+
+        fixture.paymaster = payable(
+            vm.parseJsonAddress(configJsonStr, ".paymaster")
+        );
+
+        fixture.gateway = payable(
+            vm.parseJsonAddress(configJsonStr, ".gateway")
+        );
 
         // Tree params
         fixture.addressTreeDepth = uint8(

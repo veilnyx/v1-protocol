@@ -1,7 +1,7 @@
 import { parseEther, parseUnits, zeroAddress, encodeAbiParameters } from "viem";
 import { Core } from "@labyrinthac/core";
 import { TransactionType } from "@labyrinthac/shared-types";
-import { fixture, generateTestTransactions, mockNotes } from "./fixture";
+import { fixture, generateTestTransactions, mockNotes, PAYMASTER_ADDR_FIXTURE } from "./fixture";
 
 const {
     assets: { testnetWeth, testnetUsdc, morphoVaultToken },
@@ -23,10 +23,9 @@ export const reqs = {
         // adaptor to which the ZkFi AdaptorHandler will call to execute swap
         to: "0xbF71c5Ae43827387dAAF7358acAB5C81642b74b8",
         // payload:: action: 0 (supply)
-        payload: "0x0000000000000000000000000000000000000000000000000000000000000000" as `0x${string}`,
-        revokerId: 0,
-        viaBundler: false,
         paymaster: zeroAddress,
+        revokerId: 0,
+        viaBundler: false
     }
     /**
     ,
@@ -38,8 +37,7 @@ export const reqs = {
         revokerId: 0,
         feeAssetId: testnetWeth,
         viaBundler: true,
-        paymaster:
-            `0x${"03E98aE18908eBc2Fe82e646E4DFB628963383c1"}` as `0x${string}`,
+        paymaster: PAYMASTER_ADDR_FIXTURE as `0x${string}`,
         payload:
             "0x000000000000000000000000000000000000000000000000000000000001000500000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000" as `0x${string}`, // refund: pool address (address(0))
     },
@@ -54,8 +52,8 @@ export const reqs = {
         payload: "0x0000000000000000000000000000000000000000000000000000000000000000" as `0x${string}`,
         revokerId: 0,
         viaBundler: true,
-        paymaster:
-            `0x${"03E98aE18908eBc2Fe82e646E4DFB628963383c1"}` as `0x${string}`
+        paymaster: PAYMASTER_ADDR_FIXTURE as `0x${string}`,
+
     }
     /**
     withdraw_2_morphoLoanToken: {
@@ -117,7 +115,7 @@ export const reqs = {
         payload: "0x" as `0x${string}`,
         revokerId: 0,
         viaBundler: true,
-        paymaster: "0x03E98aE18908eBc2Fe82e646E4DFB628963383c1" as `0x${string}`,
+        paymaster: PAYMASTER_ADDR_FIXTURE as `0x${string}`,
     },
     supply_5_usdt_crvUsd_on_curve: {
         type: TransactionType.CALL_ADAPTER,

@@ -13,6 +13,7 @@ import {Gateway} from "src/core/Gateway.sol";
 import {MockPool} from "test/mocks/MockPool.sol";
 import {PoolTest} from "test/fixtures/PoolTest.sol";
 import {console2} from "forge-std/console2.sol";
+import {StdCheats} from "forge-std/StdCheats.sol";
 
 // import {PoolTransactTest} from "test/helpers/PoolTransact.t.sol";
 
@@ -78,8 +79,14 @@ contract PaymasterTest is PoolTest {
             address(pool),
             address(mempool)
         );
-        paymaster = new Paymaster(entryPoint, address(gateway), address(pool));
-        console2.log("paymaster:", address(paymaster));
+
+        StdCheats.deployCodeTo(
+            "Paymaster.sol:Paymaster",
+            abi.encode(entryPoint, address(gateway), address(pool)),
+            fixture.paymaster
+        );
+        console2.log("paymaster:", fixture.paymaster);
+        paymaster = Paymaster(fixture.paymaster);
 
         // Setting chainlink feed address to fetch prices
         paymaster.setChainlinkFeed(asset1.id, address(0));

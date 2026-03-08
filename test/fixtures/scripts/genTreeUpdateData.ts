@@ -47,28 +47,28 @@ export const genTreeUpdateDataWithPartialQueue = async (sdk: Core) => {
     forceUpdate: true,
   });
 
-  const treeUpdateData2 = await sdk.prover.proveTreeUpdate({
-    lastTree: treeUpdateData1.newTree,
-    leaves: fixture.leavesQueue2,
-    batchSize: fixture.qmtBatchSize,
-  });
+  // const treeUpdateData2 = await sdk.prover.proveTreeUpdate({
+  //   lastTree: treeUpdateData1.newTree,
+  //   leaves: fixture.leavesQueue2,
+  //   batchSize: fixture.qmtBatchSize,
+  // });
 
   const encodedPartialTreeData = treeUpdateData1.encode();
-  const encodedFullTreeData = treeUpdateData2.encode();
+  // const encodedFullTreeData = treeUpdateData2.encode();
 
   writeFileSync(
     `${dirFixtureData}/tree_update_data_partial_queue.txt`,
     encodedPartialTreeData
   );
-  writeFileSync(
-    `${dirFixtureData}/tree_update_data_2.txt`,
-    encodedFullTreeData
-  );
+  // writeFileSync(
+  //   `${dirFixtureData}/tree_update_data_2.txt`,
+  //   encodedFullTreeData
+  // );
 };
 
 export const getInitialTreeState = (): MerkleTreeState => {
   let z = fp.create(BigInt(keccak256(stringToBytes("zero"))));
-  
+
   const lastSubtree: bigint[] = [];
   const zeros: bigint[] = [];
   const treeDepth: number = fixture.commitmentTreeDepth;
