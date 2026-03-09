@@ -4,11 +4,32 @@ import { TransactionType } from "@labyrinthac/shared-types";
 import { fixture, generateTestTransactions, generateTestTxsWithOutsourcedProofVerification } from "./fixture";
 
 const {
-  assets: { weth, usdc, reentrantToken, testnetWeth, testnetUsdc, morphoVaultToken },
+  assets: { weth, usdc, reentrantToken, testnetWeth, testnetUsdc, beefyWantLPToken, beefyMooToken },
   sender: { account: senderAccount },
 } = fixture;
 
 export const reqs = {
+  deposit_2_mooLPToken: {
+    type: TransactionType.DEPOSIT,
+    assetIds: [beefyMooToken],
+    values: [parseEther("2")],
+    feeAssetId: 0,
+    to: senderAccount.shieldedAddress.pack(),
+    viaBundler: false,
+    paymaster: zeroAddress,
+    revokerId: 0,
+  }
+  /**,
+  deposit_2_wantLPToken: {
+    type: TransactionType.DEPOSIT,
+    assetIds: [beefyWantLPToken],
+    values: [parseEther("2")],
+    feeAssetId: 0,
+    to: senderAccount.shieldedAddress.pack(),
+    viaBundler: false,
+    paymaster: zeroAddress,
+    revokerId: 0,
+  },
   deposit_weth_tx: {
     type: TransactionType.DEPOSIT,
     assetIds: [weth],
@@ -18,7 +39,7 @@ export const reqs = {
     viaBundler: false,
     paymaster: zeroAddress,
     revokerId: 0,
-  }/**,
+  },
   deposit_1000_reentrantToken_without_fee: {
     type: TransactionType.DEPOSIT,
     assetIds: [reentrantToken],
@@ -103,26 +124,6 @@ deposit_5_testnet_usdt_crvusd: {
   type: TransactionType.DEPOSIT,
   assetIds: [testnetUsdt, testnetCrvUsd],
   values: [parseUnits("5", 6), parseUnits("5", 18)],
-  feeAssetId: 0,
-  to: senderAccount.shieldedAddress.pack(),
-  viaBundler: false,
-  paymaster: zeroAddress,
-  revokerId: 0,
-},
-deposit_2_wantLPToken: {
-  type: TransactionType.DEPOSIT,
-  assetIds: [beefyWantToken],
-  values: [parseEther("2")],
-  feeAssetId: 0,
-  to: senderAccount.shieldedAddress.pack(),
-  viaBundler: false,
-  paymaster: zeroAddress,
-  revokerId: 0,
-},
-deposit_2_mooLPToken: {
-  type: TransactionType.DEPOSIT,
-  assetIds: [beefyMooToken],
-  values: [parseEther("2")],
   feeAssetId: 0,
   to: senderAccount.shieldedAddress.pack(),
   viaBundler: false,

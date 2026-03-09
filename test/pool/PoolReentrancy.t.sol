@@ -41,6 +41,7 @@ contract PoolReentrancyTest is PoolTest {
             "withdraw_500_reentrantToken_to_attacker_contract"
         );
 
+        vm.allowCheatcodes(REENTRANCY_ATTACK_CONTRACT_FIXTURE);
         StdCheats.deployCodeTo(
             "MockAttacker.t.sol:MockAttacker",
             abi.encode(pool, attackerWithdrawStx, tokenReent),

@@ -8,6 +8,8 @@ import {ZERO_LEAF} from "src/base/Constants.sol";
 import {PoolTest} from "test/fixtures/PoolTest.sol";
 
 contract PoolDepositTest is PoolTest {
+    uint256 public constant ETH_SEPOLIA = 11155111;
+
     function setUp() public {
         _setUp();
         _mintAsset(asset1, address(this), 10000 ether);
@@ -29,7 +31,10 @@ contract PoolDepositTest is PoolTest {
     }
 
     function test_weth_testnet_deposit() public {
-        address testnet_weth = 0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14;
+        if (block.chainid != ETH_SEPOLIA) {
+            vm.skip(true);
+        }
+        address testnet_weth = config.wToken();
         uint256 deposit1 = 2 ether;
         uint256 balance1 = IWToken(testnet_weth).balanceOf(address(pool));
 
