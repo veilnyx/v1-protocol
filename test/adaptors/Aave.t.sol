@@ -11,7 +11,8 @@ import {IAdaptor} from "src/interfaces/IAdaptor.sol";
 import {IWToken} from "src/interfaces/IWToken.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Asset, AssetType} from "src/libraries/Asset.sol";
-import {console} from "forge-std/console.sol";
+import {console2} from "forge-std/console2.sol";
+import {StdCheats} from "forge-std/StdCheats.sol";
 
 contract AaveAdaptorTest is PoolTest {
     error CheckChainConfig();
@@ -21,9 +22,9 @@ contract AaveAdaptorTest is PoolTest {
     address public WETH = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
     address public USDC = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48;
     address public constant WETH_AAVE_UNDERLYING =
-        0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2; // Laby pool WETH contract is diff. than the one supported by Aave.
+        0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2; // Laby pool WETH contract is diff. than the one supported by Aave on testnet sepolia.
 
-    uint256 public constant INITIAL_SUPPLY = 2 ether;
+    uint256 public constant INITIAL_SUPPLY = 10 ether;
     uint256 public constant INITIAL_SUPPLY_USDC = 10e6;
     address public user = 0x689EcF264657302052c3dfBD631e4c20d3ED0baB;
     address public constant STATIC_A_TOKEN_FACTORY =
@@ -32,7 +33,7 @@ contract AaveAdaptorTest is PoolTest {
         0x252231882FB38481497f3C767469106297c8d93b;
 
     function setUp() external {
-        require(shouldTestRun(), "LidoAdaptorTest: Chain not supported");
+        require(shouldTestRun(), "AaveAdaptorTest: Chain not supported");
         PoolTest._setUp();
 
         // deploying aave adaptor
@@ -42,13 +43,18 @@ contract AaveAdaptorTest is PoolTest {
             STATIC_A_TOKEN_FACTORY
         );
         /// @dev update convert req fixture with this adaptor addr as `to`
-        console.log("Aave adaptor deployed:", address(aaveAdaptor));
+        console2.log("Aave adaptor deployed:", address(aaveAdaptor));
 
         // Asset & Adaptor support on Veilnyx Protocol
         // Whitelist the hardcoded adaptor address used in fixture ZK proofs
         // and etch the dynamically deployed adaptor's runtime code at that address
         address fixtureAdaptorAddr = 0xbF71c5Ae43827387dAAF7358acAB5C81642b74b8;
-        vm.etch(fixtureAdaptorAddr, address(aaveAdaptor).code);
+
+        StdCheats.deployCodeTo(
+            "AaveV3Adaptor.sol:AaveV3Adaptor",
+            abi.encode(aave, address(pool), STATIC_A_TOKEN_FACTORY),
+            fixtureAdaptorAddr
+        );
 
         address poolOwner = pool.owner();
         vm.startPrank(poolOwner);
@@ -82,9 +88,9 @@ contract AaveAdaptorTest is PoolTest {
         assert(address(aaveAdaptor) != address(0));
     }
 
-    /// @dev Make sure the `LidoAdaptor::receive()` is commented out for this test to work.
+    /// @dev Make sure the `AaveAdaptor::receive()` is commented out for this test to work.
     function testWethLending() public {
-        console.log("Initiating staking on aave");
+        console2.log("Initiating staking on aave");
         uint256 poolwETHStaticTokenBalBeforeLending = IERC20(
             WETH_STATIC_A_TOKEN
         ).balanceOf(address(pool));
@@ -97,11 +103,11 @@ contract AaveAdaptorTest is PoolTest {
         // Asserts
         uint256 poolwETHStaticTokenBalAfterLending = IERC20(WETH_STATIC_A_TOKEN)
             .balanceOf(address(pool));
-        console.log(
+        console2.log(
             "Pool static aToken bal before lending:",
             poolwETHStaticTokenBalBeforeLending
         );
-        console.log(
+        console2.log(
             "Pool static aToken bal after lending:",
             poolwETHStaticTokenBalAfterLending
         );
@@ -111,9 +117,8 @@ contract AaveAdaptorTest is PoolTest {
         );
     }
 
-    /**
     function testWethLendingThroughBundler() public {
-        console.log("Initiating staking on aave");
+        console2.log("Initiating staking on aave");
         uint256 poolwETHStaticTokenBalBeforeLending = IERC20(
             WETH_STATIC_A_TOKEN
         ).balanceOf(address(pool));
@@ -126,11 +131,11 @@ contract AaveAdaptorTest is PoolTest {
         // Asserts
         uint256 poolwETHStaticTokenBalAfterLending = IERC20(WETH_STATIC_A_TOKEN)
             .balanceOf(address(pool));
-        console.log(
+        console2.log(
             "Pool static aToken bal before lending:",
             poolwETHStaticTokenBalBeforeLending
         );
-        console.log(
+        console2.log(
             "Pool static aToken bal after lending:",
             poolwETHStaticTokenBalAfterLending
         );
@@ -149,7 +154,7 @@ contract AaveAdaptorTest is PoolTest {
         assertEq(paymasterFee, feeValue);
         assertEq(IERC20(USDC).balanceOf(address(pool)), INITIAL_SUPPLY_USDC);
     }
-
+ 
     /// @dev This test bypasses the Veilnyx protocol and directly tests the Aave integration from the Aave adaptor.
     /// @dev Pls uncomment the `receive()` on the Aave adp to enable this test.
     function testWEthLendingAndUnLendingOnAaveBypassingVeilnyx() public {
@@ -184,7 +189,7 @@ contract AaveAdaptorTest is PoolTest {
                 adaptorwETHStaticTokenBalBeforeLending
         );
 
-        console.log("Initiating Unlending on Aave");
+        console2.log("Initiating Unlending on Aave");
 
         inAssetIds[0] = pool.getAsset(WETH_STATIC_A_TOKEN).id;
         inValues[0] = adaptorwETHStaticTokenBalAfterLending;
@@ -205,11 +210,11 @@ contract AaveAdaptorTest is PoolTest {
         assertEq(adaptorwETHStaticBalAfterUnlending, 0);
         assert(adpWETHBalAfterUnLending > 0);
     }
-     */
-    /// @dev Only allowing Lido tests to run on Holesky testnet and ETH mainnet. More chains can be added.
+
+    /// @dev Only allowing Aave tests to run on Sepolia & ETH mainnet. More chains can be added.
     function shouldTestRun() internal view returns (bool) {
-        if (block.chainid != 11155111 && block.chainid != 1) {
-            console.log(
+        if (/* block.chainid != 11155111  && */ block.chainid != 1) {
+            console2.log(
                 "Skipping Aave adaptor tests on the current chain as Aave protocol may not be deployed. To run Aave tests, kindly run the tests on the ETH Sepolia testnet where Aave is deployed. Ref: https://github.com/bgd-labs/aave-address-book/blob/main/src/AaveV3Sepolia.sol"
             );
             return false;

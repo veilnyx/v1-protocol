@@ -12,7 +12,8 @@ import {
 
 const main = async () => {
 	const { sdk, nebraClient } = await getSDKInstance();
-	await genTestDeposits(sdk);
+	// @dev Deposit notes are reused across tests (transfer, withdrawal, adaptor). Only regenerate when new assets are needed, as overriding existing notes will break dependent tests fixtures.
+	// await genTestDeposits(sdk);
 	// await genTestDepositsWithOutsourceProofVerification(sdk, nebraClient);
 	// await genTestTransfers(sdk);
 	// await genTestTransfersWithOutsourceProofVerification(sdk, nebraClient);

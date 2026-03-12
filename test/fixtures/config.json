@@ -50,8 +50,8 @@
     "reentrantToken": 65539,
     "testnetWeth": 65540,
     "testnetUsdc": 65541,
-    "wantLPToken": 65542,
-    "mooToken": 65543
+    "testnetUsdt": 65542,
+    "testnetCrvUsd": 65543
   },
   "leavesQueue1": [
     "19014214495641488759237505126948346942972912379615652741039992445865937985820",

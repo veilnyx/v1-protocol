@@ -12,7 +12,7 @@ import {IWToken} from "src/interfaces/IWToken.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import {Asset, AssetType} from "src/libraries/Asset.sol";
-import {console} from "forge-std/console.sol";
+import {console2} from "forge-std/console2.sol";
 
 enum Action {
     STAKE,
@@ -38,22 +38,23 @@ contract LidoAdaptorTest is PoolTest {
 
         iWETH = IWToken(WETH);
 
-        // deploying Uniswap adaptor
-        lidoAdaptor = new LidoAdaptor(
-            lido,
-            WETH,
-            stETH,
-            wstETH,
-            withdrawalQueueERC721,
-            address(pool)
-        );
-        /// @dev update convert req fixture with this adaptor addr as `to`
-        console.log("Lido adaptor deployed:", address(lidoAdaptor));
-
-        // Whitelist the hardcoded adaptor address used in fixture ZK proofs
-        // and etch the dynamically deployed adaptor's runtime code at that address
+        // Deploy Lido adaptor directly at the hardcoded fixture address
+        // used in ZK proofs, so no vm.etch is needed.
         address fixtureAdaptorAddr = 0xbF71c5Ae43827387dAAF7358acAB5C81642b74b8;
-        vm.etch(fixtureAdaptorAddr, address(lidoAdaptor).code);
+        deployCodeTo(
+            "LidoAdaptor.sol:LidoAdaptor",
+            abi.encode(
+                lido,
+                WETH,
+                stETH,
+                wstETH,
+                withdrawalQueueERC721,
+                address(pool)
+            ),
+            fixtureAdaptorAddr
+        );
+        lidoAdaptor = LidoAdaptor(payable(fixtureAdaptorAddr));
+        console2.log("Lido adaptor deployed:", address(lidoAdaptor));
 
         // Asset & Adaptor support on Veilnyx Protocol
         address poolOwner = pool.owner();
@@ -70,15 +71,15 @@ contract LidoAdaptorTest is PoolTest {
 
         deal(WETH, user, INITIAL_SUPPLY);
 
-        // vm.startPrank(user);
-        // iWETH.approve(address(pool), INITIAL_SUPPLY); // depositing weth to pool
-        // ShieldedTransaction memory stxWethDeposit = _loadShieldedTransaction(
-        //     "deposit_2_testnet_weth"
-        // );
-        // pool.transact(stxWethDeposit);
-        // vm.stopPrank();
+        vm.startPrank(user);
+        iWETH.approve(address(pool), INITIAL_SUPPLY); // depositing weth to pool
+        ShieldedTransaction memory stxWethDeposit = _loadShieldedTransaction(
+            "deposit_2_testnet_weth"
+        );
+        pool.transact(stxWethDeposit, false);
+        vm.stopPrank();
 
-        // _processCommitmentTreeQueue();
+        _processCommitmentTreeQueue();
     }
 
     function testLidoAdaptorDeploy() external view {
@@ -87,13 +88,13 @@ contract LidoAdaptorTest is PoolTest {
 
     /// @dev Make sure the `LidoAdaptor::receive()` is commented out for this test to work.
     function testWethStakingOnLido() public {
-        console.log("Initiating staking on Lido");
+        console2.log("Initiating staking on Lido");
         uint256 poolwstETHBalBeforeStaking = IERC20(wstETH).balanceOf(
             address(pool)
         );
 
         ShieldedTransaction memory stxStake = _loadShieldedTransaction(
-            "stake_1_testnet_weth"
+            "stake_1_testnet_weth_lido"
         );
         pool.transact(stxStake, false);
 
@@ -101,8 +102,11 @@ contract LidoAdaptorTest is PoolTest {
         uint256 poolwstETHBalPostStake = IERC20(wstETH).balanceOf(
             address(pool)
         );
-        console.log("Pool wstEth bal before swap:", poolwstETHBalBeforeStaking);
-        console.log("Pool wstEth bal after swap:", poolwstETHBalPostStake);
+        console2.log(
+            "Pool wstEth bal before swap:",
+            poolwstETHBalBeforeStaking
+        );
+        console2.log("Pool wstEth bal after swap:", poolwstETHBalPostStake);
         assert(poolwstETHBalPostStake > poolwstETHBalBeforeStaking);
     }
 
@@ -130,10 +134,10 @@ contract LidoAdaptorTest is PoolTest {
         uint256 adpWstETHBalBeforeUnStaking = IERC20(wstETH).balanceOf(
             address(lidoAdaptor)
         );
-        console.log("Adp wstEth bal after swap:", adpWstETHBalBeforeUnStaking);
+        console2.log("Adp wstEth bal after swap:", adpWstETHBalBeforeUnStaking);
         assert(adpWstETHBalBeforeUnStaking > 0);
 
-        console.log("Initiating Unstaking on Lido");
+        console2.log("Initiating Unstaking on Lido");
 
         inAssetIds[0] = pool.getAsset(wstETH).id;
         inValues[0] = adpWstETHBalBeforeUnStaking;
@@ -149,11 +153,14 @@ contract LidoAdaptorTest is PoolTest {
         uint256 adpWstETHBalPostUnStake = IERC20(wstETH).balanceOf(
             address(pool)
         );
-        console.log(
+        console2.log(
             "Adp wstEth bal before unstaking:",
             adpWstETHBalBeforeUnStaking
         );
-        console.log("Adp wstEth bal after unstaking:", adpWstETHBalPostUnStake);
+        console2.log(
+            "Adp wstEth bal after unstaking:",
+            adpWstETHBalPostUnStake
+        );
 
         assert(adpWstETHBalPostUnStake < adpWstETHBalBeforeUnStaking);
         assert(IERC721(withdrawalQueueERC721).balanceOf(user) > 0); // NFT received check
@@ -191,7 +198,7 @@ contract LidoAdaptorTest is PoolTest {
             block.chainid != 11155111 &&
             block.chainid != 1
         ) {
-            console.log(
+            console2.log(
                 "Skipping Lido adaptor tests on the current chain as Lido protocol may not be deployed. To run Lido tests, kindly run the tests on the Holesky testnet where Lido is deployed. Ref: https://docs.lido.fi/deployed-contracts/holesky"
             );
             return false;

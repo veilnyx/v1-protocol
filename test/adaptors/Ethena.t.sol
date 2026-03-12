@@ -47,8 +47,8 @@ contract EthenaAdaptorTest is PoolTest {
         assetAddresses[1] = ETHENA;
 
         uint8[] memory assetsPrecision = new uint8[](2);
-        assetsPrecision[0] = 6;
-        assetsPrecision[1] = 6;
+        assetsPrecision[0] = 18;
+        assetsPrecision[1] = 18;
         pool.addAssets(assetType, assetAddresses, assetsPrecision);
 
         vm.stopPrank();
@@ -64,7 +64,7 @@ contract EthenaAdaptorTest is PoolTest {
         deal(USDe, user, INITIAL_SUPPLY);
         IERC20(USDe).approve(address(pool), INITIAL_SUPPLY);
         ShieldedTransaction memory ztxDeposit = _loadShieldedTransaction(
-            "deposit_2_testnet_usde"
+            "deposit_2_usde"
         );
         pool.transact(ztxDeposit, false);
         _processCommitmentTreeQueue();
@@ -74,7 +74,7 @@ contract EthenaAdaptorTest is PoolTest {
         );
 
         ShieldedTransaction memory ztxStake = _loadShieldedTransaction(
-            "stake_2_orig_usde_on_ethena"
+            "stake_2_usde_on_ethena"
         );
         pool.transact(ztxStake, false);
         vm.stopPrank();
@@ -87,6 +87,7 @@ contract EthenaAdaptorTest is PoolTest {
     }
 
     /**
+     * Unstaking not supported due to the cool down period required by Ethena before unstaking, making it a non-atomic tx. User's will have to unstake from Ethena's UI after withdrawing their `sUSDe` from Veilnyx.
     function testsUSDeUnStakingOnEthena() public {
         console.log("Initiating unstaking on Ethena");
         vm.startPrank(user);

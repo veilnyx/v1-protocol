@@ -61,8 +61,8 @@ const assets = {
   reentrantToken: config.assets.reentrantToken,
   testnetWeth: config.assets.testnetWeth,
   testnetUsdc: config.assets.testnetUsdc,
-  beefyWantLPToken: config.assets.wantLPToken,
-  beefyMooToken: config.assets.mooToken,
+  testnetUsdt: config.assets.testnetUsdt,
+  testnetCrvUsd: config.assets.testnetCrvUsd,
 };
 
 const revokerPublicKey = Point.fromAffine({

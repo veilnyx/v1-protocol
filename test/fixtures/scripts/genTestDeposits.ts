@@ -4,11 +4,62 @@ import { TransactionType } from "@labyrinthac/shared-types";
 import { fixture, generateTestTransactions, generateTestTxsWithOutsourcedProofVerification } from "./fixture";
 
 const {
-  assets: { weth, usdc, reentrantToken, testnetWeth, testnetUsdc, beefyWantLPToken, beefyMooToken },
+  assets: { weth, usdc, testnetWeth, testnetUsdc, reentrantToken, testnetUsdt, testnetCrvUsd },
   sender: { account: senderAccount },
 } = fixture;
 
 export const reqs = {
+  deposit_5_testnet_usdt_crvusd: {
+    type: TransactionType.DEPOSIT,
+    assetIds: [testnetUsdt, testnetCrvUsd],
+    values: [parseUnits("5", 6), parseUnits("5", 18)],
+    feeAssetId: 0,
+    to: senderAccount.shieldedAddress.pack(),
+    viaBundler: false,
+    paymaster: zeroAddress,
+    revokerId: 0,
+  },
+  /**
+   deposit_aaveWeth_testnetUsdc: {
+    type: TransactionType.DEPOSIT,
+    assetIds: [testnetWeth, testnetUsdc],
+    values: [parseEther("10"), parseUnits("10", 6)],
+    feeAssetId: 0,
+    to: senderAccount.shieldedAddress.pack(),
+    viaBundler: false,
+    paymaster: zeroAddress,
+    revokerId: 0,
+  }
+  deposit_2_morphoVaultToken: {
+    type: TransactionType.DEPOSIT,
+    assetIds: [morphoVaultToken],
+    values: [parseEther("2")],
+    feeAssetId: 0,
+    to: senderAccount.shieldedAddress.pack(),
+    viaBundler: false,
+    paymaster: zeroAddress,
+    revokerId: 0,
+  },
+  deposit_2_morphoLoanToken: {
+    type: TransactionType.DEPOSIT,
+    assetIds: [testnetWeth],
+    values: [parseEther("2")],
+    feeAssetId: 0,
+    to: senderAccount.shieldedAddress.pack(),
+    viaBundler: false,
+    paymaster: zeroAddress,
+    revokerId: 0,
+  },
+  deposit_2_usde: {
+    type: TransactionType.DEPOSIT,
+    assetIds: [usde],
+    values: [parseEther("2")],
+    feeAssetId: 0,
+    to: senderAccount.shieldedAddress.pack(),
+    viaBundler: false,
+    paymaster: zeroAddress,
+    revokerId: 0,
+  },
   deposit_2_mooLPToken: {
     type: TransactionType.DEPOSIT,
     assetIds: [beefyMooToken],
@@ -18,8 +69,7 @@ export const reqs = {
     viaBundler: false,
     paymaster: zeroAddress,
     revokerId: 0,
-  }
-  /**,
+  },
   deposit_2_wantLPToken: {
     type: TransactionType.DEPOSIT,
     assetIds: [beefyWantLPToken],
@@ -70,36 +120,6 @@ export const reqs = {
     paymaster: zeroAddress,
     revokerId: 0,
   },
-  deposit_aaveWeth_testnetUsdc: {
-    type: TransactionType.DEPOSIT,
-    assetIds: [testnetWeth, testnetUsdc],
-    values: [parseEther("2"), parseUnits("10", 6)],
-    feeAssetId: 0,
-    to: senderAccount.shieldedAddress.pack(),
-    viaBundler: false,
-    paymaster: zeroAddress,
-    revokerId: 0,
-  },
-deposit_aaveWeth_testnetUsdc: {
-  type: TransactionType.DEPOSIT,
-  assetIds: [testnetWeth, testnetUsdc],
-  values: [parseEther("2"), parseUnits("10", 6)],
-  feeAssetId: 0,
-  to: senderAccount.shieldedAddress.pack(),
-  viaBundler: false,
-  paymaster: zeroAddress,
-  revokerId: 0,
-},
-deposit_2_morphoVaultToken: {
-  type: TransactionType.DEPOSIT,
-  assetIds: [morphoVaultToken],
-  values: [parseEther("2")],
-  feeAssetId: 0,
-  to: senderAccount.shieldedAddress.pack(),
-  viaBundler: false,
-  paymaster: zeroAddress,
-  revokerId: 0,
-},
 deposit_1000_weth_without_fee: {
   type: TransactionType.DEPOSIT,
   assetIds: [weth],
@@ -114,16 +134,6 @@ deposit_1000_weth_usdc_without_fee: {
   type: TransactionType.DEPOSIT,
   assetIds: [weth, usdc],
   values: [parseEther("1000"), parseUnits("1000", 6)],
-  feeAssetId: 0,
-  to: senderAccount.shieldedAddress.pack(),
-  viaBundler: false,
-  paymaster: zeroAddress,
-  revokerId: 0,
-},
-deposit_5_testnet_usdt_crvusd: {
-  type: TransactionType.DEPOSIT,
-  assetIds: [testnetUsdt, testnetCrvUsd],
-  values: [parseUnits("5", 6), parseUnits("5", 18)],
   feeAssetId: 0,
   to: senderAccount.shieldedAddress.pack(),
   viaBundler: false,

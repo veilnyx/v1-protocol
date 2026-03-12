@@ -62,7 +62,7 @@ contract MorphoAdaptorTest is PoolTest {
     }
 
     function testSupplyInMorphoVault() public {
-        console.log("Initiating supply on Beefy");
+        console.log("Initiating supply on morpho");
         vm.startPrank(user);
         deal(loanToken, user, INITIAL_SUPPLY);
         IERC20(loanToken).forceApprove(address(pool), INITIAL_SUPPLY);
@@ -86,7 +86,7 @@ contract MorphoAdaptorTest is PoolTest {
     }
 
     function testWithdrawFromMorphoVault() public {
-        console.log("Initiating withdraw on Beefy");
+        console.log("Initiating withdraw on morpho");
         vm.startPrank(user);
         deal(vaultToken, user, INITIAL_SUPPLY);
         IERC20(vaultToken).forceApprove(address(pool), INITIAL_SUPPLY);
@@ -113,7 +113,7 @@ contract MorphoAdaptorTest is PoolTest {
     function shouldTestRun() internal view returns (bool) {
         if (block.chainid != 1) {
             console.log(
-                "Skipping Morpho adaptor tests on the current chain as Beefy protocol may not be deployed. To run Morpho tests, kindly run the tests on the ETH Mainnet fork."
+                "Skipping Morpho adaptor tests on the current chain as morpho protocol may not be deployed. To run Morpho tests, kindly run the tests on the ETH Mainnet fork."
             );
             return false;
         }
