@@ -24,9 +24,13 @@ contract OneInchAdaptorTest is PoolTest {
     uint256 public constant INITIAL_SUPPLY = 2 ether;
     uint256 public constant SWAP_AMT = 1 ether;
     address public user = 0x689EcF264657302052c3dfBD631e4c20d3ED0baB;
+    address public constant ONEINCH_ROUTER_EXECUTOR =
+        0xE37e799D5077682FA0a244D46E5649F71457BD09;
+    address payable public constant SUSHI_SWAP =
+        payable(0x397FF1542f962076d0BFE58eA045FfA2d347ACa0);
 
     function setUp() external {
-        require(shouldTestRun(), "UniswapV3AdaptorTest: Chain not supported");
+        require(shouldTestRun(), "OneInchAdaptorTest: Chain not supported");
         _setUp();
 
         iWETH = IWToken(WETH);
@@ -37,14 +41,9 @@ contract OneInchAdaptorTest is PoolTest {
         /// @dev update convert req fixture with this adaptor addr as `to`
         console.log("OneInch adaptor deployed:", address(oneInchAdaptor));
 
-        // Whitelist the hardcoded adaptor address used in fixture ZK proofs
-        // and etch the dynamically deployed adaptor's runtime code at that address
-        address fixtureAdaptorAddr = 0xbF71c5Ae43827387dAAF7358acAB5C81642b74b8;
-        vm.etch(fixtureAdaptorAddr, address(oneInchAdaptor).code);
-
         address poolOwner = pool.owner();
         vm.prank(poolOwner);
-        pool.addAdaptorSupport(fixtureAdaptorAddr, true);
+        pool.addAdaptorSupport(address(oneInchAdaptor), true);
         deal(WETH, user, INITIAL_SUPPLY);
 
         // iWETH.approve(address(pool), INITIAL_SUPPLY); // depositing weth to pool
@@ -62,10 +61,26 @@ contract OneInchAdaptorTest is PoolTest {
     }
 
     function test1InchAdpDirectly() public {
+        SwapDescription memory swapDesc = SwapDescription({
+            srcToken: IERC20(WETH),
+            dstToken: IERC20(USDC),
+            srcReceiver: SUSHI_SWAP,
+            dstReceiver: payable(address(oneInchAdaptor)),
+            amount: SWAP_AMT,
+            minReturnAmount: 500_000_000, // 5 USDC
+            flags: 0
+        });
+
         // swap amount is 1 ether
         // function sign (first 4 bytes of calldata) is 0x7b8e4e42 is trimmed.
-        bytes
-            memory oneInchCalldata = hex"000000000000000000000000e37e799d5077682fa0a244d46e5649f71457bd09000000000000000000000000c02aaa39b223fe8d0a0e5c4f27ead9083c756cc2000000000000000000000000a0b86991c6218b36c1d19d4a2e9eb0ce3606eb48000000000000000000000000397ff1542f962076d0bfe58ea045ffa2d347aca0000000000000000000000000bf71c5ae43827387daaf7358acab5c81642b74b80000000000000000000000000000000000000000000000000de0b6b3a7640000000000000000000000000000000000000000000000000000000000007b4070cc00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000120000000000000000000000000000000000000000000000000000000000000009f00000000000000000000000000000000000000000000000000008100001a0020d6bdbf78c02aaa39b223fe8d0a0e5c4f27ead9083c756cc200206ae4071138002dc6c0397ff1542f962076d0bfe58ea045ffa2d347aca0111111125421ca6dc452d289314280a0f8842a650000000000000000000000000000000000000000000000000000000000000001c02aaa39b223fe8d0a0e5c4f27ead9083c756cc20006d4e6c5";
+        bytes memory oneInchCalldata = abi.encode(
+            ONEINCH_ROUTER_EXECUTOR, // executor
+            swapDesc,
+            hex"00000000000000000000000000000000000000000000000000008100001a0020d6bdbf78c02aaa39b223fe8d0a0e5c4f27ead9083c756cc200206ae4071138002dc6c0397ff1542f962076d0bfe58ea045ffa2d347aca0111111125421ca6dc452d289314280a0f8842a650000000000000000000000000000000000000000000000000000000000000001c02aaa39b223fe8d0a0e5c4f27ead9083c756cc2" // permit data
+        );
+
+        // bytes
+        //     memory oneInchCalldata = hex"000000000000000000000000e37e799d5077682fa0a244d46e5649f71457bd09000000000000000000000000c02aaa39b223fe8d0a0e5c4f27ead9083c756cc2000000000000000000000000a0b86991c6218b36c1d19d4a2e9eb0ce3606eb48000000000000000000000000397ff1542f962076d0bfe58ea045ffa2d347aca0000000000000000000000000bf71c5ae43827387daaf7358acab5c81642b74b80000000000000000000000000000000000000000000000000de0b6b3a7640000000000000000000000000000000000000000000000000000000000007b4070cc00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000120000000000000000000000000000000000000000000000000000000000000009f00000000000000000000000000000000000000000000000000008100001a0020d6bdbf78c02aaa39b223fe8d0a0e5c4f27ead9083c756cc200206ae4071138002dc6c0397ff1542f962076d0bfe58ea045ffa2d347aca0111111125421ca6dc452d289314280a0f8842a650000000000000000000000000000000000000000000000000000000000000001c02aaa39b223fe8d0a0e5c4f27ead9083c756cc20006d4e6c5";
 
         uint24[] memory inAssetIds = new uint24[](1);
         inAssetIds[0] = pool.getAsset(WETH).id;

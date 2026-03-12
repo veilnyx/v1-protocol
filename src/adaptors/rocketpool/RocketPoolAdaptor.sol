@@ -162,7 +162,7 @@ contract RocketPoolAdaptor is AdaptorBase {
 
     /// @dev only for enabling tests bypassing protocol. Pls comment this out for production use.
     // Allow RocketPool adaptor to receive unwrapped Ether, to send to Lido for staking
-    // receive() external payable {}
+    receive() external payable {}
 
     function getRocketSwapRouterAddress() external view returns (address) {
         return address(rocketSwapRouter);

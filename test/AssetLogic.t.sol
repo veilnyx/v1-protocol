@@ -11,6 +11,12 @@ contract AssetLogicTest is Test {
     address public t3 = address(3);
     uint8 public precision = 18;
 
+    function setUp() public {
+        vm.mockCall(t1, abi.encodeWithSignature("decimals()"), abi.encode(precision));
+        vm.mockCall(t2, abi.encodeWithSignature("decimals()"), abi.encode(precision));
+        vm.mockCall(t3, abi.encodeWithSignature("decimals()"), abi.encode(precision));
+    }
+
     mapping(address => uint24) internal _assetIds;
     mapping(uint24 => Asset) internal _assets;
     uint16 internal _counter;

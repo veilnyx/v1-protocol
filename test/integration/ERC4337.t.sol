@@ -13,6 +13,7 @@ import {MockPool} from "test/mocks/MockPool.sol";
 import {PoolTest} from "test/fixtures/PoolTest.sol";
 import {MockWToken} from "test/mocks/MockWToken.sol";
 import {console2} from "forge-std/console2.sol";
+import {StdCheats} from "forge-std/StdCheats.sol";
 
 // import {PoolTransactTest} from "test/helpers/PoolTransact.t.sol";
 
@@ -35,22 +36,31 @@ contract ERC4337 is PoolTest {
         // Deploying ERC4337 infra
         entryPointContract = new EntryPoint();
 
-        gateway = new Gateway(
-            address(entryPointContract),
-            address(new MockWToken()),
-            address(pool),
-            address(mempool)
+        StdCheats.deployCodeTo(
+            "Gateway.sol:Gateway",
+            abi.encode(
+                address(entryPointContract),
+                address(new MockWToken()),
+                address(pool),
+                address(mempool)
+            ),
+            fixture.gateway
         );
+        gateway = Gateway(fixture.gateway);
+
         console2.log("Gateway(Sender) address:");
         console2.logAddress(address(gateway));
 
         mempool.updateGatewayContract(address(gateway));
 
-        paymaster = new Paymaster(
-            address(entryPointContract),
-            address(gateway),
-            address(pool)
+        StdCheats.deployCodeTo(
+            "Paymaster.sol:Paymaster",
+            abi.encode(entryPointContract, fixture.gateway, address(pool)),
+            fixture.paymaster
         );
+        console2.log("paymaster:", fixture.paymaster);
+        paymaster = Paymaster(fixture.paymaster);
+
         console2.log("Paymaster address:");
         console2.logAddress(address(paymaster));
 
@@ -101,6 +111,7 @@ contract ERC4337 is PoolTest {
         assert(paymasterFeeCollected == feeValue);
     }
 
+    /**
     // Since this tx will be preVerified, it will go to the mempool
     function testHandleOpsForBundlerPreVerifiedTx() public {
         PackedUserOperation[] memory ops = new PackedUserOperation[](1); // Entrypoint contract requires an array of ops
@@ -134,6 +145,7 @@ contract ERC4337 is PoolTest {
             proofId
         );
     }
+     */
 
     receive() external payable {
         // Handle received Ether

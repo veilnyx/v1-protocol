@@ -3,6 +3,7 @@ pragma solidity ^0.8.24;
 
 import {Test} from "forge-std/Test.sol";
 import {console2} from "forge-std/console2.sol";
+import {StdCheats} from "forge-std/StdCheats.sol";
 import {EntryPoint} from "@account-abstraction/contracts/core/EntryPoint.sol";
 import {PackedUserOperation} from "@account-abstraction/contracts/interfaces/PackedUserOperation.sol";
 import {Gateway} from "src/core/Gateway.sol";
@@ -12,13 +13,22 @@ import {Asset, AssetType} from "src/libraries/Asset.sol";
 import {ShieldedTransaction, ShieldedTransactionType} from "src/libraries/ShieldedTransaction.sol";
 import {PreVerificationDetails, Mempool} from "src/core/Mempool.sol";
 import {MockWToken} from "test/mocks/MockWToken.sol";
+import {Fixture, FixtureLib} from "test/fixtures/Fixture.sol";
 
 contract MockPool {
-    function transact(ShieldedTransaction calldata) external {
+    uint256 constant DEPOSIT_VALUE = 100 ether;
+    address mockWTokenAddress;
+
+    function transact(ShieldedTransaction calldata, bool) external {
         // Simulate gas usage
         for (uint256 i = 0; i < 10; i++) {
             new MockWToken();
         }
+        IWToken(mockWTokenAddress).transferFrom(
+            msg.sender,
+            address(this),
+            DEPOSIT_VALUE
+        );
     }
 
     function getAsset(uint24 assetId) external returns (Asset memory) {
@@ -31,6 +41,10 @@ contract MockPool {
         });
 
         return feeAsset;
+    }
+
+    function setMockWTokenAddress(address wToken) external {
+        mockWTokenAddress = wToken;
     }
 }
 
@@ -56,35 +70,41 @@ contract GatewayTest is Test {
     uint128 baseFee = 2 gwei;
     uint24 assetId = 65537;
     uint256 paymasterFeeValue = 0.1 ether;
+    uint256 constant DEPOSIT_VALUE = 100 ether;
 
     function setUp() public {
         entryPoint = new EntryPoint();
         pool = new MockPool();
         mempool = new MockMempool();
         wToken = address(new MockWToken());
+        pool.setMockWTokenAddress(wToken);
         gateway = new Gateway(
             address(entryPoint),
             address(wToken),
             address(pool),
             address(mempool)
         );
-        paymaster = new Paymaster(
-            address(entryPoint),
-            address(gateway),
-            address(pool)
+        Fixture memory fixture = FixtureLib.load(vm);
+
+        StdCheats.deployCodeTo(
+            "Paymaster.sol:Paymaster",
+            abi.encode(entryPoint, address(gateway), address(pool)),
+            fixture.paymaster
         );
+        console2.log("paymaster:", fixture.paymaster);
+        paymaster = Paymaster(fixture.paymaster);
 
         // Deposit to entry point
-        vm.deal(address(this), 100 ether);
-        paymaster.depositToEntryPoint{value: 100 ether}();
+        vm.deal(address(this), DEPOSIT_VALUE);
+        paymaster.depositToEntryPoint{value: DEPOSIT_VALUE}();
         paymaster.setChainlinkFeed(assetId, address(0));
     }
 
     function test_handleWrapAndDeposit() public {
-        vm.deal(address(this), 100 ether);
+        vm.deal(address(this), DEPOSIT_VALUE);
         ShieldedTransaction memory stx;
         stx.txType = ShieldedTransactionType.DEPOSIT;
-        gateway.handleWrapAndDeposit{value: 100 ether}(stx);
+        gateway.handleWrapAndDeposit{value: DEPOSIT_VALUE}(stx);
     }
 
     function test_handleUserOp() public {

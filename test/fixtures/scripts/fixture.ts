@@ -52,6 +52,8 @@ export const USER_OP_PRE_VERIFICATION_GAS = BigInt(75_000);
 export const USER_OP_MAX_FEE_PER_GAS = BigInt(150_000_000);
 export const USER_OP_MAX_PRIORITY_FEE_PER_GAS = BigInt(150_000_000);
 export const USER_OP_PAYMASTER_VERIFICATION_GAS = BigInt(50_000);
+export const PAYMASTER_ADDR_FIXTURE = config.paymaster;
+export const GATEWAY_ADDR_FIXTURE = config.gateway;
 
 const assets = {
   weth: config.assets.weth,
@@ -59,7 +61,8 @@ const assets = {
   reentrantToken: config.assets.reentrantToken,
   testnetWeth: config.assets.testnetWeth,
   testnetUsdc: config.assets.testnetUsdc,
-  morphoVaultToken: config.assets.morphoVaultToken,
+  testnetUsdt: config.assets.testnetUsdt,
+  testnetCrvUsd: config.assets.testnetCrvUsd,
 };
 
 const revokerPublicKey = Point.fromAffine({
@@ -200,7 +203,7 @@ const generateTestAddressRegistration = async (
   name: string,
   sdk: Core
 ) => {
-  const zaddrReg = await sdk.proveAddress("0x");
+  const zaddrReg = await sdk.proveAddress("0x"); // signature will be generated inside the protocol test setup `_getRegisterAddressSignature` function, so passing dummy data here
   const encoded = zaddrReg.encode();
   writeFileSync(`${dirFixtureData}/${name}.txt`, encoded);
 };
@@ -323,7 +326,7 @@ export const generatePackedUserOps = async (name: string, req: TransactionReques
 
   // Generating user op
   const userOp: UserOperation<"v0.7"> = {
-    sender: `0x${"F3d8f3B185d1448BD3f3762b6cCF7F129bC21fDB"}` as `0x${string}`, // make sure this matches the Gateway address from solidity test setup
+    sender: GATEWAY_ADDR_FIXTURE as `0x${string}`, // make sure this matches the Gateway address from solidity test setup
     nonce: BigInt(nonce),
     factory: undefined,
     factoryData: "0x",
@@ -333,7 +336,7 @@ export const generatePackedUserOps = async (name: string, req: TransactionReques
     preVerificationGas: USER_OP_PRE_VERIFICATION_GAS,
     maxFeePerGas: USER_OP_MAX_FEE_PER_GAS,
     maxPriorityFeePerGas: USER_OP_MAX_FEE_PER_GAS,
-    paymaster: `0x${"C141A1Fc167930FA8E1448BdC7Cea9C7a13C1021"}` as `0x${string}`, // make sure this matches the Paymaster address from solidity test setup
+    paymaster: PAYMASTER_ADDR_FIXTURE as `0x${string}`, // make sure this matches the Paymaster address from solidity test setup
     paymasterVerificationGasLimit: USER_OP_PAYMASTER_VERIFICATION_GAS,
     paymasterPostOpGasLimit: BigInt(5),
     paymasterData: "0x",

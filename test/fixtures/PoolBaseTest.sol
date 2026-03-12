@@ -8,6 +8,7 @@ import {Pool, InitAddressParams} from "src/core/Pool.sol";
 import {MESSAGE_REGISTER_ADDRESS, EIP712_DOMAIN_NAME, EIP712_DOMAIN_VERSION, EIP712_TYPEHASH_REGISTER_ADDRESS} from "src/base/Constants.sol";
 import {VerifierTransact21} from "src/verifiers/VerifierTransact21.sol";
 import {VerifierTransact22} from "src/verifiers/VerifierTransact22.sol";
+import {VerifierTransact23} from "src/verifiers/VerifierTransact23.sol";
 import {VerifierRegister} from "src/verifiers/VerifierRegister.sol";
 import {VerifierTreeUpdate} from "src/verifiers/VerifierTreeUpdate.sol";
 import {Verifier, TransactionVerifierInfo} from "src/core/Verifier.sol";
@@ -45,10 +46,11 @@ contract PoolBaseTest is BaseTest {
 
         VerifierTransact21 vt21 = new VerifierTransact21();
         VerifierTransact22 vt22 = new VerifierTransact22();
+        VerifierTransact23 vt23 = new VerifierTransact23();
         VerifierRegister vr = new VerifierRegister();
         VerifierTreeUpdate vTreeUpdate = new VerifierTreeUpdate();
         TransactionVerifierInfo[] memory vInfos = new TransactionVerifierInfo[](
-            2
+            3
         );
         vInfos[0] = TransactionVerifierInfo({
             id: 21,
@@ -60,6 +62,12 @@ contract PoolBaseTest is BaseTest {
             addr: address(vt22),
             selector: vt22.verifyProof.selector
         });
+        vInfos[2] = TransactionVerifierInfo({
+            id: 23,
+            addr: address(vt23),
+            selector: vt23.verifyProof.selector
+        });
+
         verifier = new Verifier(vInfos, address(vr), address(vTreeUpdate));
         adaptorHandler = new AdaptorHandler();
 
@@ -75,7 +83,7 @@ contract PoolBaseTest is BaseTest {
             adaptorHandler: address(adaptorHandler),
             screener: address(screener),
             hasher: address(hasher),
-            verificationTrackerService: makeAddr('zkVerificationTrackerService')
+            verificationTrackerService: makeAddr("zkVerificationTrackerService")
         });
 
         bytes memory initData = abi.encodeCall(

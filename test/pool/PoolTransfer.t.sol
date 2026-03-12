@@ -48,6 +48,29 @@ contract PoolTransferTest is PoolTest {
         uint256 balance2 = token2.balanceOf(address(pool));
 
         ShieldedTransaction memory stx = _loadShieldedTransaction(
+            "transfer_1000_weth_with_usdc_fee"
+        );
+        uint24 feeAssetId = uint24(stx.feeData >> 72);
+        uint72 feeValue = uint72(stx.feeData);
+        address paymaster = address(bytes20(bytes32(stx.feeData)));
+
+        _checkEventEmits(stx);
+
+        vm.prank(paymaster);
+        uint256 paymasterFee = pool.getCollectedPaymasterFee(
+            feeAssetId,
+            paymaster
+        );
+        assertEq(token1.balanceOf(address(pool)), balance1);
+        assertEq(token2.balanceOf(address(pool)), balance2);
+        assertEq(paymasterFee, feeValue);
+    }
+
+    function test_transferWethWithUsdcFeeWithThreeOutputNotes() public {
+        uint256 balance1 = token1.balanceOf(address(pool));
+        uint256 balance2 = token2.balanceOf(address(pool));
+
+        ShieldedTransaction memory stx = _loadShieldedTransaction(
             "transfer_500_weth_with_usdc_fee"
         );
         uint24 feeAssetId = uint24(stx.feeData >> 72);

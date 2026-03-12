@@ -118,14 +118,20 @@ export const getSDKInstance = async () => {
     const requiredPrefundInETH = options.requiredPrefundEth;
     const ethInUSD: bigint = parseUnits("4000", 6);
 
-    console.log("getUserOpFee:: requiredPrefundInETH", requiredPrefundInETH.toString());
-    console.log("getUserOpFee:: requiredPrefundInETHInUSDC", ((requiredPrefundInETH * ethInUSD) / parseEther("1")));
-
-    // assuming the fee asset is USDC
-    if (feeAssetId == Number(0x010002)) {
+    // assuming the fee asset is USDC, if not ETH (token1, testnetETH)
+    // fixture token ids:
+    // ETH = 65537
+    // USDC = 65538
+    // reentranceToken = 65539
+    // testnetETH = 65540
+    // testnetUSDC = 65541
+    // any other tokens required for testing adaptors from 65542 and onwards..
+    if (feeAssetId == 65538 || feeAssetId == 65541) {
       return ((requiredPrefundInETH * ethInUSD) / parseEther("1"));
-    } else {
+    } else if (feeAssetId == 65537 || feeAssetId == 65540) {
       return requiredPrefundInETH;
+    } else {
+      throw new Error(`fixture::sdk.ts::Unsupported fee asset id: ${feeAssetId} by the test setup. Please use USDC (65538 or 65541) or ETH (65537 or 65540) as fee asset in the test cases.`);
     }
   }
 

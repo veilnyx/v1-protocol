@@ -17,15 +17,15 @@ contract BeefyAdaptorTest is PoolTest {
 
     BeefyAdp beefyAdp;
     address public constant wantLPToken =
-        0xdAC17F958D2ee523a2206206994597C13D831ec7;
+        0x72310DAAed61321b02B08A547150c07522c6a976; // USDT
     address public constant mooToken =
-        0x9AbD7F0782CDe1DBd1F0519C35c961b6A724c2a5;
+        0x0014E0be19De3118b5b29842dd1696a2A98EB9Db;
     address public constant beefyVault =
-        0x9AbD7F0782CDe1DBd1F0519C35c961b6A724c2a5;
+        0x0014E0be19De3118b5b29842dd1696a2A98EB9Db;
     address public user = 0x689EcF264657302052c3dfBD631e4c20d3ED0baB;
     uint256 public constant INITIAL_SUPPLY = 2 ether;
-    uint256 public constant WITHDRAW_MOO_AMT = 989569;
-    uint256 public constant USDT_SUPPLY = 1e6;
+    uint256 public constant WITHDRAW_MOO_AMT = 2 ether;
+    uint256 public constant WANT_LP_TOKEN_SUPPLY = 1 ether;
 
     function setUp() external {
         require(shouldTestRun(), "BeefyAdpTest: Chain not supported");
@@ -52,7 +52,7 @@ contract BeefyAdaptorTest is PoolTest {
         assetAddresses[1] = mooToken;
 
         uint8[] memory assetsPrecision = new uint8[](2);
-        assetsPrecision[0] = 6;
+        assetsPrecision[0] = 18;
         assetsPrecision[1] = 18;
 
         pool.addAssets(assetType, assetAddresses, assetsPrecision);
@@ -88,7 +88,8 @@ contract BeefyAdaptorTest is PoolTest {
         // assertGreaterThan(mooTokenBal, 0);
     }
 
-    function testWithdrawInBeefyVault() public {
+    // @todo failing
+    function testWithdrawFromBeefyVault() public {
         console.log("Initiating withdraw on Beefy");
         vm.startPrank(user);
         deal(mooToken, user, INITIAL_SUPPLY);
@@ -101,7 +102,7 @@ contract BeefyAdaptorTest is PoolTest {
         _processCommitmentTreeQueue();
 
         ShieldedTransaction memory supplyInBeefyStx = _loadShieldedTransaction(
-            "supply_2_mooLPToken"
+            "withdraw_2_mooLPToken"
         );
         pool.transact(supplyInBeefyStx, false);
         vm.stopPrank();
@@ -114,14 +115,23 @@ contract BeefyAdaptorTest is PoolTest {
 
     function testDepositInBeefyVaultDirectly() public {
         console.log("Initiating supply on Beefy");
+        deal(wantLPToken, user, WANT_LP_TOKEN_SUPPLY);
+        // Known USDT whale on mainnet
+        // address usdtWhale = 0xF977814e90dA44bFA03b6295A0616a897441aceC; // Binance 8
+
+        // vm.prank(usdtWhale);
+        // IERC20(wantLPToken).safeTransfer(user, WANT_LP_TOKEN_SUPPLY);
+
         vm.startPrank(user);
-        deal(wantLPToken, user, USDT_SUPPLY);
-        IERC20(wantLPToken).safeTransfer(address(beefyAdp), USDT_SUPPLY);
+        IERC20(wantLPToken).safeTransfer(
+            address(beefyAdp),
+            WANT_LP_TOKEN_SUPPLY
+        );
 
         uint24[] memory inAssetIds = new uint24[](1);
         inAssetIds[0] = pool.getAsset(wantLPToken).id;
         uint256[] memory inValues = new uint256[](1);
-        inValues[0] = USDT_SUPPLY;
+        inValues[0] = WANT_LP_TOKEN_SUPPLY;
         bytes memory payload = abi.encode(uint8(0), beefyVault);
 
         // Supplying

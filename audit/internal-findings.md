@@ -209,7 +209,7 @@ function handleAssets(
 ---
 
 ## **Finding 6:**
-### [M-02] Inverted `NCoins` assignment in `CurveNGAdaptor.getLPTokenCount`
+### [L-07] Inverted `NCoins` assignment in `CurveNGAdaptor.getLPTokenCount`
 
 **File:** `src/adaptors/curveNG/CurveNGAdaptor.sol`
 
@@ -236,7 +236,7 @@ try ICurvePool(decodedPayload.curvePool).coins(2) returns (address) {
 
 **Impact:** `getLPTokenCount` will always route 2-coin pools through `_calcLPTokens3CoinPool` and 3-coin pools through `_calcLPTokens2CoinPool`, producing incorrect LP token estimates for every pool type. Any off-chain or on-chain caller relying on this view function for slippage calculation or deposit sizing will receive wrong values.
 
-**Status:** Open — fix pending
+**Status:** Fixed — NCoins assignments corrected to match the logic in `handleAssets`. Tests added `Curve.t.sol::testGetLPTokenCount` and passing.
 
 ---
 

@@ -53,16 +53,15 @@ contract CurveAdaptorTest is PoolTest {
 
         uint8[] memory assetsPrecision = new uint8[](3);
         assetsPrecision[0] = 6;
-        assetsPrecision[1] = 6;
-        assetsPrecision[2] = 6;
+        assetsPrecision[1] = 18;
+        assetsPrecision[2] = 18;
         pool.addAssets(assetType, assetAddresses, assetsPrecision);
-
         vm.stopPrank();
 
-        deal(USDT, user, INITIAL_SUPPLY_USDT);
+        vm.startPrank(user);
+        _dealUSDT(user, INITIAL_SUPPLY_USDT);
         deal(crvUSD, user, INITIAL_SUPPLY_CRVUSD);
 
-        vm.startPrank(user);
         SafeERC20.forceApprove(
             IERC20(USDT),
             address(pool),
@@ -264,6 +263,21 @@ contract CurveAdaptorTest is PoolTest {
         assert(IERC20(crvUSD_USDT_Pool).balanceOf(address(curveAdaptor)) > 0);
     }
 
+    function testGetLPTokenCount() public {
+        uint256[] memory underlyingTokenAmts = new uint256[](2);
+        underlyingTokenAmts[0] = uint256(2);
+        underlyingTokenAmts[1] = uint256(4);
+
+        uint256 lpTokenCount = curveAdaptor.getLPTokenCount(
+            crvUSD_USDT_Pool,
+            underlyingTokenAmts,
+            true
+        );
+
+        console.log("LP token count for 2 USDT and 4 crvUSD:", lpTokenCount);
+        assert(lpTokenCount > 0);
+    }
+
     function _depositInCurve()
         internal
         returns (uint24[] memory, uint256[] memory)
@@ -292,7 +306,21 @@ contract CurveAdaptorTest is PoolTest {
         console.log("Test payload:");
         console.logBytes(payloadEncoded);
 
+        // Re-fund user since initial balance was consumed during setUp deposit
+        _dealUSDT(user, inValues[0]);
+        deal(crvUSD, user, inValues[1]);
+
         vm.startPrank(user);
+        SafeERC20.forceApprove(
+            IERC20(USDT),
+            address(curveAdaptor),
+            inValues[0]
+        );
+        SafeERC20.forceApprove(
+            IERC20(crvUSD),
+            address(curveAdaptor),
+            inValues[1]
+        );
         SafeERC20.safeTransfer(
             IERC20(USDT),
             address(curveAdaptor),
@@ -414,5 +442,16 @@ contract CurveAdaptorTest is PoolTest {
             return false;
         }
         return true;
+    }
+
+    function _dealUSDT(address to, uint256 amount) internal {
+        // USDT balance storage slot is at position 2
+        bytes32 slot = keccak256(abi.encode(to, uint256(2)));
+        vm.store(USDT, slot, bytes32(amount));
+
+        // Also update total supply if needed
+        bytes32 totalSupplySlot = bytes32(uint256(1));
+        uint256 currentSupply = uint256(vm.load(USDT, totalSupplySlot));
+        vm.store(USDT, totalSupplySlot, bytes32(currentSupply + amount));
     }
 }

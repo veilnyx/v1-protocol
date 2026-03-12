@@ -3,5 +3,10 @@
     "audit-context-building@trailofbits": true,
     "ask-questions-if-underspecified@trailofbits": true,
     "building-secure-contracts@trailofbits": true
+  },
+  "permissions": {
+    "allow": [
+      "Bash(~/.foundry/bin/forge test --match-path \"test/Gateway.t.sol\" --match-test \"test_handleWrapAndDeposit\" -vvvv)"
+    ]
   }
 }

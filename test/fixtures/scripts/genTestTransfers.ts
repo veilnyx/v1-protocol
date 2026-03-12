@@ -1,7 +1,7 @@
 import { parseEther, zeroAddress } from "viem";
 import { Core } from "@labyrinthac/core";
 import { TransactionType } from "@labyrinthac/shared-types";
-import { fixture, generateTestTransactions, generateTestTxsWithOutsourcedProofVerification, mockNotes, generatePackedUserOps } from "./fixture";
+import { fixture, generateTestTransactions, generateTestTxsWithOutsourcedProofVerification, mockNotes, generatePackedUserOps, PAYMASTER_ADDR_FIXTURE } from "./fixture";
 
 const {
 	assets: { weth, usdc },
@@ -10,28 +10,55 @@ const {
 } = fixture;
 
 export const reqs = {
-	transfer_500_weth_with_weth_fee: {
-		type: TransactionType.TRANSFER,
-		assetIds: [weth],
-		values: [parseEther("500")],
-		to: receiverAccount.shieldedAddress.pack(),
-		viaBundler: true,
-		paymaster:
-			`0x${"0beEbd452688b33EF0021261d93D3c3A04916598"}` as `0x${string}`,
-		feeAssetId: weth,
-		revokerId: 0,
-	}
-	/**,
 	transfer_20_weth_with_weth_fee: {
 		type: TransactionType.TRANSFER,
 		assetIds: [weth],
 		values: [parseEther("20")],
 		to: receiverAccount.shieldedAddress.pack(),
 		viaBundler: true,
-		paymaster:
-			`0x${"C141A1Fc167930FA8E1448BdC7Cea9C7a13C1021"}` as `0x${string}`, // make sure this matches the Paymaster address from solidity test setup
+		paymaster: PAYMASTER_ADDR_FIXTURE as `0x${string}`,
 		feeAssetId: weth,
 		revokerId: 0
+	}/**,
+	transfer_500_weth_with_usdc_fee: {
+		type: TransactionType.TRANSFER,
+		assetIds: [weth],
+		values: [parseEther("500")], // transfer partial WETH note to gen 3rd change note (USDC change + WETH change + WETH receiver = 3 outputs = transact24/transact44 circuits test)
+		to: receiverAccount.shieldedAddress.pack(),
+		viaBundler: true,
+		paymaster: PAYMASTER_ADDR_FIXTURE as `0x${string}`,
+		feeAssetId: usdc,
+		revokerId: 0,
+	},
+	transfer_500_weth_without_fee: {
+		type: TransactionType.TRANSFER,
+		assetIds: [weth],
+		values: [parseEther("500")],
+		feeAssetId: 0,
+		to: receiverAccount.shieldedAddress.pack(),
+		viaBundler: false,
+		paymaster: zeroAddress,
+		revokerId: 0,
+	},
+	transfer_1000_weth_with_usdc_fee: {
+		type: TransactionType.TRANSFER,
+		assetIds: [weth],
+		values: [parseEther("10000")], // transfer full WETH note to avoid 3rd change note (only USDC change + WETH receiver = 2 outputs = transact22)
+		to: receiverAccount.shieldedAddress.pack(),
+		viaBundler: true,
+		paymaster: PAYMASTER_ADDR_FIXTURE as `0x${string}`,
+		feeAssetId: usdc,
+		revokerId: 0,
+	},
+	transfer_500_weth_with_weth_fee: {
+		type: TransactionType.TRANSFER,
+		assetIds: [weth],
+		values: [parseEther("500")],
+		to: receiverAccount.shieldedAddress.pack(),
+		viaBundler: true,
+		paymaster: PAYMASTER_ADDR_FIXTURE as `0x${string}`,
+		feeAssetId: weth,
+		revokerId: 0,
 	},
 	transfer_20_weth_without_fee: {
 		type: TransactionType.TRANSFER,
@@ -43,18 +70,27 @@ export const reqs = {
 		paymaster: zeroAddress,
 		revokerId: 0,
 	},
-	transfer_500_weth_with_usdc_fee: {
+	transfer_1000_weth_with_usdc_fee: {
 		type: TransactionType.TRANSFER,
 		assetIds: [weth],
 		values: [parseEther("500")],
 		to: receiverAccount.shieldedAddress.pack(),
 		viaBundler: true,
-		paymaster:
-			`0x${"03E98aE18908eBc2Fe82e646E4DFB628963383c1"}` as `0x${string}`,
+		paymaster: PAYMASTER_ADDR_FIXTURE as `0x${string}`,
 		feeAssetId: usdc,
 		revokerId: 0,
 	},
-   */
+	transfer_500_weth_without_fee: {
+		type: TransactionType.TRANSFER,
+		assetIds: [weth],
+		values: [parseEther("500")],
+		feeAssetId: 0,
+		to: receiverAccount.shieldedAddress.pack(),
+		viaBundler: false,
+		paymaster: zeroAddress,
+		revokerId: 0,
+	}
+	*/
 };
 
 export const genTestTransfers = async (sdk: Core) => {
