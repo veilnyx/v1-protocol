@@ -5,8 +5,8 @@
   "scripts": {
     "clean": "rm -rf cache out",
     "build": "forge build",
-    "test": "forge test",
-    "coverage": "forge coverage --ir-minimum",
+    "test": "source .env && forge test --fork-url $RPC_ETHEREUM_MAINNET",
+    "coverage": "source .env && forge coverage --no-match-coverage \"(script|test)/.*\" --fork-url $RPC_ETHEREUM_MAINNET --report summary",
     "test:prepare": "ts-node test/fixtures/scripts/index.ts",
     "genAdpPayload": "forge script script/setup/GenerateAdaptorPayload.s.sol:GenerateAdaptorPayload",
     "deploy:test": "cross-env HARDHAT_FORK=true hardhat run script/deploy.ts --network hardhat",

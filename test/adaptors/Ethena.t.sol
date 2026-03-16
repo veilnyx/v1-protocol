@@ -22,7 +22,10 @@ contract EthenaAdaptorTest is PoolTest {
     address public user = 0x689EcF264657302052c3dfBD631e4c20d3ED0baB;
 
     function setUp() external {
-        require(shouldTestRun(), "EthenaAdaptorTest: Chain not supported");
+        if (!shouldTestRun()) {
+            vm.skip(true);
+        }
+
         PoolTest._setUp();
 
         // deploying Ethena adaptor

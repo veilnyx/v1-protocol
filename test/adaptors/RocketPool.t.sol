@@ -37,7 +37,10 @@ contract RocketPoolAdpTest is PoolTest {
     address fixtureAdaptorAddr = 0xbF71c5Ae43827387dAAF7358acAB5C81642b74b8;
 
     function setUp() external {
-        require(shouldTestRun(), "RocketPoolAdpTest: Chain not supported");
+        if(!shouldTestRun()) {
+            vm.skip(true);
+        }
+        
         _setUp();
 
         // deploying Uniswap adaptor
@@ -153,7 +156,7 @@ contract RocketPoolAdpTest is PoolTest {
 
     /// @dev Only allowing RocketPool tests to run on Holesky testnet and ETH mainnet. More chains can be added.
     function shouldTestRun() internal view returns (bool) {
-        if (block.chainid != 17000 && block.chainid != 1) {
+        if ( /* block.chainid != 17000 && */ block.chainid != 1) {
             console.log(
                 "Skipping RocketPool adaptor tests on the current chain as RocketPool protocol may not be deployed. To run RocketPool tests, kindly run the tests on the Tenderly Mainnet/Mainnet fork where RocketPool is deployed."
             );

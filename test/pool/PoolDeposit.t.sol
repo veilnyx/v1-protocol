@@ -31,7 +31,7 @@ contract PoolDepositTest is PoolTest {
     }
 
     function test_weth_testnet_deposit() public {
-        if (block.chainid != ETH_SEPOLIA) {
+        if (block.chainid != ETH_SEPOLIA && block.chainid != 1) {
             vm.skip(true);
         }
         address testnet_weth = config.wToken();

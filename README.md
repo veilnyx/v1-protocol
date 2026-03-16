@@ -46,14 +46,15 @@ pnpm test:prepare
 
 This runs `test/fixtures/scripts/index.ts` which generates encoded `ShieldedTransaction` fixtures under `test/fixtures/data/`. The script uses the `@labyrinthac/core` SDK to produce real ZK proofs — expect it to take a few minutes.
 
-> **Note:** The fixture generation script is selective. Open `test/fixtures/scripts/index.ts` to see which fixture groups are active and uncomment those you need.
+> **Note:** The fixture generation script is selective. Open `test/fixtures/scripts/index.ts` to see which fixture groups are active and uncomment those you need. We have updated all tx fixtures, so running this should not be required.
 
 ### Run all tests
+Running tests on Ethereum Mainnet fork is required for DeFi adaptor tests to work, since not all DeFi protocols are deployed on testnet. 
 
 ```bash
 pnpm test
 # or
-forge test
+source .env && forge test --fork-url $RPC_ETHEREUM_MAINNET
 ```
 
 ### Run a specific test file
@@ -68,15 +69,15 @@ forge test --match-contract PoolDepositTest -vvv
 forge test --match-test testDeposit -vvv
 ```
 
-### Fork tests (adaptor tests)
+### Fork tests (DeFi adaptor tests)
 
-Adaptor tests (e.g. Aave, Lido) require a mainnet or testnet fork and will be skipped automatically when run without one. Pass the relevant RPC URL via `--fork-url`:
+Adaptor tests (e.g. Aave, Lido) require a mainnet fork and will be skipped automatically when run without one. Pass the relevant RPC URL via `--fork-url`:
 
 ```bash
 source .env && forge test --match-contract AaveAdaptorTest --fork-url "$RPC_ETHEREUM_MAINNET" -vvv
 ```
 
-### Test structure
+## Test structure
 
 | Directory | Coverage |
 |---|---|
@@ -84,6 +85,11 @@ source .env && forge test --match-contract AaveAdaptorTest --fork-url "$RPC_ETHE
 | `test/adapters/` | DeFi adaptor integrations (require fork) |
 | `test/integration/` | ERC-4337 account abstraction flow |
 | `test/*.t.sol` | Unit tests for libraries and peripheral contracts |
+
+### Test Coverage
+```bash
+source .env && forge coverage --no-match-coverage "(script|test)/.*" --fork-url $RPC_ETHEREUM_MAINNET --report lcov --report summary
+```
 
 ## Deployment
 

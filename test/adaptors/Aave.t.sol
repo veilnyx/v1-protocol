@@ -33,7 +33,10 @@ contract AaveAdaptorTest is PoolTest {
         0x252231882FB38481497f3C767469106297c8d93b;
 
     function setUp() external {
-        require(shouldTestRun(), "AaveAdaptorTest: Chain not supported");
+        if(!shouldTestRun()) {
+            vm.skip(true);
+        }
+        
         PoolTest._setUp();
 
         // deploying aave adaptor

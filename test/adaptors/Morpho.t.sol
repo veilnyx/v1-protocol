@@ -26,7 +26,10 @@ contract MorphoAdaptorTest is PoolTest {
     uint256 public constant INITIAL_SUPPLY = 2 ether;
 
     function setUp() external {
-        require(shouldTestRun(), "MorphoAdpTest: Chain not supported");
+        if (!shouldTestRun()) {
+            vm.skip(true);
+        }
+
         PoolTest._setUp();
 
         // deploying Ethena adaptor

@@ -6,6 +6,7 @@ import {EntryPoint} from "@account-abstraction/contracts/core/EntryPoint.sol";
 import {PackedUserOperation} from "@account-abstraction/contracts/interfaces/PackedUserOperation.sol";
 import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
 import {Paymaster} from "src/core/Paymaster.sol";
+import {Asset} from "src/libraries/Asset.sol";
 import {ShieldedTransaction, ShieldedTransactionType} from "src/libraries/ShieldedTransaction.sol";
 import {Mempool, PreVerificationDetails} from "src/core/Mempool.sol";
 import {Pool} from "src/core/Pool.sol";
@@ -22,9 +23,12 @@ contract PaymasterTest is PoolTest {
     Gateway public gateway;
     address public constant CHAINLINK_ETH_USDC_FEED_SEPOLIA =
         0x694AA1769357215DE4FAC081bf1f309aDC325306;
+    address public constant CHAINLINK_ETH_USDC_FEED_MAINNET =
+        0x5147eA642CAEF7BD9c1265AadcA78f997AbB9649;
     uint8 public constant ETH_DECIMALS = 18;
     uint8 public constant USDC_DECIMALS = 6;
     uint256 public constant ETH_SEPOLIA = 11155111;
+    uint256 public constant ETH_MAINNET = 1;
 
     uint24 feeAssetId;
     uint256 feeValue = 0.002 ether;
@@ -98,13 +102,26 @@ contract PaymasterTest is PoolTest {
                 asset2.id,
                 CHAINLINK_ETH_USDC_FEED_SEPOLIA
             );
+        } else if (block.chainid == ETH_MAINNET) {
+            // Mainnet
+            paymaster.setChainlinkFeed(
+                asset2.id,
+                CHAINLINK_ETH_USDC_FEED_MAINNET
+            );
         } else {
             paymaster.setChainlinkFeed(asset2.id, address(0));
         }
     }
 
+    function _getEthUsdcFeed() internal view returns (AggregatorV3Interface) {
+        if (block.chainid == ETH_MAINNET) {
+            return AggregatorV3Interface(CHAINLINK_ETH_USDC_FEED_MAINNET);
+        }
+        return AggregatorV3Interface(CHAINLINK_ETH_USDC_FEED_SEPOLIA);
+    }
+
     function test_convertFeeFromGasTokenToUSDC() public {
-        if (block.chainid != ETH_SEPOLIA) {
+        if (block.chainid != ETH_SEPOLIA && block.chainid != ETH_MAINNET) {
             vm.skip(true);
         }
 
@@ -116,15 +133,15 @@ contract PaymasterTest is PoolTest {
             feeAssetIdUSDC
         );
 
-        // assertion
-        AggregatorV3Interface feed = AggregatorV3Interface(
-            CHAINLINK_ETH_USDC_FEED_SEPOLIA
-        );
+        AggregatorV3Interface feed = _getEthUsdcFeed();
+
         (, int256 ethInUSDC, , , ) = feed.latestRoundData();
         uint8 feedDecimals = feed.decimals();
 
-        uint256 expectedFeeValueInUSDC = ((feeValueInEth * uint256(ethInUSDC)) /
-            10 ** (ETH_DECIMALS + feedDecimals)) * 10 ** USDC_DECIMALS;
+        uint256 expectedFeeValueInUSDC = (feeValueInEth *
+            uint256(ethInUSDC) *
+            10 ** USDC_DECIMALS) / 10 ** (ETH_DECIMALS + feedDecimals);
+
         assertEq(feeValueInUSDC, expectedFeeValueInUSDC);
     }
 
@@ -159,13 +176,14 @@ contract PaymasterTest is PoolTest {
     function test_revert_convertFeeFromGasTokenToFeeAsset_whenFeeAssetNotSupport()
         public
     {
+        Asset memory asset3 = pool.getAsset(address(tokenReent));
         vm.expectRevert(
             abi.encodeWithSelector(
                 Paymaster.AssetNotSupportedAsFeeAsset.selector,
-                asset2.id
+                asset3.id
             )
         );
-        paymaster.convertFeeFromGasTokenToFeeAsset(1 ether, asset2.id);
+        paymaster.convertFeeFromGasTokenToFeeAsset(1 ether, asset3.id);
     }
 
     function test_depositAndWithdrawEntryPoint() public {
@@ -288,22 +306,19 @@ contract PaymasterTest is PoolTest {
         public
         createPackedUserOps(address(gateway))
     {
-        if (block.chainid != ETH_SEPOLIA) {
+        if (block.chainid != ETH_SEPOLIA && block.chainid != ETH_MAINNET) {
             vm.skip(true);
         }
 
-        (, int256 ethInUSDC, , , ) = AggregatorV3Interface(
-            CHAINLINK_ETH_USDC_FEED_SEPOLIA
-        ).latestRoundData();
-
-        uint8 feedDecimals = AggregatorV3Interface(
-            CHAINLINK_ETH_USDC_FEED_SEPOLIA
-        ).decimals();
+        AggregatorV3Interface feed = _getEthUsdcFeed();
+        (, int256 ethInUSDC, , , ) = feed.latestRoundData();
+        uint8 feedDecimals = feed.decimals();
 
         // altering the fee value to be less than the required fee
         uint256 lowFeeValueEth = feeValue / 2;
-        uint256 lowFeeValueUSDC = ((lowFeeValueEth * uint256(ethInUSDC)) /
-            10 ** (ETH_DECIMALS + feedDecimals)) * 10 ** 6;
+        uint256 lowFeeValueUSDC = (lowFeeValueEth *
+            uint256(ethInUSDC) *
+            10 ** USDC_DECIMALS) / 10 ** (ETH_DECIMALS + feedDecimals);
 
         stx.feeData = uint256(
             bytes32(
@@ -322,8 +337,9 @@ contract PaymasterTest is PoolTest {
 
         // calc required fee in USDC
         // convert `feeValue` (in ETH) to USDC
-        uint256 requiredUSDC = ((feeValue * uint256(ethInUSDC)) /
-            10 ** (ETH_DECIMALS + feedDecimals)) * 10 ** USDC_DECIMALS;
+        uint256 requiredUSDC = (feeValue *
+            uint256(ethInUSDC) *
+            10 ** USDC_DECIMALS) / 10 ** (ETH_DECIMALS + feedDecimals);
 
         vm.prank(entryPoint);
         vm.expectRevert(
@@ -423,21 +439,18 @@ contract PaymasterTest is PoolTest {
         public
         createPackedUserOps(address(gateway))
     {
-        if (block.chainid != ETH_SEPOLIA) {
+        if (block.chainid != ETH_SEPOLIA && block.chainid != ETH_MAINNET) {
             vm.skip(true);
         }
 
-        (, int256 ethInUSDC, , , ) = AggregatorV3Interface(
-            CHAINLINK_ETH_USDC_FEED_SEPOLIA
-        ).latestRoundData();
-
-        uint8 feedDecimals = AggregatorV3Interface(
-            CHAINLINK_ETH_USDC_FEED_SEPOLIA
-        ).decimals();
+        AggregatorV3Interface feed = _getEthUsdcFeed();
+        (, int256 ethInUSDC, , , ) = feed.latestRoundData();
+        uint8 feedDecimals = feed.decimals();
 
         // converting `feeValue` in ETH to USDC
-        uint256 feeValueUSDC = ((feeValue * uint256(ethInUSDC)) /
-            10 ** (ETH_DECIMALS + feedDecimals)) * 10 ** 6;
+        uint256 feeValueUSDC = ((feeValue *
+            uint256(ethInUSDC) *
+            10 ** USDC_DECIMALS) / 10 ** (ETH_DECIMALS + feedDecimals));
 
         stx.feeData = uint256(
             bytes32(

@@ -28,7 +28,10 @@ contract BeefyAdaptorTest is PoolTest {
     uint256 public constant WANT_LP_TOKEN_SUPPLY = 1 ether;
 
     function setUp() external {
-        require(shouldTestRun(), "BeefyAdpTest: Chain not supported");
+        if (!shouldTestRun()) {
+            vm.skip(true);
+        }
+
         PoolTest._setUp();
 
         // deploying Ethena adaptor

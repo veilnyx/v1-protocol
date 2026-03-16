@@ -28,10 +28,13 @@ contract UniswapV3AdaptorTest is PoolTest {
     address public user = 0x689EcF264657302052c3dfBD631e4c20d3ED0baB;
 
     function setUp() external {
+        if (!shouldTestRun()) {
+            vm.skip(true);
+        }
+
         VeilnyxDeployer poolImplDeployer = new VeilnyxDeployer();
         poolImplDeployer.run();
 
-        require(shouldTestRun(), "UniswapV3AdaptorTest: Chain not supported");
         _setUp();
 
         iWETH = IWToken(WETH);
@@ -109,7 +112,7 @@ contract UniswapV3AdaptorTest is PoolTest {
 
     /// @dev Only allowing uniswap tests to run on Seplia testnet and ETH mainnet. More chains can be added.
     function shouldTestRun() internal view returns (bool) {
-        if (block.chainid != 11155111 && block.chainid != 1) {
+        if (/* block.chainid != 11155111 && */ block.chainid != 1) {
             console.log(
                 "Skipping Uniswap adaptor tests on the current chain as UniswapV3 protocol may not be deployed. To run Uniswap tests, kindly run the tests on one of the chain forks where UniswapV3 is deployed. Ref: https://docs.uniswap.org/contracts/v3/reference/deployments/"
             );

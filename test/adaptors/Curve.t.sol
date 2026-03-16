@@ -27,7 +27,10 @@ contract CurveAdaptorTest is PoolTest {
         0x390f3595bCa2Df7d23783dFd126427CCeb997BF4;
 
     function setUp() external {
-        require(shouldTestRun(), "CurveAdaptorTest: Chain not supported");
+        if (!shouldTestRun()) {
+            vm.skip(true);
+        }
+
         _setUp();
 
         // deploying Curve adaptor and adding test pool support

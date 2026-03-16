@@ -30,7 +30,10 @@ contract OneInchAdaptorTest is PoolTest {
         payable(0x397FF1542f962076d0BFE58eA045FfA2d347ACa0);
 
     function setUp() external {
-        require(shouldTestRun(), "OneInchAdaptorTest: Chain not supported");
+        if (!shouldTestRun()) {
+            vm.skip(true);
+        }
+
         _setUp();
 
         iWETH = IWToken(WETH);
@@ -105,7 +108,7 @@ contract OneInchAdaptorTest is PoolTest {
 
     /// @dev Only allowing 1Inch tests to run on Seplia testnet and ETH mainnet. More chains can be added.
     function shouldTestRun() internal view returns (bool) {
-        if (block.chainid != 7800 && block.chainid != 1) {
+        if (/*block.chainid != 7800 && */ block.chainid != 1) {
             console.log(
                 "Skipping 1Inch adaptor tests on the current chain as 1Inch protocol may not be deployed. To run 1Inch tests, kindly run the tests on one of the chain forks where 1Inch is deployed."
             );

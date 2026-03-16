@@ -33,7 +33,10 @@ contract LidoAdaptorTest is PoolTest {
     address public user = 0x689EcF264657302052c3dfBD631e4c20d3ED0baB;
 
     function setUp() external {
-        require(shouldTestRun(), "LidoAdaptorTest: Chain not supported");
+        if (!shouldTestRun()) {
+            vm.skip(true);
+        }
+
         _setUp();
 
         iWETH = IWToken(WETH);
@@ -194,8 +197,8 @@ contract LidoAdaptorTest is PoolTest {
     /// @dev Only allowing Lido tests to run on Holesky testnet and ETH mainnet. More chains can be added.
     function shouldTestRun() internal view returns (bool) {
         if (
-            block.chainid != 17000 &&
-            block.chainid != 11155111 &&
+            // block.chainid != 17000 &&
+            // block.chainid != 11155111 &&
             block.chainid != 1
         ) {
             console2.log(
