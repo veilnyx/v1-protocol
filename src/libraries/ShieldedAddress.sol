@@ -9,23 +9,19 @@ import {IVerifier} from "../interfaces/IVerifier.sol";
 import {INebraUpa} from "../interfaces/INebraUpa.sol";
 import {EIP712_TYPEHASH_REGISTER_ADDRESS, MESSAGE_REGISTER_ADDRESS} from "../base/Constants.sol";
 
-// @todo Refactor PreVerificationDetails outside of ShieldedAddressRegistrationData
 struct PreVerificationDetails {
-    bool isPreVerified;
     bytes32 circuitId;
     uint256[] publicInputs;
-    address verifierAddr;
 }
 
-// @todo Refactor preVerification details outside of ShieldedAddressRegistrationData and create a seperate register function for outsourced verification having preVerificationDetails as an seperate argument.
 struct ShieldedAddressRegistrationData {
-    bytes preVerificationDetails;
     bytes proof;
     bytes shieldedAddress; // In uncompressed form
     bytes signature;
 }
 
 error NotPreVerified();
+error NebraVerifierNotSet();
 
 library ShieldedAddressLogic {
     using MerkleTreeLogic for MerkleTree;
@@ -33,7 +29,59 @@ library ShieldedAddressLogic {
     bytes32 constant MASK_PACK =
         hex"8000000000000000000000000000000000000000000000000000000000000000";
 
-    function register(
+    /// @notice Registers a shielded address using a Nebra UPA pre-verified proof.
+    /// @dev `nebraVerifier` is read from PoolStorage to prevent an attacker from
+    ///      supplying a mock verifier address that always returns true.
+    function registerWithNebraVerifier(
+        ShieldedAddressRegistrationData calldata self,
+        PreVerificationDetails calldata preVerifDetails,
+        MerkleTree storage addressTree,
+        mapping(address => uint256) storage publicAddresses,
+        mapping(uint256 => bool) storage rootAddresses,
+        address nebraVerifier,
+        bytes32 hashTypedData
+    ) external {
+        if (nebraVerifier == address(0)) {
+            revert NebraVerifierNotSet();
+        }
+        
+        uint256 rootAddress = uint256(bytes32(self.shieldedAddress[0:32]));
+        _validateShieldedAddressData(self, rootAddress, rootAddresses);
+
+        if (rootAddress != preVerifDetails.publicInputs[0]) {
+            revert IPool.RootAddrMismatch(
+                preVerifDetails.publicInputs[0],
+                rootAddress
+            );
+        }
+
+        bytes32 proofId = keccak256(
+            abi.encode(
+                preVerifDetails.circuitId,
+                preVerifDetails.publicInputs[0],
+                preVerifDetails.publicInputs[1],
+                preVerifDetails.publicInputs[2],
+                preVerifDetails.publicInputs[3],
+                preVerifDetails.publicInputs[4]
+            )
+        );
+
+        if (!INebraUpa(nebraVerifier).isProofVerified(proofId)) {
+            revert NotPreVerified();
+        }
+
+        _insertAddress(
+            self,
+            addressTree,
+            publicAddresses,
+            rootAddresses,
+            hashTypedData,
+            rootAddress
+        );
+    }
+
+    /// @notice Registers a shielded address by verifying the proof on-chain via the Veilnyx verifier.
+    function registerWithVeilnyxVerifier(
         ShieldedAddressRegistrationData calldata self,
         MerkleTree storage addressTree,
         mapping(address => uint256) storage publicAddresses,
@@ -42,54 +90,44 @@ library ShieldedAddressLogic {
         bytes32 hashTypedData
     ) external {
         uint256 rootAddress = uint256(bytes32(self.shieldedAddress[0:32]));
-        PreVerificationDetails memory preVerificationDetailsDecoded = abi
-            .decode(self.preVerificationDetails, (PreVerificationDetails));
+        _validateShieldedAddressData(self, rootAddress, rootAddresses);
 
+        if (!verifyProof(self, verifier)) {
+            revert IPool.InvalidAddressProof();
+        }
+
+        _insertAddress(
+            self,
+            addressTree,
+            publicAddresses,
+            rootAddresses,
+            hashTypedData,
+            rootAddress
+        );
+    }
+
+    function _validateShieldedAddressData(
+        ShieldedAddressRegistrationData calldata self,
+        uint256 rootAddress,
+        mapping(uint256 => bool) storage rootAddresses
+    ) internal view {
         if (rootAddresses[rootAddress]) {
             revert IPool.RootAddressAlreadyRegistered(rootAddress);
         }
-
         /// @dev 160 bytes is the size of a shielded address in unpacked form. Verifier expects input in unpacked form.
         if (self.shieldedAddress.length != 160) {
             revert IPool.BadArguments();
         }
+    }
 
-        if (preVerificationDetailsDecoded.isPreVerified) {
-            // ensure that rootAddr of the proof matches the rootAddr being registered
-            if (rootAddress != preVerificationDetailsDecoded.publicInputs[0]) {
-                revert IPool.RootAddrMismatch(
-                    preVerificationDetailsDecoded.publicInputs[0],
-                    rootAddress
-                );
-            }
-
-            // verifying with Nebra
-            // Step 1: create `proofId` using the validated `publicInputs`
-            bytes32 proofId = keccak256(
-                abi.encode(
-                    preVerificationDetailsDecoded.circuitId,
-                    preVerificationDetailsDecoded.publicInputs[0],
-                    preVerificationDetailsDecoded.publicInputs[1],
-                    preVerificationDetailsDecoded.publicInputs[2],
-                    preVerificationDetailsDecoded.publicInputs[3],
-                    preVerificationDetailsDecoded.publicInputs[4]
-                )
-            );
-
-            // Step 2: check the status of the validated `proofId` generated onchain
-            bool preVerifiedStatus = INebraUpa(
-                preVerificationDetailsDecoded.verifierAddr
-            ).isProofVerified(proofId);
-
-            if (!preVerifiedStatus) {
-                revert NotPreVerified();
-            }
-        } else {
-            if (!verifyProof(self, verifier)) {
-                revert IPool.InvalidAddressProof();
-            }
-        }
-
+    function _insertAddress(
+        ShieldedAddressRegistrationData calldata self,
+        MerkleTree storage addressTree,
+        mapping(address => uint256) storage publicAddresses,
+        mapping(uint256 => bool) storage rootAddresses,
+        bytes32 hashTypedData,
+        uint256 rootAddress
+    ) internal {
         address publicAddress = ECDSA.recover(hashTypedData, self.signature);
 
         if (publicAddresses[publicAddress] != 0) {

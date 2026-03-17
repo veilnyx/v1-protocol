@@ -2,7 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {ShieldedTransaction, ShieldedTransactionType, RevokerData} from "../libraries/ShieldedTransaction.sol";
-import {ShieldedAddressRegistrationData} from "../libraries/ShieldedAddress.sol";
+import {ShieldedAddressRegistrationData, PreVerificationDetails} from "../libraries/ShieldedAddress.sol";
 import {TreeUpdateData} from "../libraries/QueuedMerkleTree.sol";
 import {AssetType, Asset} from "../libraries/Asset.sol";
 import {PoolStorage} from "../base/PoolStorage.sol";
@@ -72,6 +72,7 @@ interface IPool {
     error NoFeeToClaim(address paymaster, uint24 assetId);
     error InvalidSenderForPreverifiedSTX(address sender, address mempool);
     error InvalidWithdrawFeeBps(uint256 feeBps);
+    error PreVerifiedProofRestricted();
 
     /////////////////////////////////////////
     //         ADMIN WRITE METHODS         //
@@ -137,9 +138,13 @@ interface IPool {
 
     /// @notice Registers a new user using their address hash in the protocol.
     /// @notice Can only be called when the contract is not paused.
-    /// @param addressRegData The user's shielded address data including shieled address and proof.
+    /// @param addressRegData The user's shielded address data including shielded address and proof.
+    /// @param preVerifDetails Nebra UPA pre-verification details. Only used when `isPreVerified` is true.
+    /// @param isPreVerified If true, proof verification is outsourced to the Nebra UPA; otherwise verified on-chain by the Veilnyx verifier.
     function registerAddress(
-        ShieldedAddressRegistrationData calldata addressRegData
+        ShieldedAddressRegistrationData calldata addressRegData,
+        PreVerificationDetails calldata preVerifDetails,
+        bool isPreVerified
     ) external;
 
     /// @notice Updates the commitment tree with a queue of leaves. It uses zk proof under the hood to prove the `newRoot` and `newSubtrees` are valid.

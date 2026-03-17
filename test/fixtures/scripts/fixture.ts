@@ -375,10 +375,8 @@ export const generatePackedUserOps = async (name: string, req: TransactionReques
 
     // generating preVerificationDetails obj since required by Gateway contract
     const preVeriDetails: PreVerificationDetails = {
-      isPreVerified: isPreVerified,
       circuitId: bytesToHex(randomBytes(32)),
       publicInputs: [BigInt(0), BigInt(0)],
-      verifierAddr: bytesToHex(randomBytes(20)),
     };
 
     preVerification = new PreVerification(preVeriDetails);

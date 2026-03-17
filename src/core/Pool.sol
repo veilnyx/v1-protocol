@@ -17,7 +17,7 @@ import {PoolStorage} from "../base/PoolStorage.sol";
 import {Asset, AssetType, AssetLogic} from "../libraries/Asset.sol";
 import {MerkleTree, MerkleTreeLogic} from "../libraries/MerkleTree.sol";
 import {QueuedMerkleTree, QueuedMerkleTreeLogic, TreeUpdateData} from "../libraries/QueuedMerkleTree.sol";
-import {ShieldedAddressRegistrationData, ShieldedAddressLogic} from "../libraries/ShieldedAddress.sol";
+import {ShieldedAddressRegistrationData, ShieldedAddressLogic, PreVerificationDetails} from "../libraries/ShieldedAddress.sol";
 import {ShieldedTransaction, ShieldedTransactionLogic, RevokerData} from "../libraries/ShieldedTransaction.sol";
 
 /// @param verifier The address of the verifier contract. Verifier contract verifies the stx's zk proof, address proof and merkle tree queue proof.
@@ -32,6 +32,7 @@ struct InitAddressParams {
     address screener;
     address hasher;
     address verificationTrackerService;
+    address nebraVerifier;
 }
 
 contract Pool is
@@ -49,6 +50,13 @@ contract Pool is
     using ShieldedAddressLogic for ShieldedAddressRegistrationData;
     using ShieldedTransactionLogic for ShieldedTransaction;
 
+    modifier restrictPreVerified(bool isPreVerified) {
+        if (isPreVerified && nebraVerifier == address(0)) {
+            revert PreVerifiedProofRestricted();
+        }
+        _;
+    }
+
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
@@ -58,7 +66,7 @@ contract Pool is
     /// @dev Pool is an UUPSUpgradeable contract, so it needs to be initialized.
     /// @param addressTreeDepth The depth of the address tree.
     /// @param commitmentTreeDepth The depth of the commitment tree.
-
+    /// @param commitmentTreeQueueSize The size of the queue for the commitment tree. This determines how many leaves can be queued at MAX before a tree update is required. Defined by the circuit `treeUpdate::nLeaves`
     function initialize(
         uint8 addressTreeDepth,
         uint8 commitmentTreeDepth,
@@ -80,8 +88,8 @@ contract Pool is
         adaptorHandler = initAddressParams.adaptorHandler;
         hasher = initAddressParams.hasher;
         screener = initAddressParams.screener;
-        verificationTrackerService = initAddressParams
-            .verificationTrackerService;
+        verificationTrackerService = initAddressParams.verificationTrackerService;
+        nebraVerifier = initAddressParams.nebraVerifier;
         withdrawFeeBps = withdrawFeeBps_;
 
         _addressTree.init(addressTreeDepth, hasher);
@@ -202,6 +210,12 @@ contract Pool is
         verificationTrackerService = verificationTrackerService_;
     }
 
+    function updateNebraVerifier(
+        address nebraVerifier_
+    ) external onlyOwner {
+        nebraVerifier = nebraVerifier_;
+    }
+
     /// @notice Sets the protocol version number.
     /// @dev This is used to track the pool contract version since EIP-712 domain
     ///      name and version MUST NOT be changed (see README for critical warnings).
@@ -216,20 +230,34 @@ contract Pool is
     ////////////////////////////////////////
 
     function registerAddress(
-        ShieldedAddressRegistrationData calldata addressRegData
-    ) external whenNotPaused {
-        bytes32 hashStruct = ShieldedAddressLogic.hashRegsiterAddressStruct(
-            addressRegData.shieldedAddress
+        ShieldedAddressRegistrationData calldata addressRegData,
+        PreVerificationDetails calldata preVerifDetails,
+        bool isPreVerified
+    ) external whenNotPaused restrictPreVerified(isPreVerified) {
+        bytes32 hashTypedData = _hashTypedDataV4(
+            ShieldedAddressLogic.hashRegsiterAddressStruct(
+                addressRegData.shieldedAddress
+            )
         );
-        bytes32 hashTypedData = _hashTypedDataV4(hashStruct);
 
-        addressRegData.register({
-            addressTree: _addressTree,
-            publicAddresses: _publicAddresses,
-            rootAddresses: _rootAddresses,
-            verifier: verifier,
-            hashTypedData: hashTypedData
-        });
+        if (isPreVerified) {
+            addressRegData.registerWithNebraVerifier({
+                preVerifDetails: preVerifDetails,
+                addressTree: _addressTree,
+                publicAddresses: _publicAddresses,
+                rootAddresses: _rootAddresses,
+                nebraVerifier: nebraVerifier,
+                hashTypedData: hashTypedData
+            });
+        } else {
+            addressRegData.registerWithVeilnyxVerifier({
+                addressTree: _addressTree,
+                publicAddresses: _publicAddresses,
+                rootAddresses: _rootAddresses,
+                verifier: verifier,
+                hashTypedData: hashTypedData
+            });
+        }
     }
 
     function updateCommitmentTree(
@@ -242,7 +270,7 @@ contract Pool is
     function transact(
         ShieldedTransaction calldata stx,
         bool isPreVerified
-    ) public nonReentrant whenNotPaused {
+    ) public nonReentrant whenNotPaused restrictPreVerified(isPreVerified) {
         // constraining preVerified request sender to just the mempool contract.
         if (isPreVerified) {
             if (msg.sender != mempool) {

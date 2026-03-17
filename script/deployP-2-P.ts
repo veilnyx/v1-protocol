@@ -111,7 +111,8 @@ const main = async () => {
             adaptorHandler: zeroAddress,
             screener: chainParams.sanctionsList,
             hasher: hasher,
-            verificationTrackerService: verificationTrackerService
+            verificationTrackerService: verificationTrackerService,
+            nebraVerifier: chainParams.nebraVerifier,
         }
 
         const args = [

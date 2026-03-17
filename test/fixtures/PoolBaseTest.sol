@@ -77,13 +77,18 @@ contract PoolBaseTest is BaseTest {
         hasher = _deployHasher();
         mempool = _deployMempool();
 
+        address poolNebraVerifier = address(mockNebraVerifier) != address(0)
+            ? address(mockNebraVerifier)
+            : config.nebraVerifier();
+
         InitAddressParams memory initAddressParams = InitAddressParams({
             mempool: address(mempool),
             verifier: address(verifier),
             adaptorHandler: address(adaptorHandler),
             screener: address(screener),
             hasher: address(hasher),
-            verificationTrackerService: makeAddr("zkVerificationTrackerService")
+            verificationTrackerService: makeAddr("zkVerificationTrackerService"),
+            nebraVerifier: poolNebraVerifier
         });
 
         bytes memory initData = abi.encodeCall(

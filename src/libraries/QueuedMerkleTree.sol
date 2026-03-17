@@ -9,7 +9,7 @@ import {IPool} from "../interfaces/IPool.sol";
 struct QueuedMerkleTree {
     uint8 depth;
     uint8 currentRootIndex;
-    uint8 queueSize;
+    uint8 queueSize; // max number of leaves that can be queued before an update is required. This is defined by the circuit `treeUpdate::nLeaves` and is immutable after pool initialization.
     uint40 capacity;
     address hasher;
     address verifier;

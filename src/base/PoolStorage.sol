@@ -42,4 +42,7 @@ abstract contract PoolStorage {
     mapping(uint24 => uint256) internal _proofSubAndMempoolExitFee;
 
     uint64 public version;
+
+    // If nebraVerifier is set to a zero addres, the pool will not allow any preverified proof to be used for either shielded address registration or shielded transactions.
+    address public nebraVerifier;
 }

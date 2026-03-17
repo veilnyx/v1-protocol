@@ -15,6 +15,7 @@ export type ChainParams = {
   initAssetsPrecision: number[];
   initAssetChainlinkFeeds: Hex[];
   initAssetIdsVeilnyx: number[];
+  nebraVerifier: Hex;
 };
 
 export type AdaptorParams = {
@@ -192,7 +193,8 @@ export function loadConfigs() {
       initAssetAddresses,
       initAssetsPrecision,
       initAssetChainlinkFeeds,
-      initAssetIdsVeilnyx
+      initAssetIdsVeilnyx,
+      nebraVerifier,
     } = params as ChainParams;
 
     chainParams[Number(chainId)] = {
@@ -206,6 +208,7 @@ export function loadConfigs() {
       initAssetsPrecision: initAssetsPrecision.map(p => Number(p)),
       initAssetChainlinkFeeds: initAssetChainlinkFeeds.map(getHex),
       initAssetIdsVeilnyx: initAssetIdsVeilnyx.map(assetId => Number(assetId)),
+      nebraVerifier: getHex(nebraVerifier),
     };
   }
 

@@ -66,7 +66,8 @@ contract PoolUserRegistration is PoolBaseTest {
             0,
             shieldedAddress
         );
-        pool.registerAddress(addressRegistrationData);
+        PreVerificationDetails memory emptyPreVerifDetails;
+        pool.registerAddress(addressRegistrationData, emptyPreVerifDetails, false);
 
         assertEq(addressRegistrationData.shieldedAddress, shieldedAddress);
     }
@@ -94,8 +95,9 @@ contract PoolUserRegistration is PoolBaseTest {
             .sender
             .shieldedAddress; // packed
 
+        PreVerificationDetails memory emptyPreVerifDetails;
         vm.expectRevert(abi.encodeWithSelector(IPool.BadArguments.selector));
-        pool.registerAddress(addressRegistrationData);
+        pool.registerAddress(addressRegistrationData, emptyPreVerifDetails, false);
     }
 
     function test_userRegistrationWhenPaused() external {
@@ -105,14 +107,16 @@ contract PoolUserRegistration is PoolBaseTest {
             memory data = _loadShieldedAddressRegistrationData(
                 "register_sender"
             );
+        PreVerificationDetails memory emptyPreVerifDetails;
         vm.expectRevert(
             abi.encodeWithSelector(PausableUpgradeable.EnforcedPause.selector)
         );
-        pool.registerAddress(data);
+        pool.registerAddress(data, emptyPreVerifDetails, false);
     }
 
     function test_revertWhenAlreadyRegistered() external {
-        pool.registerAddress(addressRegistrationData);
+        PreVerificationDetails memory emptyPreVerifDetails;
+        pool.registerAddress(addressRegistrationData, emptyPreVerifDetails, false);
         uint256 rootAddress = uint256(
             bytes32(addressRegistrationData.shieldedAddress)
         );
@@ -123,6 +127,6 @@ contract PoolUserRegistration is PoolBaseTest {
             )
         );
 
-        pool.registerAddress(addressRegistrationData);
+        pool.registerAddress(addressRegistrationData, emptyPreVerifDetails, false);
     }
 }

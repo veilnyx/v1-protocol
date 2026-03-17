@@ -12,7 +12,7 @@ import {Asset, AssetType} from "src/libraries/Asset.sol";
 import {ShieldedTransaction, ShieldedTransactionType, RevokerData} from "src/libraries/ShieldedTransaction.sol";
 import {MerkleTree, MerkleTreeLogic} from "src/libraries/MerkleTree.sol";
 import {TreeUpdateData} from "src/libraries/QueuedMerkleTree.sol";
-import {ShieldedAddressRegistrationData, ShieldedAddressLogic} from "src/libraries/ShieldedAddress.sol";
+import {ShieldedAddressRegistrationData, ShieldedAddressLogic, PreVerificationDetails} from "src/libraries/ShieldedAddress.sol";
 import {IPool} from "src/interfaces/IPool.sol";
 import {MockScreener} from "test/mocks/MockScreener.sol";
 import {MockVerifier} from "test/mocks/MockVerifier.sol";
@@ -186,7 +186,8 @@ contract PoolTest is PoolBaseTest, BaseScript {
                 "register_sender"
             );
         addressRegData.signature = signature;
-        pool.registerAddress(addressRegData);
+        PreVerificationDetails memory emptyPreVerifDetails;
+        pool.registerAddress(addressRegData, emptyPreVerifDetails, false);
     }
 
     /// @notice Checks if the expect events: NullifierMarked, Commitment, Receipt are emitted.
