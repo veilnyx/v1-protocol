@@ -4,6 +4,7 @@ pragma solidity ^0.8.24;
 import {Test} from "forge-std/Test.sol";
 import {console2} from "forge-std/console2.sol";
 import {Verifier, TransactionVerifierInfo} from "src/core/Verifier.sol";
+import {IVerifier} from "src/interfaces/IVerifier.sol";
 import {VerifierTransact21} from "src/verifiers/VerifierTransact21.sol";
 import {VerifierTransact22} from "src/verifiers/VerifierTransact22.sol";
 import {VerifierTransact23} from "src/verifiers/VerifierTransact23.sol";
@@ -51,6 +52,31 @@ contract VerifierTest is BaseTest {
     function test_getVerifierId() public view {
         uint256 id = _verifier.getTransactionVerifierId(2, 2);
         assertEq(id, 22);
+
+        uint256 id2 = _verifier.getTransactionVerifierId(10, 10);
+        assertEq(id2, 1010);
+
+        uint256 id3 = _verifier.getTransactionVerifierId(123, 45);
+        assertEq(id3, 12345);
+
+        uint16 id4 = _verifier.getTransactionVerifierId(1, 0);
+        assertEq(id4, 10);
+    }
+
+    function test_getVerifierIdRevertsOnUint16Overflow() public {
+        // nOuts=0 → noOfDigits=0 → verifierID = nIns * 10^0 + 0 = nIns
+        // 65536 > type(uint16).max (65535)
+        vm.expectRevert(IVerifier.VerifierIdOverflow.selector);
+        _verifier.getTransactionVerifierId(65536, 0);
+
+        vm.expectRevert(IVerifier.VerifierIdOverflow.selector);
+        _verifier.getTransactionVerifierId(6554, 6);
+    }
+
+    function test_getVerifierIdRevertsWhenNInsZero() public {
+        // nIns=0, nOuts=6 → noOfDigits=1, verifierID = 0*10 + 6 = 6
+        vm.expectRevert(IVerifier.BadArguments.selector);
+        _verifier.getTransactionVerifierId(0, 6);
     }
 
     function test_addTransactionVerifier() public {

@@ -266,7 +266,7 @@ contract CurveAdaptorTest is PoolTest {
         assert(IERC20(crvUSD_USDT_Pool).balanceOf(address(curveAdaptor)) > 0);
     }
 
-    function testGetLPTokenCount() public {
+    function testGetLPTokenCount() public view {
         uint256[] memory underlyingTokenAmts = new uint256[](2);
         underlyingTokenAmts[0] = uint256(2);
         underlyingTokenAmts[1] = uint256(4);

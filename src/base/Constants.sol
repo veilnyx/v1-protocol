@@ -13,3 +13,5 @@ bytes32 constant EIP712_TYPEHASH_REGISTER_ADDRESS = keccak256(
     "RegisterAddress(string message,bytes shieldedAddress)"
 );
 string constant MESSAGE_REGISTER_ADDRESS = "Register Shielded Address";
+uint256 constant MAX_WITHDRAW_FEE_BPS = 25_00; // 25% in basis points
+

@@ -43,7 +43,7 @@ contract AdaptorHandler is IAdaptorHandler, ReentrancyGuard, Ownable {
     ) external payable nonReentrant onlyPool returns (PubAsset[] memory) {
         uint24[] memory inAssetIds = new uint24[](pubAssets.length);
         uint256[] memory inValues = new uint256[](pubAssets.length);
-        for (uint8 i = 0; i < pubAssets.length; ) {
+        for (uint256 i = 0; i < pubAssets.length; ) {
             inAssetIds[i] = pubAssets[i].id;
             inValues[i] = pubAssets[i].value;
 
@@ -71,7 +71,7 @@ contract AdaptorHandler is IAdaptorHandler, ReentrancyGuard, Ownable {
 
         PubAsset[] memory outPubAssets = new PubAsset[](outAssetIds.length);
 
-        for (uint8 i = 0; i < outAssetIds.length; ) {
+        for (uint256 i = 0; i < outAssetIds.length; ) {
             asset = IPool(veilnyxPool).getAsset(outAssetIds[i]);
 
             if (!asset.isActive) {

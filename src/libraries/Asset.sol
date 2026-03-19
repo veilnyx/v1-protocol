@@ -90,7 +90,7 @@ library AssetLogic {
         address[] calldata assetAddresses,
         uint8[] calldata assetsPrecision
     ) external returns (uint16) {
-        for (uint8 i = 0; i < assetAddresses.length; ) {
+        for (uint256 i = 0; i < assetAddresses.length; ) {
             counter = addAsset(
                 assetIds,
                 assets,

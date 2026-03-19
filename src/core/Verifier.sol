@@ -41,7 +41,7 @@ contract Verifier is IVerifier, Ownable {
 
         uint256 len = txvInfos.length;
 
-        for (uint8 i = 0; i < len; ) {
+        for (uint256 i = 0; i < len; ) {
             if (txvInfos[i].addr == address(0)) revert ZeroAddress();
             _transactionVerifiers[txvInfos[i].id] = txvInfos[i];
             unchecked {
@@ -170,6 +170,24 @@ contract Verifier is IVerifier, Ownable {
         uint256 nIns,
         uint256 nOuts
     ) public pure returns (uint16 id) {
-        return uint16(nIns * 10 + nOuts);
+        if(nIns == 0) {
+            revert BadArguments();
+        }
+
+        uint256 nOutsCopy = nOuts;
+        uint8 noOfDigits = 0;
+
+        while (nOutsCopy > 0) {
+            noOfDigits++;
+            nOutsCopy /= 10;
+        }
+        noOfDigits = noOfDigits == 0 ? 1 : noOfDigits;
+        uint256 verifierID = nIns * 10 ** noOfDigits + nOuts;
+
+        if (verifierID > type(uint16).max) {
+            revert VerifierIdOverflow();
+        }
+
+        return uint16(verifierID);
     }
 }

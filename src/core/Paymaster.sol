@@ -17,7 +17,7 @@ import {IPool} from "../interfaces/IPool.sol";
 
 contract Paymaster is IPaymaster, Ownable {
     uint256 public constant VALIDATION_SUCCESS = 0;
-    uint24 public constant GAS_ASSET_ID = 65537;
+    uint24 public constant GAS_ASSET_ID = 65537; // AssetId for the active chain's native gas token
     uint8 public constant ETH_DECIMALS = 18;
     IEntryPoint public immutable entryPoint;
     address public immutable sender;
@@ -34,7 +34,11 @@ contract Paymaster is IPaymaster, Ownable {
     error FeeAssetNotSupportedByVeilnyx(uint24 assetId);
     error AssetNotSupportedAsFeeAsset(uint24 assetId);
     error ChainlinkPriceFeedNotFound(uint24 assetId);
-    error ChainlinkPriceInvalid(int256 price);
+    error ChainlinkPriceInvalid(
+        int256 price,
+        uint8 feedDecimals,
+        uint256 updatedAt
+    );
     error MaxCostEthToAssetConversionFailed(uint24 assetId);
 
     /**
@@ -46,7 +50,11 @@ contract Paymaster is IPaymaster, Ownable {
         address sender_,
         address pool_
     ) Ownable(msg.sender) {
-        if (entryPoint_ == address(0) || sender_ == address(0) || pool_ == address(0)) revert ZeroAddress();
+        if (
+            entryPoint_ == address(0) ||
+            sender_ == address(0) ||
+            pool_ == address(0)
+        ) revert ZeroAddress();
         entryPoint = IEntryPoint(entryPoint_);
         sender = sender_;
         pool = IPool(pool_);
@@ -125,7 +133,7 @@ contract Paymaster is IPaymaster, Ownable {
         return entryPoint.balanceOf(address(this));
     }
 
-    /// @notice Returns the `maxCostEth` value in fee asset using Chainlink's price feeds.
+    /// @notice Returns the `maxCostEth` (native gas token of the active chain) value in `feeAssetId` using Chainlink's price feeds.
     function convertFeeFromGasTokenToFeeAsset(
         uint256 maxCostEth,
         uint24 feeAssetId
@@ -156,13 +164,22 @@ contract Paymaster is IPaymaster, Ownable {
         AggregatorV3Interface feed = AggregatorV3Interface(
             assetIdToChainlinkFeed[feeAssetId]
         );
-        (, int256 priceETHInAsset, , , ) = feed.latestRoundData();
-        if (priceETHInAsset <= 0) {
-            revert ChainlinkPriceInvalid(priceETHInAsset);
-        }
-
         // for conversion we assume price fetching of assetId in ETH only since maxCostEth is in ETH
         uint8 feedDecimals = feed.decimals();
+        
+        (, int256 priceETHInAsset, , uint256 updatedAt, ) = feed
+            .latestRoundData();
+        if (
+            priceETHInAsset <= 0 ||
+            updatedAt > block.timestamp ||
+            block.timestamp - updatedAt > 1 hours
+        ) {
+            revert ChainlinkPriceInvalid(
+                priceETHInAsset,
+                feedDecimals,
+                updatedAt
+            );
+        }
 
         // returns fees in feeAsset's precision
         feeInAsset =

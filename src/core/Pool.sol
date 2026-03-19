@@ -12,7 +12,7 @@ import {IVerifier} from "../interfaces/IVerifier.sol";
 import {IPool} from "../interfaces/IPool.sol";
 import {IAdaptorHandler} from "../interfaces/IAdaptorHandler.sol";
 import {IScreener} from "../interfaces/IScreener.sol";
-import {EIP712_DOMAIN_NAME, EIP712_DOMAIN_VERSION} from "../base/Constants.sol";
+import {EIP712_DOMAIN_NAME, EIP712_DOMAIN_VERSION, MAX_WITHDRAW_FEE_BPS} from "../base/Constants.sol";
 import {PoolStorage} from "../base/PoolStorage.sol";
 import {Asset, AssetType, AssetLogic} from "../libraries/Asset.sol";
 import {MerkleTree, MerkleTreeLogic} from "../libraries/MerkleTree.sol";
@@ -88,8 +88,16 @@ contract Pool is
         adaptorHandler = initAddressParams.adaptorHandler;
         hasher = initAddressParams.hasher;
         screener = initAddressParams.screener;
-        verificationTrackerService = initAddressParams.verificationTrackerService;
+        verificationTrackerService = initAddressParams
+            .verificationTrackerService;
         nebraVerifier = initAddressParams.nebraVerifier;
+
+        if (withdrawFeeBps_ > MAX_WITHDRAW_FEE_BPS) {
+            revert IPool.WithdrawalFeeTooHigh(
+                withdrawFeeBps_,
+                MAX_WITHDRAW_FEE_BPS
+            );
+        }
         withdrawFeeBps = withdrawFeeBps_;
 
         _addressTree.init(addressTreeDepth, hasher);
@@ -196,10 +204,10 @@ contract Pool is
         screener = screener_;
     }
 
-    /// @custom:invariant FEE-1: withdrawFeeBps cannot be set above 10000 (100%)
+    /// @custom:invariant FEE-1: withdrawFeeBps cannot be set above MAX_WITHDRAW_FEE_BPS
     function setWithdrawFeeBips(uint256 feeBps) external onlyOwner {
-        if (feeBps > 10000) {
-            revert InvalidWithdrawFeeBps(feeBps);
+        if (feeBps > MAX_WITHDRAW_FEE_BPS) {
+            revert IPool.WithdrawalFeeTooHigh(feeBps, MAX_WITHDRAW_FEE_BPS);
         }
         withdrawFeeBps = feeBps;
     }
@@ -210,9 +218,7 @@ contract Pool is
         verificationTrackerService = verificationTrackerService_;
     }
 
-    function updateNebraVerifier(
-        address nebraVerifier_
-    ) external onlyOwner {
+    function updateNebraVerifier(address nebraVerifier_) external onlyOwner {
         nebraVerifier = nebraVerifier_;
     }
 
@@ -262,7 +268,7 @@ contract Pool is
 
     function updateCommitmentTree(
         TreeUpdateData calldata treeUpdateData
-    ) external {
+    ) external whenNotPaused {
         _commitmentTree.update(treeUpdateData);
     }
 

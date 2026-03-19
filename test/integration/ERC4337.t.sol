@@ -103,12 +103,14 @@ contract ERC4337 is PoolTest {
         ShieldedTransaction memory stx = _loadShieldedTransaction(
             "transfer_20_weth_with_weth_fee"
         );
-        (, uint24 feeAssetId, uint256 feeValue) = _parseFeeParams(stx);
+        (, uint24 parsedFeeAssetId, uint256 parsedFeeValue) = _parseFeeParams(
+            stx
+        );
         uint256 paymasterFeeCollected = pool.getCollectedPaymasterFee(
-            feeAssetId,
+            parsedFeeAssetId,
             address(paymaster)
         );
-        assert(paymasterFeeCollected == feeValue);
+        assert(paymasterFeeCollected == parsedFeeValue);
     }
 
     /**
@@ -158,14 +160,14 @@ contract ERC4337 is PoolTest {
         // 20 bytes - paymaster address
         // 3 bytes - feeAssetId (24 bits)
         // 9 bytes - feeValue (72 bits)
-        address paymaster = address(uint160(stx.feeData >> (24 + 72)));
+        address paymasterAddr = address(uint160(stx.feeData >> (24 + 72)));
 
         // Extract the feeAssetId (3 bytes)
-        uint24 feeAssetId = uint24(stx.feeData >> 72);
+        uint24 parsedFeeAssetId = uint24(stx.feeData >> 72);
 
         // Extract the feeValue (9 bytes)
-        uint256 feeValue = uint256(uint72(stx.feeData));
+        uint256 parsedFeeValue = uint256(uint72(stx.feeData));
 
-        return (paymaster, feeAssetId, feeValue);
+        return (paymasterAddr, parsedFeeAssetId, parsedFeeValue);
     }
 }

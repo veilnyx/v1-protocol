@@ -147,6 +147,7 @@ library ShieldedTransactionLogic {
     /// @param stx ShieldedTransaction to be executed
     /// @custom:invariant ACCESS-4 Revoker must be active to be used in transaction
     /// @custom:invariant ADP-1: Adaptor should be supported by the protocol to be used in CALL_ADAPTOR transaction
+    /// @custom:invariant STX-1: pubAssets length cannot exceed commitments length
     function validate(
         ShieldedTransaction calldata stx,
         bool isPreVerified,
@@ -179,6 +180,10 @@ library ShieldedTransactionLogic {
         }
 
         _checkAndMarkNullifiers(stx, commitmentTree, markedNullifiers);
+
+        if (stx.pubAssets.length > stx.commitments.length) {
+            revert IPool.PubAssetsCannotExceedCommitments();
+        }
 
         if (!isPreVerified) {
             if (!verifyProof(stx, revokerData, verifier)) {
@@ -283,17 +288,12 @@ library ShieldedTransactionLogic {
         uint256[] memory pubAssetIds = new uint256[](nOuts);
         uint256[] memory pubValues = new uint256[](nOuts);
         {
-            uint256 padLen = nOuts - nPubs;
-            if (padLen < 0) {
-                revert("Output notes count is less than public assets");
-            }
-
-            for (uint8 i; i < nPubs; ++i) {
+            for (uint256 i; i < nPubs; ++i) {
                 pubAssetIds[i] = uint24(bytes3(bytes31(self.pubAssets[i])));
                 pubValues[i] = uint224(self.pubAssets[i]);
             }
 
-            // padding to make pubAsset and pubValue arrays match the length of nOuts
+            // padding to make pubAsset and pubValue arrays match the length of nOuts (commitments), since the circuit expects pubAssets and pubValues of length nOuts
             for (uint i = nPubs; i < nOuts; ++i) {
                 pubAssetIds[i] = 0;
                 pubValues[i] = 0;
@@ -620,7 +620,7 @@ library ShieldedTransactionLogic {
         uint256 outLen = outPubAssets.length;
         uint256[] memory pubCms = new uint256[](outLen);
 
-        for (uint8 i = 0; i < outLen; ++i) {
+        for (uint256 i = 0; i < outLen; ++i) {
             pubCms[i] = IHasher(hasher).hash(
                 [
                     outPubAssets[i].id,
@@ -673,7 +673,7 @@ library ShieldedTransactionLogic {
     ) internal {
         uint256 count = pubAssets.length;
 
-        for (uint8 i = 0; i < count; ) {
+        for (uint256 i = 0; i < count; ) {
             AssetLogic.receiveAsset({
                 assets: assets,
                 from: from,
@@ -697,7 +697,7 @@ library ShieldedTransactionLogic {
         uint256 count = pubAssets.length;
 
         uint256 fee;
-        for (uint8 i = 0; i < count; ) {
+        for (uint256 i = 0; i < count; ) {
             if (pubAssets[i].value == 0) {
                 unchecked {
                     ++i;
@@ -736,7 +736,7 @@ library ShieldedTransactionLogic {
         uint256 numNullifiers = stx.nullifiers.length;
         uint32 nextIdx = commitmentTree.nextLeafIndex;
 
-        for (uint8 i = 0; i < numNullifiers; ) {
+        for (uint256 i = 0; i < numNullifiers; ) {
             uint256 nullifier = stx.nullifiers[i];
             if (markedNullifiers[nullifier] != 0) {
                 revert IPool.DoubleSpend(nullifier);
@@ -760,8 +760,8 @@ library ShieldedTransactionLogic {
         uint32 leafIndexOffset = tree.nextLeafIndex +
             (tree.queueEndIndex - tree.queueStartIndex);
 
-        for (uint8 i = 0; i < memoParams.commitments.length; ++i) {
-            uint32 leafIndex = leafIndexOffset + i;
+        for (uint256 i = 0; i < memoParams.commitments.length; ++i) {
+            uint32 leafIndex = leafIndexOffset + uint32(i);
             emit IPool.Commitment(leafIndex, memoParams.commitments[i]);
         }
 
@@ -810,7 +810,7 @@ library ShieldedTransactionLogic {
         }
 
         params.pubAssets = new PubAsset[](pubLen);
-        for (uint8 i = 0; i < pubLen; ++i) {
+        for (uint256 i = 0; i < pubLen; ++i) {
             // Extract first 3 bytes assetId
             params.pubAssets[i].id = uint24(bytes3(bytes31(stx.pubAssets[i])));
             // Extract last 28 bytes value
@@ -861,13 +861,13 @@ library ShieldedTransactionLogic {
         uint256[] memory b
     ) internal pure returns (uint256[] memory) {
         uint256[] memory result = new uint256[](a.length + b.length);
-        for (uint8 i = 0; i < a.length; ) {
+        for (uint256 i = 0; i < a.length; ) {
             result[i] = a[i];
             unchecked {
                 ++i;
             }
         }
-        for (uint8 i = 0; i < b.length; ) {
+        for (uint256 i = 0; i < b.length; ) {
             result[a.length + i] = b[i];
             unchecked {
                 ++i;

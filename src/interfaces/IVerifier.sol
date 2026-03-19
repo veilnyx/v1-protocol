@@ -5,6 +5,7 @@ import {ShieldedTransaction, RevokerData} from "../libraries/ShieldedTransaction
 
 interface IVerifier {
     error BadArguments();
+    error VerifierIdOverflow();
 
     function verifyTransactionProof(
         uint16 vId,

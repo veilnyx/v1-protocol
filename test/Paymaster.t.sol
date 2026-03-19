@@ -120,6 +120,16 @@ contract PaymasterTest is PoolTest {
         return AggregatorV3Interface(CHAINLINK_ETH_USDC_FEED_SEPOLIA);
     }
 
+    function _getEthUsdcFeedData()
+        internal
+        view
+        returns (int256 price, uint256 updatedAt, uint8 decimals)
+    {
+        AggregatorV3Interface feed = _getEthUsdcFeed();
+        (, price, , updatedAt, ) = feed.latestRoundData();
+        decimals = feed.decimals();
+    }
+
     function test_convertFeeFromGasTokenToUSDC() public {
         if (block.chainid != ETH_SEPOLIA && block.chainid != ETH_MAINNET) {
             vm.skip(true);
@@ -133,10 +143,7 @@ contract PaymasterTest is PoolTest {
             feeAssetIdUSDC
         );
 
-        AggregatorV3Interface feed = _getEthUsdcFeed();
-
-        (, int256 ethInUSDC, , , ) = feed.latestRoundData();
-        uint8 feedDecimals = feed.decimals();
+        (int256 ethInUSDC, , uint8 feedDecimals) = _getEthUsdcFeedData();
 
         uint256 expectedFeeValueInUSDC = (feeValueInEth *
             uint256(ethInUSDC) *
@@ -206,6 +213,27 @@ contract PaymasterTest is PoolTest {
 
         assertEq(depositBal, value - withdrawValue);
         assertEq(withdrawAddress.balance, withdrawValue);
+    }
+
+    function test_revert_convertFeeFromGasTokenToFeeAsset_whenPriceIsStale()
+        public
+    {
+        (
+            int256 ethInUSDC,
+            uint256 updatedAt,
+            uint8 feedDecimals
+        ) = _getEthUsdcFeedData();
+
+        vm.warp(block.timestamp + 2 hours); // Move forward in time to make the price feed stale
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                Paymaster.ChainlinkPriceInvalid.selector,
+                ethInUSDC,
+                feedDecimals,
+                updatedAt
+            )
+        );
+        paymaster.convertFeeFromGasTokenToFeeAsset(1 ether, asset2.id);
     }
 
     function test_withdrawAsset() public {
@@ -310,9 +338,7 @@ contract PaymasterTest is PoolTest {
             vm.skip(true);
         }
 
-        AggregatorV3Interface feed = _getEthUsdcFeed();
-        (, int256 ethInUSDC, , , ) = feed.latestRoundData();
-        uint8 feedDecimals = feed.decimals();
+        (int256 ethInUSDC, , uint8 feedDecimals) = _getEthUsdcFeedData();
 
         // altering the fee value to be less than the required fee
         uint256 lowFeeValueEth = feeValue / 2;
@@ -443,9 +469,7 @@ contract PaymasterTest is PoolTest {
             vm.skip(true);
         }
 
-        AggregatorV3Interface feed = _getEthUsdcFeed();
-        (, int256 ethInUSDC, , , ) = feed.latestRoundData();
-        uint8 feedDecimals = feed.decimals();
+        (int256 ethInUSDC, , uint8 feedDecimals) = _getEthUsdcFeedData();
 
         // converting `feeValue` in ETH to USDC
         uint256 feeValueUSDC = ((feeValue *

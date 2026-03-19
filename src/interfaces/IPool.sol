@@ -71,8 +71,9 @@ interface IPool {
     error DuplicateRevoker(uint256[2] publicKey);
     error NoFeeToClaim(address paymaster, uint24 assetId);
     error InvalidSenderForPreverifiedSTX(address sender, address mempool);
-    error InvalidWithdrawFeeBps(uint256 feeBps);
+    error WithdrawalFeeTooHigh(uint256 feeBps, uint256 maxFeeBps);
     error PreVerifiedProofRestricted();
+    error PubAssetsCannotExceedCommitments();
 
     /////////////////////////////////////////
     //         ADMIN WRITE METHODS         //

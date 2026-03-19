@@ -31,7 +31,7 @@ contract MockPool {
         );
     }
 
-    function getAsset(uint24 assetId) external returns (Asset memory) {
+    function getAsset(uint24 /*assetId*/) external pure returns (Asset memory) {
         Asset memory feeAsset = Asset({
             id: 65537,
             assetType: AssetType.ERC20,
