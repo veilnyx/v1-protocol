@@ -8,3 +8,6 @@ broadcast/
 typechain/
 typechain-types/
 .DS_STORE
+.openzeppelin/
+.claude/
+.vscode/
