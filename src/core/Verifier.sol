@@ -27,6 +27,8 @@ contract Verifier is IVerifier, Ownable {
         address addr
     );
     event TransactionVerifierRemoved(uint16 indexed id);
+    event TreeUpdateVerifierUpdated(address indexed newTreeUpdateVerifier);
+    event AddressVerifierUpdated(address indexed newAddressVerifier);
 
     error ZeroAddress();
     error VerifierAlreadyExists(uint16 id);
@@ -51,6 +53,28 @@ contract Verifier is IVerifier, Ownable {
 
         _addressVerifier = addressVerifier;
         _treeUpdateVerifier = treeUpdateVerifier;
+    }
+
+    /// @notice Updates the tree update verifier
+    /// @dev Only callable by owner
+    /// @param newTreeUpdateVerifier The new tree update verifier address
+    function updateTreeUpdateVerifier(
+        address newTreeUpdateVerifier
+    ) external onlyOwner {
+        if (newTreeUpdateVerifier == address(0)) revert ZeroAddress();
+        _treeUpdateVerifier = newTreeUpdateVerifier;
+        emit TreeUpdateVerifierUpdated(_treeUpdateVerifier);
+    }
+
+    /// @notice Updates the address verifier
+    /// @dev Only callable by owner
+    /// @param newAddressVerifier The new address verifier address
+    function updateAddressVerifier(
+        address newAddressVerifier
+    ) external onlyOwner {
+        if (newAddressVerifier == address(0)) revert ZeroAddress();
+        _addressVerifier = newAddressVerifier;
+        emit AddressVerifierUpdated(_addressVerifier);
     }
 
     /// @notice Adds a new transaction verifier
@@ -170,7 +194,7 @@ contract Verifier is IVerifier, Ownable {
         uint256 nIns,
         uint256 nOuts
     ) public pure returns (uint16 id) {
-        if(nIns == 0) {
+        if (nIns == 0) {
             revert BadArguments();
         }
 

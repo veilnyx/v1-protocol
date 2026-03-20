@@ -20,6 +20,7 @@ struct Payload {
     uint8 withdrawType;
     uint8 singleCoinIndex;
     uint256[] underlyingTokenAmts;
+    uint256 slippageBps;
 }
 
 struct PoolUnderlyingTokensInfo {
@@ -37,6 +38,7 @@ contract CurveNGAdaptor is AdaptorBase {
 
     uint8 constant ACTION_SUPPLY = 0;
     uint8 constant ACTION_WITHDRAW = 1;
+    uint256 constant BPS_PRECISION = 100_00;
 
     constructor(address pool_) AdaptorBase(pool_) {}
 
@@ -71,7 +73,8 @@ contract CurveNGAdaptor is AdaptorBase {
                 ICurvePool(decodedPayload.curvePool),
                 NCoins,
                 inAssetIds,
-                inValues
+                inValues,
+                decodedPayload.slippageBps
             );
 
             outAssetIds = new uint24[](1);
@@ -80,7 +83,8 @@ contract CurveNGAdaptor is AdaptorBase {
             (outAssetIds[0], outValues[0]) = _supply(
                 ICurvePool(decodedPayload.curvePool),
                 NCoins,
-                inValues
+                inValues,
+                decodedPayload.slippageBps
             );
         } else if (decodedPayload.action == ACTION_WITHDRAW) {
             _withdrawChecksAndApprove(
@@ -123,24 +127,35 @@ contract CurveNGAdaptor is AdaptorBase {
                 if (
                     decodedPayload.withdrawType == uint8(WithdrawType.BALANCED)
                 ) {
-                    /// @todo This implementation results in `revert: Withdrawal resulted in fewer coins than expected`. Need to investigate.
-                    /// @notice hardcoding the minAmt of both tokens to 0 for now.
-                    /**
-                    uint256 minAmtTokenA = _calcWithdrawOneCoin(inValues[0] / 2, 0);
-                    console2.log("minAmtTokenA", minAmtTokenA);
-                    uint256 minAmtTokenB = _calcWithdrawOneCoin(inValues[0] / 2, 1);
-                    console2.log("minAmtTokenB", minAmtTokenB);
+                    uint256 minAmtTokenA = _calcWithdrawOneCoin(
+                        ICurvePool(decodedPayload.curvePool),
+                        inValues[0] / 2,
+                        0
+                    );
 
-                    // allow 0.5% slippage
-                    minAmtTokenA = minAmtTokenA - ((minAmtTokenA * 5) / 1000);
-                    minAmtTokenB = minAmtTokenB - ((minAmtTokenB * 5) / 1000);
-                    */
+                    uint256 minAmtTokenB = _calcWithdrawOneCoin(
+                        ICurvePool(decodedPayload.curvePool),
+                        inValues[0] / 2,
+                        1
+                    );
+
+                    // deducting acceptable slippage
+                    minAmtTokenA =
+                        minAmtTokenA -
+                        ((minAmtTokenA * decodedPayload.slippageBps) /
+                            BPS_PRECISION);
+                    minAmtTokenB =
+                        minAmtTokenB -
+                        ((minAmtTokenB * decodedPayload.slippageBps) /
+                            BPS_PRECISION);
+
                     outValues = new uint256[](2);
                     outAssetIds = new uint24[](2);
 
                     outValues = _withdrawLiquidityBalanced2CoinPool(
                         ICurvePool(decodedPayload.curvePool),
-                        inValues[0]
+                        inValues[0],
+                        [minAmtTokenA, minAmtTokenB]
                     );
                 }
 
@@ -169,24 +184,45 @@ contract CurveNGAdaptor is AdaptorBase {
                 if (
                     decodedPayload.withdrawType == uint8(WithdrawType.BALANCED)
                 ) {
-                    /// @todo This implementation results in `revert: Withdrawal resulted in fewer coins than expected`. Need to investigate.
-                    /// @notice hardcoding the minAmt of both tokens to 0 for now.
-                    /**
-                    uint256 minAmtTokenA = _calcWithdrawOneCoin(inValues[0] / 2, 0);
-                    console2.log("minAmtTokenA", minAmtTokenA);
-                    uint256 minAmtTokenB = _calcWithdrawOneCoin(inValues[0] / 2, 1);
-                    console2.log("minAmtTokenB", minAmtTokenB);
+                    uint256 minAmtTokenA = _calcWithdrawOneCoin(
+                        ICurvePool(decodedPayload.curvePool),
+                        inValues[0] / 3,
+                        0
+                    );
 
-                    // allow 0.5% slippage
-                    minAmtTokenA = minAmtTokenA - ((minAmtTokenA * 5) / 1000);
-                    minAmtTokenB = minAmtTokenB - ((minAmtTokenB * 5) / 1000);
-                    */
+                    uint256 minAmtTokenB = _calcWithdrawOneCoin(
+                        ICurvePool(decodedPayload.curvePool),
+                        inValues[0] / 3,
+                        1
+                    );
+
+                    uint256 minAmtTokenC = _calcWithdrawOneCoin(
+                        ICurvePool(decodedPayload.curvePool),
+                        inValues[0] / 3,
+                        2
+                    );
+
+                    // deducting acceptable slippage
+                    minAmtTokenA =
+                        minAmtTokenA -
+                        ((minAmtTokenA * decodedPayload.slippageBps) /
+                            BPS_PRECISION);
+                    minAmtTokenB =
+                        minAmtTokenB -
+                        ((minAmtTokenB * decodedPayload.slippageBps) /
+                            BPS_PRECISION);
+                    minAmtTokenC =
+                        minAmtTokenC -
+                        ((minAmtTokenC * decodedPayload.slippageBps) /
+                            BPS_PRECISION);
+
                     outValues = new uint256[](3);
                     outAssetIds = new uint24[](3);
 
                     outValues = _withdrawLiquidityBalanced3CoinPool(
                         ICurvePool(decodedPayload.curvePool),
-                        inValues[0]
+                        inValues[0],
+                        [minAmtTokenA, minAmtTokenB, minAmtTokenC]
                     );
                 }
 
@@ -229,7 +265,8 @@ contract CurveNGAdaptor is AdaptorBase {
     function _supply(
         ICurvePool curve,
         uint256 NCoins,
-        uint256[] memory inValues
+        uint256[] memory inValues,
+        uint256 slippageBps
     ) internal returns (uint24 outAssetId, uint256 outAssetValue) {
         /// @dev creating different functions for different curve pools as the curvePool contract expects a static sized `amounts` array in it's `calc_token_amount(uint256[2],bool)`, etc func. signature. We cannot use dynamic array niether can we create the func. signature string dynamically using string manupulation for abi.encodeWithSignature("funcSign", params) as `abi.encodeWithSignature` expects a constant string at compile time.
         if (NCoins == 2) {
@@ -239,9 +276,9 @@ contract CurveNGAdaptor is AdaptorBase {
                 true
             );
 
-            // 0.5% slippage
+            // deducting acceptable slippage
             uint256 minLPTokens = expectedLPTokens -
-                ((expectedLPTokens * 5) / 1000);
+                ((expectedLPTokens * slippageBps) / BPS_PRECISION);
 
             outAssetValue = _addLiquidity2CoinPool(
                 curve,
@@ -261,9 +298,9 @@ contract CurveNGAdaptor is AdaptorBase {
                 true
             );
 
-            // 0.5% slippage
+            // deducting acceptable slippage
             uint256 minLPTokens = expectedLPTokens -
-                ((expectedLPTokens * 5) / 1000);
+                ((expectedLPTokens * slippageBps) / BPS_PRECISION);
 
             outAssetValue = _addLiquidity3CoinPool(
                 curve,
@@ -371,7 +408,8 @@ contract CurveNGAdaptor is AdaptorBase {
         ICurvePool curve,
         uint256 NCoins,
         uint24[] memory inAssetIds,
-        uint256[] memory inValues
+        uint256[] memory inValues,
+        uint256 slippageBps
     ) internal {
         for (uint256 i; i < inAssetIds.length; i++) {
             Asset memory inAsset = getAsset(inAssetIds[i]);
@@ -384,6 +422,8 @@ contract CurveNGAdaptor is AdaptorBase {
             }
 
             if (!supported) revert InvalidInput();
+
+            if (slippageBps > BPS_PRECISION) revert InvalidInput();
 
             if (
                 IERC20(inAsset.assetAddress).balanceOf(address(this)) <
@@ -436,6 +476,8 @@ contract CurveNGAdaptor is AdaptorBase {
         if (inValue == 0) {
             revert ZeroValue();
         }
+
+        if (decodedPayload.slippageBps > BPS_PRECISION) revert InvalidInput();
 
         if (IERC20(inAsset.assetAddress).balanceOf(address(this)) < inValue) {
             revert InsufficientBalance();
@@ -537,13 +579,14 @@ contract CurveNGAdaptor is AdaptorBase {
 
     function _withdrawLiquidityBalanced2CoinPool(
         ICurvePool curve,
-        uint256 withdrawLPTokens
+        uint256 withdrawLPTokens,
+        uint256[2] memory minAmts
     ) internal returns (uint256[] memory) {
         // returning dynamically sized arr. as expected by outValues
         uint256[] memory coinsReceived = new uint256[](2);
         uint256[2] memory _coinsReceived = curve.remove_liquidity({
             _burn_amount: withdrawLPTokens,
-            _min_amounts: [uint256(0), uint256(0)],
+            _min_amounts: minAmts,
             receiver: address(this)
         });
 
@@ -554,13 +597,14 @@ contract CurveNGAdaptor is AdaptorBase {
 
     function _withdrawLiquidityBalanced3CoinPool(
         ICurvePool curve,
-        uint256 withdrawLPTokens
+        uint256 withdrawLPTokens,
+        uint256[3] memory minAmts
     ) internal returns (uint256[] memory) {
         // returning dynamically sized arr. as expected by outValues
         uint256[] memory coinsReceived = new uint256[](3);
         uint256[3] memory _coinsReceived = curve.remove_liquidity({
             _burn_amount: withdrawLPTokens,
-            _min_amounts: [uint256(0), uint256(0), uint256(0)],
+            _min_amounts: minAmts,
             receiver: address(this)
         });
 

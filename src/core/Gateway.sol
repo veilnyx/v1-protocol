@@ -16,7 +16,6 @@ import {IGateway} from "../interfaces/IGateway.sol";
 contract Gateway is IGateway, Ownable {
     using SafeERC20 for IWToken;
     uint256 internal constant VALIDATION_SUCCEEDED = 0;
-    uint256 internal constant VALIDATION_FAILED = 1;
 
     address public immutable entryPoint;
     address public immutable pool;

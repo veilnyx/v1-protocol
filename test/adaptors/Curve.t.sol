@@ -25,6 +25,7 @@ contract CurveAdaptorTest is PoolTest {
     address public crvUSD = 0xf939E0A03FB07F59A73314E73794Be0E57ac1b4E;
     address public crvUSD_USDT_Pool =
         0x390f3595bCa2Df7d23783dFd126427CCeb997BF4;
+    uint256 public constant MAX_SLIPPAGE_BPS = 50_00; // allowing max 50% slippage for testing purposes
 
     function setUp() external {
         if (!shouldTestRun()) {
@@ -151,7 +152,8 @@ contract CurveAdaptorTest is PoolTest {
             action: 1,
             withdrawType: 0,
             singleCoinIndex: 0,
-            underlyingTokenAmts: underlyingTokenAmts
+            underlyingTokenAmts: underlyingTokenAmts,
+            slippageBps: MAX_SLIPPAGE_BPS
         });
 
         bytes memory payloadEncoded = abi.encode(payload);
@@ -193,7 +195,8 @@ contract CurveAdaptorTest is PoolTest {
             action: uint8(1),
             withdrawType: uint8(1),
             singleCoinIndex: uint8(0),
-            underlyingTokenAmts: underlyingTokenAmts
+            underlyingTokenAmts: underlyingTokenAmts,
+            slippageBps: MAX_SLIPPAGE_BPS
         });
 
         bytes memory payloadEncoded = abi.encode(payload);
@@ -239,7 +242,8 @@ contract CurveAdaptorTest is PoolTest {
             action: uint8(1),
             withdrawType: uint8(2),
             singleCoinIndex: uint8(0),
-            underlyingTokenAmts: underlyingTokenAmts
+            underlyingTokenAmts: underlyingTokenAmts,
+            slippageBps: MAX_SLIPPAGE_BPS
         });
 
         bytes memory payloadEncoded = abi.encode(payload);
@@ -302,7 +306,8 @@ contract CurveAdaptorTest is PoolTest {
             action: 0,
             withdrawType: 0,
             singleCoinIndex: 0,
-            underlyingTokenAmts: underlyingTokenAmts
+            underlyingTokenAmts: underlyingTokenAmts,
+            slippageBps: MAX_SLIPPAGE_BPS
         });
 
         bytes memory payloadEncoded = abi.encode(payload);

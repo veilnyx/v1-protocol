@@ -19,12 +19,12 @@ const main = async () => {
 	// await genTestTransfersWithOutsourceProofVerification(sdk, nebraClient);
 	// await genTransferPackedUserOp(sdk, nebraClient);
 	// await genTransferPackedUserOpPreVerified(sdk, nebraClient);
-	await genAddressRegistrations(sdk);
+	// await genAddressRegistrations(sdk);
 	// await genAddrRegWithOutsourceProofVerification(sdk, nebraClient);
 	// await genTestDepositsWithOutsourceProofVerification(sdk, nebraClient);
 	// await genTestTransfersWithOutsourceProofVerification(sdk, nebraClient);
 	// await genTestWithdrawals(sdk);
-	// await genTestCallAdaptors(sdk);
+	await genTestCallAdaptors(sdk);
 	// await genTreeUpdateData(sdk);
 	// await genTreeUpdateDataWithPartialQueue(sdk);
 };
