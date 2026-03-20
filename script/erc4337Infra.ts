@@ -1,12 +1,6 @@
 import hre from "hardhat";
 import { parseEther, parseUnits } from "viem";
 
-/// @todo: Gas cost to be made dynamic
-// Estimated values based on gas profiling and current gas prices of 2 gwei. Ref. the Veilnyx Fee Types sheet for working.
-// const PAYMASTER_FEE_INSTANT_TX_ETH = parseEther("0.001467726");
-// const PAYMASTER_FEE_INSTANT_TX_USDC = parseUnits("2.62", 6);
-// const PAYMASTER_FEE_PREVERIFIED_TX_ETH = parseEther("0.001063");
-// const PAYMASTER_FEE_PREVERIFIED_TX_USDC = parseUnits("1.89", 6);
 const PAYMASTER_FUNDING_AMT = parseEther("2");
 
 export const deployErc4337Infra = async (chainParams, poolAddress, mempoolAddress, deployConfig) => {

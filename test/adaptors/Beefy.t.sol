@@ -91,7 +91,6 @@ contract BeefyAdaptorTest is PoolTest {
         // assertGreaterThan(mooTokenBal, 0);
     }
 
-    // @todo failing
     function testWithdrawFromBeefyVault() public {
         console.log("Initiating withdraw on Beefy");
         vm.startPrank(user);

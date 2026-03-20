@@ -36,8 +36,8 @@ forge build
 
 ## Testing
 
-### Fixture generation (required before running most tests)
-
+### Fixture generation (required before running shielded tx dependent tests)
+#### <span style="color: green">All fixtures have been updated. This step can be skipped.</span>
 The majority of pool and adaptor tests rely on pre-generated ZK proof fixtures. These fixtures encode valid shielded transactions (deposits, transfers, adaptor calls) and must be regenerated whenever the SDK or circuit changes.
 
 ```bash
@@ -102,6 +102,9 @@ pnpm deployCoreWithAdp:sepolia
 # Deploy with proof aggregation infrastructure (Sepolia)
 pnpm deployCoreWithProofAggrInfra:sepolia
 ```
+
+## Documentation
+[Veilnyx Docs](http://veilnyx.gitbook.io/)
 
 ---
 

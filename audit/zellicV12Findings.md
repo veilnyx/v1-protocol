@@ -595,25 +595,6 @@ diff --git a/src/core/Paymaster.sol b/src/core/Paymaster.sol
 
 ```
 No files changed, compilation skipped
-warning: invalid natspec tag '@todo', custom tags must use format '@custom:name'
-   --> src/adaptors/curveNG/CurveNGAdaptor.sol:126:21
-    |
-126 | ...   /// @todo This implementation results in `revert: Withdrawal resulted in fewer coins than expected`. Need to investigate.
-    |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-warning: invalid natspec tag '@todo', custom tags must use format '@custom:name'
-   --> src/adaptors/curveNG/CurveNGAdaptor.sol:172:21
-    |
-172 | ...   /// @todo This implementation results in `revert: Withdrawal resulted in fewer coins than expected`. Need to investigate.
-    |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-warning: invalid natspec tag '@todo', custom tags must use format '@custom:name'
-   --> src/core/Pool.sol:433:5
-    |
-433 |     /// @todo commenting out the treeRoot func. for now to keep the contract within deployable size.
-    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-
 Ran 1 test for test-harness/Configured.t.sol:StaleChainlinkPriceTest
 [FAIL: ChainlinkPriceInvalid(100000000000 [1e11])] test_staleChainlinkPriceAllowsUnderpayment() (gas: 367453)
 Traces:
@@ -1539,25 +1520,6 @@ This prevents an attacker from calling `registerAddress(data, true)` on a pool w
 
 ```
 No files changed, compilation skipped
-warning: invalid natspec tag '@todo', custom tags must use format '@custom:name'
-   --> src/adaptors/curveNG/CurveNGAdaptor.sol:126:21
-    |
-126 | ...   /// @todo This implementation results in `revert: Withdrawal resulted in fewer coins than expected`. Need to investigate.
-    |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-warning: invalid natspec tag '@todo', custom tags must use format '@custom:name'
-   --> src/adaptors/curveNG/CurveNGAdaptor.sol:172:21
-    |
-172 | ...   /// @todo This implementation results in `revert: Withdrawal resulted in fewer coins than expected`. Need to investigate.
-    |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-warning: invalid natspec tag '@todo', custom tags must use format '@custom:name'
-   --> src/core/Pool.sol:433:5
-    |
-433 |     /// @todo commenting out the treeRoot func. for now to keep the contract within deployable size.
-    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-
 Ran 1 test for test-harness/Configured.t.sol:UserSuppliedVerifierBypassTest
 [FAIL: log != expected log] test_userSuppliedVerifierBypassesAddressProof() (gas: 226067)
 Traces:
@@ -2157,13 +2119,6 @@ diff --git a/src/core/Pool.sol b/src/core/Pool.sol
 Compiling 5 files with Solc 0.8.24
 Solc 0.8.24 finished in 86.93s
 Compiler run successful!
-warning: invalid natspec tag '@todo', custom tags must use format '@custom:name'
-   --> src/core/Pool.sol:433:5
-    |
-433 |     /// @todo commenting out the treeRoot func. for now to keep the contract within deployable size.
-    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-
 Ran 1 test for test-harness/Configured.t.sol:PoolCommitmentTreePauseTest
 [FAIL: EnforcedPause()] test_commitmentTreeUpdateBypassesPause() (gas: 472326)
 Traces:
@@ -3824,25 +3779,6 @@ diff --git a/src/core/MemPool.sol b/src/core/MemPool.sol
 
 ```
 No files changed, compilation skipped
-warning: invalid natspec tag '@todo', custom tags must use format '@custom:name'
-   --> src/adaptors/curveNG/CurveNGAdaptor.sol:126:21
-    |
-126 | ...   /// @todo This implementation results in `revert: Withdrawal resulted in fewer coins than expected`. Need to investigate.
-    |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-warning: invalid natspec tag '@todo', custom tags must use format '@custom:name'
-   --> src/adaptors/curveNG/CurveNGAdaptor.sol:172:21
-    |
-172 | ...   /// @todo This implementation results in `revert: Withdrawal resulted in fewer coins than expected`. Need to investigate.
-    |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-warning: invalid natspec tag '@todo', custom tags must use format '@custom:name'
-   --> src/core/Pool.sol:433:5
-    |
-433 |     /// @todo commenting out the treeRoot func. for now to keep the contract within deployable size.
-    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-
 Ran 1 test for test-harness/Configured.t.sol:MempoolDropGriefingPOC
 [FAIL: InvalidStx()] testThirdPartyCanDropAndPenalizeVictim() (gas: 296256)
 Traces:

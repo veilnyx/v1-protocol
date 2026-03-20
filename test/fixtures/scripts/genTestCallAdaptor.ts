@@ -157,7 +157,6 @@ export const reqs = {
         values: [parseEther("2")],
         feeAssetId: 0,
         // adaptor to which the ZkFi AdaptorHandler will call to execute swap
-        // @todo make adaptor addr as a fixture for both fixture and test imports
         to: "0xbF71c5Ae43827387dAAF7358acAB5C81642b74b8",
         // payload:: refund: pool address (address(0)), outToken: testnetUsdc
         payload: encodeAbiParameters(
