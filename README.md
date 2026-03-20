@@ -90,6 +90,8 @@ source .env && forge test --match-contract AaveAdaptorTest --fork-url "$RPC_ETHE
 ```bash
 source .env && forge coverage --no-match-coverage "(script|test)/.*" --fork-url $RPC_ETHEREUM_MAINNET --report lcov --report summary
 ```
+#### Pre-generated coverage report available at: 
+`v1-protocol/test/report/coverage.txt`
 
 ## Deployment
 

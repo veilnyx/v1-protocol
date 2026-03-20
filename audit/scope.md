@@ -24,7 +24,7 @@ Veilnyx is a privacy protocol with built-in compliance, enabled by Selective De-
 | libraries/Asset.sol | 148 | Provides multi-asset ops like adding, updating, transfering, receiving and checkers |  Openzeppelin
 | libraries/MerkleTree.sol | 206 | Leaf insertion logic for Merkle-tree | -
 | libraries/QueuedMerkleTree.sol | 200 | Merkle tree root update using ZK representing insertion of multiple leaves together | - |
-| libraries/ShieldedAddress.sol | 124 | Validates and manages Shielded address registration using ZK |  Openzeppelin
+| libraries/ShieldedAddress.sol | 119 | Validates and manages Shielded address registration using ZK (`registerWithNebraVerifier` excluded — 42 SLOC) |  Openzeppelin
 | libraries/ShieldedTransaction.sol | 619 | Validates and executes Shielded Transaction (STX) | - |
 | base/AdaptorBase.sol | 36|  Base contract for AdaptorHandler | - |
 | base/Constants.sol | 10 | Provides the constant value used in Veilnyx protocol | - |
@@ -40,22 +40,24 @@ Veilnyx is a privacy protocol with built-in compliance, enabled by Selective De-
 | adaptors/rocketpool/RocketPoolAdaptor.sol | 133 | Adaptor for RocketPool protocol | Openzeppelin |
 | src/interfaces/ | 280 | Interfaces of Veilnyx protocol | - |
 | src/poseidon/ | - | Contains poseidon hash bytecodes for diff. input sizes | iden3/circomlibjs |
-| Total SLOC | 3,609 | 
+| Total SLOC | 3,604 | 
 
 ### Out of Scope
 - List of contracts/files excluded from audit
   - src/core/Mempool.sol
   - src/core/MempoolProxy.sol
   - src/core/Screener.sol
-  - src/libraries/EIP712.sol [TODO: Merge PR #16](https://github.com/veilnyx/v1-protocol/pull/16)
+  - src/libraries/EIP712.sol
   - src/libraries/MempoolValidator.sol
   - src/base/MempoolStorage.sol
   - src/verifiers (Will be covered by ZK circuit audits)
+  - `ShieldedAddress::registerWithNebraVerifier()` (42 SLOC, lines 35–81 of `src/libraries/ShieldedAddress.sol`)
 - Audited Third-party dependencies
   - @openzeppelin
   - @account-abstraction
   - @chainlink
 - Known issues
+  - Extend support for more combination of input/output notes verifiers
 
 ### Roles & Actors
 | Role | Privileges | Restrictions |
@@ -88,22 +90,25 @@ pnpm install
 ### Running Tests
 
 ### Generating fixtures (creates STX using SDK through FFI)
+#### <span style="color: green">All fixtures have been updated. This step can be skipped.</span>
 ```bash
 pnpm test:prepare
 ```
 
 ### Run test using generated fixture
 ```bash
-forge test --mt test_weth_deposit
+forge test --fork-url $RPC_ETHEREUM_MAINNET
 ```
 
 ### Coverage
 ```bash
 forge coverage
 ```
+#### Pre-generated coverage report available at: 
+`v1-protocol/test/report/coverage.txt`
 
 ## Commit Hash
-`0dae69fef05dc1bac3cf4da04ab4ffc4fb50077a`
+`b08c4a2431725f702da07300feff9e45e9932767`
 
 ## Deployment Chain(s)
 - Ethereum Sepolia
