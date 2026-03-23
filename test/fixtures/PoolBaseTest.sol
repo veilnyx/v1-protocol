@@ -68,7 +68,7 @@ contract PoolBaseTest is BaseTest {
             selector: vt23.verifyProof.selector
         });
 
-        verifier = new Verifier(vInfos, address(vr), address(vTreeUpdate));
+        verifier = new Verifier(vInfos, address(vr), address(vTreeUpdate), address(this));
         adaptorHandler = new AdaptorHandler();
 
         pool = new MockPool();

@@ -169,7 +169,7 @@ const main = async () => {
     const { hasher } = await deployHasher(wallet, client, deployConfig);
     console.log("Hasher deployed:", hasher);
 
-    const verifier = await deployVerifier(deployConfig);
+    const verifier = await deployVerifier(deployConfig, wallet.account.address);
 
     const initAddressParams = {
       mempool: mempoolProxy,

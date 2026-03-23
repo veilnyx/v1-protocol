@@ -21,6 +21,9 @@ contract Verifier is IVerifier, Ownable {
     address internal _addressVerifier;
     address internal _treeUpdateVerifier;
 
+    /// @notice Address authorised to add, update and remove verifiers.
+    address public verifierManager;
+
     event TransactionVerifierAdded(
         uint16 indexed id,
         bytes4 selector,
@@ -29,17 +32,31 @@ contract Verifier is IVerifier, Ownable {
     event TransactionVerifierRemoved(uint16 indexed id);
     event TreeUpdateVerifierUpdated(address indexed newTreeUpdateVerifier);
     event AddressVerifierUpdated(address indexed newAddressVerifier);
+    event VerifierManagerUpdated(
+        address indexed previousManager,
+        address indexed newManager
+    );
 
     error ZeroAddress();
     error VerifierAlreadyExists(uint16 id);
+    error NotVerifierManager();
+
+    modifier onlyVerifierManager() {
+        if (msg.sender != verifierManager) revert NotVerifierManager();
+        _;
+    }
 
     constructor(
         TransactionVerifierInfo[] memory txvInfos,
         address addressVerifier,
-        address treeUpdateVerifier
+        address treeUpdateVerifier,
+        address verifierManager_
     ) Ownable(msg.sender) {
-        if (addressVerifier == address(0) || treeUpdateVerifier == address(0))
-            revert ZeroAddress();
+        if (
+            addressVerifier == address(0) ||
+            treeUpdateVerifier == address(0) ||
+            verifierManager_ == address(0)
+        ) revert ZeroAddress();
 
         uint256 len = txvInfos.length;
 
@@ -53,36 +70,48 @@ contract Verifier is IVerifier, Ownable {
 
         _addressVerifier = addressVerifier;
         _treeUpdateVerifier = treeUpdateVerifier;
+
+        verifierManager = verifierManager_;
+        emit VerifierManagerUpdated(address(0), verifierManager_);
+    }
+
+    /// @notice Transfers the verifier manager role to a new address.
+    /// @dev Only callable by owner.
+    /// @param newManager The address to assign as the new verifier manager.
+    function setVerifierManager(address newManager) external onlyOwner {
+        if (newManager == address(0)) revert ZeroAddress();
+        emit VerifierManagerUpdated(verifierManager, newManager);
+        verifierManager = newManager;
     }
 
     /// @notice Updates the tree update verifier
-    /// @dev Only callable by owner
+    /// @dev Only callable by verifier manager
     /// @param newTreeUpdateVerifier The new tree update verifier address
     function updateTreeUpdateVerifier(
         address newTreeUpdateVerifier
-    ) external onlyOwner {
+    ) external onlyVerifierManager {
         if (newTreeUpdateVerifier == address(0)) revert ZeroAddress();
         _treeUpdateVerifier = newTreeUpdateVerifier;
         emit TreeUpdateVerifierUpdated(_treeUpdateVerifier);
     }
 
     /// @notice Updates the address verifier
-    /// @dev Only callable by owner
+    /// @dev Only callable by verifier manager
     /// @param newAddressVerifier The new address verifier address
     function updateAddressVerifier(
         address newAddressVerifier
-    ) external onlyOwner {
+    ) external onlyVerifierManager {
         if (newAddressVerifier == address(0)) revert ZeroAddress();
         _addressVerifier = newAddressVerifier;
         emit AddressVerifierUpdated(_addressVerifier);
     }
 
     /// @notice Adds a new transaction verifier
-    /// @dev Only callable by owner
+    /// @dev Only callable by verifier manager
     /// @param txvInfo The transaction verifier info to add
     function addTransactionVerifier(
         TransactionVerifierInfo calldata txvInfo
-    ) external onlyOwner {
+    ) external onlyVerifierManager {
         if (txvInfo.addr == address(0)) revert ZeroAddress();
         if (_transactionVerifiers[txvInfo.id].addr != address(0)) {
             revert VerifierAlreadyExists(txvInfo.id);
@@ -97,11 +126,11 @@ contract Verifier is IVerifier, Ownable {
     }
 
     /// @notice Adds multiple transaction verifiers in batch
-    /// @dev Only callable by owner
+    /// @dev Only callable by verifier manager
     /// @param txvInfos Array of transaction verifier infos to add
     function addTransactionVerifiers(
         TransactionVerifierInfo[] calldata txvInfos
-    ) external onlyOwner {
+    ) external onlyVerifierManager {
         uint256 len = txvInfos.length;
 
         for (uint256 i = 0; i < len; ) {
@@ -124,9 +153,11 @@ contract Verifier is IVerifier, Ownable {
     }
 
     /// @notice Removes a transaction verifier
-    /// @dev Only callable by owner
+    /// @dev Only callable by verifier manager
     /// @param vId The verifier ID to remove
-    function removeTransactionVerifier(uint16 vId) external onlyOwner {
+    function removeTransactionVerifier(
+        uint16 vId
+    ) external onlyVerifierManager {
         if (_transactionVerifiers[vId].addr == address(0)) {
             revert("Verifier: verifier not found");
         }

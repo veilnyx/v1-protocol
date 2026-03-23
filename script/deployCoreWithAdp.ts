@@ -317,7 +317,7 @@ const main = async () => {
   const { hasher } = await deployHasher(deployConfig.client.wallet, client, deployConfig);
   console.log("Hasher deployed:", hasher);
 
-  const verifier = await deployVerifier(deployConfig);
+  const verifier = await deployVerifier(deployConfig, wallets[0].account.address);
 
   const initAddressParams = {
     mempool: zeroAddress,

@@ -38,7 +38,8 @@ contract QueuedMerkleTreeLogicTest is BaseTest {
         Verifier verifier_ = new Verifier(
             txvInfos,
             address(addressVerifier_),
-            address(treeUpdateVerifier)
+            address(treeUpdateVerifier),
+            address(this)
         );
 
         qmt.init(
