@@ -259,9 +259,10 @@ const main = async () => {
   }
 
   // ERC4337 infra
-  const erc4337Contracts = await deployErc4337Infra(chainParams, poolProxy.address, mempoolProxy, deployConfig);
+  const mempoolDummyAddr = "0x1111111111111111111111111111111111111111" as `0x${string}`;
+  const erc4337Contracts = await deployErc4337Infra(chainParams, poolProxy.address, mempoolDummyAddr, deployConfig);
 
-  await updateGatewayAndPoolInMempool(deployConfig, mempoolProxy as `0x${string}`, erc4337Contracts.gateway, poolProxy.address);
+  await updateGatewayAndPoolInMempool(deployConfig, mempoolDummyAddr, erc4337Contracts.gateway, poolProxy.address);
 
   // Register Veilnyx's circuits with Nebra
   await registerCircuitsOnNebra();

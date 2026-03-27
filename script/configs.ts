@@ -34,7 +34,7 @@ export type CommonParams = {
   commitmentTreeQueueSize: number;
   addressTreeDepth: number;
   withdrawFeeBps: bigint;
-  protocolVersion: number;
+  protocolVersion: bigint;
   revokers: {
     name: string;
     description: string;
@@ -59,7 +59,7 @@ export function loadConfigs() {
     commitmentTreeQueueSize: Number(common.commitmentTreeQueueSize),
     addressTreeDepth: Number(common.addressTreeDepth),
     withdrawFeeBps: BigInt(common.withdrawFeeBps),
-    protocolVersion: Number(common.protocolVersion),
+    protocolVersion: BigInt(common.protocolVersion),
     revokers: common.revokers.map((r) => {
       const x = {
         name: r.name,

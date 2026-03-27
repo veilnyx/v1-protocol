@@ -184,7 +184,8 @@ const main = async () => {
 
     // ERC4337 infra
     /* const erc4337Contracts = */
-    await deployErc4337Infra(chainParams, poolProxy.address, zeroAddress, deployConfig);
+    const mempoolDummyAddr = "0x1111111111111111111111111111111111111111" as `0x${string}`;
+    await deployErc4337Infra(chainParams, poolProxy.address, mempoolDummyAddr, deployConfig);
 };
 
 main().catch(console.error);

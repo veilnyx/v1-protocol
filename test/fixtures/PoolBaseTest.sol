@@ -80,7 +80,7 @@ contract PoolBaseTest is BaseTest {
 
         screener = new MockScreener();
         hasher = _deployHasher();
-        // mempool = _deployMempool();
+        mempool = _deployMempool();
 
         address poolNebraVerifier = address(mockNebraVerifier) != address(0)
             ? address(mockNebraVerifier)
@@ -107,7 +107,7 @@ contract PoolBaseTest is BaseTest {
         ERC1967Proxy poolProxy = new ERC1967Proxy(address(pool), initData);
         pool = MockPool(address(poolProxy));
         adaptorHandler.setVeilnyxPool(address(pool));
-        // mempool.updatePoolAddress(address(pool));
+        mempool.updatePoolAddress(address(pool));
     }
 
     //////////////////////////////////////////////////////

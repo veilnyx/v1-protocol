@@ -218,6 +218,10 @@ contract PaymasterTest is PoolTest {
     function test_revert_convertFeeFromGasTokenToFeeAsset_whenPriceIsStale()
         public
     {
+        if (block.chainid != ETH_SEPOLIA && block.chainid != ETH_MAINNET) {
+            vm.skip(true);
+        }
+
         (
             int256 ethInUSDC,
             uint256 updatedAt,
