@@ -26,13 +26,13 @@ import {ShieldedTransaction, ShieldedTransactionLogic, RevokerData} from "../lib
 /// @param hasher The address of the hasher contract. It provides a single interface to Poseidon hashing functions
 /// @param withdrawFeeBps The fee in basis points (1/10000) that is charged for withdrawing assets from the pool.
 struct InitAddressParams {
-    address mempool;
     address verifier;
     address adaptorHandler;
     address screener;
     address hasher;
-    address verificationTrackerService;
-    address nebraVerifier;
+    // address mempool;
+    // address verificationTrackerService;
+    // address nebraVerifier;
 }
 
 contract Pool is
@@ -83,14 +83,14 @@ contract Pool is
             EIP712_DOMAIN_VERSION
         );
 
-        mempool = initAddressParams.mempool;
         verifier = initAddressParams.verifier;
         adaptorHandler = initAddressParams.adaptorHandler;
         hasher = initAddressParams.hasher;
         screener = initAddressParams.screener;
-        verificationTrackerService = initAddressParams
-            .verificationTrackerService;
-        nebraVerifier = initAddressParams.nebraVerifier;
+        // mempool = initAddressParams.mempool;
+        // verificationTrackerService = initAddressParams
+        //     .verificationTrackerService;
+        // nebraVerifier = initAddressParams.nebraVerifier;
 
         if (withdrawFeeBps_ > MAX_WITHDRAW_FEE_BPS) {
             revert IPool.WithdrawalFeeTooHigh(
@@ -212,6 +212,7 @@ contract Pool is
         withdrawFeeBps = feeBps;
     }
 
+    /**
     function updateVerificationTrackerService(
         address verificationTrackerService_
     ) external onlyOwner {
@@ -221,6 +222,7 @@ contract Pool is
     function updateNebraVerifier(address nebraVerifier_) external onlyOwner {
         nebraVerifier = nebraVerifier_;
     }
+     */
 
     /// @notice Sets the protocol version number.
     /// @dev This is used to track the pool contract version since EIP-712 domain
@@ -278,14 +280,14 @@ contract Pool is
         bool isPreVerified
     ) public nonReentrant whenNotPaused restrictPreVerified(isPreVerified) {
         // constraining preVerified request sender to just the mempool contract.
-        if (isPreVerified) {
-            if (msg.sender != mempool) {
-                revert IPool.InvalidSenderForPreverifiedSTX(
-                    msg.sender,
-                    mempool
-                );
-            }
-        }
+        // if (isPreVerified) {
+        //     if (msg.sender != mempool) {
+        //         revert IPool.InvalidSenderForPreverifiedSTX(
+        //             msg.sender,
+        //             mempool
+        //         );
+        //     }
+        // }
 
         stx.validate({
             isPreVerified: isPreVerified,
@@ -330,6 +332,7 @@ contract Pool is
         });
     }
 
+    /**
     function withdrawExitMempoolFee(
         uint24 assetId
     ) external nonReentrant whenNotPaused {
@@ -346,6 +349,7 @@ contract Pool is
             value: fee
         });
     }
+     */
 
     /////////////////////////////////////////
     //         READ METHODS                //
@@ -363,11 +367,11 @@ contract Pool is
             verifier: verifier
         });
     }
-     */
 
     function getVeilnyxVersion() external view returns (uint64) {
         return version;
     }
+      */
 
     function getRevokerData(
         uint256 id
@@ -401,33 +405,10 @@ contract Pool is
         return _paymasterFees[paymaster][assertId];
     }
 
-    function getCollectedExitMempoolFee(
-        uint24 assetId
-    ) external view returns (uint256) {
-        return _proofSubAndMempoolExitFee[assetId];
-    }
-
     function isAdaptorSupported(
         address adaptorAddress
     ) external view returns (bool) {
         return _adaptors[adaptorAddress];
-    }
-
-    function areMarkedNullifiers(
-        uint256[] calldata nullifiers
-    ) external view returns (bool[] memory) {
-        bool[] memory markedArr = new bool[](nullifiers.length);
-        uint256 nullifiersLen = nullifiers.length;
-
-        for (uint256 i = 0; i < nullifiersLen; ) {
-            markedArr[i] = _markedNullifiers[nullifiers[i]] != 0;
-
-            unchecked {
-                ++i;
-            }
-        }
-
-        return markedArr;
     }
 
     function getCommitmentTreeState()
@@ -464,6 +445,8 @@ contract Pool is
             .getState();
     }
 
+    /// @todo commenting out the treeRoot func. for now to keep the contract within deployable size.
+    /**
     function isKnownCommitmentTreeRoot(
         uint256 root
     ) external view returns (bool) {
@@ -473,6 +456,30 @@ contract Pool is
     function isKnownAddressTreeRoot(uint256 root) external view returns (bool) {
         return _addressTree.isKnownRoot(root);
     }
+
+     function areMarkedNullifiers(
+        uint256[] calldata nullifiers
+    ) external view returns (bool[] memory) {
+        bool[] memory markedArr = new bool[](nullifiers.length);
+        uint256 nullifiersLen = nullifiers.length;
+
+        for (uint256 i = 0; i < nullifiersLen; ) {
+            markedArr[i] = _markedNullifiers[nullifiers[i]] != 0;
+
+            unchecked {
+                ++i;
+            }
+        }
+
+        return markedArr;
+    }
+
+       function getCollectedExitMempoolFee(
+        uint24 assetId
+    ) external view returns (uint256) {
+        return _proofSubAndMempoolExitFee[assetId];
+    }
+    */
 
     function _authorizeUpgrade(
         address newImplementation

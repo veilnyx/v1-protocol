@@ -68,27 +68,29 @@ contract PoolBaseTest is BaseTest {
             selector: vt23.verifyProof.selector
         });
 
-        verifier = new Verifier(vInfos, address(vr), address(vTreeUpdate), address(this));
+        verifier = new Verifier(
+            vInfos,
+            address(vr),
+            address(vTreeUpdate),
+            address(this)
+        );
         adaptorHandler = new AdaptorHandler();
 
         pool = new MockPool();
 
         screener = new MockScreener();
         hasher = _deployHasher();
-        mempool = _deployMempool();
+        // mempool = _deployMempool();
 
         address poolNebraVerifier = address(mockNebraVerifier) != address(0)
             ? address(mockNebraVerifier)
             : config.nebraVerifier();
 
         InitAddressParams memory initAddressParams = InitAddressParams({
-            mempool: address(mempool),
             verifier: address(verifier),
             adaptorHandler: address(adaptorHandler),
             screener: address(screener),
-            hasher: address(hasher),
-            verificationTrackerService: makeAddr("zkVerificationTrackerService"),
-            nebraVerifier: poolNebraVerifier
+            hasher: address(hasher)
         });
 
         bytes memory initData = abi.encodeCall(
@@ -105,7 +107,7 @@ contract PoolBaseTest is BaseTest {
         ERC1967Proxy poolProxy = new ERC1967Proxy(address(pool), initData);
         pool = MockPool(address(poolProxy));
         adaptorHandler.setVeilnyxPool(address(pool));
-        mempool.updatePoolAddress(address(pool));
+        // mempool.updatePoolAddress(address(pool));
     }
 
     //////////////////////////////////////////////////////

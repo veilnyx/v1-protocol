@@ -258,9 +258,6 @@ const main = async () => {
   // individual adp deployment
   // deployMorpho(adpParams.morpho, "0x9163043b553aDeF9fE44b088922560cfBFdEC51b" as Hex, deployConfig);
 
-  const eip712 = await hre.viem.deployContract("EIP712", [], deployConfig);
-  console.log("EIP712 deployed:", eip712.address);
-
   const asset = await hre.viem.deployContract("AssetLogic", [], deployConfig);
   console.log("AssetLogic deployed:", asset.address);
 
@@ -304,7 +301,6 @@ const main = async () => {
   const poolImpl = await hre.viem.deployContract("Pool", [], {
     client: deployConfig.client,
     libraries: {
-      EIP712: eip712.address,
       AssetLogic: asset.address,
       MerkleTreeLogic: merkleTree.address,
       QueuedMerkleTreeLogic: queuedMerkleTree.address,
@@ -320,13 +316,13 @@ const main = async () => {
   const verifier = await deployVerifier(deployConfig, wallets[0].account.address);
 
   const initAddressParams = {
-    mempool: zeroAddress,
     verifier: verifier,
     adaptorHandler: adaptorHandler.address,
     screener: chainParams.sanctionsList,
     hasher: hasher,
-    verificationTrackerService: zeroAddress,
-    nebraVerifier: chainParams.nebraVerifier,
+    // mempool: zeroAddress,
+    // verificationTrackerService: zeroAddress,
+    // nebraVerifier: chainParams.nebraVerifier,
   }
 
   const args = [

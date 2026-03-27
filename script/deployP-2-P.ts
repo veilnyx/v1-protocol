@@ -45,8 +45,6 @@ const main = async () => {
         maxFeePerGas: BigInt(200_000_000_000), // 200 gwei
     }
 
-    const eip712 = await hre.viem.deployContract("EIP712", [], deployConfig);
-    console.log("EIP712 deployed:", eip712.address);
     const asset = await hre.viem.deployContract("AssetLogic", [], deployConfig);
     console.log("AssetLogic deployed:", asset.address);
     const merkleTree = await hre.viem.deployContract("MerkleTreeLogic", [], deployConfig);
@@ -89,7 +87,6 @@ const main = async () => {
     {
         const poolImpl = await hre.viem.deployContract("Pool", [], {
             libraries: {
-                EIP712: eip712.address,
                 AssetLogic: asset.address,
                 MerkleTreeLogic: merkleTree.address,
                 QueuedMerkleTreeLogic: queuedMerkleTree.address,
@@ -106,13 +103,13 @@ const main = async () => {
         const verifier = await deployVerifier(deployConfig, wallet.account.address);
 
         const initAddressParams = {
-            mempool: zeroAddress,
             verifier: verifier,
             adaptorHandler: zeroAddress,
             screener: chainParams.sanctionsList,
             hasher: hasher,
-            verificationTrackerService: verificationTrackerService,
-            nebraVerifier: chainParams.nebraVerifier,
+            // mempool: zeroAddress,
+            // verificationTrackerService: verificationTrackerService,
+            // nebraVerifier: chainParams.nebraVerifier,
         }
 
         const args = [

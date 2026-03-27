@@ -217,12 +217,6 @@ interface IPool {
         address adaptorAddress
     ) external view returns (bool);
 
-    /// @notice Returns if an array of nullifiers are marked.
-    /// @param nullifiers The array of nullifiers to check.
-    function areMarkedNullifiers(
-        uint256[] calldata nullifiers
-    ) external view returns (bool[] memory);
-
     /**
      * 
      * 
@@ -234,8 +228,11 @@ interface IPool {
     /// @param assetAddress The address of the asset to check.
     function isAssetActive(address assetAddress) external view returns (bool);
 
-
-
+    /// @notice Returns if an array of nullifiers are marked.
+    /// @param nullifiers The array of nullifiers to check.
+    function areMarkedNullifiers(
+        uint256[] calldata nullifiers
+    ) external view returns (bool[] memory);
 
     /// @notice Returns the depth of the commitment merkle tree.
     function getCommitmentTreeDepth() external view returns (uint8);
