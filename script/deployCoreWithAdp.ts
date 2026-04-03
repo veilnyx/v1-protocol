@@ -366,15 +366,15 @@ const main = async () => {
   await client.waitForTransactionReceipt({ hash: setVersionHash });
   console.log("Pool: version set to", commonParams.protocolVersion);
   
-  // Deploy Adaptors 
-  await deployAdaptors(poolProxy.address, adpParams, deployConfig);
-
   // ERC4337 infra setup
   const mempoolDummyAddr = "0x1111111111111111111111111111111111111111" as `0x${string}`;
   await deployErc4337Infra(chainParams, poolProxy.address, mempoolDummyAddr, deployConfig);
 
   // Asset & Revoker Setup
   await addAssetsAndRevokers(poolProxy.address, chainParams, commonParams, client, deployConfig.client.wallet);
+
+  // Deploy Adaptors (should be after base assets are added to maintain the expected ID order)
+  await deployAdaptors(poolProxy.address, adpParams, deployConfig);
 };
 
 main().catch(console.error);
