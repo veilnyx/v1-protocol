@@ -9,11 +9,6 @@ import {IVerifier} from "../interfaces/IVerifier.sol";
 import {INebraUpa} from "../interfaces/INebraUpa.sol";
 import {EIP712_TYPEHASH_REGISTER_ADDRESS, MESSAGE_REGISTER_ADDRESS} from "../base/Constants.sol";
 
-struct PreVerificationDetails {
-    bytes32 circuitId;
-    uint256[] publicInputs;
-}
-
 struct ShieldedAddressRegistrationData {
     bytes proof;
     bytes shieldedAddress; // In uncompressed form
@@ -29,59 +24,8 @@ library ShieldedAddressLogic {
     bytes32 constant MASK_PACK =
         hex"8000000000000000000000000000000000000000000000000000000000000000";
 
-    /// @notice Registers a shielded address using a Nebra UPA pre-verified proof.
-    /// @dev `nebraVerifier` is read from PoolStorage to prevent an attacker from
-    ///      supplying a mock verifier address that always returns true.
-    function registerWithNebraVerifier(
-        ShieldedAddressRegistrationData calldata self,
-        PreVerificationDetails calldata preVerifDetails,
-        MerkleTree storage addressTree,
-        mapping(address => uint256) storage publicAddresses,
-        mapping(uint256 => bool) storage rootAddresses,
-        address nebraVerifier,
-        bytes32 hashTypedData
-    ) external {
-        if (nebraVerifier == address(0)) {
-            revert NebraVerifierNotSet();
-        }
-        
-        uint256 rootAddress = uint256(bytes32(self.shieldedAddress[0:32]));
-        _validateShieldedAddressData(self, rootAddress, rootAddresses);
-
-        if (rootAddress != preVerifDetails.publicInputs[0]) {
-            revert IPool.RootAddrMismatch(
-                preVerifDetails.publicInputs[0],
-                rootAddress
-            );
-        }
-
-        bytes32 proofId = keccak256(
-            abi.encode(
-                preVerifDetails.circuitId,
-                preVerifDetails.publicInputs[0],
-                preVerifDetails.publicInputs[1],
-                preVerifDetails.publicInputs[2],
-                preVerifDetails.publicInputs[3],
-                preVerifDetails.publicInputs[4]
-            )
-        );
-
-        if (!INebraUpa(nebraVerifier).isProofVerified(proofId)) {
-            revert NotPreVerified();
-        }
-
-        _insertAddress(
-            self,
-            addressTree,
-            publicAddresses,
-            rootAddresses,
-            hashTypedData,
-            rootAddress
-        );
-    }
-
     /// @notice Registers a shielded address by verifying the proof on-chain via the Veilnyx verifier.
-    function registerWithVeilnyxVerifier(
+    function register(
         ShieldedAddressRegistrationData calldata self,
         MerkleTree storage addressTree,
         mapping(address => uint256) storage publicAddresses,

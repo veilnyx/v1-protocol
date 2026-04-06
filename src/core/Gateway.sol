@@ -6,11 +6,9 @@ import {IAccount} from "@account-abstraction/contracts/interfaces/IAccount.sol";
 import {IEntryPoint} from "@account-abstraction/contracts/interfaces/IEntryPoint.sol";
 import {PackedUserOperation} from "@account-abstraction/contracts/interfaces/PackedUserOperation.sol";
 import {ShieldedTransaction} from "../libraries/ShieldedTransaction.sol";
-import {PreVerificationDetails} from "./Mempool.sol";
 import {IWToken} from "../interfaces/IWToken.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IPool} from "../interfaces/IPool.sol";
-import {IMempool} from "../interfaces/IMempool.sol";
 import {IGateway} from "../interfaces/IGateway.sol";
 
 contract Gateway is IGateway, Ownable {
@@ -19,7 +17,6 @@ contract Gateway is IGateway, Ownable {
 
     address public immutable entryPoint;
     address public immutable pool;
-    address public immutable mempool;
     address public immutable wToken;
 
     error InvalidEntryPoint(address entryPoint);
@@ -36,14 +33,16 @@ contract Gateway is IGateway, Ownable {
     constructor(
         address entryPoint_,
         address wToken_,
-        address pool_,
-        address mempool_
+        address pool_
     ) Ownable(msg.sender) {
-        if (entryPoint_ == address(0) || wToken_ == address(0) || pool_ == address(0) || mempool_ == address(0)) revert ZeroAddress();
+        if (
+            entryPoint_ == address(0) ||
+            wToken_ == address(0) ||
+            pool_ == address(0)
+        ) revert ZeroAddress();
         entryPoint = entryPoint_;
         pool = pool_;
         wToken = wToken_;
-        mempool = mempool_;
     }
 
     /// @dev `missingAccountFunds` is always expected to be 0 since paymaster
@@ -57,14 +56,9 @@ contract Gateway is IGateway, Ownable {
     }
 
     function handleUserOp(
-        ShieldedTransaction calldata stx,
-        PreVerificationDetails calldata preVerificationDetails
+        ShieldedTransaction calldata stx
     ) external onlyEntryPoint {
-        if (preVerificationDetails.isPreVerified) {
-            IMempool(mempool).addSTXToMempool(stx, preVerificationDetails);
-        } else {
-            IPool(pool).transact(stx, false);
-        }
+        IPool(pool).transact(stx);
     }
 
     function handleWrapAndDeposit(
@@ -72,7 +66,7 @@ contract Gateway is IGateway, Ownable {
     ) external payable {
         IWToken(wToken).deposit{value: msg.value}();
         IWToken(wToken).forceApprove(pool, msg.value);
-        IPool(pool).transact(stx, false);
+        IPool(pool).transact(stx);
     }
 
     // This may not be needed as paymaster is always supposed to pay for gas

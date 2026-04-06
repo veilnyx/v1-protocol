@@ -150,7 +150,6 @@ library ShieldedTransactionLogic {
     /// @custom:invariant STX-1: pubAssets length cannot exceed commitments length
     function validate(
         ShieldedTransaction calldata stx,
-        bool isPreVerified,
         MerkleTree storage addressTree,
         QueuedMerkleTree storage commitmentTree,
         address verifier,
@@ -185,10 +184,8 @@ library ShieldedTransactionLogic {
             revert IPool.PubAssetsCannotExceedCommitments();
         }
 
-        if (!isPreVerified) {
-            if (!verifyProof(stx, revokerData, verifier)) {
-                revert IPool.InvalidTransactionProof();
-            }
+        if (!verifyProof(stx, revokerData, verifier)) {
+            revert IPool.InvalidTransactionProof();
         }
     }
 
@@ -200,11 +197,9 @@ library ShieldedTransactionLogic {
     /// @param paymasterFees Mapping of paymaster address to assetId to fee value
     function execute(
         ShieldedTransaction calldata stx,
-        bool isPreVerified,
         QueuedMerkleTree storage commitmentTree,
         mapping(uint24 => Asset) storage assets,
         mapping(address => mapping(uint24 => uint256)) storage paymasterFees,
-        mapping(uint24 => uint256) storage proofSubAndExitMempoolFees,
         mapping(uint24 => uint256) storage withdrawFees,
         address hasher,
         address adaptorHandler,
@@ -214,12 +209,7 @@ library ShieldedTransactionLogic {
         MemoParams memory memoParams = _copyMemoParamsToMemory(stx);
 
         // Credit paymaster fees
-        _creditPaymasterFee(
-            paymasterFees,
-            proofSubAndExitMempoolFees,
-            params,
-            isPreVerified
-        );
+        _creditPaymasterFee(paymasterFees, params);
 
         // Receive any deposits
         if (stx.txType == ShieldedTransactionType.DEPOSIT) {
@@ -640,29 +630,13 @@ library ShieldedTransactionLogic {
 
     function _creditPaymasterFee(
         mapping(address => mapping(uint24 => uint256)) storage paymasterFees,
-        mapping(uint24 => uint256) storage proofSubAndExitMempoolFees,
-        Params memory params,
-        bool isPreVerified
+        Params memory params
     ) internal {
         uint256 feeValue = params.feeValue;
 
         if (feeValue != 0) {
-            if (isPreVerified) {
-                // Allot 65% percentage of fee to the verification tracker service for exiting tx out of mempool to the Veilnyx pool and the balance (35%) to the paymaster for adding tx to the Mempool.
-                uint256 gasFeeAddMempool = (feeValue * 35) / 100;
-                uint256 gasFeeExitMempool = feeValue - gasFeeAddMempool;
-
-                paymasterFees[params.paymaster][
-                    params.feeAssetId
-                ] += gasFeeAddMempool;
-
-                proofSubAndExitMempoolFees[
-                    params.feeAssetId
-                ] += gasFeeExitMempool;
-            } else {
-                // All fee goes to the paymaster only
-                paymasterFees[params.paymaster][params.feeAssetId] += feeValue;
-            }
+            // All fee goes to the paymaster only
+            paymasterFees[params.paymaster][params.feeAssetId] += feeValue;
         }
     }
 

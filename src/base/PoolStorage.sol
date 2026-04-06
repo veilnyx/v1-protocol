@@ -37,12 +37,5 @@ abstract contract PoolStorage {
     mapping(address paymaster => mapping(uint24 assetId => uint256 feeAmount))
         internal _paymasterFees;
 
-    address public mempool;
-    address public verificationTrackerService;
-    mapping(uint24 => uint256) internal _proofSubAndMempoolExitFee;
-
     uint64 public version;
-
-    // If nebraVerifier is set to a zero addres, the pool will not allow any preverified proof to be used for either shielded address registration or shielded transactions. Adding the nebraVerifier storage slot anyway for future compatibility, avoiding storage layout change during upgrades.
-    address public nebraVerifier = address(0);
 }

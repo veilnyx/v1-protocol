@@ -12,7 +12,6 @@ import {IEntryPoint} from "@account-abstraction/contracts/interfaces/IEntryPoint
 import {PackedUserOperation} from "@account-abstraction/contracts/interfaces/PackedUserOperation.sol";
 import {ShieldedTransaction} from "../libraries/ShieldedTransaction.sol";
 import {Asset, AssetLogic} from "../libraries/Asset.sol";
-import {PreVerificationDetails} from "../interfaces/IMempool.sol";
 import {IPool} from "../interfaces/IPool.sol";
 
 contract Paymaster is IPaymaster, Ownable {
@@ -166,7 +165,7 @@ contract Paymaster is IPaymaster, Ownable {
         );
         // for conversion we assume price fetching of assetId in ETH only since maxCostEth is in ETH
         uint8 feedDecimals = feed.decimals();
-        
+
         (, int256 priceETHInAsset, , uint256 updatedAt, ) = feed
             .latestRoundData();
         if (
@@ -234,9 +233,9 @@ contract Paymaster is IPaymaster, Ownable {
     function _parseFeeParams(
         PackedUserOperation calldata userOp
     ) internal pure returns (address, uint24, uint256) {
-        (ShieldedTransaction memory stx, ) = abi.decode(
+        ShieldedTransaction memory stx = abi.decode(
             userOp.callData[4:],
-            (ShieldedTransaction, PreVerificationDetails)
+            (ShieldedTransaction)
         );
 
         // FeeData is packed as follows (in order):
