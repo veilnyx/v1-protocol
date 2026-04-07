@@ -5,7 +5,6 @@ import {Test} from "forge-std/Test.sol";
 import {Vm} from "forge-std/Vm.sol";
 import {PackedUserOperation} from "@account-abstraction/contracts/interfaces/PackedUserOperation.sol";
 import {ShieldedTransaction, ShieldedTransactionType} from "src/libraries/ShieldedTransaction.sol";
-import {PreVerificationDetails} from "src/core/Mempool.sol";
 import {ShieldedAddressRegistrationData} from "src/libraries/ShieldedAddress.sol";
 import {ShieldedAccount} from "test/helpers/ShieldedAccount.sol";
 import {TreeUpdateData} from "src/libraries/QueuedMerkleTree.sol";
@@ -178,18 +177,6 @@ library FixtureLib {
             (ShieldedTransaction)
         );
         return stx;
-    }
-
-    function loadPreVerificationDetails(
-        string memory name,
-        Vm vm
-    ) external view returns (PreVerificationDetails memory) {
-        bytes memory data = loadData(name, vm);
-        PreVerificationDetails memory preVerificationDetails = abi.decode(
-            data,
-            (PreVerificationDetails)
-        );
-        return preVerificationDetails;
     }
 
     function loadPackedUserOp(

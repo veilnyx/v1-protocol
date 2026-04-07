@@ -12,7 +12,7 @@ import {Asset, AssetType} from "src/libraries/Asset.sol";
 import {ShieldedTransaction, ShieldedTransactionType, RevokerData} from "src/libraries/ShieldedTransaction.sol";
 import {MerkleTree, MerkleTreeLogic} from "src/libraries/MerkleTree.sol";
 import {TreeUpdateData} from "src/libraries/QueuedMerkleTree.sol";
-import {ShieldedAddressRegistrationData, ShieldedAddressLogic, PreVerificationDetails} from "src/libraries/ShieldedAddress.sol";
+import {ShieldedAddressRegistrationData, ShieldedAddressLogic} from "src/libraries/ShieldedAddress.sol";
 import {IPool} from "src/interfaces/IPool.sol";
 import {MockScreener} from "test/mocks/MockScreener.sol";
 import {MockVerifier} from "test/mocks/MockVerifier.sol";
@@ -186,8 +186,7 @@ contract PoolTest is PoolBaseTest, BaseScript {
                 "register_sender"
             );
         addressRegData.signature = signature;
-        PreVerificationDetails memory emptyPreVerifDetails;
-        pool.registerAddress(addressRegData, emptyPreVerifDetails, false);
+        pool.registerAddress(addressRegData);
     }
 
     /// @notice Checks if the expect events: NullifierMarked, Commitment, Receipt are emitted.
@@ -201,7 +200,7 @@ contract PoolTest is PoolBaseTest, BaseScript {
         // expectCommitmentsInserted(stx)
         expectReceipt(stx)
     {
-        pool.transact(stx, false);
+        pool.transact(stx);
     }
 
     function _mintAsset(
@@ -235,7 +234,7 @@ contract PoolTest is PoolBaseTest, BaseScript {
         ShieldedTransaction memory stx = _loadShieldedTransaction(
             "deposit_pre_tx"
         );
-        pool.transact(stx, false);
+        pool.transact(stx);
         _processCommitmentTreeQueue();
     }
 

@@ -87,6 +87,6 @@ contract PoolDepositTest is PoolTest {
                 stx.nullifiers[0]
             )
         );
-        pool.transact(stx, false);
+        pool.transact(stx);
     }
 }

@@ -79,7 +79,7 @@ contract LidoAdaptorTest is PoolTest {
         ShieldedTransaction memory stxWethDeposit = _loadShieldedTransaction(
             "deposit_2_testnet_weth"
         );
-        pool.transact(stxWethDeposit, false);
+        pool.transact(stxWethDeposit);
         vm.stopPrank();
 
         _processCommitmentTreeQueue();
@@ -99,7 +99,7 @@ contract LidoAdaptorTest is PoolTest {
         ShieldedTransaction memory stxStake = _loadShieldedTransaction(
             "stake_1_testnet_weth_lido"
         );
-        pool.transact(stxStake, false);
+        pool.transact(stxStake);
 
         // Asserts
         uint256 poolwstETHBalPostStake = IERC20(wstETH).balanceOf(

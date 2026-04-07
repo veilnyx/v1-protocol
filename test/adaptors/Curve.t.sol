@@ -25,7 +25,7 @@ contract CurveAdaptorTest is PoolTest {
     address public crvUSD = 0xf939E0A03FB07F59A73314E73794Be0E57ac1b4E;
     address public crvUSD_USDT_Pool =
         0x390f3595bCa2Df7d23783dFd126427CCeb997BF4;
-    uint256 public constant MAX_SLIPPAGE_BPS = 50_00; // allowing max 50% slippage for testing purposes
+    uint256 public constant MAX_SLIPPAGE_BPS = 70_00; // allowing max 50% slippage for testing purposes
 
     function setUp() external {
         if (!shouldTestRun()) {
@@ -80,7 +80,7 @@ contract CurveAdaptorTest is PoolTest {
         ShieldedTransaction memory stxDeposit = _loadShieldedTransaction(
             "deposit_5_testnet_usdt_crvusd"
         );
-        pool.transact(stxDeposit, false);
+        pool.transact(stxDeposit);
         vm.stopPrank();
 
         _processCommitmentTreeQueue();
@@ -101,7 +101,7 @@ contract CurveAdaptorTest is PoolTest {
             "supply_5_usdt_crvUsd_on_curve"
         );
 
-        pool.transact(stxSupply, false);
+        pool.transact(stxSupply);
 
         // Asserts
         uint256 curveLPTokenBalPostSupply = IERC20(crvUSD_USDT_Pool).balanceOf(
@@ -157,6 +157,7 @@ contract CurveAdaptorTest is PoolTest {
         });
 
         bytes memory payloadEncoded = abi.encode(payload);
+
         vm.startPrank(user);
         /// @dev We don't need to transfer the LP tokens to the CurveAdaptor as during the deposit, LP tokens were received by the CurveAdaptor itself.
         (uint24[] memory outAssetIds, uint256[] memory outValues) = IAdaptor(

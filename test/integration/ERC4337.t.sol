@@ -7,7 +7,6 @@ import {PackedUserOperation} from "@account-abstraction/contracts/interfaces/Pac
 import {Paymaster} from "src/core/Paymaster.sol";
 import {Gateway} from "src/core/Gateway.sol";
 import {ShieldedTransaction, ShieldedTransactionLogic, ShieldedTransactionType} from "src/libraries/ShieldedTransaction.sol";
-import {Mempool, PreVerificationDetails} from "src/core/Mempool.sol";
 import {Pool} from "src/core/Pool.sol";
 import {MockPool} from "test/mocks/MockPool.sol";
 import {PoolTest} from "test/fixtures/PoolTest.sol";
@@ -41,8 +40,7 @@ contract ERC4337 is PoolTest {
             abi.encode(
                 address(entryPointContract),
                 address(new MockWToken()),
-                address(pool),
-                address(mempool)
+                address(pool)
             ),
             fixture.gateway
         );
@@ -50,8 +48,6 @@ contract ERC4337 is PoolTest {
 
         console2.log("Gateway(Sender) address:");
         console2.logAddress(address(gateway));
-
-        mempool.updateGatewayContract(address(gateway));
 
         StdCheats.deployCodeTo(
             "Paymaster.sol:Paymaster",
@@ -85,7 +81,7 @@ contract ERC4337 is PoolTest {
             "deposit_weth_tx"
         );
 
-        pool.transact(stx, false);
+        pool.transact(stx);
         _processCommitmentTreeQueue();
     }
 

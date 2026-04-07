@@ -17,8 +17,7 @@ const main = async () => {
 	// await genTestDepositsWithOutsourceProofVerification(sdk, nebraClient);
 	// await genTestTransfers(sdk);
 	// await genTestTransfersWithOutsourceProofVerification(sdk, nebraClient);
-	// await genTransferPackedUserOp(sdk, nebraClient);
-	// await genTransferPackedUserOpPreVerified(sdk, nebraClient);
+	await genTransferPackedUserOp(sdk, nebraClient);
 	// await genAddressRegistrations(sdk);
 	// await genAddrRegWithOutsourceProofVerification(sdk, nebraClient);
 	// await genTestDepositsWithOutsourceProofVerification(sdk, nebraClient);

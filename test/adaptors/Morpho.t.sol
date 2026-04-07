@@ -73,13 +73,13 @@ contract MorphoAdaptorTest is PoolTest {
         ShieldedTransaction memory depositStx = _loadShieldedTransaction(
             "deposit_2_morphoLoanToken"
         );
-        pool.transact(depositStx, false);
+        pool.transact(depositStx);
         _processCommitmentTreeQueue();
 
         ShieldedTransaction memory supplyStx = _loadShieldedTransaction(
             "supply_2_morphoLoanToken"
         );
-        pool.transact(supplyStx, false);
+        pool.transact(supplyStx);
         vm.stopPrank();
 
         console.log("Supplying done!");
@@ -97,13 +97,13 @@ contract MorphoAdaptorTest is PoolTest {
         ShieldedTransaction memory depositStx = _loadShieldedTransaction(
             "deposit_2_morphoVaultToken"
         );
-        pool.transact(depositStx, false);
+        pool.transact(depositStx);
         _processCommitmentTreeQueue();
 
         ShieldedTransaction memory withdrawStx = _loadShieldedTransaction(
             "withdraw_2_morphoLoanToken"
         );
-        pool.transact(withdrawStx, false);
+        pool.transact(withdrawStx);
         vm.stopPrank();
 
         console.log("Withdrawing done!");

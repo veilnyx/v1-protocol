@@ -74,7 +74,7 @@ contract RocketPoolAdpTest is PoolTest {
         ShieldedTransaction memory stxWethDeposit = _loadShieldedTransaction(
             "deposit_2_testnet_weth"
         );
-        pool.transact(stxWethDeposit, false);
+        pool.transact(stxWethDeposit);
         vm.stopPrank();
 
         _processCommitmentTreeQueue();
@@ -145,7 +145,7 @@ contract RocketPoolAdpTest is PoolTest {
         ShieldedTransaction memory stxStake = _loadShieldedTransaction(
             "stake_1_testnet_weth_rocketpool"
         );
-        pool.transact(stxStake, false);
+        pool.transact(stxStake);
 
         // Asserts
         uint256 poolrETHBalPostStake = IERC20(rETH).balanceOf(address(pool));

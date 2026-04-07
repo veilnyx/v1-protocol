@@ -8,7 +8,6 @@ import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interf
 import {Paymaster} from "src/core/Paymaster.sol";
 import {Asset} from "src/libraries/Asset.sol";
 import {ShieldedTransaction, ShieldedTransactionType} from "src/libraries/ShieldedTransaction.sol";
-import {Mempool, PreVerificationDetails} from "src/core/Mempool.sol";
 import {Pool} from "src/core/Pool.sol";
 import {Gateway} from "src/core/Gateway.sol";
 import {MockPool} from "test/mocks/MockPool.sol";
@@ -35,7 +34,6 @@ contract PaymasterTest is PoolTest {
     uint256 feeValueForOutsourcedVerification = 0.001 ether;
 
     ShieldedTransaction stx;
-    PreVerificationDetails preVerificationDetails;
     PackedUserOperation userOp;
 
     modifier createPackedUserOps(address gatewayAddr) {
@@ -58,17 +56,10 @@ contract PaymasterTest is PoolTest {
         publicInputs[0] = 0;
         publicInputs[1] = 0;
 
-        preVerificationDetails = PreVerificationDetails({
-            isPreVerified: false,
-            circuitId: bytes32(0),
-            publicInputs: publicInputs,
-            verifierAddr: address(0)
-        });
-
         userOp.sender = gatewayAddr;
         userOp.callData = abi.encodeCall(
-            MockPool.transactForPaymasterTestSetup,
-            (stx, preVerificationDetails)
+            Pool.transact,
+            (stx)
         );
         _;
     }
@@ -80,8 +71,7 @@ contract PaymasterTest is PoolTest {
         gateway = new Gateway(
             address(entryPoint),
             makeAddr("wToken"),
-            address(pool),
-            address(mempool)
+            address(pool)
         );
 
         StdCheats.deployCodeTo(
@@ -286,8 +276,8 @@ contract PaymasterTest is PoolTest {
 
         userOp.sender = address(pool);
         userOp.callData = abi.encodeCall(
-            MockPool.transactForPaymasterTestSetup,
-            (stx, preVerificationDetails)
+            Pool.transact,
+            (stx)
         );
 
         vm.prank(entryPoint);
@@ -319,8 +309,8 @@ contract PaymasterTest is PoolTest {
         );
 
         userOp.callData = abi.encodeCall(
-            MockPool.transactForPaymasterTestSetup,
-            (stx, preVerificationDetails)
+            Pool.transact,
+            (stx)
         );
 
         vm.prank(entryPoint);
@@ -361,8 +351,8 @@ contract PaymasterTest is PoolTest {
         );
 
         userOp.callData = abi.encodeCall(
-            MockPool.transactForPaymasterTestSetup,
-            (stx, preVerificationDetails)
+            Pool.transact,
+            (stx)
         );
 
         // calc required fee in USDC
@@ -388,7 +378,6 @@ contract PaymasterTest is PoolTest {
     {
         uint256 lowFeeValue = feeValueForOutsourcedVerification - 0.00005 ether;
         // feeding the required values for outsourced verification in userops.calldata
-        preVerificationDetails.isPreVerified = true;
         stx.feeData = uint256(
             bytes32(
                 bytes.concat(
@@ -400,8 +389,8 @@ contract PaymasterTest is PoolTest {
         );
 
         userOp.callData = abi.encodeCall(
-            MockPool.transactForPaymasterTestSetup,
-            (stx, preVerificationDetails)
+            Pool.transact,
+            (stx)
         );
 
         vm.startPrank(entryPoint);
@@ -436,8 +425,8 @@ contract PaymasterTest is PoolTest {
         );
 
         userOp.callData = abi.encodeCall(
-            MockPool.transactForPaymasterTestSetup,
-            (stx, preVerificationDetails)
+            Pool.transact,
+            (stx)
         );
 
         vm.prank(entryPoint);
@@ -491,8 +480,8 @@ contract PaymasterTest is PoolTest {
         );
 
         userOp.callData = abi.encodeCall(
-            MockPool.transactForPaymasterTestSetup,
-            (stx, preVerificationDetails)
+            Pool.transact,
+            (stx)
         );
 
         vm.prank(entryPoint);
@@ -504,7 +493,6 @@ contract PaymasterTest is PoolTest {
         createPackedUserOps(address(gateway))
     {
         // feeding the required values for outsourced verification in userops.calldata
-        preVerificationDetails.isPreVerified = true;
         stx.feeData = uint256(
             bytes32(
                 bytes.concat(
@@ -516,8 +504,8 @@ contract PaymasterTest is PoolTest {
         );
 
         userOp.callData = abi.encodeCall(
-            MockPool.transactForPaymasterTestSetup,
-            (stx, preVerificationDetails)
+            Pool.transact,
+            (stx)
         );
 
         vm.startPrank(entryPoint);
@@ -541,7 +529,7 @@ contract PaymasterTest is PoolTest {
         ShieldedTransaction memory withdrawSTX = _loadShieldedTransaction(
             "withdraw_10_weth_with_weth_fee"
         );
-        pool.transact(withdrawSTX, false);
+        pool.transact(withdrawSTX);
 
         uint256 expectedFeeValue = uint256(uint72(withdrawSTX.feeData));
 
@@ -562,7 +550,7 @@ contract PaymasterTest is PoolTest {
         ShieldedTransaction memory withdrawSTX = _loadShieldedTransaction(
             "withdraw_10_weth_with_weth_fee"
         );
-        pool.transact(withdrawSTX, false);
+        pool.transact(withdrawSTX);
 
         vm.startPrank(address(paymaster));
         pool.withdrawPaymasterFee(feeAssetId, address(paymaster));

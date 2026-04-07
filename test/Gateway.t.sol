@@ -11,7 +11,6 @@ import {Paymaster} from "src/core/Paymaster.sol";
 import {IWToken} from "src/interfaces/IWToken.sol";
 import {Asset, AssetType} from "src/libraries/Asset.sol";
 import {ShieldedTransaction, ShieldedTransactionType} from "src/libraries/ShieldedTransaction.sol";
-import {PreVerificationDetails, Mempool} from "src/core/Mempool.sol";
 import {MockWToken} from "test/mocks/MockWToken.sol";
 import {Fixture, FixtureLib} from "test/fixtures/Fixture.sol";
 
@@ -19,7 +18,7 @@ contract MockPool {
     uint256 constant DEPOSIT_VALUE = 100 ether;
     address mockWTokenAddress;
 
-    function transact(ShieldedTransaction calldata, bool) external {
+    function transact(ShieldedTransaction calldata) external {
         // Simulate gas usage
         for (uint256 i = 0; i < 10; i++) {
             new MockWToken();
@@ -48,18 +47,8 @@ contract MockPool {
     }
 }
 
-contract MockMempool {
-    function addSTXToMempool() external {
-        // Simulate gas usage
-        for (uint256 i = 0; i < 10; i++) {
-            new MockWToken();
-        }
-    }
-}
-
 contract GatewayTest is Test {
     MockPool public pool;
-    MockMempool public mempool;
     EntryPoint public entryPoint;
     Paymaster paymaster;
 
@@ -75,14 +64,12 @@ contract GatewayTest is Test {
     function setUp() public {
         entryPoint = new EntryPoint();
         pool = new MockPool();
-        mempool = new MockMempool();
         wToken = address(new MockWToken());
         pool.setMockWTokenAddress(wToken);
         gateway = new Gateway(
             address(entryPoint),
             address(wToken),
-            address(pool),
-            address(mempool)
+            address(pool)
         );
         Fixture memory fixture = FixtureLib.load(vm);
 
@@ -109,7 +96,6 @@ contract GatewayTest is Test {
 
     function test_handleUserOp() public {
         ShieldedTransaction memory stx;
-        PreVerificationDetails memory preVerificationDetails;
         uint24[] memory pubAssetIds = new uint24[](1);
         uint224[] memory pubAssetValues = new uint224[](1);
         uint248[] memory pubAssets = new uint248[](1);
@@ -150,14 +136,9 @@ contract GatewayTest is Test {
             )
         );
 
-        preVerificationDetails.isPreVerified = false;
-
         PackedUserOperation memory userOp;
         userOp.sender = address(gateway);
-        userOp.callData = abi.encodeCall(
-            Gateway.handleUserOp,
-            (stx, preVerificationDetails)
-        );
+        userOp.callData = abi.encodeCall(Gateway.handleUserOp, (stx));
         userOp.accountGasLimits = bytes32(
             bytes.concat(bytes16(verificationGasLimit), bytes16(callGasLimit))
         );

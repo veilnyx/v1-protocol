@@ -3,7 +3,6 @@ pragma solidity ^0.8.24;
 
 import {Pool} from "src/core/Pool.sol";
 import {ShieldedTransaction} from "src/libraries/ShieldedTransaction.sol";
-import {PreVerificationDetails} from "src/core/Mempool.sol";
 import {IVerifier} from "src/interfaces/IVerifier.sol";
 import {MerkleTree, MerkleTreeLogic} from "src/libraries/MerkleTree.sol";
 import {QueuedMerkleTree, QueuedMerkleTreeLogic, TreeUpdateData} from "src/libraries/QueuedMerkleTree.sol";
@@ -19,12 +18,5 @@ contract MockPool is Pool {
 
     function mock_queueCommitments(uint256[] memory commitments) public {
         _commitmentTree.queueLeaves(commitments);
-    }
-
-    function transactForPaymasterTestSetup(
-        ShieldedTransaction calldata stx,
-        PreVerificationDetails calldata preVerificationDetails
-    ) public {
-        transact(stx, preVerificationDetails.isPreVerified);
     }
 }

@@ -3,7 +3,6 @@ pragma solidity ^0.8.24;
 
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
-import {Mempool} from "src/core/Mempool.sol";
 import {Pool, InitAddressParams} from "src/core/Pool.sol";
 import {MESSAGE_REGISTER_ADDRESS, EIP712_DOMAIN_NAME, EIP712_DOMAIN_VERSION, EIP712_TYPEHASH_REGISTER_ADDRESS} from "src/base/Constants.sol";
 import {VerifierTransact21} from "src/verifiers/VerifierTransact21.sol";
@@ -26,7 +25,6 @@ contract PoolBaseTest is BaseTest {
             "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
         );
 
-    Mempool public mempool;
     Verifier public verifier;
     AdaptorHandler public adaptorHandler;
     Hasher public hasher;
@@ -80,11 +78,6 @@ contract PoolBaseTest is BaseTest {
 
         screener = new MockScreener();
         hasher = _deployHasher();
-        mempool = _deployMempool();
-
-        address poolNebraVerifier = address(mockNebraVerifier) != address(0)
-            ? address(mockNebraVerifier)
-            : config.nebraVerifier();
 
         InitAddressParams memory initAddressParams = InitAddressParams({
             verifier: address(verifier),
@@ -107,7 +100,6 @@ contract PoolBaseTest is BaseTest {
         ERC1967Proxy poolProxy = new ERC1967Proxy(address(pool), initData);
         pool = MockPool(address(poolProxy));
         adaptorHandler.setVeilnyxPool(address(pool));
-        mempool.updatePoolAddress(address(pool));
     }
 
     //////////////////////////////////////////////////////

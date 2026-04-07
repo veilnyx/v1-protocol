@@ -31,7 +31,7 @@ import {
   TransactionRequest,
 } from "@labyrinthac/shared-types";
 import { Core } from "@labyrinthac/core";
-import { ZTransaction, PreVerification, PreVerificationDetails } from "@labyrinthac/zk-prover";
+import { ZTransaction } from "@labyrinthac/zk-prover";
 import { Note, SIZE_ENCRYPTED_DECRYPTION_KEY, SIZE_FULLY_ENCRYPTED_NOTE_DATA } from "@labyrinthac/transaction";
 import config from "../config.json";
 
@@ -174,8 +174,8 @@ export const generateTestTransactionWithOutsourcedProofVerification = async (
   console.log("ZTX Encoded");
   writeFileSync(`${dirFixtureData}/${name}.txt`, encoded);
 
-  const encodedPreVerification = preVerification.encode();
-  writeFileSync(`${dirFixtureData}/${name}_preVerificationEncodedStruct.txt`, encodedPreVerification);
+  // const encodedPreVerification = preVerification.encode();
+  // writeFileSync(`${dirFixtureData}/${name}_preVerificationEncodedStruct.txt`, encodedPreVerification);
 };
 
 export const generateTestAddressRegistrations = async (
@@ -263,7 +263,7 @@ export async function mockNotes(depositName: string, sdk: Core) {
   const ztx = ZTransaction.decode(encoded) as any;
   // let notesMemo: Hex = stringToHex(ztx.notesMemo);
   const revokerData = await sdk.getRevokerData(0);
-  const revokerPublicKey = revokerData.revokerPublicKey;
+  const revokerPublicKey: PointType = revokerData.revokerPublicKey;
   // Parse encrypted data
   const [encryptedRefundDataKey, ...encryptedNotesKeys] = splitToChunks(
     ztx.keysMemo,
@@ -361,41 +361,21 @@ export const generatePackedUserOps = async (name: string, req: TransactionReques
   const signedTx = await sdk.signTransaction(tx);
 
   let ztx: ZTransaction;
-  let preVerification: PreVerification;
-
-  if (isPreVerified) {
-    const { ztx: preVerifiedTx, preVerification: preVerification_, } = await sdk.proveOutsourcedVerificationTx(
-      tx,
-      nebraClient
-    );
-    ztx = preVerifiedTx;
-    preVerification = preVerification_;
-  } else {
-    ztx = await sdk.proveTransaction(signedTx);
-
-    // generating preVerificationDetails obj since required by Gateway contract
-    const preVeriDetails: PreVerificationDetails = {
-      circuitId: bytesToHex(randomBytes(32)),
-      publicInputs: [BigInt(0), BigInt(0)],
-    };
-
-    preVerification = new PreVerification(preVeriDetails);
-  }
 
   console.log("ZTX:", ztx);
   const encodedZTx = ztx.encode();
   writeFileSync(`${dirFixtureData}/${name}.txt`, encodedZTx);
   console.log("ZTX fixture created");
 
-  const encodedPreVerification = preVerification.encode();
-  writeFileSync(`${dirFixtureData}/${name}_preVerificationEncodedStruct.txt`, encodedPreVerification);
+  // const encodedPreVerification = preVerification.encode();
+  // writeFileSync(`${dirFixtureData}/${name}_preVerificationEncodedStruct.txt`, encodedPreVerification);
 
   // Generating & Updating calldata in UserOp
   const gatewayAbi = JSON.parse(readFileSync("out/Gateway.sol/Gateway.json", "utf-8")).abi;
   userOp.callData = encodeFunctionData({
     abi: gatewayAbi,
     functionName: "handleUserOp",
-    args: [ztx.toSolidityInput(), preVerification]
+    args: [ztx.toSolidityInput()]
   });
 
   // Generating packed user op

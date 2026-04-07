@@ -3,11 +3,8 @@ pragma solidity ^0.8.24;
 
 import {PackedUserOperation} from "@account-abstraction/contracts/interfaces/PackedUserOperation.sol";
 import {Test} from "forge-std/Test.sol";
-import {Mempool} from "src/core/Mempool.sol";
-import {MempoolProxy} from "src/core/MempoolProxy.sol";
 import {MockNebraVerifier} from "test/mocks/MockNebraVerifier.sol";
 import {ShieldedTransactionType, ShieldedTransaction} from "src/libraries/ShieldedTransaction.sol";
-import {PreVerificationDetails} from "src/core/Mempool.sol";
 import {ShieldedAddressRegistrationData} from "src/libraries/ShieldedAddress.sol";
 import {TreeUpdateData} from "src/libraries/QueuedMerkleTree.sol";
 import {Hasher} from "src/core/Hasher.sol";
@@ -26,7 +23,6 @@ abstract contract BaseTest is Test {
     MockERC20ForReentrancyTest public tokenReent;
     MockNebraVerifier public mockNebraVerifier;
     Config public config;
-    uint256 MEMPOOL_EXIT_FEES = 45e13; // 500k gas @ 0.9 gwei = 0.00045 ETH
     address VERIFICATION_TRACKER_SERVICE = makeAddr("tracker");
     address MOCK_GATEWAY = makeAddr("gateway");
 
@@ -49,12 +45,6 @@ abstract contract BaseTest is Test {
         string memory name
     ) internal view returns (ShieldedAddressRegistrationData memory) {
         return FixtureLib.loadShieldedAddressRegistrationData(name, vm);
-    }
-
-    function _loadPreVerificationDetails(
-        string memory name
-    ) internal view returns (PreVerificationDetails memory) {
-        return FixtureLib.loadPreVerificationDetails(name, vm);
     }
 
     function _loadPackedUserOp(
@@ -107,28 +97,5 @@ abstract contract BaseTest is Test {
 
         Hasher hasher = new Hasher(poseidonT3, poseidonT4, poseidonT5);
         return hasher;
-    }
-
-    function _deployMempool() internal returns (Mempool) {
-        Mempool mempool = new Mempool();
-        address nebraVerifier = config.nebraVerifier();
-        if (nebraVerifier == address(0)) {
-            mockNebraVerifier = new MockNebraVerifier();
-            mockNebraVerifier.setIsProofVerifiedResult(true);
-            nebraVerifier = address(mockNebraVerifier);
-        }
-
-        bytes memory initializeData = abi.encodeWithSelector(
-            mempool.initialize.selector,
-            address(0),
-            MEMPOOL_EXIT_FEES,
-            VERIFICATION_TRACKER_SERVICE,
-            nebraVerifier,
-            MOCK_GATEWAY
-        );
-
-        MempoolProxy proxy = new MempoolProxy(address(mempool), initializeData);
-        mempool = Mempool(address(proxy));
-        return mempool;
     }
 }

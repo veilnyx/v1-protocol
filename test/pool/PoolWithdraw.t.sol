@@ -34,7 +34,6 @@ contract PoolWithdrawTest is PoolTest {
 
     function test_withdrawWethWithWethFee() public {
         uint256 balance1 = token1.balanceOf(address(pool));
-        uint256 balance2 = token2.balanceOf(address(pool));
 
         ShieldedTransaction memory stx = _loadShieldedTransaction(
             "withdraw_10_weth_with_weth_fee"
