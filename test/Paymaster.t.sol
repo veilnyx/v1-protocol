@@ -57,10 +57,7 @@ contract PaymasterTest is PoolTest {
         publicInputs[1] = 0;
 
         userOp.sender = gatewayAddr;
-        userOp.callData = abi.encodeCall(
-            Pool.transact,
-            (stx)
-        );
+        userOp.callData = abi.encodeCall(Pool.transact, (stx));
         _;
     }
 
@@ -308,10 +305,7 @@ contract PaymasterTest is PoolTest {
             )
         );
 
-        userOp.callData = abi.encodeCall(
-            Pool.transact,
-            (stx)
-        );
+        userOp.callData = abi.encodeCall(Pool.transact, (stx));
 
         vm.prank(entryPoint);
         vm.expectRevert(
@@ -350,10 +344,7 @@ contract PaymasterTest is PoolTest {
             )
         );
 
-        userOp.callData = abi.encodeCall(
-            Pool.transact,
-            (stx)
-        );
+        userOp.callData = abi.encodeCall(Pool.transact, (stx));
 
         // calc required fee in USDC
         // convert `feeValue` (in ETH) to USDC
@@ -388,10 +379,7 @@ contract PaymasterTest is PoolTest {
             )
         );
 
-        userOp.callData = abi.encodeCall(
-            Pool.transact,
-            (stx)
-        );
+        userOp.callData = abi.encodeCall(Pool.transact, (stx));
 
         vm.startPrank(entryPoint);
         vm.expectRevert(
@@ -424,10 +412,7 @@ contract PaymasterTest is PoolTest {
             )
         );
 
-        userOp.callData = abi.encodeCall(
-            Pool.transact,
-            (stx)
-        );
+        userOp.callData = abi.encodeCall(Pool.transact, (stx));
 
         vm.prank(entryPoint);
         vm.expectRevert(
@@ -479,10 +464,7 @@ contract PaymasterTest is PoolTest {
             )
         );
 
-        userOp.callData = abi.encodeCall(
-            Pool.transact,
-            (stx)
-        );
+        userOp.callData = abi.encodeCall(Pool.transact, (stx));
 
         vm.prank(entryPoint);
         paymaster.validatePaymasterUserOp(userOp, bytes32(0), feeValue); // feeValue is maxCostEth
@@ -503,10 +485,7 @@ contract PaymasterTest is PoolTest {
             )
         );
 
-        userOp.callData = abi.encodeCall(
-            Pool.transact,
-            (stx)
-        );
+        userOp.callData = abi.encodeCall(Pool.transact, (stx));
 
         vm.startPrank(entryPoint);
         (, uint256 flag) = paymaster.validatePaymasterUserOp(

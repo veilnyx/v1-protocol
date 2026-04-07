@@ -106,10 +106,7 @@ const main = async () => {
             verifier: verifier,
             adaptorHandler: zeroAddress,
             screener: chainParams.sanctionsList,
-            hasher: hasher,
-            // mempool: zeroAddress,
-            // verificationTrackerService: verificationTrackerService,
-            // nebraVerifier: chainParams.nebraVerifier,
+            hasher: hasher
         }
 
         const args = [
@@ -151,7 +148,7 @@ const main = async () => {
             address: poolProxy.address,
             abi: poolAbi,
             functionName: "addAssets",
-            args: [chainParams.initAssetType, chainParams.initAssetAddresses],
+            args: [chainParams.initAssetType, chainParams.initAssetAddresses, chainParams.initAssetsPrecision],
         });
 
         const rct = await client.waitForTransactionReceipt({ hash });
@@ -184,8 +181,7 @@ const main = async () => {
 
     // ERC4337 infra
     /* const erc4337Contracts = */
-    const mempoolDummyAddr = "0x1111111111111111111111111111111111111111" as `0x${string}`;
-    await deployErc4337Infra(chainParams, poolProxy.address, mempoolDummyAddr, deployConfig);
+    await deployErc4337Infra(chainParams, poolProxy.address, deployConfig);
 };
 
 main().catch(console.error);

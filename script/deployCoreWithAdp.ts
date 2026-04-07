@@ -319,10 +319,7 @@ const main = async () => {
     verifier: verifier,
     adaptorHandler: adaptorHandler.address,
     screener: chainParams.sanctionsList,
-    hasher: hasher,
-    // mempool: zeroAddress,
-    // verificationTrackerService: zeroAddress,
-    // nebraVerifier: chainParams.nebraVerifier,
+    hasher: hasher
   }
 
   const args = [
@@ -365,10 +362,9 @@ const main = async () => {
   });
   await client.waitForTransactionReceipt({ hash: setVersionHash });
   console.log("Pool: version set to", commonParams.protocolVersion);
-  
+
   // ERC4337 infra setup
-  const mempoolDummyAddr = "0x1111111111111111111111111111111111111111" as `0x${string}`;
-  await deployErc4337Infra(chainParams, poolProxy.address, mempoolDummyAddr, deployConfig);
+  await deployErc4337Infra(chainParams, poolProxy.address, deployConfig);
 
   // Asset & Revoker Setup
   await addAssetsAndRevokers(poolProxy.address, chainParams, commonParams, client, deployConfig.client.wallet);

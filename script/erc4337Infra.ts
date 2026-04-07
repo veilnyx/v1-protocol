@@ -3,13 +3,12 @@ import { parseEther, parseUnits } from "viem";
 
 const PAYMASTER_FUNDING_AMT = parseEther("2");
 
-export const deployErc4337Infra = async (chainParams, poolAddress, mempoolAddress, deployConfig) => {
+export const deployErc4337Infra = async (chainParams, poolAddress, deployConfig) => {
     // ERC4337 infra setup
     const gateway = await hre.viem.deployContract("Gateway", [
         chainParams.entryPoint,
         chainParams.wToken,
         poolAddress,
-        mempoolAddress,
     ], deployConfig);
     console.log("Gateway deployed:", gateway.address);
 
