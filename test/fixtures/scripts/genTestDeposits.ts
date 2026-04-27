@@ -9,6 +9,27 @@ const {
 } = fixture;
 
 export const reqs = {
+  deposit_pre_tx: {
+    type: TransactionType.DEPOSIT,
+    assetIds: [weth, usdc],
+    values: [parseEther("10000"), parseUnits("10000", 6)],
+    feeAssetId: 0,
+    to: senderAccount.shieldedAddress.pack(),
+    viaBundler: false,
+    paymaster: zeroAddress,
+    revokerId: 0,
+  }
+  /**,
+  deposit_weth_tx: {
+    type: TransactionType.DEPOSIT,
+    assetIds: [weth],
+    values: [parseEther("100")],
+    feeAssetId: 0,
+    to: senderAccount.shieldedAddress.pack(),
+    viaBundler: false,
+    paymaster: zeroAddress,
+    revokerId: 0,
+  },
   deposit_5_testnet_usdt_crvusd: {
     type: TransactionType.DEPOSIT,
     assetIds: [testnetUsdt, testnetCrvUsd],
@@ -19,7 +40,6 @@ export const reqs = {
     paymaster: zeroAddress,
     revokerId: 0,
   },
-  /**
    deposit_aaveWeth_testnetUsdc: {
     type: TransactionType.DEPOSIT,
     assetIds: [testnetWeth, testnetUsdc],
@@ -80,16 +100,6 @@ export const reqs = {
     paymaster: zeroAddress,
     revokerId: 0,
   },
-  deposit_weth_tx: {
-    type: TransactionType.DEPOSIT,
-    assetIds: [weth],
-    values: [parseEther("100")],
-    feeAssetId: 0,
-    to: senderAccount.shieldedAddress.pack(),
-    viaBundler: false,
-    paymaster: zeroAddress,
-    revokerId: 0,
-  },
   deposit_1000_reentrantToken_without_fee: {
     type: TransactionType.DEPOSIT,
     assetIds: [reentrantToken],
@@ -104,16 +114,6 @@ export const reqs = {
     type: TransactionType.DEPOSIT,
     assetIds: [testnetWeth],
     values: [parseEther("2")],
-    feeAssetId: 0,
-    to: senderAccount.shieldedAddress.pack(),
-    viaBundler: false,
-    paymaster: zeroAddress,
-    revokerId: 0,
-  },
-  deposit_pre_tx: {
-    type: TransactionType.DEPOSIT,
-    assetIds: [weth, usdc],
-    values: [parseEther("10000"), parseUnits("10000", 6)],
     feeAssetId: 0,
     to: senderAccount.shieldedAddress.pack(),
     viaBundler: false,

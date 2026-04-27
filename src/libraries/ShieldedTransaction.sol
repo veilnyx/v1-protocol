@@ -46,6 +46,7 @@ struct RevokerData {
 /// @param commitmentTreeRoot   Recent merkle root of commitment tree
 /// @param feeData              Packed fee data (20-byte paymaster address + 12-byte fee value)
 /// @param refundAddress        Blinded address to publicly refund assets to such as in adaptor transactions
+/// @param betaUHF              Beta UHF value generated off-chain from PoseidonEncrytion(encryptedInputs) and used in UHF (gamma) = ∑i (a+β)^i⋅Di modp.
 /// @param pubAssets            Encoded (assetId + value) for publicly spent assets. If applicable, fee asset is
 ///                             the first element in this array
 /// @param nullifiers           Revealed nullifiers of input/spent notes
@@ -63,6 +64,7 @@ struct ShieldedTransaction {
     uint256 commitmentTreeRoot;
     uint256 feeData;
     uint256 refundAddress;
+    uint256 betaUHF;
     uint248[] pubAssets;
     uint256[] nullifiers;
     uint256[] commitments;
@@ -272,43 +274,52 @@ library ShieldedTransactionLogic {
         ShieldedTransaction calldata self,
         RevokerData memory revokerData
     ) public pure returns (bytes memory) {
-        bytes memory pubDataChunk1;
+        bytes memory pubDataChunk1 = abi.encodePacked(
+            self.addressTreeRoot,
+            self.commitmentTreeRoot,
+            hash(self),
+            self.txType == ShieldedTransactionType.DEPOSIT
+                ? uint256(0)
+                : uint256(1)
+        );
+
+        bytes memory pubDataChunk2 = abi.encodePacked(
+            revokerData.revokerPublicKey[0],
+            revokerData.revokerPublicKey[1],
+            self.refundAddress,
+            revokerData.encryptionPublicKey[0],
+            revokerData.encryptionPublicKey[1]
+        );
+
+        // Performing sequential hashing (sha256) of encrypted data derived from notesMemo
+        (uint256 alpha, uint256 gamma) = _computeAlphaGammaForUHF(self);
+
+        return
+            abi.encodePacked(
+                self.proof,
+                pubDataChunk1,
+                pubDataChunk2,
+                alpha,
+                self.betaUHF,
+                gamma
+            );
+    }
+
+    /// @dev Builds pubAsset/pubValue arrays padded to nOuts, then computes UHF (alpha, gamma).
+    ///      Extracted to avoid stack-too-deep in toVerifierInput.
+    function _computeAlphaGammaForUHF(
+        ShieldedTransaction calldata self
+    ) internal pure returns (uint256 alpha, uint256 gamma) {
         uint256 nOuts = self.commitments.length;
         uint256 nPubs = self.pubAssets.length;
         uint256[] memory pubAssetIds = new uint256[](nOuts);
         uint256[] memory pubValues = new uint256[](nOuts);
-        {
-            for (uint256 i; i < nPubs; ++i) {
-                pubAssetIds[i] = uint24(bytes3(bytes31(self.pubAssets[i])));
-                pubValues[i] = uint224(self.pubAssets[i]);
-            }
 
-            // padding to make pubAsset and pubValue arrays match the length of nOuts (commitments), since the circuit expects pubAssets and pubValues of length nOuts
-            for (uint i = nPubs; i < nOuts; ++i) {
-                pubAssetIds[i] = 0;
-                pubValues[i] = 0;
-            }
-
-            pubDataChunk1 = abi.encodePacked(
-                self.addressTreeRoot,
-                self.commitmentTreeRoot,
-                hash(self),
-                self.txType == ShieldedTransactionType.DEPOSIT
-                    ? uint256(0)
-                    : uint256(1)
-            );
+        for (uint256 i; i < nPubs; ++i) {
+            pubAssetIds[i] = uint24(bytes3(bytes31(self.pubAssets[i])));
+            pubValues[i] = uint224(self.pubAssets[i]);
         }
-
-        bytes memory pubDataChunk2;
-        {
-            pubDataChunk2 = abi.encodePacked(
-                revokerData.revokerPublicKey[0],
-                revokerData.revokerPublicKey[1],
-                self.refundAddress,
-                revokerData.encryptionPublicKey[0],
-                revokerData.encryptionPublicKey[1]
-            );
-        }
+        // remaining entries are already zero-initialised
 
         UHFArrays memory uhfArrays = UHFArrays({
             pubAssetIds: pubAssetIds,
@@ -323,20 +334,9 @@ library ShieldedTransactionLogic {
             uhfArrays.encryptedDataEncryptionKeySeed,
             uhfArrays.refundInputs,
             uhfArrays.notes
-        ) = _decomposeNotesMemo(self.notesMemo, self.commitments.length);
+        ) = _decomposeNotesMemo(self.notesMemo, nOuts);
 
-        // Performing sequential hashing (sha256) of encrypted data derived from notesMemo
-        (uint256 alpha, uint256 beta) = _UHF(uhfArrays);
-
-        bytes memory verifierParams = abi.encodePacked(
-            self.proof,
-            pubDataChunk1,
-            pubDataChunk2,
-            alpha,
-            beta
-        );
-
-        return verifierParams;
+        return _UHF(self.betaUHF, uhfArrays);
     }
 
     /**
@@ -509,78 +509,87 @@ library ShieldedTransactionLogic {
     function _addToUHFAccumulator(
         uint256[] memory elements,
         uint256 alpha,
-        uint256 alphaPow,
+        uint256 beta,
+        uint256 coefficientPow,
         uint256 accumulator
     ) internal pure returns (uint256, uint256) {
         for (uint i = 0; i < elements.length; i++) {
-            uint256 product = mulmod(elements[i], alphaPow, FIELD_SIZE);
+            uint256 product = mulmod(elements[i], coefficientPow, FIELD_SIZE);
             accumulator = addmod(accumulator, product, FIELD_SIZE);
-            alphaPow = mulmod(alphaPow, alpha, FIELD_SIZE);
+            coefficientPow = mulmod(coefficientPow, (alpha + beta), FIELD_SIZE);
         }
-        return (accumulator, alphaPow);
+        return (accumulator, coefficientPow);
     }
 
     /// @dev Universal Hash Function (UHF) for reducing the encryted data public inputs (nIns + nOuts + 3 + 4 + nOuts * 4) to only 2 public inputs. This is done to reduce the number of public inputs to the circuit and be compatible with Nebra's requirement of a max of 16 PIs.
     /// @dev The UHF is defined as follows:
     // β (accumulator) = UHF(D, a) = ∑i a^i⋅Di modp where D = [D1, D2, ..., Dn] is the list of encrypted data private inputs and a is the alpha value and p is the prime field modulus.
     /// @dev The onchain implementation of UHF processes each array of inputs being hashed seperately (unlike the TS implementation), due to the stack size limit of 16 in Solidity.
-
+    /// @param betaUHF This is the beta value for UHF which is generated from PoseidonEncryption of encryptedInputs offchain. This is passed in as a parameter to save gas instead of recomputing it onchain.
     function _UHF(
+        uint256 betaUHF,
         UHFArrays memory uhfArrays
     ) internal pure returns (uint256, uint256) {
         uint256 alpha = _genEncryptedDataHashUsingSha256(uhfArrays);
 
-        uint256 alphaPow = 1;
+        uint256 coefficientPow = 1;
         uint256 accumulator = 0;
 
-        (accumulator, alphaPow) = _addToUHFAccumulator(
+        (accumulator, coefficientPow) = _addToUHFAccumulator(
             uhfArrays.pubAssetIds,
             alpha,
-            alphaPow,
+            betaUHF,
+            coefficientPow,
             accumulator
         );
 
-        (accumulator, alphaPow) = _addToUHFAccumulator(
+        (accumulator, coefficientPow) = _addToUHFAccumulator(
             uhfArrays.pubValues,
             alpha,
-            alphaPow,
+            betaUHF,
+            coefficientPow,
             accumulator
         );
 
-        (accumulator, alphaPow) = _addToUHFAccumulator(
+        (accumulator, coefficientPow) = _addToUHFAccumulator(
             uhfArrays.nullifiers,
             alpha,
-            alphaPow,
+            betaUHF,
+            coefficientPow,
             accumulator
         );
 
-        (accumulator, alphaPow) = _addToUHFAccumulator(
+        (accumulator, coefficientPow) = _addToUHFAccumulator(
             uhfArrays.commitments,
             alpha,
-            alphaPow,
+            betaUHF,
+            coefficientPow,
             accumulator
         );
 
-        (accumulator, alphaPow) = _addToUHFAccumulator(
+        (accumulator, coefficientPow) = _addToUHFAccumulator(
             uhfArrays.encryptedDataEncryptionKeySeed,
             alpha,
-            alphaPow,
+            betaUHF,
+            coefficientPow,
             accumulator
         );
 
-        (accumulator, alphaPow) = _addToUHFAccumulator(
+        (accumulator, coefficientPow) = _addToUHFAccumulator(
             uhfArrays.refundInputs,
             alpha,
-            alphaPow,
+            betaUHF,
+            coefficientPow,
             accumulator
         );
 
         // Process individual notes
         for (uint i = 0; i < uhfArrays.commitments.length; i++) {
-            (accumulator, alphaPow) = _addToUHFAccumulator(
+            (accumulator, coefficientPow) = _addToUHFAccumulator(
                 uhfArrays.notes[i],
                 alpha,
-                alphaPow,
+                betaUHF,
+                coefficientPow,
                 accumulator
             );
         }
