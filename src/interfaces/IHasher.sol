@@ -16,6 +16,7 @@ interface IPoseidon {
 }
 
 interface IHasher {
+    error ZeroAddress();
     function hash(uint256[2] calldata inputs) external view returns (uint256);
 
     function hash(uint256[3] calldata inputs) external view returns (uint256);

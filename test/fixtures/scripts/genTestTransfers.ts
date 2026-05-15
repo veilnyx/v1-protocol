@@ -10,37 +10,6 @@ const {
 } = fixture;
 
 export const reqs = {
-	transfer_20_weth_without_fee: {
-		type: TransactionType.TRANSFER,
-		assetIds: [weth],
-		values: [parseEther("20")],
-		feeAssetId: 0,
-		to: receiverAccount.shieldedAddress.pack(),
-		viaBundler: false,
-		paymaster: zeroAddress,
-		revokerId: 0,
-	}
-	/**,
-	transfer_20_weth_with_weth_fee: {
-		type: TransactionType.TRANSFER,
-		assetIds: [weth],
-		values: [parseEther("20")],
-		to: receiverAccount.shieldedAddress.pack(),
-		viaBundler: true,
-		paymaster: PAYMASTER_ADDR_FIXTURE as `0x${string}`,
-		feeAssetId: weth,
-		revokerId: 0
-	},
-	transfer_500_weth_with_usdc_fee: {
-		type: TransactionType.TRANSFER,
-		assetIds: [weth],
-		values: [parseEther("500")], // transfer partial WETH note to gen 3rd change note (USDC change + WETH change + WETH receiver = 3 outputs = transact24/transact44 circuits test)
-		to: receiverAccount.shieldedAddress.pack(),
-		viaBundler: true,
-		paymaster: PAYMASTER_ADDR_FIXTURE as `0x${string}`,
-		feeAssetId: usdc,
-		revokerId: 0,
-	},
 	transfer_500_weth_without_fee: {
 		type: TransactionType.TRANSFER,
 		assetIds: [weth],
@@ -50,15 +19,16 @@ export const reqs = {
 		viaBundler: false,
 		paymaster: zeroAddress,
 		revokerId: 0,
-	},
-	transfer_1000_weth_with_usdc_fee: {
+	}
+	/**,
+	transfer_20_weth_without_fee: {
 		type: TransactionType.TRANSFER,
 		assetIds: [weth],
-		values: [parseEther("10000")], // transfer full WETH note to avoid 3rd change note (only USDC change + WETH receiver = 2 outputs = transact22)
+		values: [parseEther("20")],
+		feeAssetId: 0,
 		to: receiverAccount.shieldedAddress.pack(),
-		viaBundler: true,
-		paymaster: PAYMASTER_ADDR_FIXTURE as `0x${string}`,
-		feeAssetId: usdc,
+		viaBundler: false,
+		paymaster: zeroAddress,
 		revokerId: 0,
 	},
 	transfer_500_weth_with_weth_fee: {
@@ -70,6 +40,26 @@ export const reqs = {
 		paymaster: PAYMASTER_ADDR_FIXTURE as `0x${string}`,
 		feeAssetId: weth,
 		revokerId: 0,
+	},
+	transfer_500_weth_with_usdc_fee: {
+		type: TransactionType.TRANSFER,
+		assetIds: [weth],
+		values: [parseEther("500")], // transfer partial WETH note to gen 3rd change note (USDC change + WETH change + WETH receiver = 3 outputs = transact24/transact44 circuits test)
+		to: receiverAccount.shieldedAddress.pack(),
+		viaBundler: true,
+		paymaster: PAYMASTER_ADDR_FIXTURE as `0x${string}`,
+		feeAssetId: usdc,
+		revokerId: 0,
+	},
+	transfer_20_weth_with_weth_fee: {
+		type: TransactionType.TRANSFER,
+		assetIds: [weth],
+		values: [parseEther("20")],
+		to: receiverAccount.shieldedAddress.pack(),
+		viaBundler: true,
+		paymaster: PAYMASTER_ADDR_FIXTURE as `0x${string}`,
+		feeAssetId: weth,
+		revokerId: 0
 	},
 	transfer_1000_weth_with_usdc_fee: {
 		type: TransactionType.TRANSFER,

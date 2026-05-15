@@ -2,7 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
-import {FIELD_SIZE_DIV_2} from "../base/Constants.sol";
+import {FIELD_SIZE, FIELD_SIZE_DIV_2} from "../base/Constants.sol";
 import {MerkleTree, MerkleTreeLogic} from "./MerkleTree.sol";
 import {IPool} from "../interfaces/IPool.sol";
 import {IVerifier} from "../interfaces/IVerifier.sol";
@@ -17,6 +17,9 @@ struct ShieldedAddressRegistrationData {
 
 error NotPreVerified();
 error NebraVerifierNotSet();
+error ShieldedAddrIncorrectLength(uint8 givenLength, uint8 expectedLength);
+error ZeroRootAddress();
+error ExceededFieldSize();
 
 library ShieldedAddressLogic {
     using MerkleTreeLogic for MerkleTree;
@@ -60,7 +63,14 @@ library ShieldedAddressLogic {
         }
         /// @dev 160 bytes is the size of a shielded address in unpacked form. Verifier expects input in unpacked form.
         if (self.shieldedAddress.length != 160) {
-            revert IPool.BadArguments();
+            revert ShieldedAddrIncorrectLength(
+                uint8(self.shieldedAddress.length),
+                160
+            );
+        }
+
+        if (rootAddress == 0) {
+            revert ZeroRootAddress();
         }
     }
 
@@ -115,6 +125,10 @@ library ShieldedAddressLogic {
     }
 
     function _packPoint(bytes32 x, bytes32 y) internal pure returns (bytes32) {
+        if (uint256(x) >= FIELD_SIZE || uint256(y) >= FIELD_SIZE) {
+            revert ExceededFieldSize();
+        }
+
         if (uint256(x) > FIELD_SIZE_DIV_2) {
             return MASK_PACK | y;
         }

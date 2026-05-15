@@ -44,7 +44,7 @@ const receiverPubAddress = config.receiver.pubAddress;
 const addressTreeDepth = Number(config.addressTreeDepth);
 const commitmentTreeDepth = Number(config.commitmentTreeDepth);
 const commitmentTreeQueueSize = Number(config.commitmentTreeQueueSize);
-const qmtBatchSize = Number(config.qmtBatchSize);
+const qmtQueueSize = Number(config.qmtQueueSize);
 
 export const USER_OP_CALL_GAS_LIMIT = BigInt(25_00_000);
 export const USER_OP_VERIFICATION_GAS_LIMIT = BigInt(75_000);
@@ -61,8 +61,7 @@ const assets = {
   reentrantToken: config.assets.reentrantToken,
   testnetWeth: config.assets.testnetWeth,
   testnetUsdc: config.assets.testnetUsdc,
-  testnetUsdt: config.assets.testnetUsdt,
-  testnetCrvUsd: config.assets.testnetCrvUsd,
+  usde: config.assets.usde
 };
 
 const revokerPublicKey = Point.fromAffine({
@@ -96,7 +95,7 @@ export const fixture = {
   addressTreeDepth,
   commitmentTreeDepth,
   commitmentTreeQueueSize,
-  qmtBatchSize,
+  qmtQueueSize,
   revokerPublicKey,
   encryptionPublicKey,
   assets,
@@ -134,9 +133,12 @@ export const generateTestTransaction = async (
   };
   const tx = await sdk.createTransaction(req, opts);
   // console.log("TX: ", tx);
+
   const signedTx = await sdk.signTransaction(tx);
+
   const ztx = await sdk.proveTransaction(signedTx);
   console.log("ZTX:", ztx);
+
   const encoded = ztx.encode();
   writeFileSync(`${dirFixtureData}/${name}.txt`, encoded);
 };
@@ -348,7 +350,7 @@ export const generatePackedUserOps = async (name: string, req: TransactionReques
     entryPoint: ENTRYPOINT_ADDRESS_V07
   });
 
-  // Generating ztx
+  // Generating ztx (preparing userop calldata)
   const opts: TransactionOptions = {
     viaBundler: req.viaBundler,
     paymaster: req.paymaster,
@@ -360,7 +362,7 @@ export const generatePackedUserOps = async (name: string, req: TransactionReques
   console.log("TX: ", tx);
   const signedTx = await sdk.signTransaction(tx);
 
-  let ztx: ZTransaction;
+  let ztx: ZTransaction = await sdk.proveTransaction(signedTx);
 
   console.log("ZTX:", ztx);
   const encodedZTx = ztx.encode();

@@ -57,6 +57,10 @@ contract LidoAdaptor is AdaptorBase {
         override
         returns (uint24[] memory outAssetIds, uint256[] memory outValues)
     {
+        if (inAssetIds.length != 1 || inValues.length != 1) {
+            revert InvalidInputAssetLength(uint8(inAssetIds.length), 1);
+        }
+
         (Action action, address withdrawAddress) = abi.decode(
             payload,
             (Action, address)

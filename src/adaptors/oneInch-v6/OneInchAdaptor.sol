@@ -30,6 +30,10 @@ contract OneInchAdaptor is AdaptorBase {
         override
         returns (uint24[] memory outAssetIds, uint256[] memory outValues)
     {
+        if (inAssetIds.length != 1 || inValues.length != 1) {
+            revert InvalidInputAssetLength(uint8(inAssetIds.length), 1);
+        }
+
         address inAsset = getAsset(inAssetIds[0]).assetAddress;
 
         if (inValues[0] == 0) {

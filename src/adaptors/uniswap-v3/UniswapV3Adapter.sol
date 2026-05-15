@@ -32,7 +32,7 @@ contract UniswapV3Adapter is AdaptorBase {
         uint256 inValue;
         // Checks
         if (inAssetIds.length != 1 || inValues.length != 1) {
-            revert MultiAssetSwap();
+            revert InvalidInputAssetLength(uint8(inAssetIds.length), 1);
         }
 
         if (inValues[0] == 0) {

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity ^0.8.24;
 
-import {FIELD_SIZE, ZERO_LEAF} from "../base/Constants.sol";
+import {ZERO_LEAF} from "../base/Constants.sol";
 import {IHasher} from "../interfaces/IHasher.sol";
 import {IVerifier} from "../interfaces/IVerifier.sol";
 import {IPool} from "../interfaces/IPool.sol";
@@ -10,7 +10,7 @@ struct QueuedMerkleTree {
     uint8 depth;
     uint8 currentRootIndex;
     uint8 queueSize; // max number of leaves that can be queued before an update is required. This is defined by the circuit `treeUpdate::nLeaves` and is immutable after pool initialization.
-    uint40 capacity;
+    uint32 capacity;
     address hasher;
     address verifier;
     uint32 nextLeafIndex;
@@ -24,6 +24,7 @@ struct QueuedMerkleTree {
 
 struct TreeUpdateData {
     uint256 newRoot;
+    uint32 batchSize;
     uint256[] newSubtrees;
     bytes proof;
 }
@@ -31,6 +32,8 @@ struct TreeUpdateData {
 library QueuedMerkleTreeLogic {
     error MerkleTreeFull();
     error InvalidProof();
+    error InvalidDepth(uint8 depth, uint8 min, uint8 max);
+    error ZeroAddress();
 
     uint8 public constant ROOT_HISTORY_SIZE = 50;
 
@@ -43,6 +46,14 @@ library QueuedMerkleTreeLogic {
         address hasher,
         address verifier
     ) public {
+        if (depth == 0 || depth > 31) {
+            revert InvalidDepth(depth, 1, 31);
+        }
+
+        if (hasher == address(0) || verifier == address(0)) {
+            revert ZeroAddress();
+        }
+
         self.depth = depth;
         self.hasher = hasher;
         self.verifier = verifier;
@@ -72,7 +83,7 @@ library QueuedMerkleTreeLogic {
         uint32 nextIndex = self.queueEndIndex;
         uint32 nLeaves = uint32(leaves.length);
 
-        for (uint8 i = 0; i < nLeaves; ) {
+        for (uint32 i = 0; i < nLeaves; ) {
             self.queuedLeaves[nextIndex + i] = leaves[i];
             unchecked {
                 ++i;
@@ -89,8 +100,8 @@ library QueuedMerkleTreeLogic {
         uint32 startIdx = self.queueStartIndex;
         uint32 endIdx = self.queueEndIndex;
 
-        uint32 queueLen = endIdx - startIdx; //
-        uint32 nLeaves = queueLen > n ? n : queueLen;
+        uint32 batchSize = endIdx - startIdx;
+        uint32 nLeaves = batchSize > n ? n : batchSize;
 
         uint256[] memory leaves = new uint256[](n);
 
@@ -120,8 +131,7 @@ library QueuedMerkleTreeLogic {
         QueuedMerkleTree storage self,
         TreeUpdateData calldata data
     ) public {
-        uint32 batchSize = self.queueEndIndex - self.queueStartIndex;
-        bool isValid = _verifyUpdateProof(self, data, batchSize);
+        bool isValid = _verifyUpdateProof(self, data);
 
         if (!isValid) {
             revert InvalidProof();
@@ -139,9 +149,9 @@ library QueuedMerkleTreeLogic {
             }
         }
 
-        if (batchSize < self.queueSize) {
+        if (data.batchSize < self.queueSize) {
             self.queueStartIndex = self.queueEndIndex;
-            self.nextLeafIndex += batchSize;
+            self.nextLeafIndex += data.batchSize;
         } else {
             self.queueStartIndex += self.queueSize;
             self.nextLeafIndex += self.queueSize;
@@ -150,14 +160,13 @@ library QueuedMerkleTreeLogic {
 
     function _verifyUpdateProof(
         QueuedMerkleTree storage self,
-        TreeUpdateData calldata data,
-        uint32 batchSize
+        TreeUpdateData calldata data
     ) internal view returns (bool) {
         uint256[] memory leaves = _getQueuedLeaves(self);
         uint256[] memory lastSubtrees = _getSubtrees(self);
         uint256 lastRoot = self.roots[self.currentRootIndex];
-        uint256 nZeroLeaves = batchSize < self.queueSize
-            ? self.queueSize - batchSize
+        uint256 nZeroLeaves = data.batchSize < self.queueSize
+            ? self.queueSize - data.batchSize
             : 0;
 
         bytes memory vParams = abi.encodePacked(

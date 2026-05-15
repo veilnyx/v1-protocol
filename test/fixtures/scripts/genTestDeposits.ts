@@ -4,52 +4,11 @@ import { TransactionType } from "@labyrinthac/shared-types";
 import { fixture, generateTestTransactions, generateTestTxsWithOutsourcedProofVerification } from "./fixture";
 
 const {
-  assets: { weth, usdc, testnetWeth, testnetUsdc, reentrantToken, testnetUsdt, testnetCrvUsd },
+  assets: { weth, usdc, testnetWeth, testnetUsdc, morphoVaultToken },
   sender: { account: senderAccount },
 } = fixture;
 
 export const reqs = {
-  deposit_pre_tx: {
-    type: TransactionType.DEPOSIT,
-    assetIds: [weth, usdc],
-    values: [parseEther("10000"), parseUnits("10000", 6)],
-    feeAssetId: 0,
-    to: senderAccount.shieldedAddress.pack(),
-    viaBundler: false,
-    paymaster: zeroAddress,
-    revokerId: 0,
-  }
-  /**,
-  deposit_weth_tx: {
-    type: TransactionType.DEPOSIT,
-    assetIds: [weth],
-    values: [parseEther("100")],
-    feeAssetId: 0,
-    to: senderAccount.shieldedAddress.pack(),
-    viaBundler: false,
-    paymaster: zeroAddress,
-    revokerId: 0,
-  },
-  deposit_5_testnet_usdt_crvusd: {
-    type: TransactionType.DEPOSIT,
-    assetIds: [testnetUsdt, testnetCrvUsd],
-    values: [parseUnits("5", 6), parseUnits("5", 18)],
-    feeAssetId: 0,
-    to: senderAccount.shieldedAddress.pack(),
-    viaBundler: false,
-    paymaster: zeroAddress,
-    revokerId: 0,
-  },
-   deposit_aaveWeth_testnetUsdc: {
-    type: TransactionType.DEPOSIT,
-    assetIds: [testnetWeth, testnetUsdc],
-    values: [parseEther("10"), parseUnits("10", 6)],
-    feeAssetId: 0,
-    to: senderAccount.shieldedAddress.pack(),
-    viaBundler: false,
-    paymaster: zeroAddress,
-    revokerId: 0,
-  }
   deposit_2_morphoVaultToken: {
     type: TransactionType.DEPOSIT,
     assetIds: [morphoVaultToken],
@@ -59,7 +18,8 @@ export const reqs = {
     viaBundler: false,
     paymaster: zeroAddress,
     revokerId: 0,
-  },
+  }
+  /**
   deposit_2_morphoLoanToken: {
     type: TransactionType.DEPOSIT,
     assetIds: [testnetWeth],
@@ -69,7 +29,8 @@ export const reqs = {
     viaBundler: false,
     paymaster: zeroAddress,
     revokerId: 0,
-  },
+  }
+  /**
   deposit_2_usde: {
     type: TransactionType.DEPOSIT,
     assetIds: [usde],
@@ -79,7 +40,19 @@ export const reqs = {
     viaBundler: false,
     paymaster: zeroAddress,
     revokerId: 0,
-  },
+  }
+  /**
+  deposit_5_testnet_usdt_crvusd: {
+    type: TransactionType.DEPOSIT,
+    assetIds: [testnetUsdt, testnetCrvUsd],
+    values: [parseUnits("5", 6), parseUnits("5", 18)],
+    feeAssetId: 0,
+    to: senderAccount.shieldedAddress.pack(),
+    viaBundler: false,
+    paymaster: zeroAddress,
+    revokerId: 0,
+  }
+  /**
   deposit_2_mooLPToken: {
     type: TransactionType.DEPOSIT,
     assetIds: [beefyMooToken],
@@ -89,10 +62,31 @@ export const reqs = {
     viaBundler: false,
     paymaster: zeroAddress,
     revokerId: 0,
-  },
+  }
+  /**,
   deposit_2_wantLPToken: {
     type: TransactionType.DEPOSIT,
     assetIds: [beefyWantLPToken],
+    values: [parseEther("2")],
+    feeAssetId: 0,
+    to: senderAccount.shieldedAddress.pack(),
+    viaBundler: false,
+    paymaster: zeroAddress,
+    revokerId: 0,
+  },
+  deposit_aaveWeth_testnetUsdc: {
+    type: TransactionType.DEPOSIT,
+    assetIds: [testnetWeth, testnetUsdc],
+    values: [parseEther("10"), parseUnits("10", 6)],
+    feeAssetId: 0,
+    to: senderAccount.shieldedAddress.pack(),
+    viaBundler: false,
+    paymaster: zeroAddress,
+    revokerId: 0,
+  },
+  deposit_2_testnet_weth: {
+    type: TransactionType.DEPOSIT,
+    assetIds: [testnetWeth],
     values: [parseEther("2")],
     feeAssetId: 0,
     to: senderAccount.shieldedAddress.pack(),
@@ -110,16 +104,27 @@ export const reqs = {
     paymaster: zeroAddress,
     revokerId: 0,
   },
-  deposit_2_testnet_weth: {
+  deposit_weth_tx: {
     type: TransactionType.DEPOSIT,
-    assetIds: [testnetWeth],
-    values: [parseEther("2")],
+    assetIds: [weth],
+    values: [parseEther("100")],
     feeAssetId: 0,
     to: senderAccount.shieldedAddress.pack(),
     viaBundler: false,
     paymaster: zeroAddress,
     revokerId: 0,
   },
+  deposit_pre_tx: {
+    type: TransactionType.DEPOSIT,
+    assetIds: [weth, usdc],
+    values: [parseEther("10000"), parseUnits("10000", 6)],
+    feeAssetId: 0,
+    to: senderAccount.shieldedAddress.pack(),
+    viaBundler: false,
+    paymaster: zeroAddress,
+    revokerId: 0,
+  }
+  ,
 deposit_1000_weth_without_fee: {
   type: TransactionType.DEPOSIT,
   assetIds: [weth],

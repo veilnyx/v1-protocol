@@ -13,7 +13,7 @@ import {
 const main = async () => {
 	const { sdk, nebraClient } = await getSDKInstance();
 	// @dev Deposit notes are reused across tests (transfer, withdrawal, adaptor). Only regenerate when new assets are needed, as overriding existing notes will break dependent tests fixtures. Commit hash containing the deposit tx fixtures on which followup tx fixtures depend: fe9cfaa37bb522f0221f6e86f043ec6b6cf6ea8f
-	await genTestDeposits(sdk);
+	// await genTestDeposits(sdk);
 	// await genTestDepositsWithOutsourceProofVerification(sdk, nebraClient);
 	// await genTestTransfers(sdk);
 	// await genTestTransfersWithOutsourceProofVerification(sdk, nebraClient);
@@ -22,8 +22,8 @@ const main = async () => {
 	// await genAddrRegWithOutsourceProofVerification(sdk, nebraClient);
 	// await genTestDepositsWithOutsourceProofVerification(sdk, nebraClient);
 	// await genTestTransfersWithOutsourceProofVerification(sdk, nebraClient);
-	await genTestWithdrawals(sdk);
-	// await genTestCallAdaptors(sdk);
+	// await genTestWithdrawals(sdk);
+	await genTestCallAdaptors(sdk);
 	// await genTreeUpdateData(sdk);
 	// await genTreeUpdateDataWithPartialQueue(sdk);
 };

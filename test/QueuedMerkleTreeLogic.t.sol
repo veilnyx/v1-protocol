@@ -82,15 +82,15 @@ contract QueuedMerkleTreeLogicTest is BaseTest {
 
     function test_updateTreeWithPartialQueue() public {
         qmt.queueLeaves(fixture.leavesQueuePartial);
-        TreeUpdateData memory treeUpdateData1 = _loadTreeUpdateData(
+        TreeUpdateData memory partialTreeUpdateData1 = _loadTreeUpdateData(
             "tree_update_data_partial_queue"
         );
-        qmt.update(treeUpdateData1);
+        qmt.update(partialTreeUpdateData1);
 
-        // qmt.queueLeaves(fixture.leavesQueue2);
-        // TreeUpdateData memory treeUpdateData2 = _loadTreeUpdateData(
-        //     "tree_update_data_2"
-        // );
-        // qmt.update(treeUpdateData2);
+        qmt.queueLeaves(fixture.leavesQueue2);
+        TreeUpdateData memory treeUpdateData2 = _loadTreeUpdateData(
+            "tree_update_data_post_partial_update"
+        );
+        qmt.update(treeUpdateData2);
     }
 }

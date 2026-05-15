@@ -90,8 +90,8 @@ contract CurveNGAdaptor is AdaptorBase {
             _withdrawChecksAndApprove(
                 ICurvePool(decodedPayload.curvePool),
                 NCoins,
-                inAssetIds[0],
-                inValues[0],
+                inAssetIds,
+                inValues,
                 decodedPayload
             );
 
@@ -411,6 +411,13 @@ contract CurveNGAdaptor is AdaptorBase {
         uint256[] memory inValues,
         uint256 slippageBps
     ) internal {
+        if (inAssetIds.length != NCoins || inValues.length != NCoins) {
+            revert InvalidInputAssetLength(
+                uint8(inAssetIds.length),
+                uint8(NCoins)
+            );
+        }
+
         for (uint256 i; i < inAssetIds.length; i++) {
             Asset memory inAsset = getAsset(inAssetIds[i]);
             bool supported = false;
@@ -430,10 +437,6 @@ contract CurveNGAdaptor is AdaptorBase {
                 inValues[i]
             ) {
                 revert InsufficientBalance();
-            }
-
-            if (NCoins != inAssetIds.length || NCoins != inValues.length) {
-                revert InvalidInput();
             }
 
             IERC20(inAsset.assetAddress).forceApprove(
@@ -460,11 +463,15 @@ contract CurveNGAdaptor is AdaptorBase {
     function _withdrawChecksAndApprove(
         ICurvePool curve,
         uint256 NCoins,
-        uint24 inAssetId,
-        uint256 inValue,
+        uint24[] memory inAssetIds,
+        uint256[] memory inValues,
         Payload memory decodedPayload
     ) internal {
-        Asset memory inAsset = getAsset(inAssetId);
+        if (inAssetIds.length != 1 || inValues.length != 1) {
+            revert InvalidInputAssetLength(uint8(inAssetIds.length), 1);
+        }
+
+        Asset memory inAsset = getAsset(inAssetIds[0]);
 
         if (
             inAsset.assetAddress == address(0) ||
@@ -473,13 +480,15 @@ contract CurveNGAdaptor is AdaptorBase {
             revert UnsupportedAsset(inAsset.id);
         }
 
-        if (inValue == 0) {
+        if (inValues[0] == 0) {
             revert ZeroValue();
         }
 
         if (decodedPayload.slippageBps > BPS_PRECISION) revert InvalidInput();
 
-        if (IERC20(inAsset.assetAddress).balanceOf(address(this)) < inValue) {
+        if (
+            IERC20(inAsset.assetAddress).balanceOf(address(this)) < inValues[0]
+        ) {
             revert InsufficientBalance();
         }
 
@@ -508,7 +517,7 @@ contract CurveNGAdaptor is AdaptorBase {
             }
         }
 
-        IERC20(address(curve)).forceApprove(address(curve), inValue);
+        IERC20(address(curve)).forceApprove(address(curve), inValues[0]);
     }
 
     // Two pool functions

@@ -2,13 +2,13 @@
 pragma solidity ^0.8.18;
 
 import {IHasher} from "../interfaces/IHasher.sol";
-import {FIELD_SIZE, ZERO_LEAF} from "../base/Constants.sol";
+import {ZERO_LEAF} from "../base/Constants.sol";
 
 struct MerkleTree {
     uint8 depth;
     uint8 currentRootIndex;
     uint32 nextLeafIndex;
-    uint40 capacity;
+    uint32 capacity;
     address hasher;
     mapping(uint8 => uint256) roots;
     mapping(uint8 => uint256) zeroes;
@@ -17,6 +17,8 @@ struct MerkleTree {
 
 library MerkleTreeLogic {
     error MerkleTreeFull();
+    error InvalidDepth(uint8 depth, uint8 min, uint8 max);
+    error ZeroAddress();
 
     uint8 public constant ROOT_HISTORY_SIZE = 100;
 
@@ -31,6 +33,14 @@ library MerkleTreeLogic {
     /// @custom:invariant MT-2: roots[] is circular buffer of size ROOT_HISTORY_SIZE
     /// @custom:invariant MT-3: nextLeafIndex < capacity at all times
     function init(MerkleTree storage self, uint8 depth, address hasher) public {
+        if (depth == 0 || depth > 31) {
+            revert InvalidDepth(depth, 1, 31);
+        }
+
+        if (hasher == address(0)) {
+            revert ZeroAddress();
+        }
+
         self.depth = depth;
         self.hasher = hasher;
         self.capacity = uint32(2 ** depth);

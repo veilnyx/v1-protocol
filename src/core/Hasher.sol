@@ -8,10 +8,12 @@ contract Hasher is IHasher {
     address internal immutable _poseidonT4;
     address internal immutable _poseidonT5;
 
-    error ZeroAddress();
-
     constructor(address poseidonT3, address poseidonT4, address poseidonT5) {
-        if (poseidonT3 == address(0) || poseidonT4 == address(0) || poseidonT5 == address(0)) revert ZeroAddress();
+        if (
+            poseidonT3 == address(0) ||
+            poseidonT4 == address(0) ||
+            poseidonT5 == address(0)
+        ) revert ZeroAddress();
         _poseidonT3 = poseidonT3;
         _poseidonT4 = poseidonT4;
         _poseidonT5 = poseidonT5;
@@ -33,13 +35,15 @@ contract Hasher is IHasher {
         uint256[] calldata inputs
     ) external view override returns (uint256) {
         if (inputs.length == 3) {
-            return IPoseidon(_poseidonT4).poseidon(
-                [inputs[0], inputs[1], inputs[2]]
-            );
+            return
+                IPoseidon(_poseidonT4).poseidon(
+                    [inputs[0], inputs[1], inputs[2]]
+                );
         } else if (inputs.length == 4) {
-            return IPoseidon(_poseidonT5).poseidon(
-                [inputs[0], inputs[1], inputs[2], inputs[3]]
-            );
+            return
+                IPoseidon(_poseidonT5).poseidon(
+                    [inputs[0], inputs[1], inputs[2], inputs[3]]
+                );
         } else {
             revert("Invalid number of inputs");
         }

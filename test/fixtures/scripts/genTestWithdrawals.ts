@@ -9,6 +9,17 @@ const {
 } = fixture;
 
 export const reqs = {
+  withdraw_500_reentrantToken_to_attacker_contract: {
+    type: TransactionType.WITHDRAW,
+    assetIds: [reentrantToken],
+    values: [parseEther("500")],
+    feeAssetId: 0,
+    to: "0x8F2FbdFDa8BE4Da8B9454aE9F0301150932AE4b5",
+    viaBundler: false,
+    paymaster: zeroAddress,
+    revokerId: 0,
+  }
+  /**,
   withdraw_100_weth_without_fee: {
     type: TransactionType.WITHDRAW,
     assetIds: [weth],
@@ -17,17 +28,6 @@ export const reqs = {
     to: senderPubAddress,
     viaBundler: false,
     paymaster: zeroAddress,
-    revokerId: 0,
-  }
-  /**
-  withdraw_10_weth_with_usdc_fee: {
-    type: TransactionType.WITHDRAW,
-    assetIds: [weth],
-    values: [parseEther("10")],
-    feeAssetId: usdc,
-    to: senderPubAddress,
-    viaBundler: true,
-    paymaster: PAYMASTER_ADDR_FIXTURE as `0x${string}`,
     revokerId: 0,
   },
   withdraw_10_weth_with_weth_fee: {
@@ -40,16 +40,16 @@ export const reqs = {
     paymaster: PAYMASTER_ADDR_FIXTURE as `0x${string}`,
     revokerId: 0
   },
-withdraw_500_reentrantToken_to_attacker_contract: {
-  type: TransactionType.WITHDRAW,
-  assetIds: [reentrantToken],
-  values: [parseEther("500")],
-  feeAssetId: 0,
-  to: "0x8F2FbdFDa8BE4Da8B9454aE9F0301150932AE4b5",
-  viaBundler: false,
-  paymaster: zeroAddress,
-  revokerId: 0,
-},
+  withdraw_10_weth_with_usdc_fee: {
+    type: TransactionType.WITHDRAW,
+    assetIds: [weth],
+    values: [parseEther("10")],
+    feeAssetId: usdc,
+    to: senderPubAddress,
+    viaBundler: true,
+    paymaster: PAYMASTER_ADDR_FIXTURE as `0x${string}`,
+    revokerId: 0,
+  },
 withdraw_500_weth_without_fee: {
   type: TransactionType.WITHDRAW,
   assetIds: [weth],
@@ -64,6 +64,6 @@ withdraw_500_weth_without_fee: {
 };
 
 export const genTestWithdrawals = async (sdk: Core) => {
-  await mockNotes("deposit_pre_tx", sdk);
+  await mockNotes("deposit_1000_reentrantToken_without_fee", sdk);
   await generateTestTransactions(reqs, sdk);
 };

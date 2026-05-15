@@ -20,6 +20,7 @@ import {MockERC20} from "test/mocks/MockERC20.sol";
 import {MockVerifier} from "test/mocks/MockVerifier.sol";
 import {PoolBaseTest} from "./PoolBaseTest.sol";
 import {BaseScript} from "script/BaseScript.sol";
+import {console} from "forge-std/console.sol";
 
 /// @dev PoolTest is a test setup contract providing the following functionalities:
 /// 1. Adding asset support to the pool.
@@ -242,7 +243,10 @@ contract PoolTest is PoolBaseTest, BaseScript {
         // Process the batch
         uint8 depth = fixture.commitmentTreeDepth;
         _helperTree.init(depth, address(hasher));
-        (uint256[] memory leaves, , , , ) = pool.getCommitmentTreeState();
+        console.log("Inside _processCommitmentTreeQueue");
+        (uint256[] memory leaves, , , , uint32 nextLeafIndex) = pool
+            .getCommitmentTreeState();
+        console.log("Leaves in the queue:", leaves.length);
         for (uint256 i = 0; i < leaves.length; ++i) {
             _helperTree.insert(leaves[i]);
         }
@@ -252,6 +256,7 @@ contract PoolTest is PoolBaseTest, BaseScript {
 
         TreeUpdateData memory treeUpdateData = TreeUpdateData({
             newRoot: lastRoot,
+            batchSize: nextLeafIndex,
             newSubtrees: lastSubtrees,
             proof: bytes("")
         });

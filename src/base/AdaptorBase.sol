@@ -12,6 +12,7 @@ abstract contract AdaptorBase is IAdaptor {
     error InvalidAction();
     error UnsupportedAsset(uint24 assetId);
     error InsufficientBalance();
+    error InvalidInputAssetLength(uint8 actual, uint8 expected);
 
     IPool immutable _pool;
 

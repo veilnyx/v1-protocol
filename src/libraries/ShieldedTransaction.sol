@@ -604,10 +604,30 @@ library ShieldedTransactionLogic {
         Params memory params,
         MemoParams memory memoParams
     ) internal {
+        // Filter out pubAssets with value of 0 as they don't need to be sent to the adaptor handler and can cause issues with certain adaptors that expect only non-zero value assets.
+        // Value of pubAssets used as feeAsset for bundler paymaster fee, can become zero after fee is deducted. Ref: _copyParamsToMemory().
+        uint8 nonZeroValueAssetCount;
+        for (uint256 i = 0; i < params.pubAssets.length; ++i) {
+            if (params.pubAssets[i].value != 0) {
+                nonZeroValueAssetCount++;
+            }
+        }
+        PubAsset[] memory pubAssetsWithValue = new PubAsset[](
+            nonZeroValueAssetCount
+        );
+
+        uint8 index = 0;
+        for (uint256 i = 0; i < params.pubAssets.length; ++i) {
+            if (params.pubAssets[i].value != 0) {
+                pubAssetsWithValue[index] = params.pubAssets[i];
+                index++;
+            }
+        }
+
         PubAsset[] memory outPubAssets = IAdaptorHandler(adaptorHandler)
             .handleAdaptor(
                 params.target,
-                params.pubAssets,
+                pubAssetsWithValue,
                 params.targetPayload
             );
 

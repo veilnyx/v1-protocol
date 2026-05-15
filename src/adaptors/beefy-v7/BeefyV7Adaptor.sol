@@ -28,6 +28,10 @@ contract BeefyV7Adaptor is AdaptorBase {
         override
         returns (uint24[] memory outAssetIds, uint256[] memory outValues)
     {
+        if (inAssetIds.length != 1 || inValues.length != 1) {
+            revert InvalidInputAssetLength(uint8(inAssetIds.length), 1);
+        }
+
         (uint8 action, address vault) = abi.decode(payload, (uint8, address));
 
         outAssetIds = new uint24[](1);

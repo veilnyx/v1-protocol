@@ -40,6 +40,10 @@ contract EthenaAdaptor is AdaptorBase {
         override
         returns (uint24[] memory outAssetIds, uint256[] memory outValues)
     {
+        if(inAssetIds.length != 1 || inValues.length != 1) {
+            revert InvalidInputAssetLength(uint8(inAssetIds.length), 1);
+        }
+        
         Asset memory inAsset = getAsset(inAssetIds[0]);
         if (inAsset.assetAddress != USDe) {
             revert UnsupportedAsset(inAsset.id);
