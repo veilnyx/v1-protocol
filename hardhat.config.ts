@@ -22,7 +22,15 @@ const veilnyxPrivateKeys = [process.env.VEILNYX_TEST_PRIV_KEY as string];
 const forkEnabled = process.env.HARDHAT_FORK === "true";
 
 const config: HardhatUserConfig = {
-  solidity: "0.8.24",
+  solidity: {
+    version: "0.8.24",
+    settings: {
+      optimizer: {
+        enabled: true,
+        runs: 1_000_000,
+      },
+    }
+  },
   networks: {
     hardhat: {
       allowUnlimitedContractSize: false,

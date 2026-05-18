@@ -5,7 +5,7 @@ ffi = true
 ast = true
 via-ir = false
 optimizer = true
-optimizer-runs = 500
+optimizer-runs = 1_000_000
 build_info = true
 extra_output = ["storageLayout"]
 fs_permissions = [{ access = "read-write", path = "./" }]
