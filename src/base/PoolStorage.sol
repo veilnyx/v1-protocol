@@ -5,12 +5,16 @@ import {MerkleTree} from "../libraries/MerkleTree.sol";
 import {QueuedMerkleTree} from "../libraries/QueuedMerkleTree.sol";
 import {Asset, AssetType} from "../libraries/Asset.sol";
 import {RevokerData} from "../libraries/ShieldedTransaction.sol";
+import {IVerifier} from "../interfaces/IVerifier.sol";
+import {IAdaptorHandler} from "../interfaces/IAdaptorHandler.sol";
+import {IHasher} from "../interfaces/IHasher.sol";
+import {IScreener} from "../interfaces/IScreener.sol";
 
 abstract contract PoolStorage {
-    address public verifier;
-    address public adaptorHandler;
-    address public hasher;
-    address public screener;
+    IVerifier public verifier;
+    IAdaptorHandler public adaptorHandler;
+    IHasher public hasher;
+    IScreener public screener;
 
     MerkleTree internal _addressTree;
     QueuedMerkleTree internal _commitmentTree;

@@ -45,11 +45,11 @@ contract QueuedMerkleTreeLogicTest is BaseTest {
         qmt.init(
             fixture.commitmentTreeDepth,
             fixture.commitmentTreeQueueSize,
-            address(hasher),
-            address(verifier_)
+            hasher,
+            verifier_
         );
 
-        refTree.init(fixture.commitmentTreeDepth, address(hasher));
+        refTree.init(fixture.commitmentTreeDepth, hasher);
     }
 
     ////////////////////////////////////////

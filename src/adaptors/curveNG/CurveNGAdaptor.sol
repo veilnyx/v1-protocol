@@ -7,6 +7,7 @@ import {AdaptorBase} from "../../base/AdaptorBase.sol";
 import {Asset, AssetType} from "../../libraries/Asset.sol";
 import {IWToken} from "../../interfaces/IWToken.sol";
 import {ICurvePool} from "./ICurvePool.sol";
+import {AssetAmount} from "../../interfaces/IAdaptor.sol";
 
 enum WithdrawType {
     BALANCED,
@@ -43,16 +44,24 @@ contract CurveNGAdaptor is AdaptorBase {
     constructor(address pool_) AdaptorBase(pool_) {}
 
     function handleAssets(
-        uint24[] calldata inAssetIds,
-        uint256[] calldata inValues,
+        AssetAmount[] calldata inAssets,
         bytes calldata payload
     )
         external
         payable
         virtual
         override
-        returns (uint24[] memory outAssetIds, uint256[] memory outValues)
+        returns (AssetAmount[] memory outAssets)
     {
+        uint24[] memory inAssetIds = new uint24[](inAssets.length);
+        uint256[] memory inValues = new uint256[](inAssets.length);
+        for (uint256 i; i < inAssets.length; i++) {
+            inAssetIds[i] = inAssets[i].assetId;
+            inValues[i] = inAssets[i].value;
+        }
+        uint24[] memory outAssetIds;
+        uint256[] memory outValues;
+
         Payload memory decodedPayload = abi.decode(payload, (Payload));
         uint256 NCoins;
         // trying to access the third coin (index 2 of the coins array) to determine if it's a 2-coin or 3-coin pool
@@ -86,6 +95,10 @@ contract CurveNGAdaptor is AdaptorBase {
                 inValues,
                 decodedPayload.slippageBps
             );
+            outAssets = new AssetAmount[](outAssetIds.length);
+            for (uint256 i; i < outAssetIds.length; i++) {
+                outAssets[i] = AssetAmount(outAssetIds[i], outValues[i]);
+            }
         } else if (decodedPayload.action == ACTION_WITHDRAW) {
             _withdrawChecksAndApprove(
                 ICurvePool(decodedPayload.curvePool),
@@ -120,7 +133,11 @@ contract CurveNGAdaptor is AdaptorBase {
                     )
                 ).id;
 
-                return (outAssetIds, outValues);
+                outAssets = new AssetAmount[](outAssetIds.length);
+                for (uint256 i; i < outAssetIds.length; i++) {
+                    outAssets[i] = AssetAmount(outAssetIds[i], outValues[i]);
+                }
+                return outAssets;
             }
 
             if (NCoins == 2) {
@@ -256,7 +273,11 @@ contract CurveNGAdaptor is AdaptorBase {
                 ).id;
             }
 
-            return (outAssetIds, outValues);
+            outAssets = new AssetAmount[](outAssetIds.length);
+            for (uint256 i; i < outAssetIds.length; i++) {
+                outAssets[i] = AssetAmount(outAssetIds[i], outValues[i]);
+            }
+            return outAssets;
         } else {
             revert InvalidAction();
         }

@@ -13,6 +13,11 @@ import {VerifierTreeUpdate} from "src/verifiers/VerifierTreeUpdate.sol";
 import {Verifier, TransactionVerifierInfo} from "src/core/Verifier.sol";
 import {AdaptorHandler} from "src/core/AdaptorHandler.sol";
 import {Hasher} from "src/core/Hasher.sol";
+import {IVerifier} from "src/interfaces/IVerifier.sol";
+import {IAdaptorHandler} from "src/interfaces/IAdaptorHandler.sol";
+import {IHasher} from "src/interfaces/IHasher.sol";
+import {IScreener} from "src/interfaces/IScreener.sol";
+import {IPool} from "src/interfaces/IPool.sol";
 import {MockPool} from "test/mocks/MockPool.sol";
 import {MockScreener} from "test/mocks/MockScreener.sol";
 import {MockERC20} from "test/mocks/MockERC20.sol";
@@ -80,10 +85,10 @@ contract PoolBaseTest is BaseTest {
         hasher = _deployHasher();
 
         InitAddressParams memory initAddressParams = InitAddressParams({
-            verifier: address(verifier),
-            adaptorHandler: address(adaptorHandler),
-            screener: address(screener),
-            hasher: address(hasher)
+            verifier: IVerifier(address(verifier)),
+            adaptorHandler: IAdaptorHandler(address(adaptorHandler)),
+            screener: IScreener(address(screener)),
+            hasher: IHasher(address(hasher))
         });
 
         bytes memory initData = abi.encodeCall(
@@ -99,7 +104,7 @@ contract PoolBaseTest is BaseTest {
 
         ERC1967Proxy poolProxy = new ERC1967Proxy(address(pool), initData);
         pool = MockPool(address(poolProxy));
-        adaptorHandler.setVeilnyxPool(address(pool));
+        adaptorHandler.setVeilnyxPool(IPool(address(pool)));
     }
 
     //////////////////////////////////////////////////////

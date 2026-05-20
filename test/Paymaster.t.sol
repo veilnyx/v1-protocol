@@ -10,6 +10,9 @@ import {Asset} from "src/libraries/Asset.sol";
 import {ShieldedTransaction, ShieldedTransactionType} from "src/libraries/ShieldedTransaction.sol";
 import {Pool} from "src/core/Pool.sol";
 import {Gateway} from "src/core/Gateway.sol";
+import {IEntryPoint} from "@account-abstraction/contracts/interfaces/IEntryPoint.sol";
+import {IWToken} from "src/interfaces/IWToken.sol";
+import {IPool} from "src/interfaces/IPool.sol";
 import {MockPool} from "test/mocks/MockPool.sol";
 import {PoolTest} from "test/fixtures/PoolTest.sol";
 import {console2} from "forge-std/console2.sol";
@@ -66,9 +69,9 @@ contract PaymasterTest is PoolTest {
         feeAssetId = asset1.id;
         entryPoint = address(new EntryPoint());
         gateway = new Gateway(
-            address(entryPoint),
-            makeAddr("wToken"),
-            address(pool)
+            IEntryPoint(entryPoint),
+            IWToken(makeAddr("wToken")),
+            IPool(address(pool))
         );
 
         StdCheats.deployCodeTo(
@@ -80,23 +83,29 @@ contract PaymasterTest is PoolTest {
         paymaster = Paymaster(fixture.paymaster);
 
         // Setting chainlink feed address to fetch prices
-        paymaster.setChainlinkFeed(asset1.id, address(0));
+        paymaster.setChainlinkFeed(
+            asset1.id,
+            AggregatorV3Interface(address(0))
+        );
 
         // asset 2 (USDC)
         if (block.chainid == ETH_SEPOLIA) {
             // Sepolia
             paymaster.setChainlinkFeed(
                 asset2.id,
-                CHAINLINK_ETH_USDC_FEED_SEPOLIA
+                AggregatorV3Interface(CHAINLINK_ETH_USDC_FEED_SEPOLIA)
             );
         } else if (block.chainid == ETH_MAINNET) {
             // Mainnet
             paymaster.setChainlinkFeed(
                 asset2.id,
-                CHAINLINK_ETH_USDC_FEED_MAINNET
+                AggregatorV3Interface(CHAINLINK_ETH_USDC_FEED_MAINNET)
             );
         } else {
-            paymaster.setChainlinkFeed(asset2.id, address(0));
+            paymaster.setChainlinkFeed(
+                asset2.id,
+                AggregatorV3Interface(address(0))
+            );
         }
     }
 

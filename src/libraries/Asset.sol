@@ -6,7 +6,6 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IPool} from "../interfaces/IPool.sol";
-import {Asset, AssetType} from "../libraries/Asset.sol";
 
 enum AssetType {
     NULL,
@@ -27,7 +26,7 @@ library AssetLogic {
     using SafeERC20 for IERC20;
 
     error ZeroAddress();
-    error PrecisionMismatch();
+    error UnsupportedAssetType(uint24 assetId);
 
     function getAssetOrRevert(
         mapping(uint24 => Asset) storage assets,
@@ -44,67 +43,59 @@ library AssetLogic {
     function addAsset(
         mapping(address => uint24) storage assetIds,
         mapping(uint24 => Asset) storage assets,
-        uint16 counter,
+        uint16 assetCount,
         AssetType assetType,
-        address assetAddress,
-        uint8 assetPrecision
+        IERC20 assetAddress
     ) public returns (uint16) {
-        if (_isAssetAdded(assetIds, assetAddress)) {
-            revert IPool.DuplicateAsset(assetAddress);
+        if (_isAssetAdded(assetIds, address(assetAddress))) {
+            revert IPool.DuplicateAsset(address(assetAddress));
         }
 
-        if (assetAddress == address(0)) {
+        if (address(assetAddress) == address(0)) {
             revert ZeroAddress();
         }
 
-        if (IERC20Metadata(assetAddress).decimals() != assetPrecision) {
-            revert PrecisionMismatch();
-        }
+        uint8 precision = IERC20Metadata(address(assetAddress)).decimals();
+        assetCount += 1;
 
-        // Uid of added asset
-        uint16 uid = counter + 1;
+        // Asset ID: 1 byte type | 2 bytes asset counter
+        uint24 newAssetId = (uint24(uint8(assetType)) << 16) |
+            uint24(assetCount);
 
-        // Concat asset type and uid to get asset id
-        uint24 newAssetId = uint24(
-            bytes3(bytes.concat(bytes1(uint8(assetType)), bytes2(uid)))
-        );
-
-        assetIds[assetAddress] = newAssetId;
+        assetIds[address(assetAddress)] = newAssetId;
         assets[newAssetId] = Asset({
             id: newAssetId,
             assetType: assetType,
-            assetAddress: assetAddress,
+            assetAddress: address(assetAddress),
             isActive: true,
-            precision: assetPrecision
+            precision: precision
         });
 
-        emit IPool.AssetAdded(assetAddress, newAssetId);
-        return uid;
+        emit IPool.AssetAdded(address(assetAddress), newAssetId);
+        return assetCount;
     }
 
     function addAssets(
         mapping(address => uint24) storage assetIds,
         mapping(uint24 => Asset) storage assets,
-        uint16 counter,
+        uint16 assetCount,
         AssetType assetType,
-        address[] calldata assetAddresses,
-        uint8[] calldata assetsPrecision
+        address[] calldata assetAddresses
     ) external returns (uint16) {
         for (uint256 i = 0; i < assetAddresses.length; ) {
-            counter = addAsset(
+            assetCount = addAsset(
                 assetIds,
                 assets,
-                counter,
+                assetCount,
                 assetType,
-                assetAddresses[i],
-                assetsPrecision[i]
+                IERC20(assetAddresses[i])
             );
 
             unchecked {
                 ++i;
             }
         }
-        return counter;
+        return assetCount;
     }
 
     function updateAsset(
@@ -127,7 +118,7 @@ library AssetLogic {
         if (asset.assetType == AssetType.ERC20) {
             _receiveERC20(asset, from, address(this), value);
         } else {
-            revert IPool.InactiveAsset(assetId);
+            revert UnsupportedAssetType(assetId);
         }
     }
 
@@ -142,7 +133,7 @@ library AssetLogic {
         if (asset.assetType == AssetType.ERC20) {
             _transferERC20(asset, to, value);
         } else {
-            revert IPool.InactiveAsset(assetId);
+            revert UnsupportedAssetType(assetId);
         }
     }
 

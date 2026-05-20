@@ -12,6 +12,7 @@ import {SwapDescription} from "src/adaptors/oneInch-v6/IOneInch.sol";
 import {IWToken} from "src/interfaces/IWToken.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Asset, AssetType} from "src/libraries/Asset.sol";
+import {AssetAmount} from "src/interfaces/IAdaptor.sol";
 import {console} from "forge-std/Test.sol";
 
 contract OneInchAdaptorTest is PoolTest {
@@ -85,23 +86,23 @@ contract OneInchAdaptorTest is PoolTest {
         // bytes
         //     memory oneInchCalldata = hex"000000000000000000000000e37e799d5077682fa0a244d46e5649f71457bd09000000000000000000000000c02aaa39b223fe8d0a0e5c4f27ead9083c756cc2000000000000000000000000a0b86991c6218b36c1d19d4a2e9eb0ce3606eb48000000000000000000000000397ff1542f962076d0bfe58ea045ffa2d347aca0000000000000000000000000bf71c5ae43827387daaf7358acab5c81642b74b80000000000000000000000000000000000000000000000000de0b6b3a7640000000000000000000000000000000000000000000000000000000000007b4070cc00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000120000000000000000000000000000000000000000000000000000000000000009f00000000000000000000000000000000000000000000000000008100001a0020d6bdbf78c02aaa39b223fe8d0a0e5c4f27ead9083c756cc200206ae4071138002dc6c0397ff1542f962076d0bfe58ea045ffa2d347aca0111111125421ca6dc452d289314280a0f8842a650000000000000000000000000000000000000000000000000000000000000001c02aaa39b223fe8d0a0e5c4f27ead9083c756cc20006d4e6c5";
 
-        uint24[] memory inAssetIds = new uint24[](1);
-        inAssetIds[0] = pool.getAsset(WETH).id;
-        uint256[] memory inValues = new uint256[](1);
-        inValues[0] = SWAP_AMT;
+        AssetAmount[] memory inAssets = new AssetAmount[](1);
+        inAssets[0] = AssetAmount({
+            assetId: pool.getAsset(WETH).id,
+            value: SWAP_AMT
+        });
 
         vm.startPrank(user);
         iWETH.transfer(address(oneInchAdaptor), SWAP_AMT);
 
-        (, uint256[] memory outAssetValues) = oneInchAdaptor.handleAssets(
-            inAssetIds,
-            inValues,
+        AssetAmount[] memory outAssets = oneInchAdaptor.handleAssets(
+            inAssets,
             oneInchCalldata
         );
         vm.stopPrank();
 
         // Asserts
-        assert(outAssetValues[0] > 0);
+        assert(outAssets[0].value > 0);
         assert(IERC20(USDC).balanceOf(address(oneInchAdaptor)) > 0);
         assertEq(IERC20(WETH).balanceOf(address(oneInchAdaptor)), 0);
     }

@@ -8,11 +8,13 @@ interface IVerifier {
     error VerifierIdOverflow();
 
     function verifyTransactionProof(
-        uint16 vId,
-        bytes memory vInp
+        uint16 verifierId,
+        bytes calldata vInputs
     ) external view returns (bool);
 
-    function verifyAddressProof(bytes memory vInp) external view returns (bool);
+    function verifyAddressProof(
+        bytes calldata vInputs
+    ) external view returns (bool);
 
     function verifyTreeUpdateProof(
         bytes calldata vInputs

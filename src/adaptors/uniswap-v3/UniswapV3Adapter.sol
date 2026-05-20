@@ -6,6 +6,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {AdaptorBase} from "src/base/AdaptorBase.sol";
 import {Asset, AssetType} from "src/libraries/Asset.sol";
 import {ISwapRouter02} from "./ISwapRouter02.sol";
+import {AssetAmount} from "../../interfaces/IAdaptor.sol";
 
 contract UniswapV3Adapter is AdaptorBase {
     // Errors //
@@ -20,28 +21,19 @@ contract UniswapV3Adapter is AdaptorBase {
 
     /// @dev Will be called by the zkFi AdaptorHandler.sol to execute the swap.
     function handleAssets(
-        uint24[] calldata inAssetIds,
-        uint256[] calldata inValues,
+        AssetAmount[] calldata inAssets,
         bytes calldata payload
-    )
-        external
-        payable
-        override
-        returns (uint24[] memory outAssetIds, uint256[] memory outValues)
-    {
-        uint256 inValue;
+    ) external payable override returns (AssetAmount[] memory outAssets) {
         // Checks
-        if (inAssetIds.length != 1 || inValues.length != 1) {
-            revert InvalidInputAssetLength(uint8(inAssetIds.length), 1);
+        if (inAssets.length != 1) {
+            revert InvalidInputAssetLength(uint8(inAssets.length), 1);
         }
 
-        if (inValues[0] == 0) {
+        if (inAssets[0].value == 0) {
             revert ZeroValue();
-        } else {
-            inValue = inValues[0];
         }
 
-        Asset memory inAsset = getAsset(inAssetIds[0]);
+        Asset memory inAsset = getAsset(inAssets[0].assetId);
 
         // decoding payload
         (uint24 outAssetId, address beneficiary, uint256 minOut) = abi.decode(
@@ -59,7 +51,7 @@ contract UniswapV3Adapter is AdaptorBase {
         // Executing swap using UniswapV3
         uint256 tokenOutAmount = swapExactInputSingle({
             tokenIn: inAsset.assetAddress,
-            tokenInAmt: inValue,
+            tokenInAmt: inAssets[0].value,
             tokenOut: outAsset.assetAddress,
             minOut: minOut,
             beneficiary: beneficiary
@@ -67,14 +59,10 @@ contract UniswapV3Adapter is AdaptorBase {
 
         // initialising out arrays
         if (beneficiary == address(this)) {
-            outAssetIds = new uint24[](1);
-            outValues = new uint256[](1);
-
-            outAssetIds[0] = outAssetId;
-            outValues[0] = tokenOutAmount;
+            outAssets = new AssetAmount[](1);
+            outAssets[0] = AssetAmount(outAssetId, tokenOutAmount);
         } else {
-            outAssetIds = new uint24[](0);
-            outValues = new uint256[](0);
+            outAssets = new AssetAmount[](0);
         }
     }
 

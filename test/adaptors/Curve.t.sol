@@ -7,6 +7,7 @@ import {Pool} from "src/core/Pool.sol";
 import {ShieldedTransaction} from "src/libraries/ShieldedTransaction.sol";
 import {CurveNGAdaptor as CurveAdaptor, Payload} from "src/adaptors/curveNG/CurveNGAdaptor.sol";
 import {IAdaptor} from "src/interfaces/IAdaptor.sol";
+import {AssetAmount} from "src/interfaces/IAdaptor.sol";
 import {IWToken} from "src/interfaces/IWToken.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -55,11 +56,7 @@ contract CurveAdaptorTest is PoolTest {
         assetAddresses[1] = crvUSD;
         assetAddresses[2] = crvUSD_USDT_Pool;
 
-        uint8[] memory assetsPrecision = new uint8[](3);
-        assetsPrecision[0] = 6;
-        assetsPrecision[1] = 18;
-        assetsPrecision[2] = 18;
-        pool.addAssets(assetType, assetAddresses, assetsPrecision);
+        pool.addAssets(assetType, assetAddresses);
         vm.stopPrank();
 
         vm.startPrank(user);
@@ -135,10 +132,7 @@ contract CurveAdaptorTest is PoolTest {
     }
 
     function testBalancedWithdraw() public {
-        (
-            uint24[] memory depositOutAssetIds,
-            uint256[] memory depositOutValues
-        ) = _depositInCurve();
+        AssetAmount[] memory depositOutAssets = _depositInCurve();
 
         /// @todo uncommet
         // _performSwapsToGenerateFee(); // ("Underlying tokens received:", 1966937 [1.966e6], 3035599336757587327 [3.035e18])
@@ -160,9 +154,8 @@ contract CurveAdaptorTest is PoolTest {
 
         vm.startPrank(user);
         /// @dev We don't need to transfer the LP tokens to the CurveAdaptor as during the deposit, LP tokens were received by the CurveAdaptor itself.
-        (uint24[] memory outAssetIds, uint256[] memory outValues) = IAdaptor(
-            address(curveAdaptor)
-        ).handleAssets(depositOutAssetIds, depositOutValues, payloadEncoded);
+        AssetAmount[] memory outAssets = IAdaptor(address(curveAdaptor))
+            .handleAssets(depositOutAssets, payloadEncoded);
         vm.stopPrank();
 
         console.log(
@@ -171,18 +164,15 @@ contract CurveAdaptorTest is PoolTest {
             IERC20(crvUSD).balanceOf(address(curveAdaptor))
         );
 
-        assert(outAssetIds.length == 2);
-        assert(outValues[0] > 0);
-        assert(outValues[1] > 0);
+        assert(outAssets.length == 2);
+        assert(outAssets[0].value > 0);
+        assert(outAssets[1].value > 0);
         assert(IERC20(USDT).balanceOf(address(curveAdaptor)) > 0);
         assert(IERC20(crvUSD).balanceOf(address(curveAdaptor)) > 0);
     }
 
     function testOneCoinWithdraw() public {
-        (
-            uint24[] memory depositOutAssetIds,
-            uint256[] memory depositOutValues
-        ) = _depositInCurve();
+        AssetAmount[] memory depositOutAssets = _depositInCurve();
 
         /// @todo uncommet
         // _performSwapsToGenerateFee();
@@ -203,9 +193,8 @@ contract CurveAdaptorTest is PoolTest {
         bytes memory payloadEncoded = abi.encode(payload);
 
         vm.startPrank(user);
-        (uint24[] memory outAssetIds, uint256[] memory outValues) = IAdaptor(
-            address(curveAdaptor)
-        ).handleAssets(depositOutAssetIds, depositOutValues, payloadEncoded); // staking directly through CurveAdaptor
+        AssetAmount[] memory outAssets = IAdaptor(address(curveAdaptor))
+            .handleAssets(depositOutAssets, payloadEncoded); // staking directly through CurveAdaptor
         vm.stopPrank();
 
         console.log(
@@ -214,17 +203,14 @@ contract CurveAdaptorTest is PoolTest {
             IERC20(crvUSD).balanceOf(address(curveAdaptor))
         );
 
-        assert(outAssetIds.length == 1);
-        assert(outValues[0] > 0);
+        assert(outAssets.length == 1);
+        assert(outAssets[0].value > 0);
         assert(IERC20(USDT).balanceOf(address(curveAdaptor)) > 0);
         assert(IERC20(crvUSD).balanceOf(address(curveAdaptor)) == 0);
     }
 
     function testImbalanceWithdraw() public {
-        (
-            uint24[] memory depositOutAssetIds,
-            uint256[] memory depositOutValues
-        ) = _depositInCurve();
+        AssetAmount[] memory depositOutAssets = _depositInCurve();
 
         // _performSwapsToGenerateFee();
 
@@ -250,9 +236,8 @@ contract CurveAdaptorTest is PoolTest {
         bytes memory payloadEncoded = abi.encode(payload);
 
         vm.startPrank(user);
-        (uint24[] memory outAssetIds, uint256[] memory outValues) = IAdaptor(
-            address(curveAdaptor)
-        ).handleAssets(depositOutAssetIds, depositOutValues, payloadEncoded); // staking directly through CurveAdaptor
+        AssetAmount[] memory outAssets = IAdaptor(address(curveAdaptor))
+            .handleAssets(depositOutAssets, payloadEncoded); // staking directly through CurveAdaptor
         vm.stopPrank();
 
         console.log(
@@ -262,9 +247,9 @@ contract CurveAdaptorTest is PoolTest {
             IERC20(crvUSD_USDT_Pool).balanceOf(address(curveAdaptor))
         );
 
-        assert(outAssetIds.length == 2);
-        assert(outValues[0] > 0);
-        assert(outValues[1] > 0);
+        assert(outAssets.length == 2);
+        assert(outAssets[0].value > 0);
+        assert(outAssets[1].value > 0);
         assert(IERC20(USDT).balanceOf(address(curveAdaptor)) > 0);
         assert(IERC20(crvUSD).balanceOf(address(curveAdaptor)) > 0);
         // since not withdrawing all underlying tokens, some LP token bal should be left
@@ -286,17 +271,13 @@ contract CurveAdaptorTest is PoolTest {
         assert(lpTokenCount > 0);
     }
 
-    function _depositInCurve()
-        internal
-        returns (uint24[] memory, uint256[] memory)
-    {
-        uint24[] memory inAssetIds = new uint24[](2);
-        inAssetIds[0] = pool.getAsset(USDT).id;
-        inAssetIds[1] = pool.getAsset(crvUSD).id;
-
-        uint256[] memory inValues = new uint256[](2);
-        inValues[0] = INITIAL_SUPPLY_USDT;
-        inValues[1] = INITIAL_SUPPLY_CRVUSD;
+    function _depositInCurve() internal returns (AssetAmount[] memory) {
+        AssetAmount[] memory inAssets = new AssetAmount[](2);
+        inAssets[0] = AssetAmount(pool.getAsset(USDT).id, INITIAL_SUPPLY_USDT);
+        inAssets[1] = AssetAmount(
+            pool.getAsset(crvUSD).id,
+            INITIAL_SUPPLY_CRVUSD
+        );
 
         uint256[] memory underlyingTokenAmts = new uint256[](2);
         underlyingTokenAmts[0] = uint256(0);
@@ -316,37 +297,36 @@ contract CurveAdaptorTest is PoolTest {
         console.logBytes(payloadEncoded);
 
         // Re-fund user since initial balance was consumed during setUp deposit
-        _dealUSDT(user, inValues[0]);
-        deal(crvUSD, user, inValues[1]);
+        _dealUSDT(user, INITIAL_SUPPLY_USDT);
+        deal(crvUSD, user, INITIAL_SUPPLY_CRVUSD);
 
         vm.startPrank(user);
         SafeERC20.forceApprove(
             IERC20(USDT),
             address(curveAdaptor),
-            inValues[0]
+            INITIAL_SUPPLY_USDT
         );
         SafeERC20.forceApprove(
             IERC20(crvUSD),
             address(curveAdaptor),
-            inValues[1]
+            INITIAL_SUPPLY_CRVUSD
         );
         SafeERC20.safeTransfer(
             IERC20(USDT),
             address(curveAdaptor),
-            inValues[0]
+            INITIAL_SUPPLY_USDT
         );
         SafeERC20.safeTransfer(
             IERC20(crvUSD),
             address(curveAdaptor),
-            inValues[1]
+            INITIAL_SUPPLY_CRVUSD
         );
 
-        (uint24[] memory outAssetIds, uint256[] memory outValues) = IAdaptor(
-            address(curveAdaptor)
-        ).handleAssets(inAssetIds, inValues, payloadEncoded); // staking directly through CurveAdaptor
+        AssetAmount[] memory outAssets = IAdaptor(address(curveAdaptor))
+            .handleAssets(inAssets, payloadEncoded); // staking directly through CurveAdaptor
         vm.stopPrank();
 
-        return (outAssetIds, outValues);
+        return outAssets;
     }
 
     function _performSwapsToGenerateFee() internal {

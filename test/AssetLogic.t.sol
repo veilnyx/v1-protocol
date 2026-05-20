@@ -2,6 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {Test} from "forge-std/Test.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {AssetType, Asset, AssetLogic} from "src/libraries/Asset.sol";
 import {IPool} from "src/interfaces/IPool.sol";
 
@@ -12,9 +13,21 @@ contract AssetLogicTest is Test {
     uint8 public precision = 18;
 
     function setUp() public {
-        vm.mockCall(t1, abi.encodeWithSignature("decimals()"), abi.encode(precision));
-        vm.mockCall(t2, abi.encodeWithSignature("decimals()"), abi.encode(precision));
-        vm.mockCall(t3, abi.encodeWithSignature("decimals()"), abi.encode(precision));
+        vm.mockCall(
+            t1,
+            abi.encodeWithSignature("decimals()"),
+            abi.encode(precision)
+        );
+        vm.mockCall(
+            t2,
+            abi.encodeWithSignature("decimals()"),
+            abi.encode(precision)
+        );
+        vm.mockCall(
+            t3,
+            abi.encodeWithSignature("decimals()"),
+            abi.encode(precision)
+        );
     }
 
     mapping(address => uint24) internal _assetIds;
@@ -27,8 +40,7 @@ contract AssetLogicTest is Test {
             _assets,
             _counter,
             AssetType.ERC20,
-            t1,
-            precision
+            IERC20(t1)
         );
         assertEq(count, _counter + 1);
     }
@@ -41,18 +53,12 @@ contract AssetLogicTest is Test {
         assetAddresses[1] = t2;
         assetAddresses[2] = t3;
 
-        uint8[] memory assetsPrecision = new uint8[](3);
-        assetsPrecision[0] = precision;
-        assetsPrecision[1] = precision;
-        assetsPrecision[2] = precision;
-
         uint16 count = AssetLogic.addAssets(
             _assetIds,
             _assets,
             _counter,
             assetType,
-            assetAddresses,
-            assetsPrecision
+            assetAddresses
         );
 
         assertEq(count, _counter + assetAddresses.length);
@@ -64,8 +70,7 @@ contract AssetLogicTest is Test {
             _assets,
             _counter,
             AssetType.ERC20,
-            t1,
-            precision
+            IERC20(t1)
         );
         uint24 newAssetId = _assetIds[t1];
         AssetLogic.updateAsset(_assets, newAssetId, false);
@@ -78,8 +83,7 @@ contract AssetLogicTest is Test {
             _assets,
             count,
             AssetType.ERC20,
-            t1,
-            precision
+            IERC20(t1)
         );
     }
 }

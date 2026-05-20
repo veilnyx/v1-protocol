@@ -8,8 +8,8 @@ struct MerkleTree {
     uint8 depth;
     uint8 currentRootIndex;
     uint32 nextLeafIndex;
-    uint40 capacity;
-    address hasher;
+    uint32 capacity;
+    IHasher hasher;
     mapping(uint8 => uint256) roots;
     mapping(uint8 => uint256) zeroes;
     mapping(uint8 => uint256) lastSubtrees;
@@ -20,7 +20,7 @@ library MerkleTreeLogic {
     error InvalidDepth(uint8 given, uint8 min, uint8 max);
     error OutOfField();
 
-    uint8 public constant ROOT_HISTORY_SIZE = 100;
+    uint8 internal constant ROOT_HISTORY_SIZE = 100;
 
     modifier whenTreeNotFull(MerkleTree storage self) {
         if (self.nextLeafIndex >= self.capacity) {
@@ -32,24 +32,24 @@ library MerkleTreeLogic {
     /// @custom:invariant MT-1: Leaves can only be appended, never modified
     /// @custom:invariant MT-2: roots[] is circular buffer of size ROOT_HISTORY_SIZE
     /// @custom:invariant MT-3: nextLeafIndex < capacity at all times
-    function init(MerkleTree storage self, uint8 depth, address hasher) public {
-        if(depth == 0 || depth > 31) {
+    function init(MerkleTree storage self, uint8 depth, IHasher hasher) public {
+        if (depth == 0 || depth > 31) {
             revert InvalidDepth(depth, 1, 31);
         }
 
-        if(hasher == address(0)) {
-            revert IHasher.ZeroAddress();
+        if (address(hasher) == address(0)) {
+            revert ZeroAddress();
         }
 
         self.depth = depth;
         self.hasher = hasher;
-        self.capacity = uint32(2 ** depth);
+        self.capacity = uint32(1 << depth);
 
         uint256 zero = ZERO_LEAF;
         for (uint8 i = 0; i < depth; ) {
             self.zeroes[i] = zero;
             self.lastSubtrees[i] = zero;
-            zero = IHasher(hasher).hash([zero, zero]);
+            zero = hasher.hash([zero, zero]);
 
             unchecked {
                 ++i;
@@ -64,7 +64,7 @@ library MerkleTreeLogic {
         uint256 leaf1,
         uint256 leaf2
     ) public view returns (uint256) {
-        return IHasher(self.hasher).hash([leaf1, leaf2]);
+        return self.hasher.hash([leaf1, leaf2]);
     }
 
     function insert(
@@ -76,9 +76,10 @@ library MerkleTreeLogic {
         }
 
         uint8 depth = self.depth;
+        uint32 leafInsertIndex = self.nextLeafIndex;
 
         uint256 currentLevelHash = leaf;
-        uint32 currentLevelIndex = self.nextLeafIndex;
+        uint32 currentLevelIndex = leafInsertIndex;
 
         uint256 left;
         uint256 right;
@@ -106,9 +107,9 @@ library MerkleTreeLogic {
         uint8 newRootIndex = (self.currentRootIndex + 1) % ROOT_HISTORY_SIZE;
         self.currentRootIndex = newRootIndex;
         self.roots[newRootIndex] = currentLevelHash;
-        self.nextLeafIndex = self.nextLeafIndex + 1;
+        self.nextLeafIndex = leafInsertIndex + 1;
 
-        return self.nextLeafIndex;
+        return leafInsertIndex + 1;
     }
 
     /// @custom:invariant MT-3: Any valid root from last 100 insertions is accepted
@@ -151,10 +152,19 @@ library MerkleTreeLogic {
 
     function getState(
         MerkleTree storage self
-    ) public view returns (uint256[] memory, uint256, uint8, uint32) {
-        uint256[] memory lastSubtrees = _getSubtrees(self);
-        uint32 nextLeafIndex = self.nextLeafIndex;
-        uint256 lastRoot = self.roots[self.currentRootIndex];
-        return (lastSubtrees, lastRoot, self.currentRootIndex, nextLeafIndex);
+    )
+        public
+        view
+        returns (
+            uint256[] memory subtrees,
+            uint256 lastRoot,
+            uint8 currentRootIdx,
+            uint32 nextLeafIndex
+        )
+    {
+        subtrees = _getSubtrees(self);
+        nextLeafIndex = self.nextLeafIndex;
+        lastRoot = self.roots[self.currentRootIndex];
+        currentRootIdx = self.currentRootIndex;
     }
 }

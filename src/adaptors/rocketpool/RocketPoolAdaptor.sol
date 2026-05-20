@@ -8,6 +8,7 @@ import {IRocketSwapRouter} from "./IRocketSwapRouter.sol";
 import {IWToken} from "../../interfaces/IWToken.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {AssetAmount} from "../../interfaces/IAdaptor.sol";
 
 error InsufficientStakingAmt(uint256 stakingAmt, uint256 minimumDeposit);
 
@@ -35,18 +36,17 @@ contract RocketPoolAdaptor is AdaptorBase {
     }
 
     function handleAssets(
-        uint24[] calldata inAssetIds,
-        uint256[] calldata inValues,
+        AssetAmount[] calldata inAssets,
         bytes calldata payload
     )
         external
         payable
         virtual
         override
-        returns (uint24[] memory outAssetIds, uint256[] memory outValues)
+        returns (AssetAmount[] memory outAssets)
     {
-        if (inAssetIds.length != 1 || inValues.length != 1) {
-            revert InvalidInputAssetLength(uint8(inAssetIds.length), 1);
+        if (inAssets.length != 1) {
+            revert InvalidInputAssetLength(uint8(inAssets.length), 1);
         }
 
         (
@@ -56,27 +56,32 @@ contract RocketPoolAdaptor is AdaptorBase {
             uint256 minTokensOut
         ) = abi.decode(payload, (Action, uint256, uint256, uint256));
 
-        outAssetIds = new uint24[](1);
-        outValues = new uint256[](1);
+        uint24[] memory outAssetIds;
+        uint256[] memory outValues;
 
         if (action == Action.STAKE) {
             (outAssetIds, outValues) = _stake(
-                inAssetIds[0],
-                inValues[0],
+                inAssets[0].assetId,
+                inAssets[0].value,
                 uniswapPortion,
                 balancerPortion,
                 minTokensOut
             );
         } else if (action == Action.UNSTAKE) {
             (outAssetIds, outValues) = _unstake(
-                inAssetIds[0],
-                inValues[0],
+                inAssets[0].assetId,
+                inAssets[0].value,
                 uniswapPortion,
                 balancerPortion,
                 minTokensOut
             );
         } else {
             revert InvalidAction();
+        }
+
+        outAssets = new AssetAmount[](outAssetIds.length);
+        for (uint256 i; i < outAssetIds.length; i++) {
+            outAssets[i] = AssetAmount(outAssetIds[i], outValues[i]);
         }
     }
 

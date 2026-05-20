@@ -26,18 +26,14 @@ contract MerkleTreeLogicTest is BaseTest {
     }
 
     function setUp() external {
-        MerkleTreeLogic.init(
-            _commitmentTree,
-            commitmentTreeDepth,
-            address(hasher)
-        );
+        MerkleTreeLogic.init(_commitmentTree, commitmentTreeDepth, hasher);
         BinaryIMTLogic.init(
             _binaryIMTToCheckCommitmentTreeRoot,
             commitmentTreeDepth,
             ZERO_LEAF
         );
 
-        MerkleTreeLogic.init(_addressTree, addressTreeDepth, address(hasher));
+        MerkleTreeLogic.init(_addressTree, addressTreeDepth, hasher);
         BinaryIMTLogic.init(
             _binaryIMTToCheckAddressTreeRoot,
             addressTreeDepth,

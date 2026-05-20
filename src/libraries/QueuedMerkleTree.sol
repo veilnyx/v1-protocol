@@ -11,8 +11,8 @@ struct QueuedMerkleTree {
     uint8 currentRootIndex;
     uint8 queueSize; // max number of leaves that can be queued before an update is required. This is defined by the circuit `treeUpdate::nLeaves` and is immutable after pool initialization.
     uint32 capacity;
-    address hasher;
-    address verifier;
+    IHasher hasher;
+    IVerifier verifier;
     uint32 nextLeafIndex;
     uint32 queueStartIndex;
     uint32 queueEndIndex;
@@ -35,7 +35,7 @@ library QueuedMerkleTreeLogic {
     error InvalidDepth(uint8 depth, uint8 min, uint8 max);
     error ZeroAddress();
 
-    uint8 public constant ROOT_HISTORY_SIZE = 50;
+    uint8 internal constant ROOT_HISTORY_SIZE = 50;
 
     /// @custom:invariant QMT-1: queueStartIndex <= queueEndIndex always
     /// @custom:invariant QMT-2: queueEndIndex - queueStartIndex <= total leaves queued at all times
@@ -43,21 +43,21 @@ library QueuedMerkleTreeLogic {
         QueuedMerkleTree storage self,
         uint8 depth,
         uint8 queueSize,
-        address hasher,
-        address verifier
+        IHasher hasher,
+        IVerifier verifier
     ) public {
         if (depth == 0 || depth > 31) {
             revert InvalidDepth(depth, 1, 31);
         }
 
-        if (hasher == address(0) || verifier == address(0)) {
+        if (address(hasher) == address(0) || address(verifier) == address(0)) {
             revert ZeroAddress();
         }
 
         self.depth = depth;
         self.hasher = hasher;
         self.verifier = verifier;
-        self.capacity = uint32(2 ** depth);
+        self.capacity = uint32(1 << depth);
         self.queueSize = queueSize;
         self.queueStartIndex = 0;
         self.queueEndIndex = 0;
@@ -66,7 +66,7 @@ library QueuedMerkleTreeLogic {
         for (uint8 i = 0; i < depth; ) {
             self.zeroes[i] = zero;
             self.lastSubtrees[i] = zero;
-            zero = IHasher(hasher).hash([zero, zero]);
+            zero = hasher.hash([zero, zero]);
 
             unchecked {
                 ++i;
@@ -131,7 +131,7 @@ library QueuedMerkleTreeLogic {
         QueuedMerkleTree storage self,
         TreeUpdateData calldata data
     ) public {
-        bool isValid = _verifyUpdateProof(self, data);
+        (bool isValid, uint32 insertedLeaves) = _verifyUpdateProof(self, data);
 
         if (!isValid) {
             revert InvalidProof();
@@ -151,17 +151,19 @@ library QueuedMerkleTreeLogic {
 
         if (data.batchSize < self.queueSize) {
             self.queueStartIndex = self.queueEndIndex;
-            self.nextLeafIndex += data.batchSize;
         } else {
-            self.queueStartIndex += self.queueSize;
-            self.nextLeafIndex += self.queueSize;
+            self.queueStartIndex += insertedLeaves;
         }
+        self.nextLeafIndex += insertedLeaves;
     }
 
     function _verifyUpdateProof(
         QueuedMerkleTree storage self,
         TreeUpdateData calldata data
-    ) internal view returns (bool) {
+    ) internal view returns (bool valid, uint32 insertedLeaves) {
+        insertedLeaves = data.batchSize < self.queueSize
+            ? data.batchSize
+            : self.queueSize;
         uint256[] memory leaves = _getQueuedLeaves(self);
         uint256[] memory lastSubtrees = _getSubtrees(self);
         uint256 lastRoot = self.roots[self.currentRootIndex];
@@ -180,7 +182,7 @@ library QueuedMerkleTreeLogic {
             nZeroLeaves
         );
 
-        return IVerifier(self.verifier).verifyTreeUpdateProof(vParams);
+        valid = self.verifier.verifyTreeUpdateProof(vParams);
     }
 
     function _getQueuedLeaves(
@@ -235,32 +237,23 @@ library QueuedMerkleTreeLogic {
         return false;
     }
 
-    /**
-    function getRoot(
-        QueuedMerkleTree storage self,
-        uint8 rootIndex
-    ) external view returns (uint256) {
-        return self.roots[rootIndex];
-    }
-     */
-
     function getState(
         QueuedMerkleTree storage self
     )
         public
         view
-        returns (uint256[] memory, uint256[] memory, uint256, uint8, uint32)
+        returns (
+            uint256[] memory queuedLeaves,
+            uint256[] memory subtrees,
+            uint256 lastRoot,
+            uint8 currentRootIdx,
+            uint32 nextLeafIndex
+        )
     {
-        uint256[] memory leaves = _getQueuedLeaves(self);
-        uint256[] memory lastSubtrees = _getSubtrees(self);
-        uint32 nextLeafIndex = self.nextLeafIndex;
-        uint256 lastRoot = self.roots[self.currentRootIndex];
-        return (
-            leaves,
-            lastSubtrees,
-            lastRoot,
-            self.currentRootIndex,
-            nextLeafIndex
-        );
+        queuedLeaves = _getQueuedLeaves(self);
+        subtrees = _getSubtrees(self);
+        nextLeafIndex = self.nextLeafIndex;
+        lastRoot = self.roots[self.currentRootIndex];
+        currentRootIdx = self.currentRootIndex;
     }
 }

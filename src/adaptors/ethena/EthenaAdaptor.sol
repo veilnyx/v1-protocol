@@ -7,6 +7,7 @@ import {IEthena} from "./IEthena.sol";
 import {IWToken} from "../../interfaces/IWToken.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {AssetAmount} from "../../interfaces/IAdaptor.sol";
 
 /// @notice Supports staking. User's will have to acquire USDe from external pools. Ref: https://ethena-labs.gitbook.io/ethena-labs/solution-design/key-addresses#liquidity-pool-contracts
 /// @notice Unstaking is not supported. User's will have to unstake from Ethena's UI after withdrawing their `sUSDe` from Veilnyx. This is due to the cool down period required by Ethena before unstaking, making it a non-atomic tx.
@@ -30,26 +31,25 @@ contract EthenaAdaptor is AdaptorBase {
     }
 
     function handleAssets(
-        uint24[] calldata inAssetIds,
-        uint256[] calldata inValues,
+        AssetAmount[] calldata inAssets,
         bytes calldata /* payload */
     )
         external
         payable
         virtual
         override
-        returns (uint24[] memory outAssetIds, uint256[] memory outValues)
+        returns (AssetAmount[] memory outAssets)
     {
-        if(inAssetIds.length != 1 || inValues.length != 1) {
-            revert InvalidInputAssetLength(uint8(inAssetIds.length), 1);
+        if (inAssets.length != 1) {
+            revert InvalidInputAssetLength(uint8(inAssets.length), 1);
         }
         
-        Asset memory inAsset = getAsset(inAssetIds[0]);
+        Asset memory inAsset = getAsset(inAssets[0].assetId);
         if (inAsset.assetAddress != USDe) {
             revert UnsupportedAsset(inAsset.id);
         }
 
-        uint256 stakeValue = inValues[0];
+        uint256 stakeValue = inAssets[0].value;
         if (stakeValue == 0) {
             revert ZeroValue();
         }
@@ -60,10 +60,7 @@ contract EthenaAdaptor is AdaptorBase {
 
         Asset memory outAsset = getAsset(sUSDe);
 
-        outValues = new uint256[](1);
-        outAssetIds = new uint24[](1);
-
-        outAssetIds[0] = outAsset.id;
-        outValues[0] = sUSDeShares;
+        outAssets = new AssetAmount[](1);
+        outAssets[0] = AssetAmount(outAsset.id, sUSDeShares);
     }
 }

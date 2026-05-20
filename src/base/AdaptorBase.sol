@@ -14,7 +14,7 @@ abstract contract AdaptorBase is IAdaptor {
     error InsufficientBalance();
     error InvalidInputAssetLength(uint8 actual, uint8 expected);
 
-    IPool immutable _pool;
+    IPool internal immutable _pool;
 
     constructor(address pool_) {
         _pool = IPool(pool_);

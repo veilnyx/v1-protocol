@@ -17,8 +17,8 @@ contract PoolInitTest is PoolTest {
     }
 
     function test_correctParameters() public view {
-        address verifier_ = pool.verifier();
-        address adaptorHandler_ = pool.adaptorHandler();
+        address verifier_ = address(pool.verifier());
+        address adaptorHandler_ = address(pool.adaptorHandler());
         assertEq(verifier_, address(verifier));
         assertEq(adaptorHandler_, address(adaptorHandler));
         assertEq(commitmentTreeDepth, fixture.commitmentTreeDepth);
@@ -30,11 +30,9 @@ contract PoolInitTest is PoolTest {
 
         address[] memory assetAddresses = new address[](1);
         assetAddresses[0] = address(testToken);
-        uint8[] memory assetsPrecision = new uint8[](1);
-        assetsPrecision[0] = 18;
         AssetType assetType = AssetType.ERC20;
 
-        pool.addAssets(assetType, assetAddresses, assetsPrecision);
+        pool.addAssets(assetType, assetAddresses);
 
         // bool isAssetActive = pool.isAssetActive(assetAddress);
         Asset memory newAsset = pool.getAsset(assetAddresses[0]);

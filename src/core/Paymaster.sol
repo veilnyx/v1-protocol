@@ -22,7 +22,7 @@ contract Paymaster is IPaymaster, Ownable {
     address public immutable sender;
     IPool public immutable pool;
 
-    mapping(uint24 => address) public assetIdToChainlinkFeed;
+    mapping(uint24 => AggregatorV3Interface) public assetIdToChainlinkFeed;
 
     error InvalidPaymaster(address paymaster);
     error InvalidEntryPoint();
@@ -64,7 +64,10 @@ contract Paymaster is IPaymaster, Ownable {
      * @param assetId - Asset id to update fee for.
      * @param feed    - Chainlink feed address.
      */
-    function setChainlinkFeed(uint24 assetId, address feed) external onlyOwner {
+    function setChainlinkFeed(
+        uint24 assetId,
+        AggregatorV3Interface feed
+    ) external onlyOwner {
         assetIdToChainlinkFeed[assetId] = feed;
     }
 
@@ -146,23 +149,21 @@ contract Paymaster is IPaymaster, Ownable {
 
         // if chainlink feed for assetId not found, return maxCostEth
         if (
-            assetIdToChainlinkFeed[feeAssetId] == address(0) &&
+            address(assetIdToChainlinkFeed[feeAssetId]) == address(0) &&
             feeAssetId != GAS_ASSET_ID
         ) {
             revert AssetNotSupportedAsFeeAsset(feeAssetId);
         }
 
         if (
-            assetIdToChainlinkFeed[feeAssetId] == address(0) &&
+            address(assetIdToChainlinkFeed[feeAssetId]) == address(0) &&
             feeAssetId == GAS_ASSET_ID
         ) {
             // fee asset is GAS_TOKEN itself, returning default value
             return maxCostEth;
         }
 
-        AggregatorV3Interface feed = AggregatorV3Interface(
-            assetIdToChainlinkFeed[feeAssetId]
-        );
+        AggregatorV3Interface feed = assetIdToChainlinkFeed[feeAssetId];
         // for conversion we assume price fetching of assetId in ETH only since maxCostEth is in ETH
         uint8 feedDecimals = feed.decimals();
 

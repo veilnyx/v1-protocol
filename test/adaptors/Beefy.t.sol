@@ -10,6 +10,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Asset, AssetType} from "src/libraries/Asset.sol";
 import {console} from "forge-std/Test.sol";
+import {AssetAmount} from "src/interfaces/IAdaptor.sol";
 
 contract BeefyAdaptorTest is PoolTest {
     using SafeERC20 for IERC20;
@@ -54,11 +55,7 @@ contract BeefyAdaptorTest is PoolTest {
         assetAddresses[0] = wantLPToken;
         assetAddresses[1] = mooToken;
 
-        uint8[] memory assetsPrecision = new uint8[](2);
-        assetsPrecision[0] = 18;
-        assetsPrecision[1] = 18;
-
-        pool.addAssets(assetType, assetAddresses, assetsPrecision);
+        pool.addAssets(assetType, assetAddresses);
         vm.stopPrank();
     }
 
@@ -130,25 +127,22 @@ contract BeefyAdaptorTest is PoolTest {
             WANT_LP_TOKEN_SUPPLY
         );
 
-        uint24[] memory inAssetIds = new uint24[](1);
-        inAssetIds[0] = pool.getAsset(wantLPToken).id;
-        uint256[] memory inValues = new uint256[](1);
-        inValues[0] = WANT_LP_TOKEN_SUPPLY;
+        AssetAmount[] memory inAssets = new AssetAmount[](1);
+        inAssets[0] = AssetAmount(
+            pool.getAsset(wantLPToken).id,
+            WANT_LP_TOKEN_SUPPLY
+        );
         bytes memory payload = abi.encode(uint8(0), beefyVault);
 
         // Supplying
-        (
-            ,
-            /* uint24[] memory outAssetIds */ uint256[] memory outAssetValues
-        ) = beefyAdp.handleAssets({
-                inAssetIds: inAssetIds,
-                inValues: inValues,
-                payload: payload
-            });
+        AssetAmount[] memory outAssets = beefyAdp.handleAssets({
+            inAssets: inAssets,
+            payload: payload
+        });
         vm.stopPrank();
         console.log("Staking done!");
-        console.log("mooTokens received:", outAssetValues[0]);
-        assert(outAssetValues[0] > 0);
+        console.log("mooTokens received:", outAssets[0].value);
+        assert(outAssets[0].value > 0);
     }
 
     function testWithdrawInBeefyVaultDirectly() public {
@@ -157,18 +151,12 @@ contract BeefyAdaptorTest is PoolTest {
         deal(mooToken, user, WITHDRAW_MOO_AMT);
         IERC20(mooToken).safeTransfer(address(beefyAdp), WITHDRAW_MOO_AMT);
 
-        uint24[] memory inAssetIds = new uint24[](1);
-        inAssetIds[0] = pool.getAsset(mooToken).id;
-        uint256[] memory inValues = new uint256[](1);
-        inValues[0] = WITHDRAW_MOO_AMT;
+        AssetAmount[] memory inAssets = new AssetAmount[](1);
+        inAssets[0] = AssetAmount(pool.getAsset(mooToken).id, WITHDRAW_MOO_AMT);
         bytes memory payload = abi.encode(uint8(1), beefyVault);
 
         // Supplying
-        beefyAdp.handleAssets({
-            inAssetIds: inAssetIds,
-            inValues: inValues,
-            payload: payload
-        });
+        beefyAdp.handleAssets({inAssets: inAssets, payload: payload});
         vm.stopPrank();
         console.log("Withdrawing done!");
         uint256 lpTokenBal = IERC20(wantLPToken).balanceOf(address(beefyAdp));

@@ -12,11 +12,9 @@ contract AddAssets is BaseScript {
 
         AssetType assetType = AssetType.ERC20;
         address[] memory assetAddresses = new address[](1);
-        uint8[] memory assetsPrecision = new uint8[](1);
 
         assetAddresses[0] = address(0x3e3FE7dBc6B4C189E7128855dD526361c49b40Af);
-        assetsPrecision[0] = 18;
 
-        pool.addAssets(assetType, assetAddresses, assetsPrecision);
+        pool.addAssets(assetType, assetAddresses);
     }
 }

@@ -2,6 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {Hasher} from "src/core/Hasher.sol";
+import {IPoseidon} from "src/interfaces/IHasher.sol";
 import {BaseScript} from "../BaseScript.sol";
 
 contract HasherDeployer is BaseScript {
@@ -34,6 +35,10 @@ contract HasherDeployer is BaseScript {
             poseidonT5 := create(0, add(t5Bytecode, 0x20), mload(t5Bytecode))
         }
 
-        new Hasher(poseidonT3, poseidonT4, poseidonT5);
+        new Hasher(
+            IPoseidon(poseidonT3),
+            IPoseidon(poseidonT4),
+            IPoseidon(poseidonT5)
+        );
     }
 }

@@ -10,6 +10,8 @@ import {EIP712Upgradeable} from "@openzeppelin/contracts-upgradeable/utils/crypt
 
 import {IVerifier} from "../interfaces/IVerifier.sol";
 import {IPool} from "../interfaces/IPool.sol";
+import {IScreener} from "../interfaces/IScreener.sol";
+import {IHasher} from "../interfaces/IHasher.sol";
 import {IAdaptorHandler} from "../interfaces/IAdaptorHandler.sol";
 import {IScreener} from "../interfaces/IScreener.sol";
 import {EIP712_DOMAIN_NAME, EIP712_DOMAIN_VERSION, MAX_WITHDRAW_FEE_BPS} from "../base/Constants.sol";
@@ -26,10 +28,10 @@ import {ShieldedTransaction, ShieldedTransactionLogic, RevokerData} from "../lib
 /// @param hasher The address of the hasher contract. It provides a single interface to Poseidon hashing functions
 /// @param withdrawFeeBps The fee in basis points (1/10000) that is charged for withdrawing assets from the pool.
 struct InitAddressParams {
-    address verifier;
-    address adaptorHandler;
-    address screener;
-    address hasher;
+    IVerifier verifier;
+    IAdaptorHandler adaptorHandler;
+    IScreener screener;
+    IHasher hasher;
 }
 
 contract Pool is
@@ -64,11 +66,11 @@ contract Pool is
         InitAddressParams calldata initAddressParams,
         uint256 withdrawFeeBps_
     ) external initializer {
-        __Ownable_init(msg.sender);
-        __UUPSUpgradeable_init();
-        __ReentrancyGuard_init();
-        __Pausable_init();
-        EIP712Upgradeable.__EIP712_init(
+        __Ownable_init_unchained(msg.sender);
+        __UUPSUpgradeable_init_unchained();
+        __ReentrancyGuard_init_unchained();
+        __Pausable_init_unchained();
+        EIP712Upgradeable.__EIP712_init_unchained(
             EIP712_DOMAIN_NAME,
             EIP712_DOMAIN_VERSION
         );
@@ -109,16 +111,14 @@ contract Pool is
 
     function addAssets(
         AssetType assetType,
-        address[] calldata assetAddresses,
-        uint8[] calldata assetPrecision
+        address[] calldata assetAddresses
     ) external onlyOwner {
         _assetCounts[assetType] = AssetLogic.addAssets({
             assetIds: _assetIds,
             assets: _assets,
-            counter: _assetCounts[assetType],
+            assetCount: _assetCounts[assetType],
             assetType: assetType,
-            assetAddresses: assetAddresses,
-            assetsPrecision: assetPrecision
+            assetAddresses: assetAddresses
         });
     }
 
@@ -187,7 +187,8 @@ contract Pool is
     }
 
     function setScreener(address screener_) external onlyOwner {
-        screener = screener_;
+        screener = IScreener(screener_);
+        emit ScreenerUpdated(screener_);
     }
 
     /// @custom:invariant FEE-1: withdrawFeeBps cannot be set above MAX_WITHDRAW_FEE_BPS
@@ -196,6 +197,7 @@ contract Pool is
             revert IPool.WithdrawalFeeTooHigh(feeBps, MAX_WITHDRAW_FEE_BPS);
         }
         withdrawFeeBps = feeBps;
+        emit WithdrawFeeUpdated(feeBps);
     }
 
     /// @notice Sets the protocol version number.
@@ -241,7 +243,7 @@ contract Pool is
         stx.validate({
             addressTree: _addressTree,
             commitmentTree: _commitmentTree,
-            verifier: verifier,
+            verifier: address(verifier),
             markedNullifiers: _markedNullifiers,
             supportedAdaptors: _adaptors,
             revokerDataMap: _revokers
@@ -252,8 +254,8 @@ contract Pool is
             assets: _assets,
             paymasterFees: _paymasterFees,
             withdrawFees: _withdrawFees,
-            hasher: hasher,
-            adaptorHandler: adaptorHandler,
+            hasher: address(hasher),
+            adaptorHandler: address(adaptorHandler),
             withdrawFeeBps: withdrawFeeBps
         });
     }

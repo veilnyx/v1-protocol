@@ -10,6 +10,7 @@ import {IAave} from "./IAave.sol";
 import {IStaticAToken} from "./IStaticAToken.sol";
 import {IStaticATokenFactory} from "./IStaticATokenFactory.sol";
 import {IAToken} from "./IAToken.sol";
+import {AssetAmount} from "../../interfaces/IAdaptor.sol";
 
 contract AaveV3Adaptor is AdaptorBase {
     using SafeERC20 for IERC20;
@@ -30,34 +31,32 @@ contract AaveV3Adaptor is AdaptorBase {
     }
 
     function handleAssets(
-        uint24[] calldata inAssetIds,
-        uint256[] calldata inValues,
+        AssetAmount[] calldata inAssets,
         bytes calldata payload
     )
         external
         payable
         virtual
         override
-        returns (uint24[] memory outAssetIds, uint256[] memory outValues)
+        returns (AssetAmount[] memory outAssets)
     {
-        if (inAssetIds.length != 1 || inValues.length != 1) {
-            revert InvalidInputAssetLength(uint8(inAssetIds.length), 1);
+        if (inAssets.length != 1) {
+            revert InvalidInputAssetLength(uint8(inAssets.length), 1);
         }
 
         uint8 action = abi.decode(payload, (uint8));
 
-        outAssetIds = new uint24[](1);
-        outValues = new uint256[](1);
+        outAssets = new AssetAmount[](1);
 
         if (action == ACTION_SUPPLY) {
-            (outAssetIds[0], outValues[0]) = _supply(
-                inAssetIds[0],
-                uint256(inValues[0])
+            (outAssets[0].assetId, outAssets[0].value) = _supply(
+                inAssets[0].assetId,
+                inAssets[0].value
             );
         } else if (action == ACTION_WITHDRAW) {
-            (outAssetIds[0], outValues[0]) = _withdraw(
-                inAssetIds[0],
-                uint256(inValues[0])
+            (outAssets[0].assetId, outAssets[0].value) = _withdraw(
+                inAssets[0].assetId,
+                inAssets[0].value
             );
         } else {
             revert InvalidAction();

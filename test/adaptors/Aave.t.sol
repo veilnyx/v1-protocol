@@ -8,6 +8,7 @@ import {PoolTest} from "test/fixtures/PoolTest.sol";
 import {Pool} from "src/core/Pool.sol";
 import {ShieldedTransaction} from "src/libraries/ShieldedTransaction.sol";
 import {IAdaptor} from "src/interfaces/IAdaptor.sol";
+import {AssetAmount} from "src/interfaces/IAdaptor.sol";
 import {IWToken} from "src/interfaces/IWToken.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Asset, AssetType} from "src/libraries/Asset.sol";
@@ -33,10 +34,10 @@ contract AaveAdaptorTest is PoolTest {
         0x252231882FB38481497f3C767469106297c8d93b;
 
     function setUp() external {
-        if(!shouldTestRun()) {
+        if (!shouldTestRun()) {
             vm.skip(true);
         }
-        
+
         PoolTest._setUp();
 
         // deploying aave adaptor
@@ -65,12 +66,9 @@ contract AaveAdaptorTest is PoolTest {
 
         AssetType assetType = AssetType.ERC20;
         address[] memory assetAddresses = new address[](1);
-        uint8[] memory assetsPrecision = new uint8[](1);
-
         // assetAddresses[0] = WETH_AAVE_UNDERLYING; // already added to the pool
         assetAddresses[0] = WETH_STATIC_A_TOKEN;
-        assetsPrecision[0] = 18;
-        pool.addAssets(assetType, assetAddresses, assetsPrecision);
+        pool.addAssets(assetType, assetAddresses);
         vm.stopPrank();
 
         deal(WETH_AAVE_UNDERLYING, user, INITIAL_SUPPLY);
@@ -157,7 +155,7 @@ contract AaveAdaptorTest is PoolTest {
         assertEq(paymasterFee, feeValue);
         assertEq(IERC20(USDC).balanceOf(address(pool)), INITIAL_SUPPLY_USDC);
     }
- 
+
     /// @dev This test bypasses the Veilnyx protocol and directly tests the Aave integration from the Aave adaptor.
     /// @dev Pls uncomment the `receive()` on the Aave adp to enable this test.
     function testWEthLendingAndUnLendingOnAaveBypassingVeilnyx() public {
@@ -166,22 +164,19 @@ contract AaveAdaptorTest is PoolTest {
         vm.prank(address(aaveAdaptor));
         IWToken(WETH_AAVE_UNDERLYING).deposit{value: initialDeposit}();
 
-        uint24[] memory inAssetIds = new uint24[](1);
-        uint256[] memory inValues = new uint256[](1);
+        AssetAmount[] memory inAssets = new AssetAmount[](1);
         bytes memory payload = abi.encode(uint8(0)); // supply action
 
-        inAssetIds[0] = pool.getAsset(WETH_AAVE_UNDERLYING).id;
-        inValues[0] = initialDeposit;
+        inAssets[0] = AssetAmount(
+            pool.getAsset(WETH_AAVE_UNDERLYING).id,
+            initialDeposit
+        );
 
         uint256 adaptorwETHStaticTokenBalBeforeLending = IERC20(
             WETH_STATIC_A_TOKEN
         ).balanceOf(address(aaveAdaptor));
 
-        IAdaptor(address(aaveAdaptor)).handleAssets(
-            inAssetIds,
-            inValues,
-            payload
-        ); // lending directly through Aave Adaptor
+        IAdaptor(address(aaveAdaptor)).handleAssets(inAssets, payload); // lending directly through Aave Adaptor
 
         uint256 adaptorwETHStaticTokenBalAfterLending = IERC20(
             WETH_STATIC_A_TOKEN
@@ -194,15 +189,13 @@ contract AaveAdaptorTest is PoolTest {
 
         console2.log("Initiating Unlending on Aave");
 
-        inAssetIds[0] = pool.getAsset(WETH_STATIC_A_TOKEN).id;
-        inValues[0] = adaptorwETHStaticTokenBalAfterLending;
+        inAssets[0] = AssetAmount(
+            pool.getAsset(WETH_STATIC_A_TOKEN).id,
+            adaptorwETHStaticTokenBalAfterLending
+        );
         payload = abi.encode(uint8(1)); // withdraw action
 
-        IAdaptor(address(aaveAdaptor)).handleAssets(
-            inAssetIds,
-            inValues,
-            payload
-        ); // unlending directly through Aave adp
+        IAdaptor(address(aaveAdaptor)).handleAssets(inAssets, payload); // unlending directly through Aave adp
 
         // Asserts
         uint256 adaptorwETHStaticBalAfterUnlending = IERC20(WETH_STATIC_A_TOKEN)

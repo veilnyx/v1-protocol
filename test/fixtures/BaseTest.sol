@@ -8,6 +8,7 @@ import {ShieldedTransactionType, ShieldedTransaction} from "src/libraries/Shield
 import {ShieldedAddressRegistrationData} from "src/libraries/ShieldedAddress.sol";
 import {TreeUpdateData} from "src/libraries/QueuedMerkleTree.sol";
 import {Hasher} from "src/core/Hasher.sol";
+import {IPoseidon} from "src/interfaces/IHasher.sol";
 import {Config} from "script/Config.sol";
 import {Fixture, FixtureLib} from "test/fixtures/Fixture.sol";
 import {MockERC20} from "test/mocks/MockERC20.sol";
@@ -95,7 +96,11 @@ abstract contract BaseTest is Test {
             poseidonT5 := create(0, add(t5Bytecode, 0x20), mload(t5Bytecode))
         }
 
-        Hasher hasher = new Hasher(poseidonT3, poseidonT4, poseidonT5);
+        Hasher hasher = new Hasher(
+            IPoseidon(poseidonT3),
+            IPoseidon(poseidonT4),
+            IPoseidon(poseidonT5)
+        );
         return hasher;
     }
 }

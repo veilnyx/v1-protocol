@@ -9,6 +9,9 @@ import {PackedUserOperation} from "@account-abstraction/contracts/interfaces/Pac
 import {Gateway} from "src/core/Gateway.sol";
 import {Paymaster} from "src/core/Paymaster.sol";
 import {IWToken} from "src/interfaces/IWToken.sol";
+import {IEntryPoint} from "@account-abstraction/contracts/interfaces/IEntryPoint.sol";
+import {IPool} from "src/interfaces/IPool.sol";
+import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
 import {Asset, AssetType} from "src/libraries/Asset.sol";
 import {ShieldedTransaction, ShieldedTransactionType} from "src/libraries/ShieldedTransaction.sol";
 import {MockWToken} from "test/mocks/MockWToken.sol";
@@ -67,9 +70,9 @@ contract GatewayTest is Test {
         wToken = address(new MockWToken());
         pool.setMockWTokenAddress(wToken);
         gateway = new Gateway(
-            address(entryPoint),
-            address(wToken),
-            address(pool)
+            IEntryPoint(address(entryPoint)),
+            IWToken(address(wToken)),
+            IPool(address(pool))
         );
         Fixture memory fixture = FixtureLib.load(vm);
 
@@ -84,7 +87,7 @@ contract GatewayTest is Test {
         // Deposit to entry point
         vm.deal(address(this), DEPOSIT_VALUE);
         paymaster.depositToEntryPoint{value: DEPOSIT_VALUE}();
-        paymaster.setChainlinkFeed(assetId, address(0));
+        paymaster.setChainlinkFeed(assetId, AggregatorV3Interface(address(0)));
     }
 
     function test_handleWrapAndDeposit() public {

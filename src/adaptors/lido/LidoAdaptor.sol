@@ -10,6 +10,7 @@ import {IWstEthToken} from "./IWstEthToken.sol";
 import {IWToken} from "../../interfaces/IWToken.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {AssetAmount} from "../../interfaces/IAdaptor.sol";
 
 enum Action {
     STAKE,
@@ -47,18 +48,17 @@ contract LidoAdaptor is AdaptorBase {
 
     /// @notice For unstaking from Lido, users will receive an NFT representing their withdrawal request as the unstaking process is queued on Lido's end. Once the unstaking process is complete on Lido's end, users can redeem their NFT for their staked ETH. This will leak privacy as the unstaking process is not atomic and will require a `withdrawAddress`. However, this is a constraint by Lido's design.
     function handleAssets(
-        uint24[] calldata inAssetIds,
-        uint256[] calldata inValues,
+        AssetAmount[] calldata inAssets,
         bytes calldata payload
     )
         external
         payable
         virtual
         override
-        returns (uint24[] memory outAssetIds, uint256[] memory outValues)
+        returns (AssetAmount[] memory outAssets)
     {
-        if (inAssetIds.length != 1 || inValues.length != 1) {
-            revert InvalidInputAssetLength(uint8(inAssetIds.length), 1);
+        if (inAssets.length != 1) {
+            revert InvalidInputAssetLength(uint8(inAssets.length), 1);
         }
 
         (Action action, address withdrawAddress) = abi.decode(
@@ -66,16 +66,27 @@ contract LidoAdaptor is AdaptorBase {
             (Action, address)
         );
 
+        uint24[] memory outAssetIds;
+        uint256[] memory outValues;
+
         if (action == Action.STAKE) {
-            (outAssetIds, outValues) = _stake(inAssetIds[0], inValues[0]);
+            (outAssetIds, outValues) = _stake(
+                inAssets[0].assetId,
+                inAssets[0].value
+            );
         } else if (action == Action.UNSTAKE) {
             (outAssetIds, outValues) = _unstake(
-                inAssetIds[0],
-                inValues[0],
+                inAssets[0].assetId,
+                inAssets[0].value,
                 withdrawAddress
             );
         } else {
             revert InvalidAction();
+        }
+
+        outAssets = new AssetAmount[](outAssetIds.length);
+        for (uint256 i; i < outAssetIds.length; i++) {
+            outAssets[i] = AssetAmount(outAssetIds[i], outValues[i]);
         }
     }
 

@@ -339,62 +339,6 @@ library ShieldedTransactionLogic {
         return _UHF(self.betaUHF, uhfArrays);
     }
 
-    /**
-        function genEncryptDataHashUsingPoseidon(
-            bytes calldata notesMemo,
-            uint256 nOuts,
-            address hasher
-        ) public view returns (uint256) {
-            uint256 encryptedDataHash;
-
-            // Call _decomposeNotesMemo() to get the uhfArrays
-            (
-                uint256[] memory encryptedDataEncryptionKeySeed,
-                uint256[] memory refundInputs,
-                uint256[][] memory notes
-            ) = _decomposeNotesMemo(notesMemo, nOuts);
-            // Hash encryptedDataEncryptionKeySeed (first 3 values)
-            uint256 keySeedHash = IHasher(hasher).hash(
-                encryptedDataEncryptionKeySeed
-            ); // 3
-            console.log("Encrypted DEK seed hash:");
-            console.logUint(keySeedHash);
-
-            // 3. Hash encryptedRefundData (next 4 values)
-            uint256 refundHash = IHasher(hasher).hash(refundInputs); // 4
-            console.log("Encrypted refund data hash:");
-            console.logUint(refundHash);
-
-            // 4. Hash each encryptedNote (4 values each)
-            uint256[] memory noteHashes = new uint256[](nOuts);
-            for (uint256 i = 0; i < nOuts; i++) {
-                uint256[] memory noteInputs = new uint256[](4);
-                for (uint256 j = 0; j < 4; j++) {
-                    noteInputs[j] = notes[i][j];
-                }
-                noteHashes[i] = IHasher(hasher).hash(noteInputs); // 4
-            }
-
-            for (uint256 i = 0; i < nOuts; i++) {
-                console.log("Encrypted note hash:");
-                console.logUint(noteHashes[i]);
-            }
-
-            // 5. Final hash combining all hashes
-            uint256[] memory finalInputs = new uint256[](2 + nOuts);
-            finalInputs[0] = keySeedHash;
-            finalInputs[1] = refundHash;
-            for (uint256 i = 0; i < nOuts; i++) {
-                finalInputs[2 + i] = noteHashes[i];
-            }
-
-            encryptedDataHash = IHasher(hasher).hash(finalInputs); // 4
-            console.log("FINAL HASH (encryptedDataHash public signal):");
-            console.logUint(encryptedDataHash);
-            return encryptedDataHash;
-        }
-     */
-
     ///////////////////////////////////
     ///////// Internal Functions //////
     ///////////////////////////////////
@@ -414,8 +358,9 @@ library ShieldedTransactionLogic {
         require(notesMemo.length % 32 == 0, "Invalid notesMemo length");
 
         // 1. Split notesMemo into values array each 32 bytes
-        uint256[] memory values = new uint256[](notesMemo.length / 32);
-        for (uint256 i = 0; i < notesMemo.length / 32; i++) {
+        uint256 numWords = notesMemo.length / 32;
+        uint256[] memory values = new uint256[](numWords);
+        for (uint256 i = 0; i < numWords; i++) {
             values[i] = uint256(bytes32(notesMemo[i * 32:(i + 1) * 32]));
         }
 
@@ -490,7 +435,7 @@ library ShieldedTransactionLogic {
         return currentHash;
     }
 
-    // Hashes a chunk of data with a previous hash value
+    // Hashes a chunk of data with a previous hash value; does NOT reduce modulo FIELD_SIZE
     function _hashChunkUsingSha256(
         uint256 prev,
         uint256[] memory nums

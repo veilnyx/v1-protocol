@@ -6,6 +6,7 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {IBeefyVault} from "./IBeefyVault.sol";
 import {AdaptorBase} from "../../base/AdaptorBase.sol";
 import {Asset} from "../../libraries/Asset.sol";
+import {AssetAmount} from "../../interfaces/IAdaptor.sol";
 
 enum Action {
     DEPOSIT,
@@ -18,35 +19,33 @@ contract BeefyV7Adaptor is AdaptorBase {
     constructor(address pool_) AdaptorBase(pool_) {}
 
     function handleAssets(
-        uint24[] calldata inAssetIds,
-        uint256[] calldata inValues,
+        AssetAmount[] calldata inAssets,
         bytes calldata payload
     )
         external
         payable
         virtual
         override
-        returns (uint24[] memory outAssetIds, uint256[] memory outValues)
+        returns (AssetAmount[] memory outAssets)
     {
-        if (inAssetIds.length != 1 || inValues.length != 1) {
-            revert InvalidInputAssetLength(uint8(inAssetIds.length), 1);
+        if (inAssets.length != 1) {
+            revert InvalidInputAssetLength(uint8(inAssets.length), 1);
         }
 
         (uint8 action, address vault) = abi.decode(payload, (uint8, address));
 
-        outAssetIds = new uint24[](1);
-        outValues = new uint256[](1);
+        outAssets = new AssetAmount[](1);
 
         if (action == uint8(Action.DEPOSIT)) {
-            (outAssetIds[0], outValues[0]) = _deposit(
-                inAssetIds[0],
-                inValues[0],
+            (outAssets[0].assetId, outAssets[0].value) = _deposit(
+                inAssets[0].assetId,
+                inAssets[0].value,
                 vault
             );
         } else if (action == uint8(Action.WITHDRAW)) {
-            (outAssetIds[0], outValues[0]) = _withdraw(
-                inAssetIds[0],
-                inValues[0],
+            (outAssets[0].assetId, outAssets[0].value) = _withdraw(
+                inAssets[0].assetId,
+                inAssets[0].value,
                 vault
             );
         } else {

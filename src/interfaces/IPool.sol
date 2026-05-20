@@ -15,7 +15,7 @@ interface IPool {
     event RegisterAddress(
         address indexed publicAddress,
         uint256 indexed rootAddress,
-        uint32 leafIndex,
+        uint32 indexed leafIndex,
         bytes shieldedAddress
     );
     event RevokerRegistered(
@@ -27,9 +27,12 @@ interface IPool {
     event RevokerStatusUpdated(uint256 indexed id, bool status);
     event VersionUpdated(uint64 indexed version);
 
-    event AssetAdded(address indexed assetAddress, uint24 assetId);
+    event AssetAdded(address indexed assetAddress, uint24 indexed assetId);
 
-    event NullifierMarked(uint256 indexed nullifier, uint32 markLeafIndex);
+    event NullifierMarked(
+        uint256 indexed nullifier,
+        uint32 indexed markLeafIndex
+    );
     // Commitments
     event Commitment(uint256 indexed leafIndex, uint256 indexed commitment);
 
@@ -37,7 +40,7 @@ interface IPool {
         ShieldedTransactionType indexed txType,
         uint16 indexed revokerId,
         uint32 lastLeafIndex,
-        address target,
+        address indexed target,
         uint24 feeAssetId,
         uint96 feeValue,
         address paymaster,
@@ -89,11 +92,9 @@ interface IPool {
     /// @notice Can only be called by the owner.
     /// @param assetType The type of the asset to be added.
     /// @param assetAddresses The addresses of the assets.
-    /// @param assetsPrecision The precision (decimals) of the assets.
     function addAssets(
         AssetType assetType,
-        address[] calldata assetAddresses,
-        uint8[] calldata assetsPrecision
+        address[] calldata assetAddresses
     ) external;
 
     /// @notice Adds support for an external adaptor to a DeFi protocol.
@@ -127,9 +128,13 @@ interface IPool {
     /// @notice Can only be called by the owner.
     function setScreener(address screener) external;
 
+    event ScreenerUpdated(address indexed screener);
+
     /// @notice Sets the no. of bips (basis points: 1/10000) fee that is charged for withdrawing assets from the pool.
     /// @notice Can only be called by the owner.
     function setWithdrawFeeBips(uint256 feeBips) external;
+
+    event WithdrawFeeUpdated(uint256 feeBps);
 
     /////////////////////////////////////////
     //        PUBLIC WRITE METHODS         //
@@ -162,14 +167,6 @@ interface IPool {
     /////////////////////////////////////////
     //         READ METHODS                //
     ////////////////////////////////////////
-
-    /**
-    /// @notice Verifies the proof of a stx.
-    /// @param stx The stx to be verified.
-    function verifyTransactionProof(
-        ShieldedTransaction calldata stx
-    ) external view returns (bool);
-     */
 
     /// @notice Returns the data of an asset.
     /// @param assetId The id of the asset.

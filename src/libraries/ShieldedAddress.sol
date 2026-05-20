@@ -2,12 +2,10 @@
 pragma solidity ^0.8.24;
 
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
-import {FIELD_SIZE, FIELD_SIZE_DIV_2} from "../base/Constants.sol";
+import {FIELD_SIZE, FIELD_SIZE_DIV_2, EIP712_TYPEHASH_REGISTER_ADDRESS, MESSAGE_REGISTER_ADDRESS} from "../base/Constants.sol";
 import {MerkleTree, MerkleTreeLogic} from "./MerkleTree.sol";
 import {IPool} from "../interfaces/IPool.sol";
 import {IVerifier} from "../interfaces/IVerifier.sol";
-import {INebraUpa} from "../interfaces/INebraUpa.sol";
-import {EIP712_TYPEHASH_REGISTER_ADDRESS, MESSAGE_REGISTER_ADDRESS} from "../base/Constants.sol";
 
 struct ShieldedAddressRegistrationData {
     bytes proof;
@@ -15,8 +13,6 @@ struct ShieldedAddressRegistrationData {
     bytes signature;
 }
 
-error NotPreVerified();
-error NebraVerifierNotSet();
 error ShieldedAddrIncorrectLength(uint8 givenLength, uint8 expectedLength);
 error ZeroRootAddress();
 error ExceededFieldSize();
@@ -24,7 +20,9 @@ error ExceededFieldSize();
 library ShieldedAddressLogic {
     using MerkleTreeLogic for MerkleTree;
 
-    bytes32 constant MASK_PACK =
+    error NotPreVerified();
+
+    bytes32 internal constant MASK_PACK =
         hex"8000000000000000000000000000000000000000000000000000000000000000";
 
     /// @notice Registers a shielded address by verifying the proof on-chain via the Veilnyx verifier.
@@ -33,13 +31,13 @@ library ShieldedAddressLogic {
         MerkleTree storage addressTree,
         mapping(address => uint256) storage publicAddresses,
         mapping(uint256 => bool) storage rootAddresses,
-        address verifier,
+        IVerifier verifier,
         bytes32 hashTypedData
     ) external {
         uint256 rootAddress = uint256(bytes32(self.shieldedAddress[0:32]));
         _validateShieldedAddressData(self, rootAddress, rootAddresses);
 
-        if (!verifyProof(self, verifier)) {
+        if (!verifyProof(self, address(verifier))) {
             revert IPool.InvalidAddressProof();
         }
 
