@@ -8,7 +8,7 @@ import {ShieldedTransactionType, ShieldedTransaction} from "src/libraries/Shield
 import {ShieldedAddressRegistrationData} from "src/libraries/ShieldedAddress.sol";
 import {TreeUpdateData} from "src/libraries/QueuedMerkleTree.sol";
 import {Hasher} from "src/core/Hasher.sol";
-import {IPoseidon} from "src/interfaces/IHasher.sol";
+import {IPoseidon} from "src/interfaces/IPoseidon.sol";
 import {Config} from "script/Config.sol";
 import {Fixture, FixtureLib} from "test/fixtures/Fixture.sol";
 import {MockERC20} from "test/mocks/MockERC20.sol";

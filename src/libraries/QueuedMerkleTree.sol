@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity ^0.8.24;
+pragma solidity 0.8.24;
 
 import {ZERO_LEAF} from "../base/Constants.sol";
 import {IHasher} from "../interfaces/IHasher.sol";
 import {IVerifier} from "../interfaces/IVerifier.sol";
 import {IPool} from "../interfaces/IPool.sol";
+import {LevelData} from "./MerkleTree.sol";
 
 struct QueuedMerkleTree {
     uint8 depth;
@@ -18,8 +19,7 @@ struct QueuedMerkleTree {
     uint32 queueEndIndex;
     mapping(uint32 => uint256) queuedLeaves;
     mapping(uint8 => uint256) roots;
-    mapping(uint8 => uint256) zeroes;
-    mapping(uint8 => uint256) lastSubtrees;
+    mapping(uint8 => LevelData) levels;
 }
 
 struct TreeUpdateData {
@@ -64,8 +64,8 @@ library QueuedMerkleTreeLogic {
 
         uint256 zero = ZERO_LEAF;
         for (uint8 i = 0; i < depth; ) {
-            self.zeroes[i] = zero;
-            self.lastSubtrees[i] = zero;
+            self.levels[i].zero = zero;
+            self.levels[i].lastSubtree = zero;
             zero = hasher.hash([zero, zero]);
 
             unchecked {
@@ -143,7 +143,7 @@ library QueuedMerkleTreeLogic {
         self.roots[newRootIndex] = data.newRoot;
 
         for (uint8 i = 0; i < self.depth; ) {
-            self.lastSubtrees[i] = data.newSubtrees[i];
+            self.levels[i].lastSubtree = data.newSubtrees[i];
             unchecked {
                 ++i;
             }
@@ -205,7 +205,7 @@ library QueuedMerkleTreeLogic {
         uint256[] memory subtree = new uint256[](tree.depth);
 
         for (uint8 i; i < tree.depth; ) {
-            subtree[i] = tree.lastSubtrees[i];
+            subtree[i] = tree.levels[i].lastSubtree;
 
             unchecked {
                 ++i;

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.24;
+pragma solidity 0.8.24;
 
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
@@ -9,7 +9,7 @@ import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/Pau
 import {EIP712Upgradeable} from "@openzeppelin/contracts-upgradeable/utils/cryptography/EIP712Upgradeable.sol";
 
 import {IVerifier} from "../interfaces/IVerifier.sol";
-import {IPool} from "../interfaces/IPool.sol";
+import {IPool, InitAddressParams} from "../interfaces/IPool.sol";
 import {IScreener} from "../interfaces/IScreener.sol";
 import {IHasher} from "../interfaces/IHasher.sol";
 import {IAdaptorHandler} from "../interfaces/IAdaptorHandler.sol";
@@ -21,18 +21,6 @@ import {MerkleTree, MerkleTreeLogic} from "../libraries/MerkleTree.sol";
 import {QueuedMerkleTree, QueuedMerkleTreeLogic, TreeUpdateData} from "../libraries/QueuedMerkleTree.sol";
 import {ShieldedAddressRegistrationData, ShieldedAddressLogic} from "../libraries/ShieldedAddress.sol";
 import {ShieldedTransaction, ShieldedTransactionLogic, RevokerData} from "../libraries/ShieldedTransaction.sol";
-
-/// @param verifier The address of the verifier contract. Verifier contract verifies the stx's zk proof, address proof and merkle tree queue proof.
-/// @param adaptorHandler The address of the adaptor handler contract, responsible for delegate calling adaptors of external DeFi protocols.
-/// @param screener The address of the screener contract, responsible for screening sanctioned addresseses.
-/// @param hasher The address of the hasher contract. It provides a single interface to Poseidon hashing functions
-/// @param withdrawFeeBps The fee in basis points (1/10000) that is charged for withdrawing assets from the pool.
-struct InitAddressParams {
-    IVerifier verifier;
-    IAdaptorHandler adaptorHandler;
-    IScreener screener;
-    IHasher hasher;
-}
 
 contract Pool is
     IPool,
@@ -66,6 +54,13 @@ contract Pool is
         InitAddressParams calldata initAddressParams,
         uint256 withdrawFeeBps_
     ) external initializer {
+        if (withdrawFeeBps_ > MAX_WITHDRAW_FEE_BPS) {
+            revert IPool.WithdrawalFeeTooHigh(
+                withdrawFeeBps_,
+                MAX_WITHDRAW_FEE_BPS
+            );
+        }
+
         __Ownable_init_unchained(msg.sender);
         __UUPSUpgradeable_init_unchained();
         __ReentrancyGuard_init_unchained();
@@ -80,12 +75,6 @@ contract Pool is
         hasher = initAddressParams.hasher;
         screener = initAddressParams.screener;
 
-        if (withdrawFeeBps_ > MAX_WITHDRAW_FEE_BPS) {
-            revert IPool.WithdrawalFeeTooHigh(
-                withdrawFeeBps_,
-                MAX_WITHDRAW_FEE_BPS
-            );
-        }
         withdrawFeeBps = withdrawFeeBps_;
 
         _addressTree.init(addressTreeDepth, hasher);

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.24;
+pragma solidity 0.8.24;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -34,10 +34,6 @@ contract AdaptorHandler is IAdaptorHandler, ReentrancyGuard, Ownable {
 
     function setVeilnyxPool(IPool _veilnyxPool) external onlyOwner {
         if (address(_veilnyxPool) == address(0)) revert ZeroAddress();
-        require(
-            address(veilnyxPool) == address(0),
-            "Veilnyx Pool address already set"
-        );
         veilnyxPool = _veilnyxPool;
     }
 

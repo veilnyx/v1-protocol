@@ -69,12 +69,12 @@ contract MorphoVaultAdaptor is AdaptorBase {
             revert ZeroValue();
         }
 
-        if (IERC20(inAsset.assetAddress).balanceOf(address(this)) < inValue) {
-            revert InsufficientBalance();
-        }
-
         if (inAsset.assetAddress != morpho.asset()) {
             revert UnsupportedAsset(inAsset.id);
+        }
+
+        if (IERC20(inAsset.assetAddress).balanceOf(address(this)) < inValue) {
+            revert InsufficientBalance();
         }
 
         IERC20(inAsset.assetAddress).forceApprove(address(morpho), inValue);
@@ -94,10 +94,6 @@ contract MorphoVaultAdaptor is AdaptorBase {
         // Checks
         if (inValue == 0) {
             revert ZeroValue();
-        }
-
-        if (IERC20(inAsset.assetAddress).balanceOf(address(this)) < inValue) {
-            revert InsufficientBalance();
         }
 
         if (inAsset.assetAddress != address(morpho)) {

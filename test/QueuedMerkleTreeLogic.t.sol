@@ -60,8 +60,8 @@ contract QueuedMerkleTreeLogicTest is BaseTest {
         assertEq(qmt.depth, fixture.commitmentTreeDepth);
         assertEq(qmt.capacity, 2 ** fixture.commitmentTreeDepth);
         assertEq(qmt.queueSize, fixture.commitmentTreeQueueSize);
-        assertEq(qmt.zeroes[0], ZERO_LEAF);
-        assertEq(qmt.lastSubtrees[0], ZERO_LEAF);
+        assertEq(qmt.levels[0].zero, ZERO_LEAF);
+        assertEq(qmt.levels[0].lastSubtree, ZERO_LEAF);
         assertEq(qmt.nextLeafIndex, 0);
         assertEq(qmt.currentRootIndex, 0);
     }

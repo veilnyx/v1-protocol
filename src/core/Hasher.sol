@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity ^0.8.24;
+pragma solidity 0.8.24;
 
-import {IHasher, IPoseidon} from "../interfaces/IHasher.sol";
+import {IHasher} from "../interfaces/IHasher.sol";
+import {IPoseidon} from "../interfaces/IPoseidon.sol";
 
 contract Hasher is IHasher {
     IPoseidon internal immutable _poseidonT3;

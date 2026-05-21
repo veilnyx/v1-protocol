@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.24;
+pragma solidity 0.8.24;
 
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -182,9 +182,14 @@ contract Paymaster is IPaymaster, Ownable {
         }
 
         // returns fees in feeAsset's precision
-        feeInAsset =
-            (maxCostEth * uint256(priceETHInAsset) * 10 ** feeAsset.precision) /
-            (10 ** (gasAsset.precision + feedDecimals));
+        uint256 feePrec = feeAsset.precision;
+        uint256 baseExp = gasAsset.precision + feedDecimals;
+        feeInAsset = feePrec >= baseExp
+            ? (maxCostEth *
+                uint256(priceETHInAsset) *
+                10 ** (feePrec - baseExp))
+            : ((maxCostEth * uint256(priceETHInAsset)) /
+                10 ** (baseExp - feePrec));
 
         if (feeInAsset == 0) {
             revert MaxCostEthToAssetConversionFailed(feeAssetId);

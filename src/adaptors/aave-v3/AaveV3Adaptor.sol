@@ -91,6 +91,8 @@ contract AaveV3Adaptor is AdaptorBase {
             revert InsufficientBalance();
         }
 
+        uint256 aTokensPreSupplyBal = IERC20(aToken).balanceOf(address(this));
+
         IERC20(underlyingToken).forceApprove(address(aave), lendValue);
         aave.supply({
             asset: underlyingToken,
@@ -101,7 +103,8 @@ contract AaveV3Adaptor is AdaptorBase {
         });
 
         // rebasable aTokens by Aave
-        uint256 aTokensReceived = IERC20(aToken).balanceOf(address(this));
+        uint256 aTokensPostSupplyBal = IERC20(aToken).balanceOf(address(this));
+        uint256 aTokensReceived = aTokensPostSupplyBal - aTokensPreSupplyBal;
 
         // Step 2: Convert aToken(rebasable) to static tokens as supported by Veilnyx (non-rebasing)
         IERC20(aToken).forceApprove(staticAToken, aTokensReceived);

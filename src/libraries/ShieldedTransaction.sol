@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity ^0.8.24;
+pragma solidity 0.8.24;
 
 import {FIELD_SIZE} from "../base/Constants.sol";
 import {Asset, AssetLogic} from "./Asset.sol";
@@ -366,34 +366,30 @@ library ShieldedTransactionLogic {
 
         // 2. Hash encryptedDataEncryptionKeySeed (first 3 values)
         encryptedDataEncryptionKeySeed = new uint256[](3);
-        for (uint256 i = 0; i < 3; i++) {
-            encryptedDataEncryptionKeySeed[i] = values[i];
-        }
+        encryptedDataEncryptionKeySeed[0] = values[0];
+        encryptedDataEncryptionKeySeed[1] = values[1];
+        encryptedDataEncryptionKeySeed[2] = values[2];
 
         // 3. Hash encryptedRefundData (next 4 values)
         refundInputs = new uint256[](4);
-        for (uint256 i = 0; i < 4; i++) {
-            refundInputs[i] = values[i + 3];
-        }
+        refundInputs[0] = values[3];
+        refundInputs[1] = values[4];
+        refundInputs[2] = values[5];
+        refundInputs[3] = values[6];
 
         // 4. Hash each encryptedNote (4 values each)
         notes = new uint256[][](nOuts);
         for (uint256 i = 0; i < nOuts; i++) {
             notes[i] = new uint256[](4);
-            for (uint256 j = 0; j < 4; j++) {
-                notes[i][j] = values[7 + (i * 4) + j];
-            }
-        }
-
-        for (uint256 i = 0; i < nOuts; i++) {
-            for (uint256 j = 0; j < 4; j++) {
-                notes[i][j] = values[7 + (i * 4) + j];
-            }
+            notes[i][0] = values[7 + (i * 4)];
+            notes[i][1] = values[7 + (i * 4) + 1];
+            notes[i][2] = values[7 + (i * 4) + 2];
+            notes[i][3] = values[7 + (i * 4) + 3];
         }
     }
 
     /// @dev Performs sequential hashing (sha256) to generate `alpha` for _UHF
-    function _genEncryptedDataHashUsingSha256(
+    function _genUHFAlphaUsingSha256(
         UHFArrays memory uhfArrays
     ) internal pure returns (uint256) {
         // Call _decomposeNotesMemo() to get the uhfArrays
@@ -440,15 +436,8 @@ library ShieldedTransactionLogic {
         uint256 prev,
         uint256[] memory nums
     ) internal pure returns (uint256) {
-        // Convert to bytes
-        bytes memory data = abi.encodePacked(prev);
-        for (uint i = 0; i < nums.length; i++) {
-            data = abi.encodePacked(data, nums[i]);
-        }
-
-        bytes32 chunkHash = sha256(data);
-        uint256 hashWithinField = uint256(chunkHash) % FIELD_SIZE;
-        return hashWithinField;
+        bytes memory data = abi.encodePacked(prev, nums);
+        return uint256(sha256(data)) % FIELD_SIZE;
     }
 
     function _addToUHFAccumulator(
@@ -475,7 +464,7 @@ library ShieldedTransactionLogic {
         uint256 betaUHF,
         UHFArrays memory uhfArrays
     ) internal pure returns (uint256, uint256) {
-        uint256 alpha = _genEncryptedDataHashUsingSha256(uhfArrays);
+        uint256 alpha = _genUHFAlphaUsingSha256(uhfArrays);
 
         uint256 coefficientPow = 1;
         uint256 accumulator = 0;

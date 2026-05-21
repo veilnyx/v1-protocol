@@ -65,10 +65,6 @@ contract BeefyV7Adaptor is AdaptorBase {
             revert ZeroValue();
         }
 
-        if (IERC20(inAsset.assetAddress).balanceOf(address(this)) < inValue) {
-            revert InsufficientBalance();
-        }
-
         if (inAsset.assetAddress != wantToken) {
             revert UnsupportedAsset(inAsset.id);
         }
@@ -95,19 +91,21 @@ contract BeefyV7Adaptor is AdaptorBase {
             revert ZeroValue();
         }
 
-        if (IERC20(inAsset.assetAddress).balanceOf(address(this)) < inValue) {
-            revert InsufficientBalance();
-        }
-
         if (inAsset.assetAddress != vault) {
             revert UnsupportedAsset(inAsset.id);
         }
 
+        uint256 wantTokenBalBeforeWithdraw = IERC20(wantToken).balanceOf(
+            address(this)
+        );
         IERC20(inAsset.assetAddress).forceApprove(vault, inValue);
         IBeefyVault(vault).withdraw(inValue);
+        uint256 wantTokenBalAfterWithdraw = IERC20(wantToken).balanceOf(
+            address(this)
+        );
 
         outAssetId = getAsset(wantToken).id;
-        outValue = IERC20(wantToken).balanceOf(address(this));
+        outValue = wantTokenBalAfterWithdraw - wantTokenBalBeforeWithdraw;
         return (outAssetId, outValue);
     }
 }

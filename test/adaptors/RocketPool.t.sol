@@ -5,7 +5,8 @@ pragma abicoder v2;
 import {PoolTest} from "test/fixtures/PoolTest.sol";
 import {Pool} from "src/core/Pool.sol";
 import {ShieldedTransaction} from "src/libraries/ShieldedTransaction.sol";
-import {RocketPoolAdaptor} from "src/adaptors/rocketPool/RocketPoolAdaptor.sol";
+import {IRocketSwapRouter} from "src/adaptors/rocketpool/IRocketSwapRouter.sol";
+import {RocketPoolAdaptor} from "src/adaptors/rocketpool/RocketPoolAdaptor.sol";
 import {IAdaptor, AssetAmount} from "src/interfaces/IAdaptor.sol";
 import {IWToken} from "src/interfaces/IWToken.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -24,7 +25,8 @@ contract RocketPoolAdpTest is PoolTest {
     error CheckChainConfig();
 
     RocketPoolAdaptor rocketPoolAdp;
-    address rocketSwapRouter = 0x16D5A408e807db8eF7c578279BEeEe6b228f1c1C;
+    IRocketSwapRouter rocketSwapRouter =
+        IRocketSwapRouter(0x16D5A408e807db8eF7c578279BEeEe6b228f1c1C);
     address public rETH = 0xae78736Cd615f374D3085123A210448E74Fc6393;
     address public WETH = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
     IWToken public iWETH = IWToken(WETH);
@@ -44,7 +46,12 @@ contract RocketPoolAdpTest is PoolTest {
         _setUp();
 
         // deploying Uniswap adaptor
-        rocketPoolAdp = new RocketPoolAdaptor(rETH, WETH, address(pool));
+        rocketPoolAdp = new RocketPoolAdaptor(
+            rETH,
+            WETH,
+            rocketSwapRouter,
+            address(pool)
+        );
 
         /// @dev update convert req fixture with this adaptor addr as `to`
         console.log("RocketPool adaptor deployed:", address(rocketPoolAdp));

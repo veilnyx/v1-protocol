@@ -1,11 +1,27 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.24;
+pragma solidity 0.8.24;
 
 import {ShieldedTransaction, ShieldedTransactionType, RevokerData} from "../libraries/ShieldedTransaction.sol";
 import {ShieldedAddressRegistrationData} from "../libraries/ShieldedAddress.sol";
 import {TreeUpdateData} from "../libraries/QueuedMerkleTree.sol";
 import {AssetType, Asset} from "../libraries/Asset.sol";
 import {PoolStorage} from "../base/PoolStorage.sol";
+
+import {IVerifier} from "./IVerifier.sol";
+import {IAdaptorHandler} from "./IAdaptorHandler.sol";
+import {IScreener} from "./IScreener.sol";
+import {IHasher} from "./IHasher.sol";
+
+/// @param verifier The address of the verifier contract. Verifier contract verifies the stx's zk proof, address proof and merkle tree queue proof.
+/// @param adaptorHandler The address of the adaptor handler contract, responsible for delegate calling adaptors of external DeFi protocols.
+/// @param screener The address of the screener contract, responsible for screening sanctioned addresseses.
+/// @param hasher The address of the hasher contract. It provides a single interface to Poseidon hashing functions
+struct InitAddressParams {
+    IVerifier verifier;
+    IAdaptorHandler adaptorHandler;
+    IScreener screener;
+    IHasher hasher;
+}
 
 interface IPool {
     /////////////////////////////////////////

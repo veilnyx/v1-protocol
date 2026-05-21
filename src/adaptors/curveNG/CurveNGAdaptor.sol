@@ -24,15 +24,15 @@ struct Payload {
     uint256 slippageBps;
 }
 
-struct PoolUnderlyingTokensInfo {
-    address[] coins;
-    uint256[] balances;
-    uint24[] assetIds;
-    uint8[] indexes;
-}
-
 contract CurveNGAdaptor is AdaptorBase {
     using SafeERC20 for IERC20;
+
+    struct PoolUnderlyingTokensInfo {
+        address[] coins;
+        uint256[] balances;
+        uint24[] assetIds;
+        uint8[] indexes;
+    }
 
     error InvalidInput();
     error AssetNotSupportedByPool(address asset, address curvePool);
@@ -310,9 +310,7 @@ contract CurveNGAdaptor is AdaptorBase {
 
             // LP tokens and Curve Pool share the same contract
             outAssetId = getAsset(address(curve)).id;
-        }
-
-        if (NCoins == 3) {
+        } else if (NCoins == 3) {
             uint256 expectedLPTokens = _calcLPTokens3CoinPool(
                 curve,
                 inValues,
@@ -332,6 +330,8 @@ contract CurveNGAdaptor is AdaptorBase {
 
             // LP tokens and Curve Pool share the same contract
             outAssetId = getAsset(address(curve)).id;
+        } else {
+            revert InvalidInput();
         }
     }
 
@@ -453,13 +453,6 @@ contract CurveNGAdaptor is AdaptorBase {
 
             if (slippageBps > BPS_PRECISION) revert InvalidInput();
 
-            if (
-                IERC20(inAsset.assetAddress).balanceOf(address(this)) <
-                inValues[i]
-            ) {
-                revert InsufficientBalance();
-            }
-
             IERC20(inAsset.assetAddress).forceApprove(
                 address(curve),
                 inValues[i]
@@ -506,12 +499,6 @@ contract CurveNGAdaptor is AdaptorBase {
         }
 
         if (decodedPayload.slippageBps > BPS_PRECISION) revert InvalidInput();
-
-        if (
-            IERC20(inAsset.assetAddress).balanceOf(address(this)) < inValues[0]
-        ) {
-            revert InsufficientBalance();
-        }
 
         if (decodedPayload.withdrawType == uint8(WithdrawType.SINGLE)) {
             if (curve.coins(decodedPayload.singleCoinIndex) == address(0)) {

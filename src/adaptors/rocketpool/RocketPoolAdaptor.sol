@@ -20,8 +20,7 @@ enum Action {
 contract RocketPoolAdaptor is AdaptorBase {
     using SafeERC20 for IERC20;
 
-    IRocketSwapRouter public immutable rocketSwapRouter =
-        IRocketSwapRouter(0x16D5A408e807db8eF7c578279BEeEe6b228f1c1C);
+    IRocketSwapRouter public immutable rocketSwapRouter;
     address public immutable WETH;
     address public immutable rETH;
     uint256 public constant MINIMUM_DEPOSIT = 0.01 ether;
@@ -29,10 +28,12 @@ contract RocketPoolAdaptor is AdaptorBase {
     constructor(
         address rEth_,
         address wEth_,
+        IRocketSwapRouter rocketSwapRouter_,
         address veilnyxPool_
     ) AdaptorBase(veilnyxPool_) {
         rETH = rEth_;
         WETH = wEth_;
+        rocketSwapRouter = rocketSwapRouter_;
     }
 
     function handleAssets(

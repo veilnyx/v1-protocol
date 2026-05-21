@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity ^0.8.24;
+pragma solidity 0.8.24;
 
 uint256 constant FIELD_SIZE = 21888242871839275222246405745257275088548364400416034343698204186575808495617;
 
@@ -16,4 +16,4 @@ bytes32 constant EIP712_TYPEHASH_REGISTER_ADDRESS = keccak256(
     "RegisterAddress(string message,bytes shieldedAddress)"
 );
 string constant MESSAGE_REGISTER_ADDRESS = "Register Shielded Address";
-uint256 constant MAX_WITHDRAW_FEE_BPS = 25_00; // 25% in basis points
+uint256 constant MAX_WITHDRAW_FEE_BPS = 0.25e4; // 25% in basis points

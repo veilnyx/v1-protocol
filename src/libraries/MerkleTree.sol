@@ -1,8 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity ^0.8.18;
+pragma solidity 0.8.24;
 
 import {IHasher} from "../interfaces/IHasher.sol";
 import {FIELD_SIZE, ZERO_LEAF} from "../base/Constants.sol";
+
+struct LevelData {
+    uint256 zero;
+    uint256 lastSubtree;
+}
 
 struct MerkleTree {
     uint8 depth;
@@ -11,14 +16,14 @@ struct MerkleTree {
     uint32 capacity;
     IHasher hasher;
     mapping(uint8 => uint256) roots;
-    mapping(uint8 => uint256) zeroes;
-    mapping(uint8 => uint256) lastSubtrees;
+    mapping(uint8 => LevelData) levels;
 }
 
 library MerkleTreeLogic {
     error MerkleTreeFull();
     error InvalidDepth(uint8 given, uint8 min, uint8 max);
     error OutOfField();
+    error ZeroAddress();
 
     uint8 internal constant ROOT_HISTORY_SIZE = 100;
 
@@ -47,8 +52,8 @@ library MerkleTreeLogic {
 
         uint256 zero = ZERO_LEAF;
         for (uint8 i = 0; i < depth; ) {
-            self.zeroes[i] = zero;
-            self.lastSubtrees[i] = zero;
+            self.levels[i].zero = zero;
+            self.levels[i].lastSubtree = zero;
             zero = hasher.hash([zero, zero]);
 
             unchecked {
@@ -88,11 +93,11 @@ library MerkleTreeLogic {
             if (currentLevelIndex % 2 == 0) {
                 // Insertion on the left leaf
                 left = currentLevelHash;
-                right = self.zeroes[i];
-                self.lastSubtrees[i] = currentLevelHash;
+                right = self.levels[i].zero;
+                self.levels[i].lastSubtree = currentLevelHash;
             } else {
                 // insertion on the right leaf
-                left = self.lastSubtrees[i];
+                left = self.levels[i].lastSubtree;
                 right = currentLevelHash;
             }
             // preparing for next level
@@ -117,9 +122,6 @@ library MerkleTreeLogic {
         MerkleTree storage self,
         uint256 _root
     ) public view returns (bool) {
-        if (_root == 0) {
-            return false;
-        }
         uint8 _currentRootIndex = self.currentRootIndex;
         uint8 i = _currentRootIndex; // currentRootIndex -> 0
         do {
@@ -141,7 +143,7 @@ library MerkleTreeLogic {
         uint256[] memory subtrees = new uint256[](self.depth);
 
         for (uint8 i; i < uint8(self.depth); ) {
-            subtrees[i] = self.lastSubtrees[i];
+            subtrees[i] = self.levels[i].lastSubtree;
 
             unchecked {
                 ++i;

@@ -1,22 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity ^0.8.24;
-
-interface IPoseidon {
-    function poseidon(
-        uint256[2] calldata inputs
-    ) external view returns (uint256);
-
-    function poseidon(
-        uint256[3] calldata inputs
-    ) external view returns (uint256);
-
-    function poseidon(
-        uint256[4] calldata inputs
-    ) external view returns (uint256);
-}
+pragma solidity 0.8.24;
 
 interface IHasher {
     error ZeroAddress();
+
     function hash(uint256[2] calldata inputs) external view returns (uint256);
 
     function hash(uint256[3] calldata inputs) external view returns (uint256);

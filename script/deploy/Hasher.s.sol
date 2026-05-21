@@ -2,7 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {Hasher} from "src/core/Hasher.sol";
-import {IPoseidon} from "src/interfaces/IHasher.sol";
+import {IPoseidon} from "src/interfaces/IPoseidon.sol";
 import {BaseScript} from "../BaseScript.sol";
 
 contract HasherDeployer is BaseScript {

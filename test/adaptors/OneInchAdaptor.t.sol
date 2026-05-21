@@ -19,9 +19,10 @@ contract OneInchAdaptorTest is PoolTest {
     error CheckChainConfig();
 
     OneInchAdaptor oneInchAdaptor;
+    IWToken public iWETH;
+    address public oneInchRouter = 0x111111125421cA6dc452d289314280a0f8842A65;
     address public WETH = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
     address public USDC = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48;
-    IWToken public iWETH;
     uint256 public constant INITIAL_SUPPLY = 2 ether;
     uint256 public constant SWAP_AMT = 1 ether;
     address public user = 0x689EcF264657302052c3dfBD631e4c20d3ED0baB;
@@ -40,7 +41,7 @@ contract OneInchAdaptorTest is PoolTest {
         iWETH = IWToken(WETH);
 
         // deploying 1Inch adaptor
-        oneInchAdaptor = new OneInchAdaptor(address(pool));
+        oneInchAdaptor = new OneInchAdaptor(address(pool), oneInchRouter);
 
         /// @dev update convert req fixture with this adaptor addr as `to`
         console.log("OneInch adaptor deployed:", address(oneInchAdaptor));

@@ -13,9 +13,11 @@ error OneInchSwapFailed();
 contract OneInchAdaptor is AdaptorBase {
     using SafeERC20 for IERC20;
 
-    address constant oneInchRouter = 0x111111125421cA6dc452d289314280a0f8842A65;
+    address public immutable oneInchRouter;
 
-    constructor(address pool_) AdaptorBase(pool_) {}
+    constructor(address pool_, address oneInchRouter_) AdaptorBase(pool_) {
+        oneInchRouter = oneInchRouter_;
+    }
 
     /// @dev 1Inch swap router expects the calldata to be acquired from the 1Inch API. The calldata is then passed to the 1Inch router to execute the swap. Decoding is not required.
     /// @param inAssets Array of asset amounts to be swapped
