@@ -7,6 +7,7 @@ import {AdaptorBase} from "src/base/AdaptorBase.sol";
 import {Asset, AssetType} from "src/libraries/Asset.sol";
 import {ISwapRouter02} from "./ISwapRouter02.sol";
 import {AssetAmount} from "../../interfaces/IAdaptor.sol";
+import {IPool} from "../../interfaces/IPool.sol";
 
 contract UniswapV3Adapter is AdaptorBase {
     // Errors //
@@ -15,7 +16,7 @@ contract UniswapV3Adapter is AdaptorBase {
     ISwapRouter02 public immutable swapRouter02;
     uint24 public constant feeTier = 3000;
 
-    constructor(address swapRouter02_, address pool_) AdaptorBase(pool_) {
+    constructor(address swapRouter02_, IPool pool_) AdaptorBase(pool_) {
         swapRouter02 = ISwapRouter02(swapRouter02_); // Uniswap V3 Swap router
     }
 

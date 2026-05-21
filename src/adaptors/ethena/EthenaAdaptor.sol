@@ -8,6 +8,7 @@ import {IWToken} from "../../interfaces/IWToken.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {AssetAmount} from "../../interfaces/IAdaptor.sol";
+import {IPool} from "../../interfaces/IPool.sol";
 
 /// @notice Supports staking. User's will have to acquire USDe from external pools. Ref: https://ethena-labs.gitbook.io/ethena-labs/solution-design/key-addresses#liquidity-pool-contracts
 /// @notice Unstaking is not supported. User's will have to unstake from Ethena's UI after withdrawing their `sUSDe` from Veilnyx. This is due to the cool down period required by Ethena before unstaking, making it a non-atomic tx.
@@ -23,7 +24,7 @@ contract EthenaAdaptor is AdaptorBase {
     constructor(
         address ethena_,
         address USDe_,
-        address pool_
+        IPool pool_
     ) AdaptorBase(pool_) {
         ethena = IEthena(ethena_);
         USDe = USDe_;

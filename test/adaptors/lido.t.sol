@@ -7,6 +7,7 @@ import {Pool} from "src/core/Pool.sol";
 import {ShieldedTransaction} from "src/libraries/ShieldedTransaction.sol";
 import {LidoAdaptor} from "src/adaptors/lido/LidoAdaptor.sol";
 import {ILido} from "src/adaptors/lido/ILido.sol";
+import {IAdaptorHandler} from "src/interfaces/IAdaptorHandler.sol";
 import {IAdaptor} from "src/interfaces/IAdaptor.sol";
 import {AssetAmount} from "src/interfaces/IAdaptor.sol";
 import {IWToken} from "src/interfaces/IWToken.sol";
@@ -63,7 +64,7 @@ contract LidoAdaptorTest is PoolTest {
         // Asset & Adaptor support on Veilnyx Protocol
         address poolOwner = pool.owner();
         vm.prank(poolOwner);
-        pool.addAdaptorSupport(fixtureAdaptorAddr, true);
+        pool.addAdaptorSupport(IAdaptorHandler(fixtureAdaptorAddr), true);
 
         AssetType assetType = AssetType.ERC20;
         address[] memory assetAddresses = new address[](1);

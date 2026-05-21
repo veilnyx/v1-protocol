@@ -9,6 +9,7 @@ import {Pool} from "src/core/Pool.sol";
 import {ShieldedTransaction} from "src/libraries/ShieldedTransaction.sol";
 import {IAdaptor} from "src/interfaces/IAdaptor.sol";
 import {AssetAmount} from "src/interfaces/IAdaptor.sol";
+import {IAdaptorHandler} from "src/interfaces/IAdaptorHandler.sol";
 import {IWToken} from "src/interfaces/IWToken.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Asset, AssetType} from "src/libraries/Asset.sol";
@@ -43,7 +44,7 @@ contract AaveAdaptorTest is PoolTest {
         // deploying aave adaptor
         aaveAdaptor = new AaveV3Adaptor(
             aave,
-            address(pool),
+            pool,
             STATIC_A_TOKEN_FACTORY
         );
         /// @dev update convert req fixture with this adaptor addr as `to`
@@ -62,7 +63,7 @@ contract AaveAdaptorTest is PoolTest {
 
         address poolOwner = pool.owner();
         vm.startPrank(poolOwner);
-        pool.addAdaptorSupport(fixtureAdaptorAddr, true);
+        pool.addAdaptorSupport(IAdaptorHandler(fixtureAdaptorAddr), true);
 
         AssetType assetType = AssetType.ERC20;
         address[] memory assetAddresses = new address[](1);

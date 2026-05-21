@@ -45,10 +45,7 @@ interface IPool {
 
     event AssetAdded(address indexed assetAddress, uint24 indexed assetId);
 
-    event NullifierMarked(
-        uint256 indexed nullifier,
-        uint32 indexed markLeafIndex
-    );
+    event NullifierMarked(uint256 indexed nullifier, uint32 indexed leafIndex);
     // Commitments
     event Commitment(uint256 indexed leafIndex, uint256 indexed commitment);
 
@@ -117,7 +114,10 @@ interface IPool {
     /// @notice Can only be called by the owner.
     /// @param adaptorAddress The address of the adaptor contract.
     /// @param enable Whether to enable or disable the adaptor.
-    function addAdaptorSupport(address adaptorAddress, bool enable) external;
+    function addAdaptorSupport(
+        IAdaptorHandler adaptorAddress,
+        bool enable
+    ) external;
 
     /// @notice Registers a new revoker. Revokers are responsible for deanonymizing transactions along with a network of Guardians.
     /// @notice Can only be called by the owner.
@@ -142,7 +142,7 @@ interface IPool {
 
     /// @notice Sets the address of the address screener/sactionion contract.
     /// @notice Can only be called by the owner.
-    function setScreener(address screener) external;
+    function setScreener(IScreener screener) external;
 
     event ScreenerUpdated(address indexed screener);
 
@@ -217,7 +217,7 @@ interface IPool {
     /// @notice Returns if an external adaptor is supported.
     /// @param adaptorAddress The address of the adaptor.
     function isAdaptorSupported(
-        address adaptorAddress
+        IAdaptorHandler adaptorAddress
     ) external view returns (bool);
 
     /**

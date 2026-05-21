@@ -16,8 +16,8 @@ abstract contract AdaptorBase is IAdaptor {
 
     IPool internal immutable _pool;
 
-    constructor(address pool_) {
-        _pool = IPool(pool_);
+    constructor(IPool pool_) {
+        _pool = pool_;
     }
 
     function getAssetId(address assetAddress) public view returns (uint24) {

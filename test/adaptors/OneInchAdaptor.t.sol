@@ -6,6 +6,7 @@ import {BaseScript} from "script/BaseScript.sol";
 import {PoolTest} from "test/fixtures/PoolTest.sol";
 import {Pool} from "src/core/Pool.sol";
 import {IPool} from "src/interfaces/IPool.sol";
+import {IAdaptorHandler} from "src/interfaces/IAdaptorHandler.sol";
 import {ShieldedTransaction} from "src/libraries/ShieldedTransaction.sol";
 import {OneInchAdaptor} from "src/adaptors/oneInch-v6/OneInchAdaptor.sol";
 import {SwapDescription} from "src/adaptors/oneInch-v6/IOneInch.sol";
@@ -41,14 +42,14 @@ contract OneInchAdaptorTest is PoolTest {
         iWETH = IWToken(WETH);
 
         // deploying 1Inch adaptor
-        oneInchAdaptor = new OneInchAdaptor(address(pool), oneInchRouter);
+        oneInchAdaptor = new OneInchAdaptor(pool, oneInchRouter);
 
         /// @dev update convert req fixture with this adaptor addr as `to`
         console.log("OneInch adaptor deployed:", address(oneInchAdaptor));
 
         address poolOwner = pool.owner();
         vm.prank(poolOwner);
-        pool.addAdaptorSupport(address(oneInchAdaptor), true);
+        pool.addAdaptorSupport(IAdaptorHandler(address(oneInchAdaptor)), true);
         deal(WETH, user, INITIAL_SUPPLY);
 
         // iWETH.approve(address(pool), INITIAL_SUPPLY); // depositing weth to pool

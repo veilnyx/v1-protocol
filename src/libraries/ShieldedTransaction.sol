@@ -2,6 +2,7 @@
 pragma solidity 0.8.24;
 
 import {FIELD_SIZE} from "../base/Constants.sol";
+import {ArrayUtils} from "./ArrayUtils.sol";
 import {Asset, AssetLogic} from "./Asset.sol";
 import {MerkleTree, MerkleTreeLogic} from "./MerkleTree.sol";
 import {QueuedMerkleTree, QueuedMerkleTreeLogic} from "./QueuedMerkleTree.sol";
@@ -154,9 +155,9 @@ library ShieldedTransactionLogic {
         ShieldedTransaction calldata stx,
         MerkleTree storage addressTree,
         QueuedMerkleTree storage commitmentTree,
-        address verifier,
+        IVerifier verifier,
         mapping(uint256 => uint32) storage markedNullifiers,
-        mapping(address => bool) storage supportedAdaptors,
+        mapping(IAdaptorHandler => bool) storage supportedAdaptors,
         mapping(uint256 => RevokerData) storage revokerDataMap
     ) external {
         RevokerData memory revokerData = revokerDataMap[stx.revokerId];
@@ -175,7 +176,9 @@ library ShieldedTransactionLogic {
 
         if (
             stx.txType == ShieldedTransactionType.CALL_ADAPTOR &&
-            !supportedAdaptors[address(bytes20(stx.targetData))]
+            !supportedAdaptors[
+                IAdaptorHandler(address(bytes20(stx.targetData)))
+            ]
         ) {
             revert IPool.UnsupportedAdaptor();
         }
@@ -203,8 +206,8 @@ library ShieldedTransactionLogic {
         mapping(uint24 => Asset) storage assets,
         mapping(address => mapping(uint24 => uint256)) storage paymasterFees,
         mapping(uint24 => uint256) storage withdrawFees,
-        address hasher,
-        address adaptorHandler,
+        IHasher hasher,
+        IAdaptorHandler adaptorHandler,
         uint256 withdrawFeeBps
     ) external {
         Params memory params = _copyParamsToMemory(stx);
@@ -235,7 +238,7 @@ library ShieldedTransactionLogic {
                 assets,
                 withdrawFees,
                 params.pubAssets,
-                adaptorHandler,
+                address(adaptorHandler),
                 0
             );
             _handleAdaptorCall(
@@ -253,14 +256,14 @@ library ShieldedTransactionLogic {
     function verifyProof(
         ShieldedTransaction calldata stx,
         RevokerData memory revokerData,
-        address verifier
+        IVerifier verifier
     ) public view returns (bool) {
-        uint16 vId = IVerifier(verifier).getTransactionVerifierId(
+        uint16 vId = verifier.getTransactionVerifierId(
             stx.nullifiers.length,
             stx.commitments.length
         );
         bytes memory vInp = toVerifierInput(stx, revokerData);
-        return IVerifier(verifier).verifyTransactionProof(vId, vInp);
+        return verifier.verifyTransactionProof(vId, vInp);
     }
 
     /**
@@ -355,7 +358,7 @@ library ShieldedTransactionLogic {
             uint256[][] memory notes
         )
     {
-        require(notesMemo.length % 32 == 0, "Invalid notesMemo length");
+        require(notesMemo.length & 31 == 0, "Invalid notesMemo length");
 
         // 1. Split notesMemo into values array each 32 bytes
         uint256 numWords = notesMemo.length / 32;
@@ -533,8 +536,8 @@ library ShieldedTransactionLogic {
 
     function _handleAdaptorCall(
         mapping(uint24 => Asset) storage assets,
-        address hasher,
-        address adaptorHandler,
+        IHasher hasher,
+        IAdaptorHandler adaptorHandler,
         Params memory params,
         MemoParams memory memoParams
     ) internal {
@@ -558,14 +561,13 @@ library ShieldedTransactionLogic {
             }
         }
 
-        PubAsset[] memory outPubAssets = IAdaptorHandler(adaptorHandler)
-            .handleAdaptor(
-                params.target,
-                pubAssetsWithValue,
-                params.targetPayload
-            );
+        PubAsset[] memory outPubAssets = adaptorHandler.handleAdaptor(
+            params.target,
+            pubAssetsWithValue,
+            params.targetPayload
+        );
 
-        _receivePubAssets(assets, outPubAssets, adaptorHandler);
+        _receivePubAssets(assets, outPubAssets, address(adaptorHandler));
 
         /// @dev Creating commitments and output noteMemos for received tokens. This is done on the protocol side for CALL_ADAPTOR txns because the exact value of converted tokens can only be determined after executing the tx.
         /// @dev `refundAddress` is used as the recipient's blinded address.
@@ -574,7 +576,7 @@ library ShieldedTransactionLogic {
         uint256[] memory pubCms = new uint256[](outLen);
 
         for (uint256 i = 0; i < outLen; ++i) {
-            pubCms[i] = IHasher(hasher).hash(
+            pubCms[i] = hasher.hash(
                 [
                     outPubAssets[i].id,
                     params.refundAddress,
@@ -588,7 +590,10 @@ library ShieldedTransactionLogic {
             );
         }
 
-        memoParams.commitments = _concat(memoParams.commitments, pubCms);
+        memoParams.commitments = ArrayUtils.concat(
+            memoParams.commitments,
+            pubCms
+        );
     }
 
     function _creditPaymasterFee(
@@ -791,25 +796,5 @@ library ShieldedTransactionLogic {
         }
 
         return memoParams;
-    }
-
-    function _concat(
-        uint256[] memory a,
-        uint256[] memory b
-    ) internal pure returns (uint256[] memory) {
-        uint256[] memory result = new uint256[](a.length + b.length);
-        for (uint256 i = 0; i < a.length; ) {
-            result[i] = a[i];
-            unchecked {
-                ++i;
-            }
-        }
-        for (uint256 i = 0; i < b.length; ) {
-            result[a.length + i] = b[i];
-            unchecked {
-                ++i;
-            }
-        }
-        return result;
     }
 }

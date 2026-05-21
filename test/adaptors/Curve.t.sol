@@ -7,6 +7,7 @@ import {Pool} from "src/core/Pool.sol";
 import {ShieldedTransaction} from "src/libraries/ShieldedTransaction.sol";
 import {CurveNGAdaptor as CurveAdaptor, Payload} from "src/adaptors/curveNG/CurveNGAdaptor.sol";
 import {IAdaptor} from "src/interfaces/IAdaptor.sol";
+import {IAdaptorHandler} from "src/interfaces/IAdaptorHandler.sol";
 import {AssetAmount} from "src/interfaces/IAdaptor.sol";
 import {IWToken} from "src/interfaces/IWToken.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -36,7 +37,7 @@ contract CurveAdaptorTest is PoolTest {
         _setUp();
 
         // deploying Curve adaptor and adding test pool support
-        curveAdaptor = new CurveAdaptor(address(pool));
+        curveAdaptor = new CurveAdaptor(pool);
         /// @dev update convert req fixture with this adaptor addr as `to`
         console.log("Curve adaptor deployed:", address(curveAdaptor));
 
@@ -48,7 +49,7 @@ contract CurveAdaptorTest is PoolTest {
         // Adaptor support on Veilnyx Protocol
         address poolOwner = pool.owner();
         vm.startPrank(poolOwner);
-        pool.addAdaptorSupport(fixtureAdaptorAddr, true);
+        pool.addAdaptorSupport(IAdaptorHandler(fixtureAdaptorAddr), true);
 
         AssetType assetType = AssetType.ERC20;
         address[] memory assetAddresses = new address[](3);

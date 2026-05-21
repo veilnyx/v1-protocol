@@ -67,16 +67,32 @@ contract VerifierTest is BaseTest {
     function test_getVerifierIdRevertsOnUint16Overflow() public {
         // nOuts=0 → noOfDigits=0 → verifierID = nIns * 10^0 + 0 = nIns
         // 65536 > type(uint16).max (65535)
-        vm.expectRevert(IVerifier.VerifierIdOverflow.selector);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IVerifier.VerifierIdOverflow.selector,
+                uint256(655360)
+            )
+        );
         _verifier.getTransactionVerifierId(65536, 0);
 
-        vm.expectRevert(IVerifier.VerifierIdOverflow.selector);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IVerifier.VerifierIdOverflow.selector,
+                uint256(65546)
+            )
+        );
         _verifier.getTransactionVerifierId(6554, 6);
     }
 
     function test_getVerifierIdRevertsWhenNInsZero() public {
         // nIns=0, nOuts=6 → noOfDigits=1, verifierID = 0*10 + 6 = 6
-        vm.expectRevert(IVerifier.BadArguments.selector);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IVerifier.BadArguments.selector,
+                uint256(0),
+                uint256(6)
+            )
+        );
         _verifier.getTransactionVerifierId(0, 6);
     }
 

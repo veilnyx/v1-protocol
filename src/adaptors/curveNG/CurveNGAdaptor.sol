@@ -8,12 +8,7 @@ import {Asset, AssetType} from "../../libraries/Asset.sol";
 import {IWToken} from "../../interfaces/IWToken.sol";
 import {ICurvePool} from "./ICurvePool.sol";
 import {AssetAmount} from "../../interfaces/IAdaptor.sol";
-
-enum WithdrawType {
-    BALANCED,
-    SINGLE,
-    IMBALANCED
-}
+import {IPool} from "../../interfaces/IPool.sol";
 
 struct Payload {
     address curvePool;
@@ -27,6 +22,12 @@ struct Payload {
 contract CurveNGAdaptor is AdaptorBase {
     using SafeERC20 for IERC20;
 
+    enum WithdrawType {
+        BALANCED,
+        SINGLE,
+        IMBALANCED
+    }
+
     struct PoolUnderlyingTokensInfo {
         address[] coins;
         uint256[] balances;
@@ -34,14 +35,17 @@ contract CurveNGAdaptor is AdaptorBase {
         uint8[] indexes;
     }
 
-    error InvalidInput();
+    error InvalidCoinCount(uint256 nCoins);
+    error InvalidCoinIndex(uint8 coinIndex);
+    error InvalidSlippageBps(uint256 slippageBps, uint256 maxBps);
+    error InvalidUnderlyingTokenAmountLength(uint256 actual, uint256 expected);
     error AssetNotSupportedByPool(address asset, address curvePool);
 
     uint8 constant ACTION_SUPPLY = 0;
     uint8 constant ACTION_WITHDRAW = 1;
     uint256 constant BPS_PRECISION = 100_00;
 
-    constructor(address pool_) AdaptorBase(pool_) {}
+    constructor(IPool pool_) AdaptorBase(pool_) {}
 
     function handleAssets(
         AssetAmount[] calldata inAssets,
@@ -74,7 +78,7 @@ contract CurveNGAdaptor is AdaptorBase {
         }
 
         if (NCoins == 0) {
-            revert InvalidInput();
+            revert InvalidCoinCount(NCoins);
         }
 
         if (decodedPayload.action == ACTION_SUPPLY) {
@@ -115,7 +119,7 @@ contract CurveNGAdaptor is AdaptorBase {
                         decodedPayload.singleCoinIndex
                     ) == address(0)
                 ) {
-                    revert InvalidInput();
+                    revert InvalidCoinIndex(decodedPayload.singleCoinIndex);
                 }
 
                 outValues = new uint256[](1);
@@ -159,12 +163,12 @@ contract CurveNGAdaptor is AdaptorBase {
                     // deducting acceptable slippage
                     minAmtTokenA =
                         minAmtTokenA -
-                        ((minAmtTokenA * decodedPayload.slippageBps) /
-                            BPS_PRECISION);
+                        (minAmtTokenA * decodedPayload.slippageBps) /
+                        BPS_PRECISION;
                     minAmtTokenB =
                         minAmtTokenB -
-                        ((minAmtTokenB * decodedPayload.slippageBps) /
-                            BPS_PRECISION);
+                        (minAmtTokenB * decodedPayload.slippageBps) /
+                        BPS_PRECISION;
 
                     outValues = new uint256[](2);
                     outAssetIds = new uint24[](2);
@@ -222,16 +226,16 @@ contract CurveNGAdaptor is AdaptorBase {
                     // deducting acceptable slippage
                     minAmtTokenA =
                         minAmtTokenA -
-                        ((minAmtTokenA * decodedPayload.slippageBps) /
-                            BPS_PRECISION);
+                        (minAmtTokenA * decodedPayload.slippageBps) /
+                        BPS_PRECISION;
                     minAmtTokenB =
                         minAmtTokenB -
-                        ((minAmtTokenB * decodedPayload.slippageBps) /
-                            BPS_PRECISION);
+                        (minAmtTokenB * decodedPayload.slippageBps) /
+                        BPS_PRECISION;
                     minAmtTokenC =
                         minAmtTokenC -
-                        ((minAmtTokenC * decodedPayload.slippageBps) /
-                            BPS_PRECISION);
+                        (minAmtTokenC * decodedPayload.slippageBps) /
+                        BPS_PRECISION;
 
                     outValues = new uint256[](3);
                     outAssetIds = new uint24[](3);
@@ -331,7 +335,7 @@ contract CurveNGAdaptor is AdaptorBase {
             // LP tokens and Curve Pool share the same contract
             outAssetId = getAsset(address(curve)).id;
         } else {
-            revert InvalidInput();
+            revert InvalidCoinCount(NCoins);
         }
     }
 
@@ -393,7 +397,10 @@ contract CurveNGAdaptor is AdaptorBase {
             NCoins = 2;
         }
         if (underlyingTokenAmts.length != NCoins) {
-            revert InvalidInput();
+            revert InvalidUnderlyingTokenAmountLength(
+                underlyingTokenAmts.length,
+                NCoins
+            );
         }
 
         if (NCoins == 2) {
@@ -414,7 +421,7 @@ contract CurveNGAdaptor is AdaptorBase {
                 );
         }
 
-        revert InvalidInput();
+        revert InvalidCoinCount(NCoins);
     }
 
     function totalLPTokenSupply(address pool) external view returns (uint256) {
@@ -449,9 +456,16 @@ contract CurveNGAdaptor is AdaptorBase {
                 }
             }
 
-            if (!supported) revert InvalidInput();
+            if (!supported) {
+                revert AssetNotSupportedByPool(
+                    inAsset.assetAddress,
+                    address(curve)
+                );
+            }
 
-            if (slippageBps > BPS_PRECISION) revert InvalidInput();
+            if (slippageBps > BPS_PRECISION) {
+                revert InvalidSlippageBps(slippageBps, BPS_PRECISION);
+            }
 
             IERC20(inAsset.assetAddress).forceApprove(
                 address(curve),
@@ -498,11 +512,16 @@ contract CurveNGAdaptor is AdaptorBase {
             revert ZeroValue();
         }
 
-        if (decodedPayload.slippageBps > BPS_PRECISION) revert InvalidInput();
+        if (decodedPayload.slippageBps > BPS_PRECISION) {
+            revert InvalidSlippageBps(
+                decodedPayload.slippageBps,
+                BPS_PRECISION
+            );
+        }
 
         if (decodedPayload.withdrawType == uint8(WithdrawType.SINGLE)) {
             if (curve.coins(decodedPayload.singleCoinIndex) == address(0)) {
-                revert InvalidInput();
+                revert InvalidCoinIndex(decodedPayload.singleCoinIndex);
             }
         }
 

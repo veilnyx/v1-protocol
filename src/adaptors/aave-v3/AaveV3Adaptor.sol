@@ -11,6 +11,7 @@ import {IStaticAToken} from "./IStaticAToken.sol";
 import {IStaticATokenFactory} from "./IStaticATokenFactory.sol";
 import {IAToken} from "./IAToken.sol";
 import {AssetAmount} from "../../interfaces/IAdaptor.sol";
+import {IPool} from "../../interfaces/IPool.sol";
 
 contract AaveV3Adaptor is AdaptorBase {
     using SafeERC20 for IERC20;
@@ -23,7 +24,7 @@ contract AaveV3Adaptor is AdaptorBase {
 
     constructor(
         address aave_,
-        address pool_,
+        IPool pool_,
         address staticATokenFactory_
     ) AdaptorBase(pool_) {
         aave = IAave(aave_);

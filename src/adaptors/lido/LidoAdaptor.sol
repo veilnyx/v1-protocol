@@ -11,14 +11,15 @@ import {IWToken} from "../../interfaces/IWToken.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {AssetAmount} from "../../interfaces/IAdaptor.sol";
-
-enum Action {
-    STAKE,
-    UNSTAKE
-}
+import {IPool} from "../../interfaces/IPool.sol";
 
 contract LidoAdaptor is AdaptorBase {
     using SafeERC20 for IERC20;
+
+    enum Action {
+        STAKE,
+        UNSTAKE
+    }
 
     ILido public immutable iLido;
     IWithdrawQueueERC721 public immutable iWithdrawQueueERC721;
@@ -37,7 +38,7 @@ contract LidoAdaptor is AdaptorBase {
         // represents the share of stETH tokens in Lido (wrapping stETH -> wstETH). stETH is a rebasing token, wstETH is non-rebasing and will keep the balance of shares constant. This is required for easier integration with Veilnyx as it doesn't have to account for rebasing tokens.
         address wstEth_,
         address withdrawQueueERC721_,
-        address pool_
+        IPool pool_
     ) AdaptorBase(pool_) {
         iLido = ILido(lido_);
         iWithdrawQueueERC721 = IWithdrawQueueERC721(withdrawQueueERC721_);

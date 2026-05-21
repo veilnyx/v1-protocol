@@ -6,6 +6,7 @@ import {PoolTest} from "test/fixtures/PoolTest.sol";
 import {Pool} from "src/core/Pool.sol";
 import {ShieldedTransaction} from "src/libraries/ShieldedTransaction.sol";
 import {BeefyV7Adaptor as BeefyAdp} from "src/adaptors/beefy-v7/BeefyV7Adaptor.sol";
+import {IAdaptorHandler} from "src/interfaces/IAdaptorHandler.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Asset, AssetType} from "src/libraries/Asset.sol";
@@ -36,7 +37,7 @@ contract BeefyAdaptorTest is PoolTest {
         PoolTest._setUp();
 
         // deploying Ethena adaptor
-        beefyAdp = new BeefyAdp(address(pool));
+        beefyAdp = new BeefyAdp(pool);
 
         /// @dev update convert req fixture with this adaptor addr as `to`
         console.log("Beefy adaptor deployed:", address(beefyAdp));
@@ -49,7 +50,7 @@ contract BeefyAdaptorTest is PoolTest {
         // Adaptor support on Veilnyx Protocol
         address poolOwner = pool.owner();
         vm.startPrank(poolOwner);
-        pool.addAdaptorSupport(fixtureAdaptorAddr, true);
+        pool.addAdaptorSupport(IAdaptorHandler(fixtureAdaptorAddr), true);
         AssetType assetType = AssetType.ERC20;
         address[] memory assetAddresses = new address[](2);
         assetAddresses[0] = wantLPToken;

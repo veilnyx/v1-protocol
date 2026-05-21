@@ -13,14 +13,13 @@ struct ShieldedAddressRegistrationData {
     bytes signature;
 }
 
-error ShieldedAddrIncorrectLength(uint8 givenLength, uint8 expectedLength);
-error ZeroRootAddress();
-error ExceededFieldSize();
-
 library ShieldedAddressLogic {
     using MerkleTreeLogic for MerkleTree;
 
     error NotPreVerified();
+    error ShieldedAddrIncorrectLength(uint8 givenLength, uint8 expectedLength);
+    error ZeroRootAddress();
+    error ExceededFieldSize();
 
     bytes32 internal constant MASK_PACK =
         hex"8000000000000000000000000000000000000000000000000000000000000000";

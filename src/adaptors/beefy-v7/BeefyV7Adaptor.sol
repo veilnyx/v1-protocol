@@ -7,16 +7,17 @@ import {IBeefyVault} from "./IBeefyVault.sol";
 import {AdaptorBase} from "../../base/AdaptorBase.sol";
 import {Asset} from "../../libraries/Asset.sol";
 import {AssetAmount} from "../../interfaces/IAdaptor.sol";
-
-enum Action {
-    DEPOSIT,
-    WITHDRAW
-}
+import {IPool} from "../../interfaces/IPool.sol";
 
 contract BeefyV7Adaptor is AdaptorBase {
     using SafeERC20 for IERC20;
 
-    constructor(address pool_) AdaptorBase(pool_) {}
+    enum Action {
+        DEPOSIT,
+        WITHDRAW
+    }
+
+    constructor(IPool pool_) AdaptorBase(pool_) {}
 
     function handleAssets(
         AssetAmount[] calldata inAssets,

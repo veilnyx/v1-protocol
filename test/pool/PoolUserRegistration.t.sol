@@ -6,7 +6,7 @@ import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/Messa
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import {EIP712Upgradeable} from "@openzeppelin/contracts-upgradeable/utils/cryptography/EIP712Upgradeable.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
-import {ShieldedAddressRegistrationData, ShieldedAddressLogic, ShieldedAddrIncorrectLength} from "src/libraries/ShieldedAddress.sol";
+import {ShieldedAddressRegistrationData, ShieldedAddressLogic} from "src/libraries/ShieldedAddress.sol";
 import {IPool} from "src/interfaces/IPool.sol";
 import {PoolBaseTest} from "test/fixtures/PoolBaseTest.sol";
 
@@ -16,6 +16,8 @@ contract PoolUserRegistration is PoolBaseTest {
     address senderAddr;
     uint256 senderPK;
     bytes shieldedAddress;
+
+    error ShieldedAddrIncorrectLength(uint8 givenLength, uint8 expectedLength);
 
     function setUp() public {
         _setUp();
@@ -95,7 +97,11 @@ contract PoolUserRegistration is PoolBaseTest {
             .shieldedAddress; // packed
 
         vm.expectRevert(
-            abi.encodeWithSelector(ShieldedAddrIncorrectLength.selector, uint8(96), uint8(160))
+            abi.encodeWithSelector(
+                ShieldedAddrIncorrectLength.selector,
+                uint8(96),
+                uint8(160)
+            )
         );
         pool.registerAddress(addressRegistrationData);
     }

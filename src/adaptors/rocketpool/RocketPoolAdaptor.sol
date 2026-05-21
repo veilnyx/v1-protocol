@@ -9,16 +9,17 @@ import {IWToken} from "../../interfaces/IWToken.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {AssetAmount} from "../../interfaces/IAdaptor.sol";
-
-error InsufficientStakingAmt(uint256 stakingAmt, uint256 minimumDeposit);
-
-enum Action {
-    STAKE,
-    UNSTAKE
-}
+import {IPool} from "../../interfaces/IPool.sol";
 
 contract RocketPoolAdaptor is AdaptorBase {
     using SafeERC20 for IERC20;
+
+    error InsufficientStakingAmt(uint256 stakingAmt, uint256 minimumDeposit);
+
+    enum Action {
+        STAKE,
+        UNSTAKE
+    }
 
     IRocketSwapRouter public immutable rocketSwapRouter;
     address public immutable WETH;
@@ -29,7 +30,7 @@ contract RocketPoolAdaptor is AdaptorBase {
         address rEth_,
         address wEth_,
         IRocketSwapRouter rocketSwapRouter_,
-        address veilnyxPool_
+        IPool veilnyxPool_
     ) AdaptorBase(veilnyxPool_) {
         rETH = rEth_;
         WETH = wEth_;

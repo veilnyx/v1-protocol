@@ -6,6 +6,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {AdaptorBase} from "src/base/AdaptorBase.sol";
 import {MockDeFi} from "./MockDeFi.sol";
 import {AssetAmount} from "src/interfaces/IAdaptor.sol";
+import {IPool} from "src/interfaces/IPool.sol";
 
 import {console2} from "forge-std/console2.sol";
 
@@ -17,7 +18,7 @@ contract MockDeFiAdaptor is ERC20, AdaptorBase {
         address assetManager_,
         address tokenAddress_,
         address mockDefi_
-    ) ERC20("MockDeFi", "MDF") AdaptorBase(assetManager_) {
+    ) ERC20("MockDeFi", "MDF") AdaptorBase(IPool(assetManager_)) {
         tokenAddress = tokenAddress_;
         mockDefi = mockDefi_;
     }

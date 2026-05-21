@@ -30,7 +30,7 @@ abstract contract PoolStorage {
     mapping(uint256 nullifier => uint32 markLeafIndex)
         internal _markedNullifiers;
 
-    mapping(address => bool) internal _adaptors;
+    mapping(IAdaptorHandler => bool) internal _adaptors;
 
     uint16 internal _revokerCount;
     mapping(uint256 => bool) internal _revokerPublicKeys;

@@ -79,7 +79,11 @@ contract AdaptorHandler is IAdaptorHandler, ReentrancyGuard, Ownable {
             // is sent tokens from other sources apart from doing shielded transactions. In that case,
             // balance will be greater than outAssets[i].value and revert will be called.
             if (assetBalance < outAssets[i].value) {
-                revert InvalidOutputValue();
+                revert InvalidOutputValue(
+                    outAssets[i].assetId,
+                    outAssets[i].value,
+                    assetBalance
+                );
             }
 
             IERC20(asset.assetAddress).forceApprove(

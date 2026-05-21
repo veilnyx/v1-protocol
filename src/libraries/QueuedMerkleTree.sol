@@ -113,13 +113,11 @@ library QueuedMerkleTreeLogic {
             }
         }
 
-        if (nLeaves < n) {
-            for (uint32 i = nLeaves; i < n; ) {
-                leaves[i] = ZERO_LEAF;
+        for (uint32 i = nLeaves; i < n; ) {
+            leaves[i] = ZERO_LEAF;
 
-                unchecked {
-                    ++i;
-                }
+            unchecked {
+                ++i;
             }
         }
 

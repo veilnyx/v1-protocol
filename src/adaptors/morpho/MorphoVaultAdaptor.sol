@@ -7,16 +7,17 @@ import {IAdaptor, AssetAmount} from "../../interfaces/IAdaptor.sol";
 import {IMorphoVault} from "./IMorphoVault.sol";
 import {AdaptorBase} from "../../base/AdaptorBase.sol";
 import {Asset} from "../../libraries/Asset.sol";
-
-enum Action {
-    DEPOSIT,
-    WITHDRAW
-}
+import {IPool} from "../../interfaces/IPool.sol";
 
 contract MorphoVaultAdaptor is AdaptorBase {
     using SafeERC20 for IERC20;
 
-    constructor(address pool_) AdaptorBase(pool_) {}
+    enum Action {
+        DEPOSIT,
+        WITHDRAW
+    }
+
+    constructor(IPool pool_) AdaptorBase(pool_) {}
 
     function handleAssets(
         AssetAmount[] calldata inAssets,

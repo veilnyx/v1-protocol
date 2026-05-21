@@ -226,7 +226,7 @@ contract Verifier is IVerifier, Ownable {
         uint256 nOuts
     ) public pure returns (uint16 id) {
         if (nIns == 0) {
-            revert BadArguments();
+            revert BadArguments(nIns, nOuts);
         }
 
         uint256 nOutsCopy = nOuts;
@@ -240,7 +240,7 @@ contract Verifier is IVerifier, Ownable {
         uint256 verifierID = nIns * 10 ** noOfDigits + nOuts;
 
         if (verifierID > type(uint16).max) {
-            revert VerifierIdOverflow();
+            revert VerifierIdOverflow(verifierID);
         }
 
         return uint16(verifierID);

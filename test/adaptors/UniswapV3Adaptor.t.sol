@@ -7,6 +7,7 @@ import {BaseScript} from "script/BaseScript.sol";
 import {PoolTest} from "test/fixtures/PoolTest.sol";
 import {Pool} from "src/core/Pool.sol";
 import {IPool} from "src/interfaces/IPool.sol";
+import {IAdaptorHandler} from "src/interfaces/IAdaptorHandler.sol";
 import {ShieldedTransaction} from "src/libraries/ShieldedTransaction.sol";
 import {UniswapV3Adapter} from "src/adaptors/uniswap-v3/UniswapV3Adapter.sol";
 import {IWToken} from "src/interfaces/IWToken.sol";
@@ -42,7 +43,7 @@ contract UniswapV3AdaptorTest is PoolTest {
         // deploying Uniswap adaptor
         uniswapV3Adapter = new UniswapV3Adapter(
             uniswapSwapRouter02,
-            address(pool)
+            pool
         );
 
         /// @dev update convert req fixture with this adaptor addr as `to`
@@ -55,7 +56,7 @@ contract UniswapV3AdaptorTest is PoolTest {
 
         address poolOwner = pool.owner();
         vm.prank(poolOwner);
-        pool.addAdaptorSupport(fixtureAdaptorAddr, true);
+        pool.addAdaptorSupport(IAdaptorHandler(fixtureAdaptorAddr), true);
 
         vm.deal(user, INITIAL_SUPPLY * 2);
         vm.startPrank(user);

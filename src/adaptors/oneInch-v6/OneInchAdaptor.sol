@@ -6,6 +6,7 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {AdaptorBase} from "../../base/AdaptorBase.sol";
 import {SwapDescription, IOneInch, IAggregationExecutor} from "./IOneInch.sol";
 import {AssetAmount} from "../../interfaces/IAdaptor.sol";
+import {IPool} from "../../interfaces/IPool.sol";
 import {console} from "forge-std/Test.sol";
 
 error OneInchSwapFailed();
@@ -15,7 +16,7 @@ contract OneInchAdaptor is AdaptorBase {
 
     address public immutable oneInchRouter;
 
-    constructor(address pool_, address oneInchRouter_) AdaptorBase(pool_) {
+    constructor(IPool pool_, address oneInchRouter_) AdaptorBase(pool_) {
         oneInchRouter = oneInchRouter_;
     }
 

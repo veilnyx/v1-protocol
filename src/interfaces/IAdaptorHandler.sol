@@ -4,7 +4,11 @@ pragma solidity 0.8.24;
 import {PubAsset} from "../libraries/ShieldedTransaction.sol";
 
 interface IAdaptorHandler {
-    error InvalidOutputValue();
+    error InvalidOutputValue(
+        uint24 assetId,
+        uint256 expectedMin,
+        uint256 actualBalance
+    );
     error OnlyPoolCanCall();
     error PoolNotSet();
 

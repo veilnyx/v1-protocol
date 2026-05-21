@@ -7,6 +7,7 @@ import {Pool} from "src/core/Pool.sol";
 import {ShieldedTransaction} from "src/libraries/ShieldedTransaction.sol";
 import {IRocketSwapRouter} from "src/adaptors/rocketpool/IRocketSwapRouter.sol";
 import {RocketPoolAdaptor} from "src/adaptors/rocketpool/RocketPoolAdaptor.sol";
+import {IAdaptorHandler} from "src/interfaces/IAdaptorHandler.sol";
 import {IAdaptor, AssetAmount} from "src/interfaces/IAdaptor.sol";
 import {IWToken} from "src/interfaces/IWToken.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -50,7 +51,7 @@ contract RocketPoolAdpTest is PoolTest {
             rETH,
             WETH,
             rocketSwapRouter,
-            address(pool)
+            pool
         );
 
         /// @dev update convert req fixture with this adaptor addr as `to`
@@ -63,7 +64,7 @@ contract RocketPoolAdpTest is PoolTest {
         // Asset & Adaptor support on Veilnyx Protocol
         address poolOwner = pool.owner();
         vm.prank(poolOwner);
-        pool.addAdaptorSupport(fixtureAdaptorAddr, true);
+        pool.addAdaptorSupport(IAdaptorHandler(fixtureAdaptorAddr), true);
 
         AssetType assetType = AssetType.ERC20;
         address[] memory assetAddresses = new address[](1);

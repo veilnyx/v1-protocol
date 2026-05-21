@@ -10,10 +10,9 @@ import {EIP712Upgradeable} from "@openzeppelin/contracts-upgradeable/utils/crypt
 
 import {IVerifier} from "../interfaces/IVerifier.sol";
 import {IPool, InitAddressParams} from "../interfaces/IPool.sol";
-import {IScreener} from "../interfaces/IScreener.sol";
-import {IHasher} from "../interfaces/IHasher.sol";
 import {IAdaptorHandler} from "../interfaces/IAdaptorHandler.sol";
 import {IScreener} from "../interfaces/IScreener.sol";
+import {IHasher} from "../interfaces/IHasher.sol";
 import {EIP712_DOMAIN_NAME, EIP712_DOMAIN_VERSION, MAX_WITHDRAW_FEE_BPS} from "../base/Constants.sol";
 import {PoolStorage} from "../base/PoolStorage.sol";
 import {Asset, AssetType, AssetLogic} from "../libraries/Asset.sol";
@@ -112,7 +111,7 @@ contract Pool is
     }
 
     function addAdaptorSupport(
-        address adaptorAddress,
+        IAdaptorHandler adaptorAddress,
         bool enable
     ) external onlyOwner {
         _adaptors[adaptorAddress] = enable;
@@ -175,9 +174,9 @@ contract Pool is
         emit IPool.RevokerStatusUpdated(id, isActive);
     }
 
-    function setScreener(address screener_) external onlyOwner {
-        screener = IScreener(screener_);
-        emit ScreenerUpdated(screener_);
+    function setScreener(IScreener screener_) external onlyOwner {
+        screener = screener_;
+        emit ScreenerUpdated(address(screener_));
     }
 
     /// @custom:invariant FEE-1: withdrawFeeBps cannot be set above MAX_WITHDRAW_FEE_BPS
@@ -232,7 +231,7 @@ contract Pool is
         stx.validate({
             addressTree: _addressTree,
             commitmentTree: _commitmentTree,
-            verifier: address(verifier),
+            verifier: verifier,
             markedNullifiers: _markedNullifiers,
             supportedAdaptors: _adaptors,
             revokerDataMap: _revokers
@@ -243,8 +242,8 @@ contract Pool is
             assets: _assets,
             paymasterFees: _paymasterFees,
             withdrawFees: _withdrawFees,
-            hasher: address(hasher),
-            adaptorHandler: address(adaptorHandler),
+            hasher: hasher,
+            adaptorHandler: adaptorHandler,
             withdrawFeeBps: withdrawFeeBps
         });
     }
@@ -303,7 +302,7 @@ contract Pool is
     }
 
     function isAdaptorSupported(
-        address adaptorAddress
+        IAdaptorHandler adaptorAddress
     ) external view returns (bool) {
         return _adaptors[adaptorAddress];
     }
