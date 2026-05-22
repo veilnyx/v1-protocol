@@ -120,18 +120,20 @@ const deployMorpho = async (morphoParams, pool, deployConfig) => {
   await addAssets(assets, assetsPrecision, 1, pool, deployConfig.client.wallet, deployConfig.client.public);
 }
 
-const deployOneInch = async (pool, deployConfig) => {
+const deployOneInch = async (oneInchParams: any, pool: any, deployConfig: any) => {
   const oneInch = await hre.viem.deployContract("OneInchAdaptor", [
-    pool
+    pool,
+    oneInchParams.oneInchRouter
   ], deployConfig);
   console.log("OneInch deployed:", oneInch.address);
   await addAdpatorSupport(pool, oneInch.address, true, deployConfig.client.wallet, deployConfig.client.public);
 }
 
-const deployRocketPool = async (rocketPoolParams, pool, deployConfig) => {
+const deployRocketPool = async (rocketPoolParams: any, pool: any, deployConfig: any) => {
   const rocketPool = await hre.viem.deployContract("RocketPoolAdaptor", [
     rocketPoolParams.assets.rETH,
     rocketPoolParams.wETH,
+    rocketPoolParams.rocketSwapRouter,
     pool
   ], deployConfig);
   console.log("RocketPool deployed:", rocketPool.address);
@@ -143,8 +145,8 @@ const deployRocketPool = async (rocketPoolParams, pool, deployConfig) => {
   await addAssets(assets, assetsPrecision, 1, pool, deployConfig.client.wallet, deployConfig.client.public);
 }
 
-const deployAdaptors = async (pool, adpParams, deployConfig) => {
-  const { uniswap: uniswapParams, aave: aaveParams, lido: lidoParams, curve: curveParams, ethena: ethenaParams, beefy: beefyParams, morpho: morphoParams, rocketPool: rocketPoolParams } = adpParams;
+const deployAdaptors = async (pool: any, adpParams: any, deployConfig: any) => {
+  const { uniswap: uniswapParams, aave: aaveParams, lido: lidoParams, curve: curveParams, ethena: ethenaParams, beefy: beefyParams, morpho: morphoParams, rocketPool: rocketPoolParams, oneInch: oneInchParams } = adpParams;
 
   await deployUniswap(uniswapParams, pool, deployConfig);
   await deployAave(aaveParams, pool, deployConfig);
@@ -153,11 +155,11 @@ const deployAdaptors = async (pool, adpParams, deployConfig) => {
   // await deployEthena(ethenaParams, pool, deployConfig);
   // await deployBeefy(beefyParams, pool, deployConfig);
   // await deployMorpho(morphoParams, pool, deployConfig);
-  // await deployOneInch(pool, deployConfig);
+  // await deployOneInch(oneInchParams, pool, deployConfig);
   // await deployRocketPool(pool, deployConfig);
 }
 
-const addAdpatorSupport = async (pool, adpAddress, enable, wallet, client) => {
+const addAdpatorSupport = async (pool: any, adpAddress: any, enable: boolean, wallet: any, client: any) => {
   try {
     //@ts-ignore
     const hash = await wallet.writeContract({
@@ -175,7 +177,7 @@ const addAdpatorSupport = async (pool, adpAddress, enable, wallet, client) => {
   }
 }
 
-const addAssets = async (assets, assetsPrecision, assetType, poolAddr, wallet, client) => {
+const addAssets = async (assets: any, assetsPrecision: any, assetType: number, poolAddr: any, wallet: any, client: any) => {
   console.log("Adding assets:", assets);
   try {
     //@ts-ignore
@@ -193,7 +195,7 @@ const addAssets = async (assets, assetsPrecision, assetType, poolAddr, wallet, c
   }
 }
 
-const addAssetsAndRevokers = async (poolProxy, chainParams, commonParams, client, wallet) => {
+const addAssetsAndRevokers = async (poolProxy: any, chainParams: any, commonParams: any, client: any, wallet: any) => {
   try {
     //@ts-ignore
     const hash = await wallet.writeContract({
@@ -370,7 +372,7 @@ const main = async () => {
   await addAssetsAndRevokers(poolProxy.address, chainParams, commonParams, client, deployConfig.client.wallet);
 
   // Deploy Adaptors (should be after base assets are added to maintain the expected ID order)
-  await deployAdaptors(poolProxy.address, adpParams, deployConfig);
+  await deployAdaptors(poolProxy, adpParams, deployConfig);
 };
 
 main().catch(console.error);

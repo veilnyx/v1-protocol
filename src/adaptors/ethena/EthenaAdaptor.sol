@@ -2,7 +2,7 @@
 pragma solidity 0.8.24;
 
 import {AdaptorBase} from "../../base/AdaptorBase.sol";
-import {Asset, AssetType} from "src/libraries/Asset.sol";
+import {Asset, AssetType} from "../../libraries/Asset.sol";
 import {IEthena} from "./IEthena.sol";
 import {IWToken} from "../../interfaces/IWToken.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -17,18 +17,14 @@ contract EthenaAdaptor is AdaptorBase {
 
     IEthena public immutable ethena;
     // Ethena's stable coin that will be staked
-    address public immutable USDe;
+    IERC20 public immutable USDe;
     // represents the share of USDe tokens staked in Ethena (non-rebasing)
-    address public immutable sUSDe;
+    IERC20 public immutable sUSDe;
 
-    constructor(
-        address ethena_,
-        address USDe_,
-        IPool pool_
-    ) AdaptorBase(pool_) {
-        ethena = IEthena(ethena_);
+    constructor(IEthena ethena_, IERC20 USDe_, IPool pool_) AdaptorBase(pool_) {
+        ethena = ethena_;
         USDe = USDe_;
-        sUSDe = ethena_;
+        sUSDe = IERC20(address(ethena_));
     }
 
     function handleAssets(
@@ -44,9 +40,9 @@ contract EthenaAdaptor is AdaptorBase {
         if (inAssets.length != 1) {
             revert InvalidInputAssetLength(uint8(inAssets.length), 1);
         }
-        
+
         Asset memory inAsset = getAsset(inAssets[0].assetId);
-        if (inAsset.assetAddress != USDe) {
+        if (inAsset.assetAddress != address(USDe)) {
             revert UnsupportedAsset(inAsset.id);
         }
 
@@ -56,10 +52,10 @@ contract EthenaAdaptor is AdaptorBase {
         }
 
         // Staking request
-        IERC20(USDe).forceApprove(address(ethena), stakeValue);
+        USDe.forceApprove(address(ethena), stakeValue);
         uint256 sUSDeShares = ethena.deposit(stakeValue, address(this));
 
-        Asset memory outAsset = getAsset(sUSDe);
+        Asset memory outAsset = getAsset(address(sUSDe));
 
         outAssets = new AssetAmount[](1);
         outAssets[0] = AssetAmount(outAsset.id, sUSDeShares);

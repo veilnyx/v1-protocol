@@ -7,17 +7,16 @@ import {AdaptorBase} from "../../base/AdaptorBase.sol";
 import {SwapDescription, IOneInch, IAggregationExecutor} from "./IOneInch.sol";
 import {AssetAmount} from "../../interfaces/IAdaptor.sol";
 import {IPool} from "../../interfaces/IPool.sol";
-import {console} from "forge-std/Test.sol";
 
 error OneInchSwapFailed();
 
 contract OneInchAdaptor is AdaptorBase {
     using SafeERC20 for IERC20;
 
-    address public immutable oneInchRouter;
+    IOneInch public immutable ONE_INCH_ROUTER;
 
-    constructor(IPool pool_, address oneInchRouter_) AdaptorBase(pool_) {
-        oneInchRouter = oneInchRouter_;
+    constructor(IPool pool_, IOneInch oneInchRouter_) AdaptorBase(pool_) {
+        ONE_INCH_ROUTER = oneInchRouter_;
     }
 
     /// @dev 1Inch swap router expects the calldata to be acquired from the 1Inch API. The calldata is then passed to the 1Inch router to execute the swap. Decoding is not required.
@@ -48,10 +47,12 @@ contract OneInchAdaptor is AdaptorBase {
             bytes memory data
         ) = abi.decode(payload, (address, SwapDescription, bytes));
 
-        IERC20(inAsset).forceApprove(oneInchRouter, inAssets[0].value);
-        (uint256 dstTokenReturnAmt, uint256 srcTokenSpentAmt) = IOneInch(
-            oneInchRouter
-        ).swap(IAggregationExecutor(executor), swapDesc, data);
+        IERC20(inAsset).forceApprove(
+            address(ONE_INCH_ROUTER),
+            inAssets[0].value
+        );
+        (uint256 dstTokenReturnAmt, uint256 srcTokenSpentAmt) = ONE_INCH_ROUTER
+            .swap(IAggregationExecutor(executor), swapDesc, data);
 
         uint256 srcTokenReturnAmt = inAssets[0].value - srcTokenSpentAmt;
 

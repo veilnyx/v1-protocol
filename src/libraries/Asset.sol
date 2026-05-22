@@ -3,7 +3,6 @@ pragma solidity 0.8.24;
 
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IPool} from "../interfaces/IPool.sol";
 
@@ -45,7 +44,8 @@ library AssetLogic {
         mapping(uint24 => Asset) storage assets,
         uint16 assetCount,
         AssetType assetType,
-        IERC20 assetAddress
+        IERC20 assetAddress,
+        uint8 precision
     ) public returns (uint16) {
         if (_isAssetAdded(assetIds, address(assetAddress))) {
             revert IPool.DuplicateAsset(address(assetAddress));
@@ -55,7 +55,6 @@ library AssetLogic {
             revert ZeroAddress();
         }
 
-        uint8 precision = IERC20Metadata(address(assetAddress)).decimals();
         assetCount += 1;
 
         // Asset ID: 1 byte type | 2 bytes asset counter
@@ -80,7 +79,8 @@ library AssetLogic {
         mapping(uint24 => Asset) storage assets,
         uint16 assetCount,
         AssetType assetType,
-        address[] calldata assetAddresses
+        address[] calldata assetAddresses,
+        uint8[] calldata precisions
     ) external returns (uint16) {
         for (uint256 i = 0; i < assetAddresses.length; ) {
             assetCount = addAsset(
@@ -88,7 +88,8 @@ library AssetLogic {
                 assets,
                 assetCount,
                 assetType,
-                IERC20(assetAddresses[i])
+                IERC20(assetAddresses[i]),
+                precisions[i]
             );
 
             unchecked {

@@ -40,7 +40,8 @@ contract AssetLogicTest is Test {
             _assets,
             _counter,
             AssetType.ERC20,
-            IERC20(t1)
+            IERC20(t1),
+            18
         );
         assertEq(count, _counter + 1);
     }
@@ -53,12 +54,18 @@ contract AssetLogicTest is Test {
         assetAddresses[1] = t2;
         assetAddresses[2] = t3;
 
+        uint8[] memory precisions = new uint8[](3);
+        precisions[0] = 18;
+        precisions[1] = 6;
+        precisions[2] = 18;
+
         uint16 count = AssetLogic.addAssets(
             _assetIds,
             _assets,
             _counter,
             assetType,
-            assetAddresses
+            assetAddresses,
+            precisions
         );
 
         assertEq(count, _counter + assetAddresses.length);
@@ -70,7 +77,8 @@ contract AssetLogicTest is Test {
             _assets,
             _counter,
             AssetType.ERC20,
-            IERC20(t1)
+            IERC20(t1),
+            18
         );
         uint24 newAssetId = _assetIds[t1];
         AssetLogic.updateAsset(_assets, newAssetId, false);
@@ -83,7 +91,8 @@ contract AssetLogicTest is Test {
             _assets,
             count,
             AssetType.ERC20,
-            IERC20(t1)
+            IERC20(t1),
+            18
         );
     }
 }

@@ -17,17 +17,17 @@ contract AaveV3Adaptor is AdaptorBase {
     using SafeERC20 for IERC20;
 
     IAave public immutable aave;
-    address public immutable STATIC_A_TOKEN_FACTORY;
+    IStaticATokenFactory public immutable STATIC_A_TOKEN_FACTORY;
 
     uint8 constant ACTION_SUPPLY = 0;
     uint8 constant ACTION_WITHDRAW = 1;
 
     constructor(
-        address aave_,
+        IAave aave_,
         IPool pool_,
-        address staticATokenFactory_
+        IStaticATokenFactory staticATokenFactory_
     ) AdaptorBase(pool_) {
-        aave = IAave(aave_);
+        aave = aave_;
         STATIC_A_TOKEN_FACTORY = staticATokenFactory_;
     }
 
@@ -78,8 +78,9 @@ contract AaveV3Adaptor is AdaptorBase {
         // underlying asset -> static aToken (non-rebasable) -> aToken (rebasable)
         // getting static aToken address for input token
         address underlyingToken = inAsset.assetAddress;
-        address staticAToken = IStaticATokenFactory(STATIC_A_TOKEN_FACTORY)
-            .getStaticAToken(underlyingToken);
+        address staticAToken = STATIC_A_TOKEN_FACTORY.getStaticAToken(
+            underlyingToken
+        );
         address aToken = IStaticAToken(staticAToken).aToken();
 
         if (aToken == address(0)) {

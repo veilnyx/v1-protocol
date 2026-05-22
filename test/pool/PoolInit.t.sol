@@ -30,9 +30,11 @@ contract PoolInitTest is PoolTest {
 
         address[] memory assetAddresses = new address[](1);
         assetAddresses[0] = address(testToken);
+        uint8[] memory precisions = new uint8[](1);
+        precisions[0] = 18;
         AssetType assetType = AssetType.ERC20;
 
-        pool.addAssets(assetType, assetAddresses);
+        pool.addAssets(assetType, assetAddresses, precisions);
 
         // bool isAssetActive = pool.isAssetActive(assetAddress);
         Asset memory newAsset = pool.getAsset(assetAddresses[0]);

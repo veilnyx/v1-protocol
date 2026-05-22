@@ -277,5 +277,7 @@ contract Paymaster is IPaymaster, Ownable {
         }
     }
 
+    // Intentionally empty: allows this contract to receive native ETH for gas sponsorship flows.
+    // solhint-disable-next-line no-empty-blocks
     receive() external payable {}
 }

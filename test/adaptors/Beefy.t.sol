@@ -55,8 +55,11 @@ contract BeefyAdaptorTest is PoolTest {
         address[] memory assetAddresses = new address[](2);
         assetAddresses[0] = wantLPToken;
         assetAddresses[1] = mooToken;
+        uint8[] memory precisions = new uint8[](2);
+        precisions[0] = 18;
+        precisions[1] = 18;
 
-        pool.addAssets(assetType, assetAddresses);
+        pool.addAssets(assetType, assetAddresses, precisions);
         vm.stopPrank();
     }
 

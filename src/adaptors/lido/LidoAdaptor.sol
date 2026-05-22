@@ -3,7 +3,7 @@
 pragma solidity 0.8.24;
 
 import {AdaptorBase} from "../../base/AdaptorBase.sol";
-import {Asset, AssetType} from "src/libraries/Asset.sol";
+import {Asset, AssetType} from "../../libraries/Asset.sol";
 import {ILido} from "./ILido.sol";
 import {IWithdrawQueueERC721} from "./IWithdrawQueueERC721.sol";
 import {IWstEthToken} from "./IWstEthToken.sol";
@@ -23,25 +23,25 @@ contract LidoAdaptor is AdaptorBase {
 
     ILido public immutable iLido;
     IWithdrawQueueERC721 public immutable iWithdrawQueueERC721;
-    address public immutable weth;
-    address public immutable stEth;
-    address public immutable wstEth;
+    IWToken public immutable weth;
+    IERC20 public immutable stEth;
+    IERC20 public immutable wstEth;
 
     uint256 public constant HOLESKY_CHAINID = 17000;
     uint256 public constant MAINNET_CHAINID = 1;
 
     constructor(
-        address lido_,
-        address weth_,
+        ILido lido_,
+        IWToken weth_,
         // represents the staked ETH token
-        address stEth_,
+        IERC20 stEth_,
         // represents the share of stETH tokens in Lido (wrapping stETH -> wstETH). stETH is a rebasing token, wstETH is non-rebasing and will keep the balance of shares constant. This is required for easier integration with Veilnyx as it doesn't have to account for rebasing tokens.
-        address wstEth_,
-        address withdrawQueueERC721_,
+        IERC20 wstEth_,
+        IWithdrawQueueERC721 withdrawQueueERC721_,
         IPool pool_
     ) AdaptorBase(pool_) {
-        iLido = ILido(lido_);
-        iWithdrawQueueERC721 = IWithdrawQueueERC721(withdrawQueueERC721_);
+        iLido = lido_;
+        iWithdrawQueueERC721 = withdrawQueueERC721_;
         weth = weth_;
         stEth = stEth_;
         wstEth = wstEth_;
@@ -104,13 +104,13 @@ contract LidoAdaptor is AdaptorBase {
             revert ZeroValue();
         }
 
-        if (inAsset.assetAddress != weth) {
+        if (inAsset.assetAddress != address(weth)) {
             revert UnsupportedAsset(inAssetId);
         }
 
         // Staking request
         // unwrapping weth
-        IWToken(weth).withdraw(stakeValue);
+        weth.withdraw(stakeValue);
 
         // will receive shares of stEth token in Lido. stETH will is a rebasing token.
         uint256 stEthShares = iLido.submit{value: stakeValue}(address(0));
@@ -118,13 +118,13 @@ contract LidoAdaptor is AdaptorBase {
         uint256 stEthTokens = iLido.getPooledEthByShares(stEthShares);
 
         // wrapping into wstEth for keeping balances constant (non-rebasing)
-        IERC20(stEth).forceApprove(wstEth, stEthTokens);
-        uint256 wstEthTokens = IWstEthToken(wstEth).wrap(stEthTokens);
+        stEth.forceApprove(address(wstEth), stEthTokens);
+        uint256 wstEthTokens = IWstEthToken(address(wstEth)).wrap(stEthTokens);
 
         outValues = new uint256[](1);
         outAssetIds = new uint24[](1);
 
-        outAssetIds[0] = getAsset(wstEth).id;
+        outAssetIds[0] = getAsset(address(wstEth)).id;
         outValues[0] = wstEthTokens;
     }
 
@@ -145,7 +145,7 @@ contract LidoAdaptor is AdaptorBase {
         Asset memory inAsset = getAsset(inAssetId);
 
         // Unstaking request (outputs an NFT)
-        if (inAsset.assetAddress != wstEth) {
+        if (inAsset.assetAddress != address(wstEth)) {
             revert UnsupportedAsset(inAsset.id);
         }
 
@@ -157,10 +157,7 @@ contract LidoAdaptor is AdaptorBase {
         uint256[] memory amounts = new uint256[](1);
         amounts[0] = unstakeValue;
 
-        IERC20(wstEth).forceApprove(
-            address(iWithdrawQueueERC721),
-            unstakeValue
-        );
+        wstEth.forceApprove(address(iWithdrawQueueERC721), unstakeValue);
         iWithdrawQueueERC721.requestWithdrawalsWstETH(amounts, withdrawAddress);
 
         outAssetIds = new uint24[](0);
@@ -169,5 +166,7 @@ contract LidoAdaptor is AdaptorBase {
 
     /// @dev only for enabling `testWstEthUnstakingOnLido()` test. Pls comment this out for production use.
     // Allow Lido adaptor to receive unwrapped Ether, to send to Lido for staking
-    receive() external payable {}
+    // Intentionally empty: accepts native ETH after WETH unwrap before Lido staking.
+    // solhint-disable-next-line no-empty-blocks
+    // receive() external payable {}
 }

@@ -13,6 +13,8 @@ import {IAdaptorHandler} from "src/interfaces/IAdaptorHandler.sol";
 import {IWToken} from "src/interfaces/IWToken.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Asset, AssetType} from "src/libraries/Asset.sol";
+import {IAave} from "src/adaptors/aave-v3/IAave.sol";
+import {IStaticATokenFactory} from "src/adaptors/aave-v3/IStaticATokenFactory.sol";
 import {console2} from "forge-std/console2.sol";
 import {StdCheats} from "forge-std/StdCheats.sol";
 
@@ -43,9 +45,9 @@ contract AaveAdaptorTest is PoolTest {
 
         // deploying aave adaptor
         aaveAdaptor = new AaveV3Adaptor(
-            aave,
+            IAave(aave),
             pool,
-            STATIC_A_TOKEN_FACTORY
+            IStaticATokenFactory(STATIC_A_TOKEN_FACTORY)
         );
         /// @dev update convert req fixture with this adaptor addr as `to`
         console2.log("Aave adaptor deployed:", address(aaveAdaptor));
@@ -57,7 +59,11 @@ contract AaveAdaptorTest is PoolTest {
 
         StdCheats.deployCodeTo(
             "AaveV3Adaptor.sol:AaveV3Adaptor",
-            abi.encode(aave, address(pool), STATIC_A_TOKEN_FACTORY),
+            abi.encode(
+                IAave(aave),
+                pool,
+                IStaticATokenFactory(STATIC_A_TOKEN_FACTORY)
+            ),
             fixtureAdaptorAddr
         );
 
@@ -69,7 +75,9 @@ contract AaveAdaptorTest is PoolTest {
         address[] memory assetAddresses = new address[](1);
         // assetAddresses[0] = WETH_AAVE_UNDERLYING; // already added to the pool
         assetAddresses[0] = WETH_STATIC_A_TOKEN;
-        pool.addAssets(assetType, assetAddresses);
+        uint8[] memory precisions = new uint8[](1);
+        precisions[0] = 18;
+        pool.addAssets(assetType, assetAddresses, precisions);
         vm.stopPrank();
 
         deal(WETH_AAVE_UNDERLYING, user, INITIAL_SUPPLY);

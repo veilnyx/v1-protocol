@@ -5,11 +5,11 @@ pragma abicoder v2;
 import {PoolTest} from "test/fixtures/PoolTest.sol";
 import {Pool} from "src/core/Pool.sol";
 import {ShieldedTransaction} from "src/libraries/ShieldedTransaction.sol";
-import {EthenaAdaptor} from "src/adaptors/ETHENA/EthenaAdaptor.sol";
+import {EthenaAdaptor} from "src/adaptors/ethena/EthenaAdaptor.sol";
 import {IAdaptorHandler} from "src/interfaces/IAdaptorHandler.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Asset, AssetType} from "src/libraries/Asset.sol";
-import {IEthena} from "src/adaptors/Ethena/IEthena.sol";
+import {IEthena} from "src/adaptors/ethena/IEthena.sol";
 import {console} from "forge-std/console.sol";
 
 contract EthenaAdaptorTest is PoolTest {
@@ -30,7 +30,7 @@ contract EthenaAdaptorTest is PoolTest {
         PoolTest._setUp();
 
         // deploying Ethena adaptor
-        ethenaAdaptor = new EthenaAdaptor(ETHENA, USDe, pool);
+        ethenaAdaptor = new EthenaAdaptor(IEthena(ETHENA), IERC20(USDe), pool);
 
         /// @dev update convert req fixture with this adaptor addr as `to`
         console.log("Ethena adaptor deployed:", address(ethenaAdaptor));
@@ -49,8 +49,11 @@ contract EthenaAdaptorTest is PoolTest {
         address[] memory assetAddresses = new address[](2);
         assetAddresses[0] = USDe;
         assetAddresses[1] = ETHENA;
+        uint8[] memory precisions = new uint8[](2);
+        precisions[0] = 18;
+        precisions[1] = 18;
 
-        pool.addAssets(assetType, assetAddresses);
+        pool.addAssets(assetType, assetAddresses, precisions);
 
         vm.stopPrank();
     }

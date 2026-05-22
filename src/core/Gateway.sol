@@ -78,5 +78,7 @@ contract Gateway is IGateway, Ownable {
         entryPoint.withdrawTo(withdrawAddress, amount);
     }
 
+    // Intentionally empty: accepts native ETH for wrapping and gateway transfer flows.
+    // solhint-disable-next-line no-empty-blocks
     receive() external payable {}
 }

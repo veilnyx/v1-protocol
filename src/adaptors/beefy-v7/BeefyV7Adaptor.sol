@@ -17,6 +17,8 @@ contract BeefyV7Adaptor is AdaptorBase {
         WITHDRAW
     }
 
+    // Intentionally empty: no adaptor-specific constructor logic beyond base initialization.
+    // solhint-disable-next-line no-empty-blocks
     constructor(IPool pool_) AdaptorBase(pool_) {}
 
     function handleAssets(

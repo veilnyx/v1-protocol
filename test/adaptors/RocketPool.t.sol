@@ -48,8 +48,8 @@ contract RocketPoolAdpTest is PoolTest {
 
         // deploying Uniswap adaptor
         rocketPoolAdp = new RocketPoolAdaptor(
-            rETH,
-            WETH,
+            IERC20(rETH),
+            IWToken(WETH),
             rocketSwapRouter,
             pool
         );
@@ -69,8 +69,10 @@ contract RocketPoolAdpTest is PoolTest {
         AssetType assetType = AssetType.ERC20;
         address[] memory assetAddresses = new address[](1);
         assetAddresses[0] = rETH;
+        uint8[] memory precisions = new uint8[](1);
+        precisions[0] = 18;
 
-        pool.addAssets(assetType, assetAddresses);
+        pool.addAssets(assetType, assetAddresses, precisions);
 
         deal(WETH, user, INITIAL_SUPPLY);
         deal(rETH, user, INITIAL_SUPPLY);

@@ -27,6 +27,7 @@ export type AdaptorParams = {
   beefy: Object;
   morpho: Object;
   rocketPool: Object;
+  oneInch: Object;
 }
 
 export type CommonParams = {
@@ -91,7 +92,8 @@ export function loadConfigs() {
       ethena,
       beefy,
       morpho,
-      rocketPool
+      rocketPool,
+      oneInch
     } = params;
 
     adpParams[Number(chainId)] = {
@@ -176,6 +178,9 @@ export function loadConfigs() {
         assetsPrecision: {
           rETH: Number(rocketPool.assetsPrecision.rETH)
         }
+      },
+      oneInch: {
+        oneInchRouter: getHex(oneInch.oneInchRouter)
       }
     };
   }

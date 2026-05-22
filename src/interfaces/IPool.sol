@@ -105,9 +105,11 @@ interface IPool {
     /// @notice Can only be called by the owner.
     /// @param assetType The type of the asset to be added.
     /// @param assetAddresses The addresses of the assets.
+    /// @param precisions The decimal precision (e.g. 18 for ETH) for each asset, supplied by the protocol owner.
     function addAssets(
         AssetType assetType,
-        address[] calldata assetAddresses
+        address[] calldata assetAddresses,
+        uint8[] calldata precisions
     ) external;
 
     /// @notice Adds support for an external adaptor to a DeFi protocol.

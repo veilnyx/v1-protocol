@@ -19,6 +19,8 @@ contract AdaptorHandler is IAdaptorHandler, ReentrancyGuard, Ownable {
 
     IPool public veilnyxPool;
 
+    // Intentionally empty: ownership is initialized via Ownable(msg.sender).
+    // solhint-disable-next-line no-empty-blocks
     constructor() Ownable(msg.sender) {}
 
     modifier onlyPool() {
@@ -105,5 +107,7 @@ contract AdaptorHandler is IAdaptorHandler, ReentrancyGuard, Ownable {
     }
 
     // Allow Lido/RocketPool adaptor to receive unwrapped Ether for staking
+    // Intentionally empty: this contract must be able to receive native ETH.
+    // solhint-disable-next-line no-empty-blocks
     receive() external payable {}
 }

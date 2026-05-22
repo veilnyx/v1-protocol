@@ -9,7 +9,7 @@ import {IPool} from "src/interfaces/IPool.sol";
 import {IAdaptorHandler} from "src/interfaces/IAdaptorHandler.sol";
 import {ShieldedTransaction} from "src/libraries/ShieldedTransaction.sol";
 import {OneInchAdaptor} from "src/adaptors/oneInch-v6/OneInchAdaptor.sol";
-import {SwapDescription} from "src/adaptors/oneInch-v6/IOneInch.sol";
+import {SwapDescription, IOneInch} from "src/adaptors/oneInch-v6/IOneInch.sol";
 import {IWToken} from "src/interfaces/IWToken.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Asset, AssetType} from "src/libraries/Asset.sol";
@@ -42,7 +42,7 @@ contract OneInchAdaptorTest is PoolTest {
         iWETH = IWToken(WETH);
 
         // deploying 1Inch adaptor
-        oneInchAdaptor = new OneInchAdaptor(pool, oneInchRouter);
+        oneInchAdaptor = new OneInchAdaptor(pool, IOneInch(oneInchRouter));
 
         /// @dev update convert req fixture with this adaptor addr as `to`
         console.log("OneInch adaptor deployed:", address(oneInchAdaptor));

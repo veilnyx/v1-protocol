@@ -10,6 +10,7 @@ import {IPool} from "src/interfaces/IPool.sol";
 import {IAdaptorHandler} from "src/interfaces/IAdaptorHandler.sol";
 import {ShieldedTransaction} from "src/libraries/ShieldedTransaction.sol";
 import {UniswapV3Adapter} from "src/adaptors/uniswap-v3/UniswapV3Adapter.sol";
+import {ISwapRouter02} from "src/adaptors/uniswap-v3/ISwapRouter02.sol";
 import {IWToken} from "src/interfaces/IWToken.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Asset, AssetType} from "src/libraries/Asset.sol";
@@ -42,7 +43,7 @@ contract UniswapV3AdaptorTest is PoolTest {
 
         // deploying Uniswap adaptor
         uniswapV3Adapter = new UniswapV3Adapter(
-            uniswapSwapRouter02,
+            ISwapRouter02(uniswapSwapRouter02),
             pool
         );
 

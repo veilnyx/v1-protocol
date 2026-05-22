@@ -81,6 +81,9 @@
             "assetsPrecision": {
                 "rETH": 18
             }
+        },
+        "oneInch": {
+            "oneInchRouter": "0x111111125421cA6dc452d289314280a0f8842A65"
         }
     },
     "7800": {
@@ -165,6 +168,9 @@
             "assetsPrecision": {
                 "rETH": 18
             }
+        },
+        "oneInch": {
+            "oneInchRouter": "0x111111125421cA6dc452d289314280a0f8842A65"
         }
     },
     "11155111": {
@@ -249,6 +255,9 @@
             "assetsPrecision": {
                 "rETH": 18
             }
+        },
+        "oneInch": {
+            "oneInchRouter": "0x111111125421cA6dc452d289314280a0f8842A65"
         }
     }
 }

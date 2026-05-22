@@ -7,6 +7,7 @@ import {Pool} from "src/core/Pool.sol";
 import {ShieldedTransaction} from "src/libraries/ShieldedTransaction.sol";
 import {LidoAdaptor} from "src/adaptors/lido/LidoAdaptor.sol";
 import {ILido} from "src/adaptors/lido/ILido.sol";
+import {IWithdrawQueueERC721} from "src/adaptors/lido/IWithdrawQueueERC721.sol";
 import {IAdaptorHandler} from "src/interfaces/IAdaptorHandler.sol";
 import {IAdaptor} from "src/interfaces/IAdaptor.sol";
 import {AssetAmount} from "src/interfaces/IAdaptor.sol";
@@ -49,12 +50,12 @@ contract LidoAdaptorTest is PoolTest {
         deployCodeTo(
             "LidoAdaptor.sol:LidoAdaptor",
             abi.encode(
-                lido,
-                WETH,
-                stETH,
-                wstETH,
-                withdrawalQueueERC721,
-                address(pool)
+                ILido(lido),
+                IWToken(WETH),
+                IERC20(stETH),
+                IERC20(wstETH),
+                IWithdrawQueueERC721(withdrawalQueueERC721),
+                pool
             ),
             fixtureAdaptorAddr
         );
@@ -69,8 +70,10 @@ contract LidoAdaptorTest is PoolTest {
         AssetType assetType = AssetType.ERC20;
         address[] memory assetAddresses = new address[](1);
         assetAddresses[0] = wstETH;
+        uint8[] memory precisions = new uint8[](1);
+        precisions[0] = 18;
 
-        pool.addAssets(assetType, assetAddresses);
+        pool.addAssets(assetType, assetAddresses, precisions);
 
         deal(WETH, user, INITIAL_SUPPLY);
 

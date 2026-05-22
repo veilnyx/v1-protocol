@@ -3,7 +3,7 @@
 pragma solidity 0.8.24;
 
 import {AdaptorBase} from "../../base/AdaptorBase.sol";
-import {Asset, AssetType} from "src/libraries/Asset.sol";
+import {Asset, AssetType} from "../../libraries/Asset.sol";
 import {IRocketSwapRouter} from "./IRocketSwapRouter.sol";
 import {IWToken} from "../../interfaces/IWToken.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -22,16 +22,16 @@ contract RocketPoolAdaptor is AdaptorBase {
     }
 
     IRocketSwapRouter public immutable rocketSwapRouter;
-    address public immutable WETH;
-    address public immutable rETH;
+    IWToken public immutable WETH;
+    IERC20 public immutable rETH;
     uint256 public constant MINIMUM_DEPOSIT = 0.01 ether;
 
     constructor(
-        address rEth_,
-        address wEth_,
+        IERC20 rEth_,
+        IWToken wEth_,
         IRocketSwapRouter rocketSwapRouter_,
-        IPool veilnyxPool_
-    ) AdaptorBase(veilnyxPool_) {
+        IPool pool_
+    ) AdaptorBase(pool_) {
         rETH = rEth_;
         WETH = wEth_;
         rocketSwapRouter = rocketSwapRouter_;
@@ -102,14 +102,14 @@ contract RocketPoolAdaptor is AdaptorBase {
             revert InsufficientStakingAmt(stakeValue, MINIMUM_DEPOSIT);
         }
 
-        if (inAsset.assetAddress != WETH) {
+        if (inAsset.assetAddress != address(WETH)) {
             revert UnsupportedAsset(inAssetId);
         }
 
         // Staking request
         // unwrapping weth
-        uint256 rEthBalBeforeStaking = IERC20(rETH).balanceOf(address(this));
-        IWToken(WETH).withdraw(stakeValue);
+        uint256 rEthBalBeforeStaking = rETH.balanceOf(address(this));
+        WETH.withdraw(stakeValue);
 
         rocketSwapRouter.swapTo{value: stakeValue}(
             uniswapPortion,
@@ -118,10 +118,10 @@ contract RocketPoolAdaptor is AdaptorBase {
             minTokensOut
         );
 
-        uint256 rEthBalAfterStaking = IERC20(rETH).balanceOf(address(this));
+        uint256 rEthBalAfterStaking = rETH.balanceOf(address(this));
 
         // initializing the out token arrays
-        Asset memory outAsset = getAsset(rETH);
+        Asset memory outAsset = getAsset(address(rETH));
 
         outValues = new uint256[](1);
         outAssetIds = new uint24[](1);
@@ -145,14 +145,14 @@ contract RocketPoolAdaptor is AdaptorBase {
             revert ZeroValue();
         }
 
-        if (inAsset.assetAddress != rETH) {
+        if (inAsset.assetAddress != address(rETH)) {
             revert UnsupportedAsset(inAssetId);
         }
 
         // Unstaking request
         uint256 ethBalBeforeUnstaking = address(this).balance;
 
-        IERC20(rETH).forceApprove(address(rocketSwapRouter), unstakeValue);
+        rETH.forceApprove(address(rocketSwapRouter), unstakeValue);
         rocketSwapRouter.swapFrom(
             uniswapPortion,
             balancerPortion,
@@ -167,15 +167,21 @@ contract RocketPoolAdaptor is AdaptorBase {
 
         outValues[0] = ethBalAfterUnstaking - ethBalBeforeUnstaking;
         // wrapping the received ETH to return to Veilnyx
-        IWToken(WETH).deposit{value: outValues[0]}();
-        outAssetIds[0] = getAsset(WETH).id;
+        WETH.deposit{value: outValues[0]}();
+        outAssetIds[0] = getAsset(address(WETH)).id;
     }
 
     /// @dev only for enabling tests bypassing protocol. Pls comment this out for production use.
-    // Allow RocketPool adaptor to receive unwrapped Ether, to send to Lido for staking
-    receive() external payable {}
+    // Allow RocketPool adaptor to receive unwrapped Ether, to send to Lido for staking.
+    // Intentionally empty: accepts native ETH returned from WETH unwrap and router flows.
+    // solhint-disable-next-line no-empty-blocks
+    // receive() external payable {}
 
-    function getRocketSwapRouterAddress() external view returns (address) {
-        return address(rocketSwapRouter);
+    function getRocketSwapRouterAddress()
+        external
+        view
+        returns (IRocketSwapRouter)
+    {
+        return rocketSwapRouter;
     }
 }

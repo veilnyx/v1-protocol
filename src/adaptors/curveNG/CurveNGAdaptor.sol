@@ -39,12 +39,14 @@ contract CurveNGAdaptor is AdaptorBase {
     error InvalidCoinIndex(uint8 coinIndex);
     error InvalidSlippageBps(uint256 slippageBps, uint256 maxBps);
     error InvalidUnderlyingTokenAmountLength(uint256 actual, uint256 expected);
-    error AssetNotSupportedByPool(address asset, address curvePool);
+    error AssetNotSupportedByPool(address asset, ICurvePool curvePool);
 
     uint8 constant ACTION_SUPPLY = 0;
     uint8 constant ACTION_WITHDRAW = 1;
     uint256 constant BPS_PRECISION = 100_00;
 
+    // Intentionally empty: no adaptor-specific constructor logic beyond base initialization.
+    // solhint-disable-next-line no-empty-blocks
     constructor(IPool pool_) AdaptorBase(pool_) {}
 
     function handleAssets(
@@ -148,15 +150,16 @@ contract CurveNGAdaptor is AdaptorBase {
                 if (
                     decodedPayload.withdrawType == uint8(WithdrawType.BALANCED)
                 ) {
+                    uint256 halfValue = inValues[0] / 2;
                     uint256 minAmtTokenA = _calcWithdrawOneCoin(
                         ICurvePool(decodedPayload.curvePool),
-                        inValues[0] / 2,
+                        halfValue,
                         0
                     );
 
                     uint256 minAmtTokenB = _calcWithdrawOneCoin(
                         ICurvePool(decodedPayload.curvePool),
-                        inValues[0] / 2,
+                        halfValue,
                         1
                     );
 
@@ -205,21 +208,22 @@ contract CurveNGAdaptor is AdaptorBase {
                 if (
                     decodedPayload.withdrawType == uint8(WithdrawType.BALANCED)
                 ) {
+                    uint256 thirdValue = inValues[0] / 3;
                     uint256 minAmtTokenA = _calcWithdrawOneCoin(
                         ICurvePool(decodedPayload.curvePool),
-                        inValues[0] / 3,
+                        thirdValue,
                         0
                     );
 
                     uint256 minAmtTokenB = _calcWithdrawOneCoin(
                         ICurvePool(decodedPayload.curvePool),
-                        inValues[0] / 3,
+                        thirdValue,
                         1
                     );
 
                     uint256 minAmtTokenC = _calcWithdrawOneCoin(
                         ICurvePool(decodedPayload.curvePool),
-                        inValues[0] / 3,
+                        thirdValue,
                         2
                     );
 
@@ -453,14 +457,12 @@ contract CurveNGAdaptor is AdaptorBase {
             for (uint256 j; j < NCoins; j++) {
                 if (inAsset.assetAddress == curve.coins(j)) {
                     supported = true;
+                    break;
                 }
             }
 
             if (!supported) {
-                revert AssetNotSupportedByPool(
-                    inAsset.assetAddress,
-                    address(curve)
-                );
+                revert AssetNotSupportedByPool(inAsset.assetAddress, curve);
             }
 
             if (slippageBps > BPS_PRECISION) {

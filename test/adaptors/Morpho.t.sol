@@ -52,8 +52,10 @@ contract MorphoAdaptorTest is PoolTest {
         address[] memory assetAddresses = new address[](1);
         // assetAddresses[0] = loanToken;
         assetAddresses[0] = vaultToken;
+        uint8[] memory precisions = new uint8[](1);
+        precisions[0] = 18;
 
-        pool.addAssets(assetType, assetAddresses);
+        pool.addAssets(assetType, assetAddresses, precisions);
         vm.stopPrank();
     }
 
