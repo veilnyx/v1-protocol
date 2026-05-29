@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.24;
 
+import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
 import {ShieldedTransaction, ShieldedTransactionType, RevokerData} from "../libraries/ShieldedTransaction.sol";
 import {ShieldedAddressRegistrationData} from "../libraries/ShieldedAddress.sol";
 import {TreeUpdateData} from "../libraries/QueuedMerkleTree.sol";
@@ -44,6 +45,7 @@ interface IPool {
     event VersionUpdated(uint64 indexed version);
 
     event AssetAdded(address indexed assetAddress, uint24 indexed assetId);
+    event AssetStatusUpdated(uint24 indexed assetId, bool isActive);
 
     event NullifierMarked(uint256 indexed nullifier, uint32 indexed leafIndex);
     // Commitments
@@ -62,6 +64,13 @@ interface IPool {
         bytes notesMemo,
         bytes refundMemo
     );
+
+    event WithdrawFeeUpdated(uint256 feeBps);
+
+    event AssetUsdPriceFeedSet(uint24 indexed assetId, address indexed feed);
+    event TvlLimitUpdated(uint256 limit);
+    event MinDepositUpdated(uint256 limit);
+    event MaxDepositUpdated(uint256 limit);
 
     /////////////////////////////////////////
     //            ERRORS                   //
@@ -88,6 +97,12 @@ interface IPool {
     error NoFeeToClaim(address paymaster, uint24 assetId);
     error WithdrawalFeeTooHigh(uint256 feeBps, uint256 maxFeeBps);
     error PubAssetsCannotExceedCommitments();
+    error TvlPriceFeedNotSet(uint24 assetId);
+    error TvlPriceStale(uint24 assetId, uint256 updatedAt);
+    error TvlPriceInvalid(uint24 assetId, int256 price);
+    error TvlLimitExceeded(uint256 projectedTvl, uint256 limit);
+    error DepositBelowMinimum(uint256 depositUsd, uint256 minDepositUsd);
+    error DepositAboveMaximum(uint256 depositUsd, uint256 maxDepositUsd);
 
     /////////////////////////////////////////
     //         ADMIN WRITE METHODS         //
@@ -106,10 +121,12 @@ interface IPool {
     /// @param assetType The type of the asset to be added.
     /// @param assetAddresses The addresses of the assets.
     /// @param precisions The decimal precision (e.g. 18 for ETH) for each asset, supplied by the protocol owner.
+    /// @param usdPriceFeeds Parallel array of Chainlink-compatible USD price feed addresses (address(0) = no feed).
     function addAssets(
         AssetType assetType,
         address[] calldata assetAddresses,
-        uint8[] calldata precisions
+        uint8[] calldata precisions,
+        AggregatorV3Interface[] calldata usdPriceFeeds
     ) external;
 
     /// @notice Adds support for an external adaptor to a DeFi protocol.
@@ -120,6 +137,12 @@ interface IPool {
         IAdaptorHandler adaptorAddress,
         bool enable
     ) external;
+
+    /// @notice Activates or deactivates an existing asset.
+    /// @notice Can only be called by the owner.
+    /// @param assetId The 3-byte id of the asset to update.
+    /// @param isActive Whether the asset should be active or inactive.
+    function updateAssetStatus(uint24 assetId, bool isActive) external;
 
     /// @notice Registers a new revoker. Revokers are responsible for deanonymizing transactions along with a network of Guardians.
     /// @notice Can only be called by the owner.
@@ -152,7 +175,23 @@ interface IPool {
     /// @notice Can only be called by the owner.
     function setWithdrawFeeBips(uint256 feeBips) external;
 
-    event WithdrawFeeUpdated(uint256 feeBps);
+    /// @notice Registers a Chainlink-compatible USD price feed for an ERC20 asset.
+    ///         Required for getTvlUsd() to include the asset in TVL calculation.
+    /// @param assetId The 3-byte asset id to register the feed for.
+    /// @param feed    Chainlink AggregatorV3Interface feed returning the asset price in USD.
+    function setAssetPriceFeed(
+        uint24 assetId,
+        AggregatorV3Interface feed
+    ) external;
+
+    /// @notice Sets the maximum allowed TVL in USD (6-decimal precision). Set to 0 to disable.
+    function setTvlLimitUsd(uint256 limitUsd) external;
+
+    /// @notice Sets the minimum single-deposit value in USD (6-decimal precision). Set to 0 to disable.
+    function setMinDepositUsd(uint256 limitUsd) external;
+
+    /// @notice Sets the maximum single-deposit value in USD (6-decimal precision). Set to 0 to disable.
+    function setMaxDepositUsd(uint256 limitUsd) external;
 
     /////////////////////////////////////////
     //        PUBLIC WRITE METHODS         //
@@ -280,4 +319,27 @@ interface IPool {
     /// @param root The root value to check.
     function isKnownAddressTreeRoot(uint256 root) external view returns (bool);
      */
+
+    /// @notice Validates that the deposit amount in `stx` falls within the configured USD limits.
+    /// @dev Call this before submitting a DEPOSIT transaction to surface limit violations early,
+    ///      without spending gas on a full transaction. Non-DEPOSIT transactions always pass.
+    ///      Limits are expressed in 6-decimal USD (e.g. 5_000_000 = $5.00).
+    ///      A limit value of 0 means the corresponding check is disabled.
+    /// @param stx The shielded transaction to validate.
+    /// @custom:error DepositBelowMinimum Thrown when `minDepositUsd > 0` and the deposit
+    ///               value is strictly less than `minDepositUsd`.
+    /// @custom:error DepositAboveMaximum Thrown when `maxDepositUsd > 0` and the deposit
+    ///               value is strictly greater than `maxDepositUsd`.
+    function checkDepositWithinLimits(
+        ShieldedTransaction calldata stx
+    ) external view;
+
+    /// @notice Checks whether a pending deposit would push TVL above tvlLimitUsd.
+    /// @dev Returns false when tvlLimitUsd is 0 (disabled) or stx is not a DEPOSIT.
+    ///      Assets with no feed registered are excluded from the deposit-side sum.
+    /// @param stx The shielded transaction to evaluate.
+    /// @return crossed True if the deposit would cause TVL to exceed the limit.
+    function isTvlLimitCrossed(
+        ShieldedTransaction calldata stx
+    ) external view returns (bool crossed);
 }

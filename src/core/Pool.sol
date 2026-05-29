@@ -13,13 +13,15 @@ import {IPool, InitAddressParams} from "../interfaces/IPool.sol";
 import {IAdaptorHandler} from "../interfaces/IAdaptorHandler.sol";
 import {IScreener} from "../interfaces/IScreener.sol";
 import {IHasher} from "../interfaces/IHasher.sol";
-import {EIP712_DOMAIN_NAME, EIP712_DOMAIN_VERSION, MAX_WITHDRAW_FEE_BPS} from "../base/Constants.sol";
+import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {EIP712_DOMAIN_NAME, EIP712_DOMAIN_VERSION, MAX_WITHDRAW_FEE_BPS, TVL_PRICE_STALENESS_THRESHOLD, TVL_USD_DECIMALS} from "../base/Constants.sol";
 import {PoolStorage} from "../base/PoolStorage.sol";
 import {Asset, AssetType, AssetLogic} from "../libraries/Asset.sol";
 import {MerkleTree, MerkleTreeLogic} from "../libraries/MerkleTree.sol";
 import {QueuedMerkleTree, QueuedMerkleTreeLogic, TreeUpdateData} from "../libraries/QueuedMerkleTree.sol";
 import {ShieldedAddressRegistrationData, ShieldedAddressLogic} from "../libraries/ShieldedAddress.sol";
-import {ShieldedTransaction, ShieldedTransactionLogic, RevokerData} from "../libraries/ShieldedTransaction.sol";
+import {ShieldedTransaction, ShieldedTransactionLogic, ShieldedTransactionType, RevokerData} from "../libraries/ShieldedTransaction.sol";
 
 contract Pool is
     IPool,
@@ -51,7 +53,10 @@ contract Pool is
         uint8 commitmentTreeDepth,
         uint8 commitmentTreeQueueSize,
         InitAddressParams calldata initAddressParams,
-        uint256 withdrawFeeBps_
+        uint256 withdrawFeeBps_,
+        uint256 tvlLimitUsd_,
+        uint256 minDepositUsd_,
+        uint256 maxDepositUsd_
     ) external initializer {
         if (withdrawFeeBps_ > MAX_WITHDRAW_FEE_BPS) {
             revert IPool.WithdrawalFeeTooHigh(
@@ -75,6 +80,9 @@ contract Pool is
         screener = initAddressParams.screener;
 
         withdrawFeeBps = withdrawFeeBps_;
+        tvlLimitUsd = tvlLimitUsd_;
+        minDepositUsd = minDepositUsd_;
+        maxDepositUsd = maxDepositUsd_;
 
         _addressTree.init(addressTreeDepth, hasher);
         _commitmentTree.init(
@@ -100,7 +108,8 @@ contract Pool is
     function addAssets(
         AssetType assetType,
         address[] calldata assetAddresses,
-        uint8[] calldata precisions
+        uint8[] calldata precisions,
+        AggregatorV3Interface[] calldata usdPriceFeeds
     ) external onlyOwner {
         _assetCounts[assetType] = AssetLogic.addAssets({
             assetIds: _assetIds,
@@ -108,7 +117,8 @@ contract Pool is
             assetCount: _assetCounts[assetType],
             assetType: assetType,
             assetAddresses: assetAddresses,
-            precisions: precisions
+            precisions: precisions,
+            usdPriceFeeds: usdPriceFeeds
         });
     }
 
@@ -117,6 +127,14 @@ contract Pool is
         bool enable
     ) external onlyOwner {
         _adaptors[adaptorAddress] = enable;
+    }
+
+    function updateAssetStatus(
+        uint24 assetId,
+        bool isActive
+    ) external onlyOwner {
+        AssetLogic.updateAsset(_assets, assetId, isActive);
+        emit IPool.AssetStatusUpdated(assetId, isActive);
     }
 
     function registerRevoker(
@@ -199,6 +217,39 @@ contract Pool is
         emit IPool.VersionUpdated(version_);
     }
 
+    /// @notice Registers a Chainlink-compatible USD price feed for an ERC20 asset.
+    ///         Required for getTvlUsd() to include the asset in TVL calculation.
+    /// @param assetId The 3-byte asset id to register the feed for.
+    /// @param feed    Chainlink AggregatorV3Interface feed returning the asset price in USD.
+    function setAssetPriceFeed(
+        uint24 assetId,
+        AggregatorV3Interface feed
+    ) external onlyOwner {
+        _setAssetPriceFeed(assetId, feed);
+    }
+
+    /// @notice Sets the maximum allowed TVL in USD (6-decimal precision, USDC/USDT standard).
+    ///         Set to 0 to disable the TVL cap entirely.
+    /// @custom:invariant TVL-1: deposits that push TVL above tvlLimitUsd are reverted
+    function setTvlLimitUsd(uint256 limitUsd) external onlyOwner {
+        tvlLimitUsd = limitUsd;
+        emit IPool.TvlLimitUpdated(limitUsd);
+    }
+
+    /// @notice Sets the minimum allowed single-deposit value in USD (6-decimal precision).
+    ///         Set to 0 to disable the minimum deposit check.
+    function setMinDepositUsd(uint256 limitUsd) external onlyOwner {
+        minDepositUsd = limitUsd;
+        emit IPool.MinDepositUpdated(limitUsd);
+    }
+
+    /// @notice Sets the maximum allowed single-deposit value in USD (6-decimal precision).
+    ///         Set to 0 to disable the maximum deposit check.
+    function setMaxDepositUsd(uint256 limitUsd) external onlyOwner {
+        maxDepositUsd = limitUsd;
+        emit IPool.MaxDepositUpdated(limitUsd);
+    }
+
     /////////////////////////////////////////
     //        PUBLIC WRITE METHODS         //
     ////////////////////////////////////////
@@ -230,6 +281,8 @@ contract Pool is
     function transact(
         ShieldedTransaction calldata stx
     ) public nonReentrant whenNotPaused {
+        checkDepositWithinLimits(stx);
+        _checkTvlLimitNotCrossed(stx);
         stx.validate({
             addressTree: _addressTree,
             commitmentTree: _commitmentTree,
@@ -273,6 +326,76 @@ contract Pool is
     /////////////////////////////////////////
     //         READ METHODS                //
     ////////////////////////////////////////
+
+    /// @notice Returns the current total value locked in USD (6-decimal precision, USDC/USDT standard)
+    ///         across all active ERC20 assets, using registered Chainlink USD price feeds.
+    /// @dev Reverts with TvlPriceFeedNotSet if any active ERC20 asset has no feed registered.
+    ///      Reverts with TvlPriceStale if a feed's answer is older than TVL_PRICE_STALENESS_THRESHOLD.
+    ///      Reverts with TvlPriceInvalid if a feed returns a non-positive price.
+    /// @return tvl Cumulative TVL in 6-decimal USD (e.g. 1_000_000 = $1).
+    function getTvlUsd() public view returns (uint256 tvl) {
+        uint16 erc20Count = _assetCounts[AssetType.ERC20];
+        for (uint16 i = 1; i <= erc20Count; ) {
+            uint24 assetId = (uint24(uint8(AssetType.ERC20)) << 16) | uint24(i);
+            Asset memory asset = _assets[assetId];
+
+            if (!asset.isActive) {
+                unchecked {
+                    ++i;
+                }
+                continue;
+            }
+
+            uint256 rawBalance = IERC20(asset.assetAddress).balanceOf(
+                address(this)
+            );
+            tvl += _getUsdValue(asset, rawBalance);
+
+            unchecked {
+                ++i;
+            }
+        }
+    }
+
+    /// @notice Validates that the deposit amount in `stx` falls within the configured USD limits.
+    /// @dev Call this before submitting a DEPOSIT transaction to surface limit violations early,
+    ///      without spending gas on a full transaction. Non-DEPOSIT transactions always pass.
+    ///      Limits are expressed in 6-decimal USD (e.g. 5_000_000 = $5.00).
+    ///      A limit value of 0 means the corresponding check is disabled.
+    /// @param stx The shielded transaction to validate.
+    /// @custom:error DepositBelowMinimum Thrown when `minDepositUsd > 0` and the deposit
+    ///               value is strictly less than `minDepositUsd`.
+    /// @custom:error DepositAboveMaximum Thrown when `maxDepositUsd > 0` and the deposit
+    ///               value is strictly greater than `maxDepositUsd`.
+    function checkDepositWithinLimits(
+        ShieldedTransaction calldata stx
+    ) public view {
+        if (stx.txType != ShieldedTransactionType.DEPOSIT) return;
+        uint256 depositUsd = _getDepositUsd(stx);
+        if (minDepositUsd > 0 && depositUsd < minDepositUsd) {
+            revert IPool.DepositBelowMinimum(depositUsd, minDepositUsd);
+        }
+        if (maxDepositUsd > 0 && depositUsd > maxDepositUsd) {
+            revert IPool.DepositAboveMaximum(depositUsd, maxDepositUsd);
+        }
+    }
+
+    /// @notice Checks whether the pending deposit in `stx` would push TVL above `tvlLimitUsd`.
+    /// @dev Only meaningful for DEPOSIT transactions. Returns false when tvlLimitUsd is 0 (disabled)
+    ///      or when the transaction type is not DEPOSIT.
+    ///      Reads deposited amounts from stx.pubAssets[]: each element encodes
+    ///      assetId in the top 3 bytes and the raw token amount in the lower 224 bits.
+    /// @param stx The shielded transaction to evaluate.
+    /// @return crossed True if the deposit would cause TVL to exceed the limit.
+    function isTvlLimitCrossed(
+        ShieldedTransaction calldata stx
+    ) public view returns (bool crossed) {
+        if (tvlLimitUsd == 0 || stx.txType != ShieldedTransactionType.DEPOSIT) {
+            return false;
+        }
+        crossed = (getTvlUsd() + _getDepositUsd(stx)) > tvlLimitUsd;
+    }
+
     function getRevokerData(
         uint256 id
     ) external view returns (RevokerData memory) {
@@ -373,4 +496,78 @@ contract Pool is
     function _authorizeUpgrade(
         address newImplementation
     ) internal override onlyOwner {}
+
+    function _setAssetPriceFeed(
+        uint24 assetId,
+        AggregatorV3Interface feed
+    ) private {
+        _assets[assetId].usdPriceFeed = feed;
+        emit IPool.AssetUsdPriceFeedSet(assetId, address(feed));
+    }
+
+    function _checkTvlLimitNotCrossed(
+        ShieldedTransaction calldata stx
+    ) private view {
+        if (isTvlLimitCrossed(stx)) {
+            uint256 projectedTvl = getTvlUsd() + _getDepositUsd(stx);
+            revert IPool.TvlLimitExceeded(projectedTvl, tvlLimitUsd);
+        }
+    }
+
+    /// @notice Returns the USD value of `amount` units of `asset` using its registered Chainlink feed.
+    /// @dev Reverts with TvlPriceFeedNotSet if no feed is registered for the asset.
+    ///      Reverts with TvlPriceStale / TvlPriceInvalid on bad feed data.
+    /// @param asset  The Asset struct (must have usdPriceFeed set).
+    /// @param amount Raw token amount (in the asset's native precision).
+    /// @return usdValue Amount expressed in 6-decimal USD.
+    function _getUsdValue(
+        Asset memory asset,
+        uint256 amount
+    ) internal view returns (uint256 usdValue) {
+        AggregatorV3Interface feed = asset.usdPriceFeed;
+
+        if (address(feed) == address(0)) {
+            revert IPool.TvlPriceFeedNotSet(asset.id);
+        }
+
+        uint8 feedDecimals = feed.decimals();
+        (, int256 price, , uint256 updatedAt, ) = feed.latestRoundData();
+
+        if (price <= 0) {
+            revert IPool.TvlPriceInvalid(asset.id, price);
+        }
+        if (
+            updatedAt > block.timestamp ||
+            block.timestamp - updatedAt > TVL_PRICE_STALENESS_THRESHOLD
+        ) {
+            revert IPool.TvlPriceStale(asset.id, updatedAt);
+        }
+
+        uint256 baseExp = uint256(asset.precision) + uint256(feedDecimals);
+        usdValue = baseExp <= TVL_USD_DECIMALS
+            ? amount * uint256(price) * 10 ** (TVL_USD_DECIMALS - baseExp)
+            : (amount * uint256(price)) / 10 ** (baseExp - TVL_USD_DECIMALS);
+    }
+
+    /// @notice Returns the total USD value (6-decimal) of the public assets in a deposit transaction.
+    /// @dev Skips assets with no registered feed rather than reverting, so this is safe to call
+    ///      for any tx type (returns 0 for non-DEPOSIT or when no feeds are set).
+    /// @param stx The shielded transaction to evaluate.
+    /// @return depositUsd Sum of USD values for all pubAssets that have a registered feed.
+    function _getDepositUsd(
+        ShieldedTransaction calldata stx
+    ) internal view returns (uint256 depositUsd) {
+        uint256 nPubs = stx.pubAssets.length;
+        for (uint256 i; i < nPubs; ) {
+            uint24 assetId = uint24(bytes3(bytes31(stx.pubAssets[i])));
+            uint224 amount = uint224(stx.pubAssets[i]);
+            Asset memory asset = _assets[assetId];
+            if (asset.isActive && address(asset.usdPriceFeed) != address(0)) {
+                depositUsd += _getUsdValue(asset, uint256(amount));
+            }
+            unchecked {
+                ++i;
+            }
+        }
+    }
 }

@@ -4,6 +4,7 @@ pragma solidity 0.8.24;
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
 import {IPool} from "../interfaces/IPool.sol";
 
 enum AssetType {
@@ -19,6 +20,8 @@ struct Asset {
     address assetAddress;
     bool isActive;
     uint8 precision;
+    /// @dev Chainlink-compatible USD price feed for TVL calculation. address(0) = not set.
+    AggregatorV3Interface usdPriceFeed;
 }
 
 library AssetLogic {
@@ -45,7 +48,8 @@ library AssetLogic {
         uint16 assetCount,
         AssetType assetType,
         IERC20 assetAddress,
-        uint8 precision
+        uint8 precision,
+        AggregatorV3Interface usdPriceFeed
     ) public returns (uint16) {
         if (_isAssetAdded(assetIds, address(assetAddress))) {
             revert IPool.DuplicateAsset(address(assetAddress));
@@ -67,7 +71,8 @@ library AssetLogic {
             assetType: assetType,
             assetAddress: address(assetAddress),
             isActive: true,
-            precision: precision
+            precision: precision,
+            usdPriceFeed: usdPriceFeed
         });
 
         emit IPool.AssetAdded(address(assetAddress), newAssetId);
@@ -80,7 +85,8 @@ library AssetLogic {
         uint16 assetCount,
         AssetType assetType,
         address[] calldata assetAddresses,
-        uint8[] calldata precisions
+        uint8[] calldata precisions,
+        AggregatorV3Interface[] calldata usdPriceFeeds
     ) external returns (uint16) {
         for (uint256 i = 0; i < assetAddresses.length; ) {
             assetCount = addAsset(
@@ -89,7 +95,10 @@ library AssetLogic {
                 assetCount,
                 assetType,
                 IERC20(assetAddresses[i]),
-                precisions[i]
+                precisions[i],
+                i < usdPriceFeeds.length
+                    ? usdPriceFeeds[i]
+                    : AggregatorV3Interface(address(0))
             );
 
             unchecked {

@@ -14,11 +14,13 @@ import {MerkleTree, MerkleTreeLogic} from "src/libraries/MerkleTree.sol";
 import {TreeUpdateData} from "src/libraries/QueuedMerkleTree.sol";
 import {ShieldedAddressRegistrationData, ShieldedAddressLogic} from "src/libraries/ShieldedAddress.sol";
 import {IPool} from "src/interfaces/IPool.sol";
+import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
 import {MockScreener} from "test/mocks/MockScreener.sol";
 import {MockVerifier} from "test/mocks/MockVerifier.sol";
 import {MockERC20} from "test/mocks/MockERC20.sol";
 import {MockVerifier} from "test/mocks/MockVerifier.sol";
 import {PoolBaseTest} from "./PoolBaseTest.sol";
+import {MockAggregatorV3} from "test/mocks/MockAggregatorV3.sol";
 import {BaseScript} from "script/BaseScript.sol";
 import {console} from "forge-std/console.sol";
 
@@ -32,6 +34,10 @@ contract PoolTest is PoolBaseTest, BaseScript {
     using MerkleTreeLogic for MerkleTree;
 
     MockVerifier internal _mockVerifier = new MockVerifier();
+
+    /// @dev Shared $1 mock price feed used for test-only assets that have no real Chainlink feed.
+    ///      Allows the TVL guard to work correctly whenever tvlLimitUsd is set in tests.
+    MockAggregatorV3 internal _defaultMockFeed;
 
     Asset public asset1;
     Asset public asset2;
@@ -121,6 +127,8 @@ contract PoolTest is PoolBaseTest, BaseScript {
     function _setUp() internal virtual override {
         PoolBaseTest._setUp();
 
+        _defaultMockFeed = new MockAggregatorV3(int256(1e8), 8); // $1 / 8-dec
+
         AssetType assetType = AssetType.ERC20;
         uint256 initAssetLength = block.chainid == 31337
             ? 0
@@ -128,9 +136,14 @@ contract PoolTest is PoolBaseTest, BaseScript {
 
         address[] memory assetAddresses = new address[](3 + initAssetLength);
         uint8[] memory assetsPrecision = new uint8[](3 + initAssetLength);
+        AggregatorV3Interface[]
+            memory usdPriceFeeds = new AggregatorV3Interface[](
+                3 + initAssetLength
+            );
         // for local testing env, we deploy mock tokens and add them as supported assets in the pool. The script/config.json will showcase arrays for initAssetAddresses, etc, which should be considered dummies, except the initAssetIdsVeilnyx used by the SDK. For testnet/mainnet, we rely on mock + existing onchain tokens, so supporting both sets of assets configured in the script/config.json file, which should include the assets needed for adaptor testing.
 
         // testnets/mainnet fork testing case
+        // will include both the mock tokens (asset1, asset2, assetReent) and the real tokens specified in the config, which should cover most of the fork testing needs. Adaptor tokens will be added by respective adaptor test contracts.
         if (block.chainid != 31337) {
             assetAddresses[0] = address(token1);
             assetAddresses[1] = address(token2);
@@ -139,11 +152,23 @@ contract PoolTest is PoolBaseTest, BaseScript {
             assetsPrecision[0] = MockERC20(assetAddresses[0]).decimals();
             assetsPrecision[1] = MockERC20(assetAddresses[1]).decimals();
             assetsPrecision[2] = MockERC20(assetAddresses[2]).decimals();
+            // mock tokens use _defaultMockFeed; real price feeds come from config
+            usdPriceFeeds[0] = AggregatorV3Interface(address(_defaultMockFeed));
+            usdPriceFeeds[1] = AggregatorV3Interface(address(_defaultMockFeed));
+            usdPriceFeeds[2] = AggregatorV3Interface(address(_defaultMockFeed));
 
+            // real feeds for fork testing. To test against them, keep tvlLimitUsd > 0 and a deposit tx.
+            address[] memory configFeeds = _config
+                .initAssetToUSDChainlinkFeeds();
             uint i = 0;
             do {
                 assetAddresses[3 + i] = _config.initAssetAddresses()[i];
                 assetsPrecision[3 + i] = _config.initAssetsPrecision()[i];
+                if (i < configFeeds.length) {
+                    usdPriceFeeds[3 + i] = AggregatorV3Interface(
+                        configFeeds[i]
+                    );
+                }
                 ++i;
             } while (i < initAssetLength);
         } else {
@@ -154,10 +179,19 @@ contract PoolTest is PoolBaseTest, BaseScript {
             assetsPrecision[0] = MockERC20(assetAddresses[0]).decimals();
             assetsPrecision[1] = MockERC20(assetAddresses[1]).decimals();
             assetsPrecision[2] = MockERC20(assetAddresses[2]).decimals();
+
+            usdPriceFeeds[0] = AggregatorV3Interface(address(_defaultMockFeed));
+            usdPriceFeeds[1] = AggregatorV3Interface(address(_defaultMockFeed));
+            usdPriceFeeds[2] = AggregatorV3Interface(address(_defaultMockFeed));
         }
 
         // adding support for testnet tokens if any to provide support of adaptor testing
-        pool.addAssets(assetType, assetAddresses, assetsPrecision);
+        pool.addAssets(
+            assetType,
+            assetAddresses,
+            assetsPrecision,
+            usdPriceFeeds
+        );
 
         asset1 = pool.getAsset(assetAddresses[0]);
         asset2 = pool.getAsset(assetAddresses[1]);
@@ -201,6 +235,16 @@ contract PoolTest is PoolBaseTest, BaseScript {
         expectReceipt(stx)
     {
         pool.transact(stx);
+    }
+
+    /// @dev Returns an address array of length `len` filled with address(_defaultMockFeed).
+    ///      Use this when adding test-only assets that need a working price feed.
+    function _mockFeedsArray(
+        uint256 len
+    ) internal view returns (AggregatorV3Interface[] memory feeds) {
+        feeds = new AggregatorV3Interface[](len);
+        for (uint256 i; i < len; ++i)
+            feeds[i] = AggregatorV3Interface(address(0));
     }
 
     function _mintAsset(

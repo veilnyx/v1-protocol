@@ -99,7 +99,10 @@ contract PoolBaseTest is BaseTest {
                 fixture.commitmentTreeDepth,
                 fixture.commitmentTreeQueueSize,
                 initAddressParams,
-                fixture.withdrawFeeBps
+                fixture.withdrawFeeBps,
+                0, // tvlLimitUsd: disabled in tests
+                0, // minDepositUsd: disabled in tests
+                0 // maxDepositUsd: disabled in tests
             )
         );
 
