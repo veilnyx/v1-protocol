@@ -45,8 +45,9 @@ const deployAave = async (aaveParams, pool, deployConfig) => {
 
   const assets = [aaveParams.assets.staticAWeth, aaveParams.assets.staticAUsdc];
   const assetsPrecision = [aaveParams.assetsPrecision.staticAWeth, aaveParams.assetsPrecision.staticAUsdc];
+  const assetsUsdPriceFeeds = [aaveParams.assetsUsdPriceFeeds.staticAWeth, aaveParams.assetsUsdPriceFeeds.staticAUsdc];
 
-  await addAssets(assets, assetsPrecision, 1, pool, deployConfig.client.wallet, deployConfig.client.public);
+  await addAssets(assets, assetsPrecision, assetsUsdPriceFeeds, 1, pool, deployConfig.client.wallet, deployConfig.client.public);
 }
 
 const deployLido = async (lidoParams, pool, deployConfig) => {
@@ -63,8 +64,9 @@ const deployLido = async (lidoParams, pool, deployConfig) => {
 
   const assets = [lidoParams.assets.wstEth];
   const assetsPrecision = [lidoParams.assetsPrecision.wstEth];
+  const assetsUsdPriceFeeds = [lidoParams.assetsUsdPriceFeeds.wstEth];
 
-  await addAssets(assets, assetsPrecision, 1, pool, deployConfig.client.wallet, deployConfig.client.public);
+  await addAssets(assets, assetsPrecision, assetsUsdPriceFeeds, 1, pool, deployConfig.client.wallet, deployConfig.client.public);
 }
 
 const deployCurve = async (curveParams, pool, deployConfig) => {
@@ -76,8 +78,9 @@ const deployCurve = async (curveParams, pool, deployConfig) => {
 
   const assets = [curveParams.assets.usdt, curveParams.assets.crvUsd, curveParams.assets.crvUsdUsdtLPToken, curveParams.assets.crvUsdSusdeLPToken];
   const assetsPrecision = [curveParams.assetsPrecision.usdt, curveParams.assetsPrecision.crvUsd, curveParams.assetsPrecision.crvUsdUsdtLPToken, curveParams.assetsPrecision.crvUsdSusdeLPToken];
+  const assetsUsdPriceFeeds = [curveParams.assetsUsdPriceFeeds.usdt, curveParams.assetsUsdPriceFeeds.crvUsd, curveParams.assetsUsdPriceFeeds.crvUsdUsdtLPToken, curveParams.assetsUsdPriceFeeds.crvUsdSusdeLPToken];
 
-  await addAssets(assets, assetsPrecision, 1, pool, deployConfig.client.wallet, deployConfig.client.public);
+  await addAssets(assets, assetsPrecision, assetsUsdPriceFeeds, 1, pool, deployConfig.client.wallet, deployConfig.client.public);
 }
 
 const deployEthena = async (ethenaParams, pool, deployConfig) => {
@@ -91,7 +94,8 @@ const deployEthena = async (ethenaParams, pool, deployConfig) => {
 
   const assets = [ethenaParams.assets.usde, ethenaParams.assets.sUsde];
   const assetsPrecision = [ethenaParams.assetsPrecision.usde, ethenaParams.assetsPrecision.sUsde];
-  await addAssets(assets, assetsPrecision, 1, pool, deployConfig.client.wallet, deployConfig.client.public);
+  const assetsUsdPriceFeeds = [ethenaParams.assetsUsdPriceFeeds.usde, ethenaParams.assetsUsdPriceFeeds.sUsde];
+  await addAssets(assets, assetsPrecision, assetsUsdPriceFeeds, 1, pool, deployConfig.client.wallet, deployConfig.client.public);
 }
 
 const deployBeefy = async (beefyParams, pool, deployConfig) => {
@@ -103,8 +107,9 @@ const deployBeefy = async (beefyParams, pool, deployConfig) => {
 
   const assets = [beefyParams.assets.mooCurveCrvUSDsUSDe];
   const assetsPrecision = [beefyParams.assetsPrecision.mooCurveCrvUSDsUSDe];
+  const assetsUsdPriceFeeds = [beefyParams.assetsUsdPriceFeeds.mooCurveCrvUSDsUSDe];
 
-  await addAssets(assets, assetsPrecision, 1, pool, deployConfig.client.wallet, deployConfig.client.public);
+  await addAssets(assets, assetsPrecision, assetsUsdPriceFeeds, 1, pool, deployConfig.client.wallet, deployConfig.client.public);
 }
 
 const deployMorpho = async (morphoParams, pool, deployConfig) => {
@@ -116,8 +121,9 @@ const deployMorpho = async (morphoParams, pool, deployConfig) => {
 
   const assets = [morphoParams.assets.gauntletWETHPrimeVault];
   const assetsPrecision = [morphoParams.assetsPrecision.gauntletWETHPrimeVault];
+  const assetsUsdPriceFeeds = [morphoParams.assetsUsdPriceFeeds.gauntletWETHPrimeVault];
 
-  await addAssets(assets, assetsPrecision, 1, pool, deployConfig.client.wallet, deployConfig.client.public);
+  await addAssets(assets, assetsPrecision, assetsUsdPriceFeeds, 1, pool, deployConfig.client.wallet, deployConfig.client.public);
 }
 
 const deployOneInch = async (oneInchParams: any, pool: any, deployConfig: any) => {
@@ -141,16 +147,17 @@ const deployRocketPool = async (rocketPoolParams: any, pool: any, deployConfig: 
 
   const assets = [rocketPoolParams.assets.rETH];
   const assetsPrecision = [rocketPoolParams.assetsPrecision.rETH];
+  const assetsUsdPriceFeeds = [rocketPoolParams.assetsUsdPriceFeeds.rETH];
 
-  await addAssets(assets, assetsPrecision, 1, pool, deployConfig.client.wallet, deployConfig.client.public);
+  await addAssets(assets, assetsPrecision, assetsUsdPriceFeeds, 1, pool, deployConfig.client.wallet, deployConfig.client.public);
 }
 
 const deployAdaptors = async (pool: any, adpParams: any, deployConfig: any) => {
   const { uniswap: uniswapParams, aave: aaveParams, lido: lidoParams, curve: curveParams, ethena: ethenaParams, beefy: beefyParams, morpho: morphoParams, rocketPool: rocketPoolParams, oneInch: oneInchParams } = adpParams;
 
-  await deployUniswap(uniswapParams, pool, deployConfig);
+  // await deployUniswap(uniswapParams, pool, deployConfig);
   await deployAave(aaveParams, pool, deployConfig);
-  await deployLido(lidoParams, pool, deployConfig);
+  // await deployLido(lidoParams, pool, deployConfig);
   // await deployCurve(curveParams, pool, deployConfig);
   // await deployEthena(ethenaParams, pool, deployConfig);
   // await deployBeefy(beefyParams, pool, deployConfig);
@@ -177,7 +184,7 @@ const addAdpatorSupport = async (pool: any, adpAddress: any, enable: boolean, wa
   }
 }
 
-const addAssets = async (assets: any, assetsPrecision: any, assetType: number, poolAddr: any, wallet: any, client: any) => {
+const addAssets = async (assets: any, assetsPrecision: any, usdPriceFeeds: any, assetType: number, poolAddr: any, wallet: any, client: any) => {
   console.log("Adding assets:", assets);
   try {
     //@ts-ignore
@@ -185,7 +192,7 @@ const addAssets = async (assets: any, assetsPrecision: any, assetType: number, p
       address: poolAddr,
       abi: poolAbi,
       functionName: "addAssets",
-      args: [assetType, assets, assetsPrecision],
+      args: [assetType, assets, assetsPrecision, usdPriceFeeds],
     });
 
     const rct = await client.waitForTransactionReceipt({ hash });
@@ -202,7 +209,7 @@ const addAssetsAndRevokers = async (poolProxy: any, chainParams: any, commonPara
       address: poolProxy,
       abi: poolAbi,
       functionName: "addAssets",
-      args: [chainParams.initAssetType, chainParams.initAssetAddresses, chainParams.initAssetsPrecision],
+      args: [chainParams.initAssetType, chainParams.initAssetAddresses, chainParams.initAssetsPrecision, chainParams.initAssetToUSDChainlinkFeeds],
     });
 
     const rct = await client.waitForTransactionReceipt({ hash });
@@ -330,6 +337,9 @@ const main = async () => {
     commonParams.commitmentTreeQueueSize,
     initAddressParams,
     BigInt(commonParams.withdrawFeeBps),
+    BigInt(500_000e6), // tvlLimitUsd: $500,000 (6-decimal precision)
+    BigInt(0),         // minDepositUsd: disabled at deploy
+    BigInt(0),         // maxDepositUsd: disabled at deploy
   ];
 
   const initData = encodeFunctionData({
@@ -366,13 +376,13 @@ const main = async () => {
   console.log("Pool: version set to", commonParams.protocolVersion);
 
   // ERC4337 infra setup
-  await deployErc4337Infra(chainParams, poolProxy.address, deployConfig);
+  // await deployErc4337Infra(chainParams, poolProxy.address, deployConfig);
 
   // Asset & Revoker Setup
   await addAssetsAndRevokers(poolProxy.address, chainParams, commonParams, client, deployConfig.client.wallet);
 
   // Deploy Adaptors (should be after base assets are added to maintain the expected ID order)
-  await deployAdaptors(poolProxy, adpParams, deployConfig);
+  await deployAdaptors(poolProxy.address, adpParams, deployConfig);
 };
 
 main().catch(console.error);

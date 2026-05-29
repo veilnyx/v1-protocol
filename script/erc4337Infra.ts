@@ -22,7 +22,7 @@ export const deployErc4337Infra = async (chainParams, poolAddress, deployConfig)
     // Set up Chainlink feeds for paymaster (sequential to avoid nonce conflicts)
     for (let index = 0; index < chainParams.initAssetIdsVeilnyx.length; index++) {
         const assetId = chainParams.initAssetIdsVeilnyx[index];
-        await setAssetChainlinkFeedInPaymaster(paymaster.address, assetId, chainParams.initAssetChainlinkFeeds[index], deployConfig.client.wallet, deployConfig.client.public);
+        await setAssetChainlinkFeedInPaymaster(paymaster.address, assetId, chainParams.initNativeGasTokenToAssetChainlinkFeeds[index], deployConfig.client.wallet, deployConfig.client.public);
     }
 
     await fundPaymaster(paymaster.address, deployConfig.client.wallet, deployConfig.client.public);

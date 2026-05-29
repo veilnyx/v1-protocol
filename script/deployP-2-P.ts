@@ -115,6 +115,9 @@ const main = async () => {
             commonParams.commitmentTreeQueueSize,
             initAddressParams,
             BigInt(commonParams.withdrawFeeBps),
+            BigInt(0), // tvlLimitUsd: disabled at deploy
+            BigInt(0), // minDepositUsd: disabled at deploy
+            BigInt(0), // maxDepositUsd: disabled at deploy
         ];
 
         const initData = encodeFunctionData({
