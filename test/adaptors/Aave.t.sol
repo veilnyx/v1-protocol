@@ -17,6 +17,7 @@ import {IAave} from "src/adaptors/aave-v3/IAave.sol";
 import {IStaticATokenFactory} from "src/adaptors/aave-v3/IStaticATokenFactory.sol";
 import {console2} from "forge-std/console2.sol";
 import {StdCheats} from "forge-std/StdCheats.sol";
+import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
 
 contract AaveAdaptorTest is PoolTest {
     error CheckChainConfig();
@@ -25,6 +26,8 @@ contract AaveAdaptorTest is PoolTest {
     address aave = 0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2;
     address public WETH = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
     address public USDC = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48;
+    address public WETH_USDC_PRICE_FEED =
+        0x5424384B256154046E9667dDFaaa5e550145215e;
     address public constant WETH_AAVE_UNDERLYING =
         0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2; // Laby pool WETH contract is diff. than the one supported by Aave on testnet sepolia.
 
@@ -77,7 +80,10 @@ contract AaveAdaptorTest is PoolTest {
         assetAddresses[0] = WETH_STATIC_A_TOKEN;
         uint8[] memory precisions = new uint8[](1);
         precisions[0] = 18;
-        pool.addAssets(assetType, assetAddresses, precisions);
+        AggregatorV3Interface[]
+            memory usdPriceFeeds = new AggregatorV3Interface[](1);
+        usdPriceFeeds[0] = AggregatorV3Interface(WETH_USDC_PRICE_FEED);
+        pool.addAssets(assetType, assetAddresses, precisions, usdPriceFeeds);
         vm.stopPrank();
 
         deal(WETH_AAVE_UNDERLYING, user, INITIAL_SUPPLY);

@@ -30,7 +30,7 @@ contract PoolAdaptorTest is PoolTest {
         addresses[0] = address(mockDefi);
         uint8[] memory precisions = new uint8[](1);
         precisions[0] = 18;
-        pool.addAssets(assetType, addresses, precisions);
+        pool.addAssets(assetType, addresses, precisions, _mockFeedsArray(addresses.length));
     }
 
     function test_supportAdaptor() public view {

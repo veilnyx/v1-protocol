@@ -244,7 +244,7 @@ contract PoolTest is PoolBaseTest, BaseScript {
     ) internal view returns (AggregatorV3Interface[] memory feeds) {
         feeds = new AggregatorV3Interface[](len);
         for (uint256 i; i < len; ++i)
-            feeds[i] = AggregatorV3Interface(address(0));
+            feeds[i] = AggregatorV3Interface(address(_defaultMockFeed));
     }
 
     function _mintAsset(

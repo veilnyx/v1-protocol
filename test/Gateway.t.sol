@@ -39,7 +39,8 @@ contract MockPool {
             assetType: AssetType.ERC20,
             assetAddress: address(0),
             isActive: true,
-            precision: 6
+            precision: 6,
+            usdPriceFeed: AggregatorV3Interface(address(0))
         });
 
         return feeAsset;

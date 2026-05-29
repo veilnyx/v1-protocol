@@ -5,6 +5,7 @@ import {Test} from "forge-std/Test.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {AssetType, Asset, AssetLogic} from "src/libraries/Asset.sol";
 import {IPool} from "src/interfaces/IPool.sol";
+import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
 
 contract AssetLogicTest is Test {
     address public t1 = address(1);
@@ -41,7 +42,8 @@ contract AssetLogicTest is Test {
             _counter,
             AssetType.ERC20,
             IERC20(t1),
-            18
+            18,
+            AggregatorV3Interface(address(0))
         );
         assertEq(count, _counter + 1);
     }
@@ -65,7 +67,8 @@ contract AssetLogicTest is Test {
             _counter,
             assetType,
             assetAddresses,
-            precisions
+            precisions,
+            new AggregatorV3Interface[](0)
         );
 
         assertEq(count, _counter + assetAddresses.length);
@@ -78,7 +81,8 @@ contract AssetLogicTest is Test {
             _counter,
             AssetType.ERC20,
             IERC20(t1),
-            18
+            18,
+            AggregatorV3Interface(address(0))
         );
         uint24 newAssetId = _assetIds[t1];
         AssetLogic.updateAsset(_assets, newAssetId, false);
@@ -92,7 +96,8 @@ contract AssetLogicTest is Test {
             count,
             AssetType.ERC20,
             IERC20(t1),
-            18
+            18,
+            AggregatorV3Interface(address(0))
         );
     }
 }
