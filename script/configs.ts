@@ -37,6 +37,7 @@ export type CommonParams = {
   addressTreeDepth: number;
   withdrawFeeBps: bigint;
   protocolVersion: bigint;
+  veilnyxMultiSigAddress: Hex;
   revokers: {
     name: string;
     description: string;
@@ -48,7 +49,7 @@ export type CommonParams = {
 const chainParams: Record<number, ChainParams> = {};
 const adpParams: Record<number, AdaptorParams> = {};
 
-const getHex = (v: any) => {
+export const getHex = (v: any) => {
   if (!isHex(v)) {
     throw new Error(`Invalid hex: ${v}`);
   }
@@ -62,6 +63,7 @@ export function loadConfigs() {
     addressTreeDepth: Number(common.addressTreeDepth),
     withdrawFeeBps: BigInt(common.withdrawFeeBps),
     protocolVersion: BigInt(common.protocolVersion),
+    veilnyxMultiSigAddress: getHex(common.veilnyxMultiSigAddress),
     revokers: common.revokers.map((r) => {
       const x = {
         name: r.name,
@@ -78,7 +80,7 @@ export function loadConfigs() {
 
       return x;
     }),
-  };
+  } as CommonParams;
 
   /// @todo The adaptor assets whose price feeds are not live yet are currently set to have their USD price feed address as 0x0. Once those price feeds are live, update the config with the correct addresses. This is required for Mainnet deployment. Testnet deployments can proceed with the USD price feed addresses set to 0x0, with the drawback of such assets TVL not contributing to the total TVL of the protocol. 
 

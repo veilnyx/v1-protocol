@@ -144,6 +144,27 @@ const main = async () => {
         console.log("Pool: version set to", commonParams.protocolVersion);
     }
 
+    // pause the protocol immediately after deployment to prevent any interactions before the setup is complete
+      // @ts-ignore
+      const pauseHash = await wallets[0].writeContract({
+        address: poolProxy.address,
+        abi: poolAbi,
+        functionName: "pause",
+      });
+      await client.waitForTransactionReceipt({ hash: pauseHash });
+      console.log("Pool: paused");
+    
+      // transfer ownership to a multisig or a Gnosis Safe after deployment. For testing purposes, we can keep the ownership to the deployer wallet
+      // @ts-ignore
+      const transferOwnershipHash = await wallets[0].writeContract({
+        address: poolProxy.address,
+        abi: poolAbi,
+        functionName: "transferOwnership",
+        args: [zeroAddress], // set to zeroAddress to keep ownership to deployer wallet for testing. Update with multisig or Gnosis Safe address for production deployment.
+      });
+      await client.waitForTransactionReceipt({ hash: transferOwnershipHash });
+      console.log("Pool: ownership transferred");
+
     // Asset support and Revoker registrations
     try {
         //@ts-ignore

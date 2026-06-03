@@ -1,7 +1,7 @@
 import hre from "hardhat";
 import { parseEther, parseUnits } from "viem";
 
-const PAYMASTER_FUNDING_AMT = parseEther("2");
+const PAYMASTER_FUNDING_AMT = parseEther("0.5");
 
 export const deployErc4337Infra = async (chainParams, poolAddress, deployConfig) => {
     // ERC4337 infra setup
