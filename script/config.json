@@ -68,7 +68,7 @@
     ],
     "withdrawFeeBps": 5,
     "protocolVersion": 1,
-    "veilnyxMultiSigAddress": "0x8f9Af25A446b8fF4aFBb52438e5B60512510fa63"
+    "veilnyxMultiSigAddress": "0x9bAf694B165c42850BD3c9c944E16d48d566C617"
   },
   "31337": {
     "chain": "local",
