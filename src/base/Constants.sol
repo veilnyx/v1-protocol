@@ -17,6 +17,5 @@ bytes32 constant EIP712_TYPEHASH_REGISTER_ADDRESS = keccak256(
 );
 string constant MESSAGE_REGISTER_ADDRESS = "Register Shielded Address";
 uint256 constant MAX_WITHDRAW_FEE_BPS = 0.25e4; // 25% in basis points
-uint256 constant TVL_PRICE_STALENESS_THRESHOLD = 1 days;
 /// @dev TVL values use 6-decimal precision (USDC/USDT DeFi standard).
 uint8 constant TVL_USD_DECIMALS = 6;

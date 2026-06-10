@@ -49,4 +49,7 @@ abstract contract PoolStorage {
     /// @dev Deposit size limits in USD, 6-decimal precision. 0 = limit disabled.
     uint256 public minDepositUsd;
     uint256 public maxDepositUsd;
+
+    /// @dev Maximum age of a Chainlink price answer before it is considered stale.
+    uint256 public tvlPriceStalenessTreshold;
 }

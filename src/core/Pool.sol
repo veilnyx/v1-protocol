@@ -9,13 +9,13 @@ import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/Pau
 import {EIP712Upgradeable} from "@openzeppelin/contracts-upgradeable/utils/cryptography/EIP712Upgradeable.sol";
 
 import {IVerifier} from "../interfaces/IVerifier.sol";
-import {IPool, InitAddressParams} from "../interfaces/IPool.sol";
+import {IPool, InitAddressParams, PoolConfigParams} from "../interfaces/IPool.sol";
 import {IAdaptorHandler} from "../interfaces/IAdaptorHandler.sol";
 import {IScreener} from "../interfaces/IScreener.sol";
 import {IHasher} from "../interfaces/IHasher.sol";
 import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {EIP712_DOMAIN_NAME, EIP712_DOMAIN_VERSION, MAX_WITHDRAW_FEE_BPS, TVL_PRICE_STALENESS_THRESHOLD, TVL_USD_DECIMALS} from "../base/Constants.sol";
+import {EIP712_DOMAIN_NAME, EIP712_DOMAIN_VERSION, MAX_WITHDRAW_FEE_BPS, TVL_USD_DECIMALS} from "../base/Constants.sol";
 import {PoolStorage} from "../base/PoolStorage.sol";
 import {Asset, AssetType, AssetLogic} from "../libraries/Asset.sol";
 import {MerkleTree, MerkleTreeLogic} from "../libraries/MerkleTree.sol";
@@ -53,14 +53,11 @@ contract Pool is
         uint8 commitmentTreeDepth,
         uint8 commitmentTreeQueueSize,
         InitAddressParams calldata initAddressParams,
-        uint256 withdrawFeeBps_,
-        uint256 tvlLimitUsd_,
-        uint256 minDepositUsd_,
-        uint256 maxDepositUsd_
+        PoolConfigParams calldata configParams
     ) external initializer {
-        if (withdrawFeeBps_ > MAX_WITHDRAW_FEE_BPS) {
+        if (configParams.withdrawFeeBps > MAX_WITHDRAW_FEE_BPS) {
             revert IPool.WithdrawalFeeTooHigh(
-                withdrawFeeBps_,
+                configParams.withdrawFeeBps,
                 MAX_WITHDRAW_FEE_BPS
             );
         }
@@ -79,10 +76,11 @@ contract Pool is
         hasher = initAddressParams.hasher;
         screener = initAddressParams.screener;
 
-        withdrawFeeBps = withdrawFeeBps_;
-        tvlLimitUsd = tvlLimitUsd_;
-        minDepositUsd = minDepositUsd_;
-        maxDepositUsd = maxDepositUsd_;
+        withdrawFeeBps = configParams.withdrawFeeBps;
+        tvlLimitUsd = configParams.tvlLimitUsd;
+        minDepositUsd = configParams.minDepositUsd;
+        maxDepositUsd = configParams.maxDepositUsd;
+        tvlPriceStalenessTreshold = configParams.tvlPriceStalenessTreshold;
 
         _addressTree.init(addressTreeDepth, hasher);
         _commitmentTree.init(
@@ -250,6 +248,13 @@ contract Pool is
         emit IPool.MaxDepositUpdated(limitUsd);
     }
 
+    /// @notice Sets the maximum age of a Chainlink price answer before it is considered stale.
+    /// @param threshold Age in seconds. A lower value is stricter; set to type(uint256).max to effectively disable the staleness check.
+    function setTvlPriceStalenessTreshold(uint256 threshold) external onlyOwner {
+        tvlPriceStalenessTreshold = threshold;
+        emit IPool.TvlPriceStalenessTresholdUpdated(threshold);
+    }
+
     /////////////////////////////////////////
     //        PUBLIC WRITE METHODS         //
     ////////////////////////////////////////
@@ -329,7 +334,7 @@ contract Pool is
 
     /// @notice Returns the current total value locked in USD (6-decimal precision, USDC/USDT standard)
     ///         across all active ERC20 assets, using registered Chainlink USD price feeds.
-    /// @dev Reverts with TvlPriceFeedNotSet if any active ERC20 asset has no feed registered.
+    /// @dev Assets with no registered feed or that are inactive contribute 0 to the TVL.
     ///      Reverts with TvlPriceStale if a feed's answer is older than TVL_PRICE_STALENESS_THRESHOLD.
     ///      Reverts with TvlPriceInvalid if a feed returns a non-positive price.
     /// @return tvl Cumulative TVL in 6-decimal USD (e.g. 1_000_000 = $1).
@@ -339,7 +344,7 @@ contract Pool is
             uint24 assetId = (uint24(uint8(AssetType.ERC20)) << 16) | uint24(i);
             Asset memory asset = _assets[assetId];
 
-            if (!asset.isActive) {
+            if (!asset.isActive || address(asset.usdPriceFeed) == address(0)) {
                 unchecked {
                     ++i;
                 }
@@ -363,6 +368,7 @@ contract Pool is
     ///      Limits are expressed in 6-decimal USD (e.g. 5_000_000 = $5.00).
     ///      A limit value of 0 means the corresponding check is disabled.
     /// @param stx The shielded transaction to validate.
+    /// @custom:error DepositRestrictedAsAssetFeedNotSet Thrown when any deposit asset has no registered USD price feed.
     /// @custom:error DepositBelowMinimum Thrown when `minDepositUsd > 0` and the deposit
     ///               value is strictly less than `minDepositUsd`.
     /// @custom:error DepositAboveMaximum Thrown when `maxDepositUsd > 0` and the deposit
@@ -538,7 +544,7 @@ contract Pool is
         }
         if (
             updatedAt > block.timestamp ||
-            block.timestamp - updatedAt > TVL_PRICE_STALENESS_THRESHOLD
+            block.timestamp - updatedAt > tvlPriceStalenessTreshold
         ) {
             revert IPool.TvlPriceStale(asset.id, updatedAt);
         }
@@ -550,10 +556,9 @@ contract Pool is
     }
 
     /// @notice Returns the total USD value (6-decimal) of the public assets in a deposit transaction.
-    /// @dev Skips assets with no registered feed rather than reverting, so this is safe to call
-    ///      for any tx type (returns 0 for non-DEPOSIT or when no feeds are set).
+    /// @dev Reverts with DepositRestrictedAsAssetFeedNotSet if any pubAsset has no registered price feed.
     /// @param stx The shielded transaction to evaluate.
-    /// @return depositUsd Sum of USD values for all pubAssets that have a registered feed.
+    /// @return depositUsd Sum of USD values for all pubAssets in a deposit transaction.
     function _getDepositUsd(
         ShieldedTransaction calldata stx
     ) internal view returns (uint256 depositUsd) {
@@ -562,9 +567,11 @@ contract Pool is
             uint24 assetId = uint24(bytes3(bytes31(stx.pubAssets[i])));
             uint224 amount = uint224(stx.pubAssets[i]);
             Asset memory asset = _assets[assetId];
-            if (asset.isActive && address(asset.usdPriceFeed) != address(0)) {
-                depositUsd += _getUsdValue(asset, uint256(amount));
+            if (!asset.isActive || address(asset.usdPriceFeed) == address(0)) {
+                revert IPool.DepositRestrictedAsAssetFeedNotSet(assetId);
             }
+            depositUsd += _getUsdValue(asset, uint256(amount));
+
             unchecked {
                 ++i;
             }

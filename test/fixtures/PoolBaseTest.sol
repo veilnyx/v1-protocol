@@ -4,7 +4,7 @@ pragma solidity ^0.8.24;
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 import {Pool} from "src/core/Pool.sol";
-import {InitAddressParams} from "src/interfaces/IPool.sol";
+import {InitAddressParams, PoolConfigParams} from "src/interfaces/IPool.sol";
 import {MESSAGE_REGISTER_ADDRESS, EIP712_DOMAIN_NAME, EIP712_DOMAIN_VERSION, EIP712_TYPEHASH_REGISTER_ADDRESS} from "src/base/Constants.sol";
 import {VerifierTransact21} from "src/verifiers/VerifierTransact21.sol";
 import {VerifierTransact22} from "src/verifiers/VerifierTransact22.sol";
@@ -92,6 +92,14 @@ contract PoolBaseTest is BaseTest {
             hasher: IHasher(address(hasher))
         });
 
+        PoolConfigParams memory configParams = PoolConfigParams({
+            withdrawFeeBps: fixture.withdrawFeeBps,
+            tvlLimitUsd: 0,
+            minDepositUsd: 0,
+            maxDepositUsd: 0,
+            tvlPriceStalenessTreshold: 1 days
+        });
+
         bytes memory initData = abi.encodeCall(
             Pool.initialize,
             (
@@ -99,10 +107,7 @@ contract PoolBaseTest is BaseTest {
                 fixture.commitmentTreeDepth,
                 fixture.commitmentTreeQueueSize,
                 initAddressParams,
-                fixture.withdrawFeeBps,
-                0, // tvlLimitUsd: disabled in tests
-                0, // minDepositUsd: disabled in tests
-                0 // maxDepositUsd: disabled in tests
+                configParams
             )
         );
 

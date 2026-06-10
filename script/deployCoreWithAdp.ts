@@ -482,15 +482,21 @@ const main = async () => {
     hasher: hasher
   }
 
+  const ONE_DAY = 86400n;
+  const configParams = {
+    withdrawFeeBps: BigInt(commonParams.withdrawFeeBps),
+    tvlLimitUsd: BigInt(5_000e6),    // $5,000 (6-decimal precision)
+    minDepositUsd: BigInt(2e6),      // $2 (6-decimal precision)
+    maxDepositUsd: BigInt(200e6),    // $200 (6-decimal precision)
+    tvlPriceStalenessTreshold: ONE_DAY * 5n, // 5 days in seconds
+  };
+
   const args = [
     commonParams.addressTreeDepth,
     commonParams.commitmentTreeDepth,
     commonParams.commitmentTreeQueueSize,
     initAddressParams,
-    BigInt(commonParams.withdrawFeeBps),
-    BigInt(5_000e6),     // tvlLimitUsd: $5,000 (6-decimal precision)
-    BigInt(2e6),         // minDepositUsd: $2 USD (6-decimal precision)
-    BigInt(200e6)        // maxDepositUsd: $200 USD (6-decimal precision)
+    configParams,
   ];
 
   const initData = encodeFunctionData({
@@ -516,6 +522,25 @@ const main = async () => {
   await client.waitForTransactionReceipt({ hash: setVersionHash });
   console.log("Pool: version set to", commonParams.protocolVersion);
 
+  // @ts-ignore
+  const setPoolTxHash = await wallets[0].writeContract({
+    address: adaptorHandler.address,
+    abi: adaptorHandlerAbi,
+    functionName: "setVeilnyxPool",
+    args: [poolProxy.address],
+  });
+  await client.waitForTransactionReceipt({ hash: setPoolTxHash });
+  console.log("AdaptorHandler: veilnyxPool set to", poolProxy.address);
+
+  // ERC4337 infra setup
+  await deployErc4337Infra(chainParams, poolProxy.address, deployConfig);
+
+  // Asset & Revoker Setup
+  await addAssetsAndRevokers(poolProxy.address, chainParams, commonParams, client, deployConfig.client.wallet);
+
+  // Deploy Adaptors (should be after base assets are added to maintain the expected ID order)
+  await deployAdaptors(poolProxy.address, adpParams, deployConfig);
+
   // pause the protocol immediately after deployment to prevent any interactions before the setup is complete
   // @ts-ignore
   const pauseHash = await wallets[0].writeContract({
@@ -536,25 +561,6 @@ const main = async () => {
   });
   await client.waitForTransactionReceipt({ hash: transferOwnershipHash });
   console.log("Pool: ownership transferred");
-
-  // @ts-ignore
-  const setPoolTxHash = await wallets[0].writeContract({
-    address: adaptorHandler.address,
-    abi: adaptorHandlerAbi,
-    functionName: "setVeilnyxPool",
-    args: [poolProxy.address],
-  });
-  await client.waitForTransactionReceipt({ hash: setPoolTxHash });
-  console.log("AdaptorHandler: veilnyxPool set to", poolProxy.address);
-
-  // ERC4337 infra setup
-  await deployErc4337Infra(chainParams, poolProxy.address, deployConfig);
-
-  // Asset & Revoker Setup
-  await addAssetsAndRevokers(poolProxy.address, chainParams, commonParams, client, deployConfig.client.wallet);
-
-  // Deploy Adaptors (should be after base assets are added to maintain the expected ID order)
-  await deployAdaptors(poolProxy.address, adpParams, deployConfig);
 
   // Verify all core contracts on Etherscan
   await verifyAll({ asset, merkleTree, queuedMerkleTree, shieldedAddress, shieldedTransaction, adaptorHandler, poolImpl, poolProxy, initData });

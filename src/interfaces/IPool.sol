@@ -24,6 +24,19 @@ struct InitAddressParams {
     IHasher hasher;
 }
 
+/// @param withdrawFeeBps Withdrawal fee in basis points (1 bps = 0.01%).
+/// @param tvlLimitUsd Maximum allowed TVL in USD (6-decimal). 0 = disabled.
+/// @param minDepositUsd Minimum single-deposit value in USD (6-decimal). 0 = disabled.
+/// @param maxDepositUsd Maximum single-deposit value in USD (6-decimal). 0 = disabled.
+/// @param tvlPriceStalenessTreshold Maximum age in seconds for a Chainlink price answer before it is considered stale.
+struct PoolConfigParams {
+    uint256 withdrawFeeBps;
+    uint256 tvlLimitUsd;
+    uint256 minDepositUsd;
+    uint256 maxDepositUsd;
+    uint256 tvlPriceStalenessTreshold;
+}
+
 interface IPool {
     /////////////////////////////////////////
     //            EVENTS                   //
@@ -71,6 +84,7 @@ interface IPool {
     event TvlLimitUpdated(uint256 limit);
     event MinDepositUpdated(uint256 limit);
     event MaxDepositUpdated(uint256 limit);
+    event TvlPriceStalenessTresholdUpdated(uint256 threshold);
 
     /////////////////////////////////////////
     //            ERRORS                   //
@@ -101,6 +115,7 @@ interface IPool {
     error TvlPriceStale(uint24 assetId, uint256 updatedAt);
     error TvlPriceInvalid(uint24 assetId, int256 price);
     error TvlLimitExceeded(uint256 projectedTvl, uint256 limit);
+    error DepositRestrictedAsAssetFeedNotSet(uint24 assetId);
     error DepositBelowMinimum(uint256 depositUsd, uint256 minDepositUsd);
     error DepositAboveMaximum(uint256 depositUsd, uint256 maxDepositUsd);
 
@@ -192,6 +207,10 @@ interface IPool {
 
     /// @notice Sets the maximum single-deposit value in USD (6-decimal precision). Set to 0 to disable.
     function setMaxDepositUsd(uint256 limitUsd) external;
+
+    /// @notice Sets the maximum age of a Chainlink price answer before it is considered stale.
+    /// @param threshold Age in seconds. Can only be called by the owner.
+    function setTvlPriceStalenessTreshold(uint256 threshold) external;
 
     /////////////////////////////////////////
     //        PUBLIC WRITE METHODS         //

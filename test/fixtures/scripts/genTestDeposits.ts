@@ -9,21 +9,21 @@ const {
 } = fixture;
 
 export const reqs = {
-  deposit_weth_tx: {
+  deposit_2_testnet_weth: {
     type: TransactionType.DEPOSIT,
-    assetIds: [weth],
-    values: [parseEther("100")],
+    assetIds: [testnetWeth],
+    values: [parseEther("2")],
     feeAssetId: 0,
     to: senderAccount.shieldedAddress.pack(),
     viaBundler: false,
     paymaster: zeroAddress,
     revokerId: 0,
   }
-  /**,
-  deposit_2_testnet_weth: {
+  /**
+  deposit_weth_tx: {
     type: TransactionType.DEPOSIT,
-    assetIds: [testnetWeth],
-    values: [parseEther("2")],
+    assetIds: [weth],
+    values: [parseEther("100")],
     feeAssetId: 0,
     to: senderAccount.shieldedAddress.pack(),
     viaBundler: false,

@@ -179,26 +179,26 @@ contract PoolTvlTest is PoolTest {
     // getTvlUsd — revert paths
     // ─────────────────────────────────────────────────────────────────────────
 
-    /// getTvlUsd reverts when an active asset has no feed registered.
-    /// Explicitly clear asset1's feed so the test is consistent on both local and fork.
-    function test_revert_getTvlUsd_noFeedRegistered() public {
-        pool.setAssetPriceFeed(asset1.id, AggregatorV3Interface(address(0)));
+    /// getTvlUsd skips assets with no feed registered and includes only assets with feeds.
+    function test_getTvlUsd_noFeedRegistered_skipsAsset() public {
+        pool.setAssetPriceFeed(
+            asset1.id,
+            AggregatorV3Interface(address(mockFeed2))
+        );
         pool.setAssetPriceFeed(
             asset2.id,
             AggregatorV3Interface(address(mockFeed2))
         );
-        pool.setAssetPriceFeed(
-            asset3.id,
-            AggregatorV3Interface(address(mockFeed3))
-        );
+        pool.setAssetPriceFeed(asset3.id, AggregatorV3Interface(address(0)));
+        token1.mint(address(pool), 1 ether);
+        token2.mint(address(pool), 1000e6);
 
-        vm.expectRevert(
-            abi.encodeWithSelector(IPool.TvlPriceFeedNotSet.selector, asset1.id)
-        );
-        pool.getTvlUsd();
+        // Should not revert — asset1 is skipped (contributes 0), asset2+3 are included.
+        uint256 tvl = pool.getTvlUsd();
+        assertGt(tvl, 0);
     }
 
-    /// getTvlUsd reverts when the price data is older than TVL_PRICE_STALENESS_THRESHOLD (1 hour).
+    /// getTvlUsd reverts when the price data is older than tvlPriceStalenessTreshold.
     /// Reads updatedAt from the actually registered feed (real on fork, mock on local).
     function test_revert_getTvlUsd_stalePrice() public {
         _registerAllFeeds();
@@ -207,8 +207,8 @@ contract PoolTvlTest is PoolTest {
             .getAsset(asset1.id)
             .usdPriceFeed
             .latestRoundData();
-        // Wind clock 2 days forward so the feed is 2d stale (threshold = 1d).
-        vm.warp(block.timestamp + 2 days);
+        // Wind clock past the configured staleness threshold.
+        vm.warp(block.timestamp + pool.tvlPriceStalenessTreshold() + 1);
 
         vm.expectRevert(
             abi.encodeWithSelector(
@@ -513,5 +513,30 @@ contract PoolTvlTest is PoolTest {
             "withdraw_100_weth_without_fee"
         );
         pool.transact(stx); // WITHDRAW → deposit guard not triggered → success
+    }
+
+    /// Deposit transaction where asset1 has no registered price feed reverts with DepositRestrictedAsAssetFeedNotSet.
+    /// Feeds are set during _setUp(), so they must be explicitly cleared first.
+    function test_revert_whenDepositWithinLimits_assetFeedNotSet() public {
+        // Explicitly clear feeds — _setUp() registers _defaultMockFeed for all assets.
+        pool.setAssetPriceFeed(asset1.id, AggregatorV3Interface(address(0)));
+        pool.setAssetPriceFeed(asset2.id, AggregatorV3Interface(address(0)));
+
+        _mintAsset(asset1, address(this), 10000 ether);
+        _mintAsset(asset2, address(this), 10000e6);
+        _approveAsset(asset1, address(pool), 10000 ether);
+        _approveAsset(asset2, address(pool), 10000e6);
+
+        ShieldedTransaction memory stx = _loadShieldedTransaction(
+            "deposit_pre_tx"
+        );
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IPool.DepositRestrictedAsAssetFeedNotSet.selector,
+                asset1.id
+            )
+        );
+        pool.transact(stx);
     }
 }
