@@ -25,13 +25,32 @@ const forkEnabled = process.env.HARDHAT_FORK === "true";
 
 const config: HardhatUserConfig = {
   solidity: {
-    version: "0.8.24",
-    settings: {
-      optimizer: {
-        enabled: true,
-        runs: 10_00_000,
+    compilers: [
+      {
+        version: "0.8.24",
+        settings: {
+          optimizer: {
+            enabled: true,
+            runs: 10_00_000,
+          },
+        },
       },
-    }
+    ],
+    // Mirror the foundry.toml `compilation_restrictions` override: Pool sits
+    // close to the EIP-170 24,576-byte limit, so compile it with low runs to
+    // shrink runtime bytecode at the cost of a tiny gas overhead on the thin
+    // dispatch shell. All other contracts keep the global 1M runs.
+    overrides: {
+      "src/core/Pool.sol": {
+        version: "0.8.24",
+        settings: {
+          optimizer: {
+            enabled: true,
+            runs: 200,
+          },
+        },
+      },
+    },
   },
   networks: {
     hardhat: {
