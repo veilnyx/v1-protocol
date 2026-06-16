@@ -4,11 +4,22 @@ import { TransactionType } from "@labyrinthac/shared-types";
 import { fixture, generateTestTransactions, mockNotes, PAYMASTER_ADDR_FIXTURE } from "./fixture";
 
 const {
-  assets: { weth, usdc, reentrantToken },
+  assets: { weth, usdc, reentrantToken, testnetWeth },
   sender: { account: senderAccount, pubAddress: senderPubAddress },
 } = fixture;
 
 export const reqs = {
+  withdraw_1_testnet_weth_without_fee: {
+    type: TransactionType.WITHDRAW,
+    assetIds: [testnetWeth],
+    values: [parseEther("1")],
+    feeAssetId: 0,
+    to: senderPubAddress,
+    viaBundler: false,
+    paymaster: zeroAddress,
+    revokerId: 0,
+  }
+  /**,
   withdraw_100_weth_without_fee: {
     type: TransactionType.WITHDRAW,
     assetIds: [weth],
@@ -18,8 +29,7 @@ export const reqs = {
     viaBundler: false,
     paymaster: zeroAddress,
     revokerId: 0,
-  }
-  /**
+  },
   withdraw_500_reentrantToken_to_attacker_contract: {
     type: TransactionType.WITHDRAW,
     assetIds: [reentrantToken],
@@ -64,6 +74,6 @@ withdraw_500_weth_without_fee: {
 };
 
 export const genTestWithdrawals = async (sdk: Core) => {
-  await mockNotes("deposit_pre_tx", sdk);
+  await mockNotes("deposit_2_testnet_weth", sdk);
   await generateTestTransactions(reqs, sdk);
 };

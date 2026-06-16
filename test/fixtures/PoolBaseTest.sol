@@ -19,6 +19,7 @@ import {IAdaptorHandler} from "src/interfaces/IAdaptorHandler.sol";
 import {IHasher} from "src/interfaces/IHasher.sol";
 import {IScreener} from "src/interfaces/IScreener.sol";
 import {IPool} from "src/interfaces/IPool.sol";
+import {IWToken} from "src/interfaces/IWToken.sol";
 import {MockPool} from "test/mocks/MockPool.sol";
 import {MockScreener} from "test/mocks/MockScreener.sol";
 import {MockERC20} from "test/mocks/MockERC20.sol";
@@ -97,7 +98,8 @@ contract PoolBaseTest is BaseTest {
             tvlLimitUsd: 0,
             minDepositUsd: 0,
             maxDepositUsd: 0,
-            tvlPriceStalenessTreshold: 1 days
+            tvlPriceStalenessTreshold: 1 days,
+            wToken: IWToken(config.wToken())
         });
 
         bytes memory initData = abi.encodeCall(
@@ -112,7 +114,7 @@ contract PoolBaseTest is BaseTest {
         );
 
         ERC1967Proxy poolProxy = new ERC1967Proxy(address(pool), initData);
-        pool = MockPool(address(poolProxy));
+        pool = MockPool(payable(address(poolProxy)));
         adaptorHandler.setVeilnyxPool(IPool(address(pool)));
     }
 

@@ -13,6 +13,7 @@ import {IPool, InitAddressParams, PoolConfigParams} from "../interfaces/IPool.so
 import {IAdaptorHandler} from "../interfaces/IAdaptorHandler.sol";
 import {IScreener} from "../interfaces/IScreener.sol";
 import {IHasher} from "../interfaces/IHasher.sol";
+import {IWToken} from "../interfaces/IWToken.sol";
 import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {EIP712_DOMAIN_NAME, EIP712_DOMAIN_VERSION, MAX_WITHDRAW_FEE_BPS, TVL_USD_DECIMALS} from "../base/Constants.sol";
@@ -81,6 +82,7 @@ contract Pool is
         minDepositUsd = configParams.minDepositUsd;
         maxDepositUsd = configParams.maxDepositUsd;
         tvlPriceStalenessTreshold = configParams.tvlPriceStalenessTreshold;
+        wToken = configParams.wToken;
 
         _addressTree.init(addressTreeDepth, hasher);
         _commitmentTree.init(
@@ -250,9 +252,25 @@ contract Pool is
 
     /// @notice Sets the maximum age of a Chainlink price answer before it is considered stale.
     /// @param threshold Age in seconds. A lower value is stricter; set to type(uint256).max to effectively disable the staleness check.
-    function setTvlPriceStalenessTreshold(uint256 threshold) external onlyOwner {
+    function setTvlPriceStalenessTreshold(
+        uint256 threshold
+    ) external onlyOwner {
         tvlPriceStalenessTreshold = threshold;
         emit IPool.TvlPriceStalenessTresholdUpdated(threshold);
+    }
+
+    /// @notice Sets the wrapped native token (e.g. WETH) used to convert any
+    ///         incoming `msg.value` into the corresponding ERC20 deposit
+    ///         during a DEPOSIT transaction.
+    /// @dev    Setting `wToken_` to address(0) disables native ETH deposits via
+    ///         this Pool: any `transact` call carrying `msg.value` will revert.
+    ///         The `wToken_` address must also be registered as an active
+    ///         ERC20 asset (via `addAssets`) for native ETH deposits to be
+    ///         accepted at runtime.
+    /// @param wToken_ The wrapped native token contract.
+    function setWToken(IWToken wToken_) external onlyOwner {
+        wToken = wToken_;
+        emit IPool.WTokenUpdated(address(wToken_));
     }
 
     /////////////////////////////////////////
@@ -285,7 +303,7 @@ contract Pool is
 
     function transact(
         ShieldedTransaction calldata stx
-    ) public nonReentrant whenNotPaused {
+    ) public payable nonReentrant whenNotPaused {
         checkDepositWithinLimits(stx);
         _checkTvlLimitNotCrossed(stx);
         stx.validate({
@@ -297,6 +315,19 @@ contract Pool is
             revokerDataMap: _revokers
         });
 
+        // Resolve the wToken and its asset ID once; used for both DEPOSIT
+        // wrapping and WITHDRAW unwrapping so storage is read only once.
+        IWToken _wToken = wToken;
+        uint24 _wTokenAssetId = _resolveWTokenAssetId(_wToken);
+
+        // If the caller attached native ETH, wrap it into wToken up-front so
+        // the ensuing deposit logic can treat the wToken portion as already
+        // credited to the Pool. msg.value == 0 preserves the ERC20
+        // transferFrom flow for every pubAsset (including wToken).
+        if (msg.value > 0) {
+            _wrapNativeEthForDeposit(stx, _wToken, _wTokenAssetId);
+        }
+
         stx.execute({
             commitmentTree: _commitmentTree,
             assets: _assets,
@@ -304,9 +335,14 @@ contract Pool is
             withdrawFees: _withdrawFees,
             hasher: hasher,
             adaptorHandler: adaptorHandler,
-            withdrawFeeBps: withdrawFeeBps
+            withdrawFeeBps: withdrawFeeBps,
+            wToken_: _wToken,
+            wTokenAssetId: _wTokenAssetId
         });
     }
+
+    /// @dev Accepts native ETH sent back by the wToken contract during WITHDRAW unwrapping.
+    receive() external payable {}
 
     /// @custom:invariant ACCESS-3: Only paymasters can withdraw their accumulated fees
     function withdrawPaymasterFee(
@@ -575,6 +611,107 @@ contract Pool is
             unchecked {
                 ++i;
             }
+        }
+    }
+
+    /// @notice Returns the asset id of `_wToken_` in this pool, or 0 if it is
+    ///         not configured or not registered as an asset. Does not revert.
+    ///         Used by `transact` to drive both the DEPOSIT wrap path and the
+    ///         WITHDRAW unwrap path without reading wToken storage twice.
+    function _resolveWTokenAssetId(
+        IWToken _wToken_
+    ) internal view returns (uint24) {
+        if (address(_wToken_) == address(0)) return 0;
+        return _assetIds[address(_wToken_)];
+    }
+
+    /// @notice Wraps the attached `msg.value` into the configured wToken so it
+    ///         can be used as the wToken portion of a DEPOSIT.
+    /// @dev    Called from `transact` only when `msg.value > 0`. Validates that
+    ///         the call shape is consistent with wrapping native ETH:
+    ///         - `txType` must be DEPOSIT (otherwise the ETH would be locked).
+    ///         - `wToken` must be configured and registered as an active
+    ///           ERC20 asset (otherwise wrapping has no destination).
+    ///         - exactly one pubAsset must reference the wToken's asset id.
+    ///         - `msg.value` must be `<=` that pubAsset's full (pre-fee) value
+    ///           so no surplus ETH is locked in the Pool. Strict-less means
+    ///           the caller has chosen to top up the deposit by approving the
+    ///           remainder in wToken (ERC20) form; we pull that delta with
+    ///           `transferFrom(msg.sender, address(this), delta)` so the Pool
+    ///           ends up holding the full `wTokenValue` of wToken before the
+    ///           library proceeds. The library skips its own per-asset
+    ///           `transferFrom` for the wToken id via `prefundedAssetId`.
+    /// @param  stx The shielded transaction being executed.
+    /// @param  _wToken_ The resolved wToken contract (from `_resolveWTokenAssetId`).
+    /// @param  wTokenAssetId The resolved wToken asset id (from `_resolveWTokenAssetId`).
+    function _wrapNativeEthForDeposit(
+        ShieldedTransaction calldata stx,
+        IWToken _wToken_,
+        uint24 wTokenAssetId
+    ) internal {
+        if (stx.txType != ShieldedTransactionType.DEPOSIT) {
+            revert IPool.NativeEthOnlyForDeposit();
+        }
+
+        if (address(_wToken_) == address(0)) {
+            revert IPool.WTokenNotConfigured();
+        }
+
+        if (wTokenAssetId == 0 || !_assets[wTokenAssetId].isActive) {
+            revert IPool.WTokenNotConfigured();
+        }
+
+        // Locate the wToken pubAsset entry. pubAssets uses (assetId | value)
+        // packed into a uint248. We compare against the full pre-fee pubAsset
+        // value: this is the on-chain inflow the user is committing to. A
+        // paymaster fee, if any, is later subtracted from this value inside
+        // the library and credited to the paymaster, so the Pool must hold
+        // the entire pre-fee amount before execution proceeds.
+        uint256 nPubs = stx.pubAssets.length;
+        bool found;
+        uint256 wTokenValue;
+        for (uint256 i; i < nPubs; ) {
+            uint24 id = uint24(bytes3(bytes31(stx.pubAssets[i])));
+            if (id == wTokenAssetId) {
+                if (found) {
+                    // A well-formed stx must not list the same assetId twice
+                    // in pubAssets. Reject early so the msg.value invariants
+                    // below remain unambiguous.
+                    revert IPool.DuplicatePubAssetId(id);
+                }
+                wTokenValue = uint224(stx.pubAssets[i]);
+                found = true;
+            }
+            unchecked {
+                ++i;
+            }
+        }
+
+        if (!found) {
+            revert IPool.WTokenNotInPubAssets();
+        }
+        if (msg.value > wTokenValue) {
+            revert IPool.NativeEthExceedsDeposit(msg.value, wTokenValue);
+        }
+
+        // Wrap the attached native ETH into wToken; the resulting wToken
+        // balance is held directly by this Pool.
+        _wToken_.deposit{value: msg.value}();
+
+        // If the caller chose to fund only part of the deposit with native
+        // ETH, pull the remainder in wToken (ERC20) form. This requires the
+        // caller to have approved at least (wTokenValue - msg.value) of
+        // wToken to this Pool. Combined with the wrap above, the Pool now
+        // holds exactly `wTokenValue` of wToken for this deposit, allowing
+        // the library to skip its own transferFrom for the wToken id.
+        uint256 remainder = wTokenValue - msg.value;
+        if (remainder != 0) {
+            AssetLogic.receiveAsset({
+                assets: _assets,
+                from: msg.sender,
+                assetId: wTokenAssetId,
+                value: remainder
+            });
         }
     }
 }

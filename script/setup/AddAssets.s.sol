@@ -9,7 +9,7 @@ import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interf
 contract AddAssets is BaseScript {
     function run() external broadcast {
         address poolProxy = _getContract("PoolProxy");
-        Pool pool = Pool(poolProxy);
+        Pool pool = Pool(payable(poolProxy));
 
         AssetType assetType = AssetType.ERC20;
         address[] memory assetAddresses = new address[](1);

@@ -489,6 +489,7 @@ const main = async () => {
     minDepositUsd: BigInt(2e6),      // $2 (6-decimal precision)
     maxDepositUsd: BigInt(200e6),    // $200 (6-decimal precision)
     tvlPriceStalenessTreshold: ONE_DAY * 5n, // 5 days in seconds
+    wToken: chainParams.wToken,      // wrapped native token (e.g. WETH) for native ETH deposits
   };
 
   const args = [
@@ -521,6 +522,9 @@ const main = async () => {
   });
   await client.waitForTransactionReceipt({ hash: setVersionHash });
   console.log("Pool: version set to", commonParams.protocolVersion);
+
+  // wToken is set via PoolConfigParams during initialize() above; no separate
+  // setWToken call is needed for fresh deployments.
 
   // @ts-ignore
   const setPoolTxHash = await wallets[0].writeContract({

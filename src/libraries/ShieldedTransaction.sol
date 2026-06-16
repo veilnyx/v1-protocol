@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0
 pragma solidity 0.8.24;
 
+import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 import {FIELD_SIZE} from "../base/Constants.sol";
 import {ArrayUtils} from "./ArrayUtils.sol";
 import {Asset, AssetLogic} from "./Asset.sol";
@@ -11,6 +12,7 @@ import {IVerifier} from "../interfaces/IVerifier.sol";
 import {IHasher} from "../interfaces/IHasher.sol";
 import {IAdaptorHandler} from "../interfaces/IAdaptorHandler.sol";
 import {INebraUpa} from "../interfaces/INebraUpa.sol";
+import {IWToken} from "../interfaces/IWToken.sol";
 
 /// @title ShieldedTransactionType enum representing types of shielded transactions
 enum ShieldedTransactionType {
@@ -200,6 +202,12 @@ library ShieldedTransactionLogic {
     /// @param assets Mapping of assetId to Asset
     /// @param adaptorHandler Address of the adaptor handler contract responsible for handling DeFi adaptor ops
     /// @param paymasterFees Mapping of paymaster address to assetId to fee value
+    /// @param wToken_ Wrapped native token (e.g. WETH). On DEPOSIT with
+    ///        `msg.value > 0` the wToken was pre-funded by the caller via
+    ///        wrapping, so `transferFrom` is skipped for that asset id. On
+    ///        WITHDRAW, the wToken is unwrapped to native ETH before forwarding
+    ///        to the recipient. Pass address(0) to disable both behaviours.
+    /// @param wTokenAssetId Asset id of `wToken_`. Pass 0 to disable.
     function execute(
         ShieldedTransaction calldata stx,
         QueuedMerkleTree storage commitmentTree,
@@ -208,7 +216,9 @@ library ShieldedTransactionLogic {
         mapping(uint24 => uint256) storage withdrawFees,
         IHasher hasher,
         IAdaptorHandler adaptorHandler,
-        uint256 withdrawFeeBps
+        uint256 withdrawFeeBps,
+        IWToken wToken_,
+        uint24 wTokenAssetId
     ) external {
         Params memory params = _copyParamsToMemory(stx);
         MemoParams memory memoParams = _copyMemoParamsToMemory(stx);
@@ -216,29 +226,40 @@ library ShieldedTransactionLogic {
         // Credit paymaster fees
         _creditPaymasterFee(paymasterFees, params);
 
-        // Receive any deposits
+        // Receive any deposits; skip transferFrom for the wToken asset when
+        // msg.value > 0 because the caller already pre-funded it via wrapping.
         if (stx.txType == ShieldedTransactionType.DEPOSIT) {
-            _receivePubAssets(assets, params.pubAssets, msg.sender);
+            uint24 prefundedAssetId = msg.value > 0 ? wTokenAssetId : 0;
+            _receivePubAssets(
+                assets,
+                params.pubAssets,
+                msg.sender,
+                prefundedAssetId
+            );
         }
 
-        // Transfer any withdrawals
+        // Transfer any withdrawals — unwrap wToken to native ETH when applicable
         if (stx.txType == ShieldedTransactionType.WITHDRAW) {
             _transferPubAssets(
                 assets,
                 withdrawFees,
                 params.pubAssets,
                 params.target,
-                withdrawFeeBps
+                withdrawFeeBps,
+                wToken_,
+                wTokenAssetId
             );
         }
 
-        // Perform any conversions
+        // Perform any conversions — adaptors receive ERC20 tokens, no unwrapping
         if (stx.txType == ShieldedTransactionType.CALL_ADAPTOR) {
             _transferPubAssets(
                 assets,
                 withdrawFees,
                 params.pubAssets,
                 address(adaptorHandler),
+                0,
+                IWToken(address(0)),
                 0
             );
             _handleAdaptorCall(
@@ -567,7 +588,7 @@ library ShieldedTransactionLogic {
             params.targetPayload
         );
 
-        _receivePubAssets(assets, outPubAssets, address(adaptorHandler));
+        _receivePubAssets(assets, outPubAssets, address(adaptorHandler), 0);
 
         /// @dev Creating commitments and output noteMemos for received tokens. This is done on the protocol side for CALL_ADAPTOR txns because the exact value of converted tokens can only be determined after executing the tx.
         /// @dev `refundAddress` is used as the recipient's blinded address.
@@ -611,11 +632,26 @@ library ShieldedTransactionLogic {
     function _receivePubAssets(
         mapping(uint24 => Asset) storage assets,
         PubAsset[] memory pubAssets,
-        address from
+        address from,
+        uint24 prefundedAssetId
     ) internal {
         uint256 count = pubAssets.length;
 
         for (uint256 i = 0; i < count; ) {
+            // Skip pulling tokens for an asset that has already been credited
+            // to the Pool out-of-band (e.g. via wrapping native ETH into
+            // wToken in `Pool.transact`). Each asset id appears at most once
+            // in pubAssets so a single match per id is sufficient.
+            if (
+                prefundedAssetId != 0 &&
+                pubAssets[i].id == prefundedAssetId
+            ) {
+                unchecked {
+                    ++i;
+                }
+                continue;
+            }
+
             AssetLogic.receiveAsset({
                 assets: assets,
                 from: from,
@@ -634,7 +670,9 @@ library ShieldedTransactionLogic {
         mapping(uint24 => uint256) storage withdrawFees,
         PubAsset[] memory pubAssets,
         address to,
-        uint256 feeBps
+        uint256 feeBps,
+        IWToken wToken_,
+        uint24 wTokenAssetId
     ) internal {
         uint256 count = pubAssets.length;
 
@@ -648,12 +686,20 @@ library ShieldedTransactionLogic {
             }
 
             fee = feeBps == 0 ? 0 : (pubAssets[i].value * feeBps) / 10000;
-            AssetLogic.transferAsset({
-                assets: assets,
-                to: to,
-                assetId: pubAssets[i].id,
-                value: pubAssets[i].value - fee
-            });
+            uint256 transferAmount = pubAssets[i].value - fee;
+
+            if (wTokenAssetId != 0 && pubAssets[i].id == wTokenAssetId) {
+                // Unwrap wToken → native ETH and forward to recipient
+                wToken_.withdraw(transferAmount);
+                Address.sendValue(payable(to), transferAmount);
+            } else {
+                AssetLogic.transferAsset({
+                    assets: assets,
+                    to: to,
+                    assetId: pubAssets[i].id,
+                    value: transferAmount
+                });
+            }
 
             if (fee != 0) {
                 withdrawFees[pubAssets[i].id] += fee;

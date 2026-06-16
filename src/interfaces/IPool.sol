@@ -12,6 +12,7 @@ import {IVerifier} from "./IVerifier.sol";
 import {IAdaptorHandler} from "./IAdaptorHandler.sol";
 import {IScreener} from "./IScreener.sol";
 import {IHasher} from "./IHasher.sol";
+import {IWToken} from "./IWToken.sol";
 
 /// @param verifier The address of the verifier contract. Verifier contract verifies the stx's zk proof, address proof and merkle tree queue proof.
 /// @param adaptorHandler The address of the adaptor handler contract, responsible for delegate calling adaptors of external DeFi protocols.
@@ -29,12 +30,17 @@ struct InitAddressParams {
 /// @param minDepositUsd Minimum single-deposit value in USD (6-decimal). 0 = disabled.
 /// @param maxDepositUsd Maximum single-deposit value in USD (6-decimal). 0 = disabled.
 /// @param tvlPriceStalenessTreshold Maximum age in seconds for a Chainlink price answer before it is considered stale.
+/// @param wToken Wrapped native token (e.g. WETH) used to wrap incoming msg.value
+///        into the corresponding ERC20 deposit during DEPOSIT transactions.
+///        Pass address(0) to disable native ETH deposits at deploy time; can
+///        later be enabled by the owner via `setWToken`.
 struct PoolConfigParams {
     uint256 withdrawFeeBps;
     uint256 tvlLimitUsd;
     uint256 minDepositUsd;
     uint256 maxDepositUsd;
     uint256 tvlPriceStalenessTreshold;
+    IWToken wToken;
 }
 
 interface IPool {
@@ -85,6 +91,7 @@ interface IPool {
     event MinDepositUpdated(uint256 limit);
     event MaxDepositUpdated(uint256 limit);
     event TvlPriceStalenessTresholdUpdated(uint256 threshold);
+    event WTokenUpdated(address indexed wToken);
 
     /////////////////////////////////////////
     //            ERRORS                   //
@@ -118,6 +125,30 @@ interface IPool {
     error DepositRestrictedAsAssetFeedNotSet(uint24 assetId);
     error DepositBelowMinimum(uint256 depositUsd, uint256 minDepositUsd);
     error DepositAboveMaximum(uint256 depositUsd, uint256 maxDepositUsd);
+
+    /// @dev msg.value was sent for a non-DEPOSIT transaction. Native ETH is only
+    ///      accepted on DEPOSIT to be wrapped into the configured wToken.
+    error NativeEthOnlyForDeposit();
+
+    /// @dev Native ETH was sent but the wrapped-native token (wToken) is not
+    ///      configured on this Pool, or the wToken has not been registered as
+    ///      an active asset.
+    error WTokenNotConfigured();
+
+    /// @dev Native ETH was sent but the deposit transaction has no pubAsset
+    ///      entry for the configured wToken to match against.
+    error WTokenNotInPubAssets();
+
+    /// @dev pubAssets contains more than one entry for the same assetId.
+    ///      A well-formed shielded transaction must list each asset at most
+    ///      once.
+    error DuplicatePubAssetId(uint24 assetId);
+
+    /// @dev msg.value exceeds the (pre-fee) wToken pubAsset value of the
+    ///      deposit. Refusing to wrap to avoid locking the surplus ETH in the
+    ///      Pool. Send `msg.value <= wTokenValue` and approve the wToken
+    ///      remainder if msg.value < wTokenValue.
+    error NativeEthExceedsDeposit(uint256 sent, uint256 expected);
 
     /////////////////////////////////////////
     //         ADMIN WRITE METHODS         //
@@ -212,6 +243,14 @@ interface IPool {
     /// @param threshold Age in seconds. Can only be called by the owner.
     function setTvlPriceStalenessTreshold(uint256 threshold) external;
 
+    /// @notice Sets the wrapped native token (e.g. WETH) used to convert any
+    ///         incoming `msg.value` into the corresponding ERC20 deposit during
+    ///         a DEPOSIT transaction.
+    /// @notice Can only be called by the owner.
+    /// @param wToken The wrapped native token contract. Pass address(0) to
+    ///        disable native ETH deposits via this Pool.
+    function setWToken(IWToken wToken) external;
+
     /////////////////////////////////////////
     //        PUBLIC WRITE METHODS         //
     ////////////////////////////////////////
@@ -231,8 +270,15 @@ interface IPool {
 
     /// @notice Validates and executes a stx.
     /// @notice Can only be called when the contract is not paused.
+    /// @notice Payable: when the transaction is a DEPOSIT and `wToken` is set,
+    ///         the caller may attach native ETH equal to the (pre-fee) wToken
+    ///         pubAsset value. The Pool then wraps the ETH into wToken on
+    ///         behalf of the caller in lieu of pulling wToken from the caller's
+    ///         wallet via `transferFrom`. msg.value of 0 preserves the
+    ///         pre-existing ERC20 transferFrom flow for any asset (including
+    ///         wToken).
     /// @param stx The stx to be executed.
-    function transact(ShieldedTransaction calldata stx) external;
+    function transact(ShieldedTransaction calldata stx) external payable;
 
     /// @notice A function to call by a paymaster contract to claim the asset wise fees collected for the ERC-4337 transactions they catered to.
     /// @notice Can only be called when the contract is not paused.

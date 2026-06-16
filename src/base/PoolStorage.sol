@@ -9,6 +9,7 @@ import {IVerifier} from "../interfaces/IVerifier.sol";
 import {IAdaptorHandler} from "../interfaces/IAdaptorHandler.sol";
 import {IHasher} from "../interfaces/IHasher.sol";
 import {IScreener} from "../interfaces/IScreener.sol";
+import {IWToken} from "../interfaces/IWToken.sol";
 
 abstract contract PoolStorage {
     IVerifier public verifier;
@@ -52,4 +53,11 @@ abstract contract PoolStorage {
 
     /// @dev Maximum age of a Chainlink price answer before it is considered stale.
     uint256 public tvlPriceStalenessTreshold;
+
+    /// @dev Wrapped native token (e.g. WETH) used to convert any incoming msg.value
+    ///      into the corresponding ERC20 deposit during a DEPOSIT transaction.
+    ///      Must be set by the owner via `setWToken` before native ETH deposits
+    ///      are accepted; while unset (address(0)) any `transact` call carrying
+    ///      msg.value > 0 reverts. ERC20-only deposits are unaffected.
+    IWToken public wToken;
 }

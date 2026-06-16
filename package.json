@@ -17,6 +17,7 @@
     "deployP-2-P:veilnyx": "hardhat run script/deployP-2-P.ts --network veilnyxTestnet",
     "deployP-2-P:arc": "hardhat run script/deployP-2-P.ts --network arcTestnet",
     "upgrade:ethSepolia": "hardhat run script/upgradePool.ts --network sepolia",
+    "gen:upgradeCalldata": "hardhat run script/genUpgradeCalldata.ts --network sepolia",
     "upgradeMempool:ethSepolia": "hardhat run script/upgradeMempool.ts --network sepolia",
     "upgrade:opSepolia": "hardhat run script/upgrade.ts --network optimismSepolia",
     "transferOwnership": "forge script script/setup/TransferOwnership.s.sol:TransferOwnership --broadcast",

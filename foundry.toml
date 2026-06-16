@@ -34,6 +34,7 @@ runs = 10_000
 
 [rpc_endpoints]
 tenderly = "${RPC_TENDERLY}"
+eth_sepolia = "${RPC_ETH_SEPOLIA}"
 op_sepolia = "${RPC_OPTIMISM_SEPOLIA}"
 polygon_amoy = "${RPC_POLYGON_AMOY}"
 
