@@ -17,3 +17,9 @@ bytes32 constant EIP712_TYPEHASH_REGISTER_ADDRESS = keccak256(
 );
 string constant MESSAGE_REGISTER_ADDRESS = "Register Shielded Address";
 uint256 constant MAX_WITHDRAW_FEE_BPS = 0.25e4; // 25% in basis points
+
+uint8 constant COMMITMENT_MERKLE_TREE_ROOT_HISTORY_SIZE = 100;
+uint8 constant USER_REGISTER_MERKLE_TREE_ROOT_HISTORY_SIZE = 50;
+
+uint8 constant MERKLE_TREE_DEPTH = 20;
+uint8 constant COMMITMENT_TREE_DEPTH = 25;

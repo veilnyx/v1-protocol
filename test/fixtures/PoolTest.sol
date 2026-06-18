@@ -11,6 +11,7 @@ import {VerifierRegister} from "src/verifiers/VerifierRegister.sol";
 import {Asset, AssetType} from "src/libraries/Asset.sol";
 import {ShieldedTransaction, ShieldedTransactionType, RevokerData} from "src/libraries/ShieldedTransaction.sol";
 import {MerkleTree, MerkleTreeLogic} from "src/libraries/MerkleTree.sol";
+import {MERKLE_TREE_DEPTH, COMMITMENT_TREE_DEPTH} from "src/base/Constants.sol";
 import {TreeUpdateData} from "src/libraries/QueuedMerkleTree.sol";
 import {ShieldedAddressRegistrationData, ShieldedAddressLogic} from "src/libraries/ShieldedAddress.sol";
 import {IPool} from "src/interfaces/IPool.sol";
@@ -240,8 +241,7 @@ contract PoolTest is PoolBaseTest, BaseScript {
 
     function _processCommitmentTreeQueue() internal {
         // Process the batch
-        uint8 depth = fixture.commitmentTreeDepth;
-        _helperTree.init(depth, hasher);
+        _helperTree.init(hasher);
         console.log("Inside _processCommitmentTreeQueue");
         (uint256[] memory leaves, , , , uint32 nextLeafIndex) = pool
             .getCommitmentTreeState();
@@ -250,13 +250,22 @@ contract PoolTest is PoolBaseTest, BaseScript {
             _helperTree.insert(leaves[i]);
         }
 
-        (uint256[] memory lastSubtrees, uint256 lastRoot, , ) = _helperTree
-            .getState();
+        (
+            uint256[MERKLE_TREE_DEPTH] memory lastSubtreesFixed,
+            uint256 lastRoot,
+            ,
+
+        ) = _helperTree.getState();
+
+        uint256[COMMITMENT_TREE_DEPTH] memory lastSubtrees;
+        for (uint256 i = 0; i < MERKLE_TREE_DEPTH; ++i) {
+            lastSubtrees[i] = lastSubtreesFixed[i];
+        }
 
         TreeUpdateData memory treeUpdateData = TreeUpdateData({
             newRoot: lastRoot,
             batchSize: nextLeafIndex,
-            newSubtrees: lastSubtrees,
+            newLevelSubtrees: lastSubtrees,
             proof: bytes("")
         });
 

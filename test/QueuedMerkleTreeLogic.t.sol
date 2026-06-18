@@ -7,7 +7,7 @@ import {MerkleTree, MerkleTreeLogic} from "../src/libraries/MerkleTree.sol";
 import {IHasher} from "src/interfaces/IHasher.sol";
 import {IPool} from "src/interfaces/IPool.sol";
 import {QueuedMerkleTree, QueuedMerkleTreeLogic, TreeUpdateData} from "src/libraries/QueuedMerkleTree.sol";
-import {FIELD_SIZE, ZERO_LEAF} from "src/base/Constants.sol";
+import {FIELD_SIZE, ZERO_LEAF, COMMITMENT_TREE_DEPTH} from "src/base/Constants.sol";
 import {PoolTest} from "test/fixtures/PoolTest.sol";
 import {BaseTest} from "test/fixtures/BaseTest.sol";
 import {Fixture, FixtureLib} from "./fixtures/Fixture.sol";
@@ -43,13 +43,12 @@ contract QueuedMerkleTreeLogicTest is BaseTest {
         );
 
         qmt.init(
-            fixture.commitmentTreeDepth,
             fixture.commitmentTreeQueueSize,
             hasher,
             verifier_
         );
 
-        refTree.init(fixture.commitmentTreeDepth, hasher);
+        refTree.init(hasher);
     }
 
     ////////////////////////////////////////
@@ -57,11 +56,10 @@ contract QueuedMerkleTreeLogicTest is BaseTest {
     ////////////////////////////////////////
 
     function test_qmtInitialization() public view {
-        assertEq(qmt.depth, fixture.commitmentTreeDepth);
-        assertEq(qmt.capacity, 2 ** fixture.commitmentTreeDepth);
+        assertEq(qmt.capacity, 1 << COMMITMENT_TREE_DEPTH);
         assertEq(qmt.queueSize, fixture.commitmentTreeQueueSize);
-        assertEq(qmt.levels[0].zero, ZERO_LEAF);
-        assertEq(qmt.levels[0].lastSubtree, ZERO_LEAF);
+        assertEq(qmt.levelZeros[0], ZERO_LEAF);
+        assertEq(qmt.levelSubtrees[0], ZERO_LEAF);
         assertEq(qmt.nextLeafIndex, 0);
         assertEq(qmt.currentRootIndex, 0);
     }

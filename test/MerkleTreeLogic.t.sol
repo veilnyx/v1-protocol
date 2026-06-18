@@ -5,7 +5,7 @@ import {console2} from "forge-std/console2.sol";
 import {BinaryIMT as BinaryIMTLogic, BinaryIMTData} from "@zk-kit/imt.sol/BinaryIMT.sol";
 import {IHasher} from "src/interfaces/IHasher.sol";
 import {MerkleTree, MerkleTreeLogic} from "src/libraries/MerkleTree.sol";
-import {FIELD_SIZE, ZERO_LEAF} from "src/base/Constants.sol";
+import {FIELD_SIZE, ZERO_LEAF, MERKLE_TREE_DEPTH} from "src/base/Constants.sol";
 import {BaseTest} from "test/fixtures/BaseTest.sol";
 
 contract MerkleTreeLogicTest is BaseTest {
@@ -13,9 +13,6 @@ contract MerkleTreeLogicTest is BaseTest {
     MerkleTree internal _addressTree;
     BinaryIMTData internal _binaryIMTToCheckCommitmentTreeRoot;
     BinaryIMTData internal _binaryIMTToCheckAddressTreeRoot;
-
-    uint8 public constant commitmentTreeDepth = 20;
-    uint8 public constant addressTreeDepth = 10;
 
     uint256[] public commitments;
 
@@ -26,17 +23,17 @@ contract MerkleTreeLogicTest is BaseTest {
     }
 
     function setUp() external {
-        MerkleTreeLogic.init(_commitmentTree, commitmentTreeDepth, hasher);
+        MerkleTreeLogic.init(_commitmentTree, hasher);
         BinaryIMTLogic.init(
             _binaryIMTToCheckCommitmentTreeRoot,
-            commitmentTreeDepth,
+            MERKLE_TREE_DEPTH,
             ZERO_LEAF
         );
 
-        MerkleTreeLogic.init(_addressTree, addressTreeDepth, hasher);
+        MerkleTreeLogic.init(_addressTree, hasher);
         BinaryIMTLogic.init(
             _binaryIMTToCheckAddressTreeRoot,
-            addressTreeDepth,
+            MERKLE_TREE_DEPTH,
             ZERO_LEAF
         );
     }
@@ -46,23 +43,21 @@ contract MerkleTreeLogicTest is BaseTest {
     ////////////////////////////////////////
 
     function test_commitmentTree_initialization() public view {
-        assertEq(_commitmentTree.depth, commitmentTreeDepth);
-        assertEq(_commitmentTree.levels[0].zero, ZERO_LEAF);
-        assertEq(_commitmentTree.levels[0].lastSubtree, ZERO_LEAF);
+        assertEq(_commitmentTree.levelZeros[0], ZERO_LEAF);
+        assertEq(_commitmentTree.levelSubtrees[0], ZERO_LEAF);
         assertEq(_commitmentTree.nextLeafIndex, 0);
         assertEq(_commitmentTree.currentRootIndex, 0);
     }
 
     function test_addressTree_initialization() public view {
-        assertEq(_addressTree.depth, addressTreeDepth);
-        assertEq(_addressTree.levels[0].zero, ZERO_LEAF);
-        assertEq(_addressTree.levels[0].lastSubtree, ZERO_LEAF);
+        assertEq(_addressTree.levelZeros[0], ZERO_LEAF);
+        assertEq(_addressTree.levelSubtrees[0], ZERO_LEAF);
         assertEq(_addressTree.nextLeafIndex, 0);
         assertEq(_addressTree.currentRootIndex, 0);
     }
 
     function test_binaryIMT_initialization() public view {
-        assertEq(_binaryIMTToCheckAddressTreeRoot.depth, addressTreeDepth);
+        assertEq(_binaryIMTToCheckAddressTreeRoot.depth, MERKLE_TREE_DEPTH);
         assertEq(_binaryIMTToCheckAddressTreeRoot.zeroes[0], ZERO_LEAF);
         assertEq(_binaryIMTToCheckAddressTreeRoot.numberOfLeaves, 0);
     }
@@ -80,7 +75,7 @@ contract MerkleTreeLogicTest is BaseTest {
     ////////////////////////////////////////
 
     function test_revertWhenAddressTreeFull() external {
-        _addressTree.nextLeafIndex = uint32(2 ** addressTreeDepth);
+        _addressTree.nextLeafIndex = uint32(1 << MERKLE_TREE_DEPTH);
         uint256 commitmentLeaf = uint256(keccak256(abi.encode("commitment")));
 
         vm.expectRevert(MerkleTreeLogic.MerkleTreeFull.selector);
@@ -92,7 +87,7 @@ contract MerkleTreeLogicTest is BaseTest {
         MerkleTreeLogic.insert(_addressTree, userAddress);
         assertEq(_addressTree.nextLeafIndex, 1);
         assertEq(_addressTree.currentRootIndex, 1);
-        assertEq(_addressTree.levels[0].lastSubtree, userAddress);
+        assertEq(_addressTree.levelSubtrees[0], userAddress);
     }
 
     function test_multipleAddressInsertion() public {
@@ -103,7 +98,7 @@ contract MerkleTreeLogicTest is BaseTest {
         assertEq(_addressTree.nextLeafIndex, 2);
         assertEq(_addressTree.currentRootIndex, 2);
         assertEq(
-            _addressTree.levels[1].lastSubtree,
+            _addressTree.levelSubtrees[1],
             MerkleTreeLogic.hashLeaves(_addressTree, userAddress1, userAddress2)
         );
     }
@@ -111,7 +106,7 @@ contract MerkleTreeLogicTest is BaseTest {
     function test_rootsOnSingleAddressInsertion() public {
         uint256 userAddress = 1;
         MerkleTreeLogic.insert(_addressTree, userAddress);
-        BinaryIMTLogic.insert(_binaryIMTToCheckAddressTreeRoot, userAddress); // BinaryIMT::insert() expects the leaf to be already hashed
+        BinaryIMTLogic.insert(_binaryIMTToCheckAddressTreeRoot, userAddress);
 
         uint256 binaryIMTRoot = _binaryIMTToCheckAddressTreeRoot.root;
         uint256 addressTreeRoot = _addressTree.roots[
@@ -127,8 +122,8 @@ contract MerkleTreeLogicTest is BaseTest {
         MerkleTreeLogic.insert(_addressTree, userAddress1);
         MerkleTreeLogic.insert(_addressTree, userAddress2);
 
-        BinaryIMTLogic.insert(_binaryIMTToCheckAddressTreeRoot, userAddress1); // BinaryIMT::insert() expects the leaf to be already hashed
-        BinaryIMTLogic.insert(_binaryIMTToCheckAddressTreeRoot, userAddress2); // BinaryIMT::insert() expects the leaf to be already hashed
+        BinaryIMTLogic.insert(_binaryIMTToCheckAddressTreeRoot, userAddress1);
+        BinaryIMTLogic.insert(_binaryIMTToCheckAddressTreeRoot, userAddress2);
 
         uint256 binaryIMTRoot = _binaryIMTToCheckAddressTreeRoot.root;
         uint256 addressTreeRoot = _addressTree.roots[
@@ -143,7 +138,7 @@ contract MerkleTreeLogicTest is BaseTest {
     ///////////////////////////////////////////
 
     function test_revertWhenCommitmentTreeFull() external {
-        _commitmentTree.nextLeafIndex = uint32(2 ** commitmentTreeDepth);
+        _commitmentTree.nextLeafIndex = uint32(1 << MERKLE_TREE_DEPTH);
         uint256 commitmentLeaf = uint256(keccak256(abi.encode("commitment")));
 
         vm.expectRevert(MerkleTreeLogic.MerkleTreeFull.selector);
@@ -155,7 +150,6 @@ contract MerkleTreeLogicTest is BaseTest {
             keccak256(abi.encode("commitment1"))
         ) % FIELD_SIZE;
 
-        // inserting both leaves together in the commitment tree
         MerkleTreeLogic.insert(_commitmentTree, commitmentLeaf1);
         uint256 commitmentTreeRoot = _commitmentTree.roots[
             _commitmentTree.currentRootIndex

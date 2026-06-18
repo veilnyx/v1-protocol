@@ -110,8 +110,6 @@ const main = async () => {
         }
 
         const args = [
-            commonParams.addressTreeDepth,
-            commonParams.commitmentTreeDepth,
             commonParams.commitmentTreeQueueSize,
             initAddressParams,
             BigInt(commonParams.withdrawFeeBps),

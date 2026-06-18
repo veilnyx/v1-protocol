@@ -165,7 +165,7 @@ interface IPool {
         ShieldedAddressRegistrationData calldata addressRegData
     ) external;
 
-    /// @notice Updates the commitment tree with a queue of leaves. It uses zk proof under the hood to prove the `newRoot` and `newSubtrees` are valid.
+    /// @notice Updates the commitment tree with a queue of leaves. It uses zk proof under the hood to prove the `newRoot` and `newLevelSubtrees` are valid.
     /// @param updatedCommitmentTreeInputs The inputs needed by the zk verifier to verify the authenticity of the queued merkle tree update.
     function updateCommitmentTree(
         TreeUpdateData memory updatedCommitmentTreeInputs

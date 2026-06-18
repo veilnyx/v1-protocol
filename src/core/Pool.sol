@@ -13,7 +13,7 @@ import {IPool, InitAddressParams} from "../interfaces/IPool.sol";
 import {IAdaptorHandler} from "../interfaces/IAdaptorHandler.sol";
 import {IScreener} from "../interfaces/IScreener.sol";
 import {IHasher} from "../interfaces/IHasher.sol";
-import {EIP712_DOMAIN_NAME, EIP712_DOMAIN_VERSION, MAX_WITHDRAW_FEE_BPS} from "../base/Constants.sol";
+import {EIP712_DOMAIN_NAME, EIP712_DOMAIN_VERSION, MAX_WITHDRAW_FEE_BPS, MERKLE_TREE_DEPTH, COMMITMENT_TREE_DEPTH} from "../base/Constants.sol";
 import {PoolStorage} from "../base/PoolStorage.sol";
 import {Asset, AssetType, AssetLogic} from "../libraries/Asset.sol";
 import {MerkleTree, MerkleTreeLogic} from "../libraries/MerkleTree.sol";
@@ -43,12 +43,8 @@ contract Pool is
 
     /// @notice Initializes the Pool contract with the given parameters.
     /// @dev Pool is an UUPSUpgradeable contract, so it needs to be initialized.
-    /// @param addressTreeDepth The depth of the address tree.
-    /// @param commitmentTreeDepth The depth of the commitment tree.
     /// @param commitmentTreeQueueSize The size of the queue for the commitment tree. This determines how many leaves can be queued at MAX before a tree update is required. Defined by the circuit `treeUpdate::nLeaves`
     function initialize(
-        uint8 addressTreeDepth,
-        uint8 commitmentTreeDepth,
         uint8 commitmentTreeQueueSize,
         InitAddressParams calldata initAddressParams,
         uint256 withdrawFeeBps_
@@ -76,9 +72,8 @@ contract Pool is
 
         withdrawFeeBps = withdrawFeeBps_;
 
-        _addressTree.init(addressTreeDepth, hasher);
+        _addressTree.init(hasher);
         _commitmentTree.init(
-            commitmentTreeDepth,
             commitmentTreeQueueSize,
             hasher,
             verifier
@@ -314,7 +309,7 @@ contract Pool is
         view
         returns (
             uint256[] memory queuedLeaves,
-            uint256[] memory lastSubtrees,
+            uint256[COMMITMENT_TREE_DEPTH] memory lastSubtrees,
             uint256 lastRoot,
             uint8 currentRootIndex,
             uint32 nextLeafIndex
@@ -333,7 +328,7 @@ contract Pool is
         external
         view
         returns (
-            uint256[] memory lastSubtrees,
+            uint256[MERKLE_TREE_DEPTH] memory lastSubtrees,
             uint256 lastRoot,
             uint8 currentRootIndex,
             uint32 nextLeafIndex
