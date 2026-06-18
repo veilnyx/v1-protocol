@@ -14,6 +14,10 @@ import {ShieldedTransaction} from "../libraries/ShieldedTransaction.sol";
 import {Asset, AssetLogic} from "../libraries/Asset.sol";
 import {IPool} from "../interfaces/IPool.sol";
 
+interface IPoolPriceFeedStaleness {
+    function tvlPriceStalenessTreshold() external view returns (uint256);
+}
+
 contract Paymaster is IPaymaster, Ownable {
     uint256 public constant VALIDATION_SUCCESS = 0;
     uint24 public constant GAS_ASSET_ID = 65537; // AssetId for the active chain's native gas token
@@ -45,18 +49,18 @@ contract Paymaster is IPaymaster, Ownable {
      * params sender_: Address of the gateway contract.
      */
     constructor(
-        address entryPoint_,
+        IEntryPoint entryPoint_,
         address sender_,
-        address pool_
+        IPool pool_
     ) Ownable(msg.sender) {
         if (
-            entryPoint_ == address(0) ||
+            address(entryPoint_) == address(0) ||
             sender_ == address(0) ||
-            pool_ == address(0)
+            address(pool_) == address(0)
         ) revert ZeroAddress();
-        entryPoint = IEntryPoint(entryPoint_);
+        entryPoint = entryPoint_;
         sender = sender_;
-        pool = IPool(pool_);
+        pool = pool_;
     }
 
     /**
@@ -172,7 +176,8 @@ contract Paymaster is IPaymaster, Ownable {
         if (
             priceETHInAsset <= 0 ||
             updatedAt > block.timestamp ||
-            block.timestamp - updatedAt > 1 hours
+            block.timestamp - updatedAt >
+            IPoolPriceFeedStaleness(address(pool)).tvlPriceStalenessTreshold()
         ) {
             revert ChainlinkPriceInvalid(
                 priceETHInAsset,

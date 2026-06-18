@@ -9,6 +9,17 @@ const {
 } = fixture;
 
 export const reqs = {
+  withdraw_10_weth_with_weth_fee: {
+    type: TransactionType.WITHDRAW,
+    assetIds: [weth],
+    values: [parseEther("10")],
+    feeAssetId: weth,
+    to: senderPubAddress,
+    viaBundler: true,
+    paymaster: PAYMASTER_ADDR_FIXTURE as `0x${string}`,
+    revokerId: 0
+  }
+  /**,
   withdraw_1_testnet_weth_without_fee: {
     type: TransactionType.WITHDRAW,
     assetIds: [testnetWeth],
@@ -18,8 +29,7 @@ export const reqs = {
     viaBundler: false,
     paymaster: zeroAddress,
     revokerId: 0,
-  }
-  /**,
+  },
   withdraw_100_weth_without_fee: {
     type: TransactionType.WITHDRAW,
     assetIds: [weth],
@@ -39,16 +49,6 @@ export const reqs = {
     viaBundler: false,
     paymaster: zeroAddress,
     revokerId: 0,
-  },
-  withdraw_10_weth_with_weth_fee: {
-    type: TransactionType.WITHDRAW,
-    assetIds: [weth],
-    values: [parseEther("10")],
-    feeAssetId: weth,
-    to: senderPubAddress,
-    viaBundler: true,
-    paymaster: PAYMASTER_ADDR_FIXTURE as `0x${string}`,
-    revokerId: 0
   },
   withdraw_10_weth_with_usdc_fee: {
     type: TransactionType.WITHDRAW,
@@ -74,6 +74,6 @@ withdraw_500_weth_without_fee: {
 };
 
 export const genTestWithdrawals = async (sdk: Core) => {
-  await mockNotes("deposit_2_testnet_weth", sdk);
+  await mockNotes("deposit_pre_tx", sdk);
   await generateTestTransactions(reqs, sdk);
 };

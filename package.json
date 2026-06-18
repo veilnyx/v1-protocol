@@ -22,6 +22,7 @@
     "upgrade:opSepolia": "hardhat run script/upgrade.ts --network optimismSepolia",
     "transferOwnership": "forge script script/setup/TransferOwnership.s.sol:TransferOwnership --broadcast",
     "genPoseidon": "npx tsx script/genPoseidon.ts",
+    "deployPaymaster:sepolia": "hardhat run script/deployPaymaster.ts --network sepolia",
     "registerCircuitNebra:ethSepolia": "hardhat run script/registerCircuitsOnNebra.ts --network sepolia"
   },
   "keywords": [],
