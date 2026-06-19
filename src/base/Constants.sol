@@ -19,3 +19,6 @@ string constant MESSAGE_REGISTER_ADDRESS = "Register Shielded Address";
 uint256 constant MAX_WITHDRAW_FEE_BPS = 0.25e4; // 25% in basis points
 /// @dev TVL values use 6-decimal precision (USDC/USDT DeFi standard).
 uint8 constant TVL_USD_DECIMALS = 6;
+/// @dev Minimum allowed price staleness threshold (seconds). Prevents operator from
+///      accidentally setting it to 0, which would brick all deposit checks.
+uint256 constant MIN_PRICE_STALENESS_THRESHOLD = 24 * 60 * 60; // 1 day in seconds

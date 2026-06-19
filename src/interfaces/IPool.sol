@@ -29,7 +29,7 @@ struct InitAddressParams {
 /// @param tvlLimitUsd Maximum allowed TVL in USD (6-decimal). 0 = disabled.
 /// @param minDepositUsd Minimum single-deposit value in USD (6-decimal). 0 = disabled.
 /// @param maxDepositUsd Maximum single-deposit value in USD (6-decimal). 0 = disabled.
-/// @param tvlPriceStalenessTreshold Maximum age in seconds for a Chainlink price answer before it is considered stale.
+/// @param priceFeedStalenessThreshold Maximum age in seconds for a Chainlink price answer before it is considered stale.
 /// @param wToken Wrapped native token (e.g. WETH) used to wrap incoming msg.value
 ///        into the corresponding ERC20 deposit during DEPOSIT transactions.
 ///        Pass address(0) to disable native ETH deposits at deploy time; can
@@ -39,7 +39,7 @@ struct PoolConfigParams {
     uint256 tvlLimitUsd;
     uint256 minDepositUsd;
     uint256 maxDepositUsd;
-    uint256 tvlPriceStalenessTreshold;
+    uint256 priceFeedStalenessThreshold;
     IWToken wToken;
 }
 
@@ -90,7 +90,7 @@ interface IPool {
     event TvlLimitUpdated(uint256 limit);
     event MinDepositUpdated(uint256 limit);
     event MaxDepositUpdated(uint256 limit);
-    event TvlPriceStalenessTresholdUpdated(uint256 threshold);
+    event PriceFeedStalenessThresholdUpdated(uint256 threshold);
     event WTokenUpdated(address indexed wToken);
 
     /////////////////////////////////////////
@@ -118,10 +118,11 @@ interface IPool {
     error NoFeeToClaim(address paymaster, uint24 assetId);
     error WithdrawalFeeTooHigh(uint256 feeBps, uint256 maxFeeBps);
     error PubAssetsCannotExceedCommitments();
-    error TvlPriceFeedNotSet(uint24 assetId);
-    error TvlPriceStale(uint24 assetId, uint256 updatedAt);
+    error PriceFeedNotSet(uint24 assetId);
+    error PriceFeedValueStale(uint24 assetId, uint256 updatedAt);
     error TvlPriceInvalid(uint24 assetId, int256 price);
     error TvlLimitExceeded(uint256 projectedTvl, uint256 limit);
+    error PriceFeedStalenessThresholdTooLow(uint256 given, uint256 minimum);
     error DepositRestrictedAsAssetFeedNotSet(uint24 assetId);
     error DepositBelowMinimum(uint256 depositUsd, uint256 minDepositUsd);
     error DepositAboveMaximum(uint256 depositUsd, uint256 maxDepositUsd);
@@ -241,7 +242,7 @@ interface IPool {
 
     /// @notice Sets the maximum age of a Chainlink price answer before it is considered stale.
     /// @param threshold Age in seconds. Can only be called by the owner.
-    function setTvlPriceStalenessTreshold(uint256 threshold) external;
+    function setPriceFeedStalenessThreshold(uint256 threshold) external;
 
     /// @notice Sets the wrapped native token (e.g. WETH) used to convert any
     ///         incoming `msg.value` into the corresponding ERC20 deposit during
@@ -397,7 +398,7 @@ interface IPool {
     ///               value is strictly greater than `maxDepositUsd`.
     function checkDepositWithinLimits(
         ShieldedTransaction calldata stx
-    ) external view;
+    ) external view returns (bool);
 
     /// @notice Checks whether a pending deposit would push TVL above tvlLimitUsd.
     /// @dev Returns false when tvlLimitUsd is 0 (disabled) or stx is not a DEPOSIT.

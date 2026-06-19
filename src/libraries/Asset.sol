@@ -113,8 +113,10 @@ library AssetLogic {
         uint24 assetId,
         bool isActive
     ) external {
-        Asset storage asset = assets[assetId];
-        asset.isActive = isActive;
+        if (assets[assetId].assetAddress == address(0)) {
+            revert IPool.InactiveAsset(assetId);
+        }
+        assets[assetId].isActive = isActive;
     }
 
     function receiveAsset(

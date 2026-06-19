@@ -98,7 +98,7 @@ contract PoolBaseTest is BaseTest {
             tvlLimitUsd: 0,
             minDepositUsd: 0,
             maxDepositUsd: 0,
-            tvlPriceStalenessTreshold: 1 days,
+            priceFeedStalenessThreshold: 1 days,
             wToken: IWToken(config.wToken())
         });
 

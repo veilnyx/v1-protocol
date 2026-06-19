@@ -8,14 +8,14 @@ import {IPool} from "src/interfaces/IPool.sol";
 import {MockAggregatorV3} from "test/mocks/MockAggregatorV3.sol";
 import {ShieldedTransaction} from "src/libraries/ShieldedTransaction.sol";
 import {MockERC20} from "test/mocks/MockERC20.sol";
-import {TVL_USD_DECIMALS} from "src/base/Constants.sol";
+import {TVL_USD_DECIMALS, MIN_PRICE_STALENESS_THRESHOLD} from "src/base/Constants.sol";
 import {PoolTest} from "test/fixtures/PoolTest.sol";
 
 /// @dev Unit tests for Pool.setAssetPriceFeed, Pool.setTvlLimitUsd, and Pool.getTvlUsd.
 ///      PoolTest._setUp() adds 3 ERC20 assets:
 ///        asset1 (token1, 18 dec), asset2 (token2, 6 dec), asset3 (tokenReent, 18 dec).
 ///      All three must have a feed registered before calling getTvlUsd().
-contract PoolTvlTest is PoolTest {
+contract PoolGuardrailsTest is PoolTest {
     MockAggregatorV3 internal mockFeed1; // token1 / WETH-like: 18-dec, $2000
     MockAggregatorV3 internal mockFeed2; // token2 / USDC-like:  6-dec,  $1
     MockAggregatorV3 internal mockFeed3; // tokenReent:          18-dec, $1
@@ -198,7 +198,7 @@ contract PoolTvlTest is PoolTest {
         assertGt(tvl, 0);
     }
 
-    /// getTvlUsd reverts when the price data is older than tvlPriceStalenessTreshold.
+    /// getTvlUsd reverts when the price data is older than priceFeedStalenessThreshold.
     /// Reads updatedAt from the actually registered feed (real on fork, mock on local).
     function test_revert_getTvlUsd_stalePrice() public {
         _registerAllFeeds();
@@ -208,11 +208,11 @@ contract PoolTvlTest is PoolTest {
             .usdPriceFeed
             .latestRoundData();
         // Wind clock past the configured staleness threshold.
-        vm.warp(block.timestamp + pool.tvlPriceStalenessTreshold() + 1);
+        vm.warp(block.timestamp + pool.priceFeedStalenessThreshold() + 1);
 
         vm.expectRevert(
             abi.encodeWithSelector(
-                IPool.TvlPriceStale.selector,
+                IPool.PriceFeedValueStale.selector,
                 asset1.id,
                 updatedAt
             )
@@ -278,6 +278,48 @@ contract PoolTvlTest is PoolTest {
         vm.prank(notOwner);
         vm.expectRevert();
         pool.setTvlLimitUsd(500_000e6);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // setPriceFeedStalenessThreshold
+    // ─────────────────────────────────────────────────────────────────────────
+
+    function test_setPriceFeedStalenessThreshold() public {
+        uint256 newThreshold = 2 days;
+        vm.expectEmit(false, false, false, true);
+        emit IPool.PriceFeedStalenessThresholdUpdated(newThreshold);
+
+        pool.setPriceFeedStalenessThreshold(newThreshold);
+        assertEq(pool.priceFeedStalenessThreshold(), newThreshold);
+    }
+
+    function test_revert_setPriceFeedStalenessThreshold_notOwner() public {
+        address notOwner = makeAddr("notOwner");
+        vm.prank(notOwner);
+        vm.expectRevert();
+        pool.setPriceFeedStalenessThreshold(2 hours);
+    }
+
+    function test_revert_setPriceFeedStalenessThreshold_tooLow() public {
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IPool.PriceFeedStalenessThresholdTooLow.selector,
+                MIN_PRICE_STALENESS_THRESHOLD - 1,
+                MIN_PRICE_STALENESS_THRESHOLD
+            )
+        );
+        pool.setPriceFeedStalenessThreshold(MIN_PRICE_STALENESS_THRESHOLD - 1);
+    }
+
+    function test_revert_setPriceFeedStalenessThreshold_zero() public {
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IPool.PriceFeedStalenessThresholdTooLow.selector,
+                uint256(0),
+                MIN_PRICE_STALENESS_THRESHOLD
+            )
+        );
+        pool.setPriceFeedStalenessThreshold(0);
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -515,12 +557,16 @@ contract PoolTvlTest is PoolTest {
         pool.transact(stx); // WITHDRAW → deposit guard not triggered → success
     }
 
-    /// Deposit transaction where asset1 has no registered price feed reverts with DepositRestrictedAsAssetFeedNotSet.
-    /// Feeds are set during _setUp(), so they must be explicitly cleared first.
+    /// Deposit transaction where asset1 has no registered price feed reverts with
+    /// DepositRestrictedAsAssetFeedNotSet when at least one USD limit is enabled.
+    /// When all limits are 0 (disabled), deposits proceed without requiring a feed (H-1 fix).
     function test_revert_whenDepositWithinLimits_assetFeedNotSet() public {
         // Explicitly clear feeds — _setUp() registers _defaultMockFeed for all assets.
         pool.setAssetPriceFeed(asset1.id, AggregatorV3Interface(address(0)));
         pool.setAssetPriceFeed(asset2.id, AggregatorV3Interface(address(0)));
+        // Enable min-deposit limit so the oracle path is entered; without a limit
+        // the guard returns early (correct post-H-1 behaviour).
+        pool.setMinDepositUsd(1);
 
         _mintAsset(asset1, address(this), 10000 ether);
         _mintAsset(asset2, address(this), 10000e6);

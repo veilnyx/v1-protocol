@@ -52,7 +52,7 @@ abstract contract PoolStorage {
     uint256 public maxDepositUsd;
 
     /// @dev Maximum age of a Chainlink price answer before it is considered stale.
-    uint256 public tvlPriceStalenessTreshold;
+    uint256 public priceFeedStalenessThreshold;
 
     /// @dev Wrapped native token (e.g. WETH) used to convert any incoming msg.value
     ///      into the corresponding ERC20 deposit during a DEPOSIT transaction.

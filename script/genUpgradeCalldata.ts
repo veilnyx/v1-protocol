@@ -1,5 +1,5 @@
 /**
- * Outputs the calldata for setTvlPriceStalenessTreshold to be used in a Safe UI
+ * Outputs the calldata for setPriceFeedStalenessThreshold to be used in a Safe UI
  * upgradeToAndCall transaction.
  *
  * Usage:
@@ -18,12 +18,12 @@ const main = async () => {
 
     const calldata = encodeFunctionData({
         abi: poolAbi,
-        functionName: "setTvlPriceStalenessTreshold",
+        functionName: "setPriceFeedStalenessThreshold",
         args: [STALENESS_THRESHOLD],
     });
 
     console.log("\n=== Safe UI calldata ===");
-    console.log("Function : setTvlPriceStalenessTreshold(uint256)");
+    console.log("Function : setPriceFeedStalenessThreshold(uint256)");
     console.log("Threshold:", STALENESS_THRESHOLD.toString(), "seconds (", Number(STALENESS_THRESHOLD) / 86400, "days )");
     console.log("Calldata :", calldata);
     console.log("=======================\n");

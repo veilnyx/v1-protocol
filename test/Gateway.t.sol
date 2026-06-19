@@ -79,7 +79,7 @@ contract GatewayTest is Test {
 
         StdCheats.deployCodeTo(
             "Paymaster.sol:Paymaster",
-            abi.encode(entryPoint, address(gateway), address(pool)),
+            abi.encode(entryPoint, address(gateway), address(pool), uint256(1 days)),
             fixture.paymaster
         );
         console2.log("paymaster:", fixture.paymaster);

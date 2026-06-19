@@ -488,7 +488,7 @@ const main = async () => {
     tvlLimitUsd: BigInt(5_000e6),    // $5,000 (6-decimal precision)
     minDepositUsd: BigInt(2e6),      // $2 (6-decimal precision)
     maxDepositUsd: BigInt(200e6),    // $200 (6-decimal precision)
-    tvlPriceStalenessTreshold: ONE_DAY * 5n, // 5 days in seconds
+    priceFeedStalenessThreshold: ONE_DAY * 5n, // 5 days in seconds
     wToken: chainParams.wToken,      // wrapped native token (e.g. WETH) for native ETH deposits
   };
 

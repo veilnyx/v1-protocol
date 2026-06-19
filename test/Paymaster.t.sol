@@ -19,9 +19,6 @@ import {StdCheats} from "forge-std/StdCheats.sol";
 import {console2} from "forge-std/console2.sol";
 
 // import {PoolTransactTest} from "test/helpers/PoolTransact.t.sol";
-interface IPoolPriceFeedStaleness {
-    function tvlPriceStalenessTreshold() external view returns (uint256);
-}
 
 contract PaymasterTest is PoolTest {
     Paymaster public paymaster;
@@ -79,7 +76,7 @@ contract PaymasterTest is PoolTest {
 
         StdCheats.deployCodeTo(
             "Paymaster.sol:Paymaster",
-            abi.encode(entryPoint, address(gateway), address(pool)),
+            abi.encode(entryPoint, address(gateway), address(pool), pool.priceFeedStalenessThreshold()),
             fixture.paymaster
         );
         console2.log("paymaster:", fixture.paymaster);
@@ -235,8 +232,7 @@ contract PaymasterTest is PoolTest {
 
         vm.warp(
             block.timestamp +
-                IPoolPriceFeedStaleness(address(pool))
-                    .tvlPriceStalenessTreshold() +
+                paymaster.priceStalenessThreshold() +
                 2 hours
         ); // Move forward in time to make the price feed stale
         vm.expectRevert(

@@ -16,7 +16,7 @@ import {IHasher} from "../interfaces/IHasher.sol";
 import {IWToken} from "../interfaces/IWToken.sol";
 import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {EIP712_DOMAIN_NAME, EIP712_DOMAIN_VERSION, MAX_WITHDRAW_FEE_BPS, TVL_USD_DECIMALS} from "../base/Constants.sol";
+import {EIP712_DOMAIN_NAME, EIP712_DOMAIN_VERSION, MAX_WITHDRAW_FEE_BPS, TVL_USD_DECIMALS, MIN_PRICE_STALENESS_THRESHOLD} from "../base/Constants.sol";
 import {PoolStorage} from "../base/PoolStorage.sol";
 import {Asset, AssetType, AssetLogic} from "../libraries/Asset.sol";
 import {MerkleTree, MerkleTreeLogic} from "../libraries/MerkleTree.sol";
@@ -81,7 +81,16 @@ contract Pool is
         tvlLimitUsd = configParams.tvlLimitUsd;
         minDepositUsd = configParams.minDepositUsd;
         maxDepositUsd = configParams.maxDepositUsd;
-        tvlPriceStalenessTreshold = configParams.tvlPriceStalenessTreshold;
+        if (
+            configParams.priceFeedStalenessThreshold <
+            MIN_PRICE_STALENESS_THRESHOLD
+        ) {
+            revert IPool.PriceFeedStalenessThresholdTooLow(
+                configParams.priceFeedStalenessThreshold,
+                MIN_PRICE_STALENESS_THRESHOLD
+            );
+        }
+        priceFeedStalenessThreshold = configParams.priceFeedStalenessThreshold;
         wToken = configParams.wToken;
 
         _addressTree.init(addressTreeDepth, hasher);
@@ -251,12 +260,20 @@ contract Pool is
     }
 
     /// @notice Sets the maximum age of a Chainlink price answer before it is considered stale.
-    /// @param threshold Age in seconds. A lower value is stricter; set to type(uint256).max to effectively disable the staleness check.
-    function setTvlPriceStalenessTreshold(
+    /// @param threshold Age in seconds. Must be >= MIN_PRICE_STALENESS_THRESHOLD (60 s) or
+    ///        type(uint256).max to effectively disable the staleness check. Setting this to 0
+    ///        would brick all deposit/TVL checks, so it is rejected.
+    function setPriceFeedStalenessThreshold(
         uint256 threshold
     ) external onlyOwner {
-        tvlPriceStalenessTreshold = threshold;
-        emit IPool.TvlPriceStalenessTresholdUpdated(threshold);
+        if (threshold < MIN_PRICE_STALENESS_THRESHOLD) {
+            revert IPool.PriceFeedStalenessThresholdTooLow(
+                threshold,
+                MIN_PRICE_STALENESS_THRESHOLD
+            );
+        }
+        priceFeedStalenessThreshold = threshold;
+        emit IPool.PriceFeedStalenessThresholdUpdated(threshold);
     }
 
     /// @notice Sets the wrapped native token (e.g. WETH) used to convert any
@@ -304,8 +321,8 @@ contract Pool is
     function transact(
         ShieldedTransaction calldata stx
     ) public payable nonReentrant whenNotPaused {
-        checkDepositWithinLimits(stx);
-        _checkTvlLimitNotCrossed(stx);
+        _validateNoDuplicatePubAssets(stx);
+        _runDepositGuardRails(stx);
         stx.validate({
             addressTree: _addressTree,
             commitmentTree: _commitmentTree,
@@ -342,7 +359,10 @@ contract Pool is
     }
 
     /// @dev Accepts native ETH sent back by the wToken contract during WITHDRAW unwrapping.
-    receive() external payable {}
+    ///      Reverts for any other sender to prevent accidental ETH from becoming permanently stuck.
+    receive() external payable {
+        if (msg.sender != address(wToken)) revert IPool.WTokenNotConfigured();
+    }
 
     /// @custom:invariant ACCESS-3: Only paymasters can withdraw their accumulated fees
     function withdrawPaymasterFee(
@@ -371,7 +391,7 @@ contract Pool is
     /// @notice Returns the current total value locked in USD (6-decimal precision, USDC/USDT standard)
     ///         across all active ERC20 assets, using registered Chainlink USD price feeds.
     /// @dev Assets with no registered feed or that are inactive contribute 0 to the TVL.
-    ///      Reverts with TvlPriceStale if a feed's answer is older than TVL_PRICE_STALENESS_THRESHOLD.
+    ///      Reverts with PriceFeedValueStale if a feed's answer is older than TVL_PRICE_STALENESS_THRESHOLD.
     ///      Reverts with TvlPriceInvalid if a feed returns a non-positive price.
     /// @return tvl Cumulative TVL in 6-decimal USD (e.g. 1_000_000 = $1).
     function getTvlUsd() public view returns (uint256 tvl) {
@@ -411,15 +431,20 @@ contract Pool is
     ///               value is strictly greater than `maxDepositUsd`.
     function checkDepositWithinLimits(
         ShieldedTransaction calldata stx
-    ) public view {
-        if (stx.txType != ShieldedTransactionType.DEPOSIT) return;
+    ) public view returns (bool) {
+        if (stx.txType != ShieldedTransactionType.DEPOSIT) return true;
+        if (minDepositUsd == 0 && maxDepositUsd == 0) return true;
+
         uint256 depositUsd = _getDepositUsd(stx);
-        if (minDepositUsd > 0 && depositUsd < minDepositUsd) {
-            revert IPool.DepositBelowMinimum(depositUsd, minDepositUsd);
+        if ((minDepositUsd > 0 && depositUsd < minDepositUsd)) {
+            return false;
         }
+
         if (maxDepositUsd > 0 && depositUsd > maxDepositUsd) {
-            revert IPool.DepositAboveMaximum(depositUsd, maxDepositUsd);
+            return false;
         }
+
+        return true;
     }
 
     /// @notice Checks whether the pending deposit in `stx` would push TVL above `tvlLimitUsd`.
@@ -547,18 +572,36 @@ contract Pool is
         emit IPool.AssetUsdPriceFeedSet(assetId, address(feed));
     }
 
-    function _checkTvlLimitNotCrossed(
+    /// @dev Runs all deposit guard-rail checks — deposit min/max limits and TVL cap
+    function _runDepositGuardRails(
         ShieldedTransaction calldata stx
     ) private view {
-        if (isTvlLimitCrossed(stx)) {
-            uint256 projectedTvl = getTvlUsd() + _getDepositUsd(stx);
-            revert IPool.TvlLimitExceeded(projectedTvl, tvlLimitUsd);
+        if (stx.txType != ShieldedTransactionType.DEPOSIT) return;
+        // All three limits disabled — skip oracle call entirely (H-1 fix).
+        // IMPORTANT: tvlLimitUsd must be part of this guard or TVL-only pools bypass the cap.
+        if (minDepositUsd == 0 && maxDepositUsd == 0 && tvlLimitUsd == 0)
+            return;
+
+        uint256 depositUsd = _getDepositUsd(stx);
+
+        if (minDepositUsd > 0 && depositUsd < minDepositUsd) {
+            revert IPool.DepositBelowMinimum(depositUsd, minDepositUsd);
+        }
+        if (maxDepositUsd > 0 && depositUsd > maxDepositUsd) {
+            revert IPool.DepositAboveMaximum(depositUsd, maxDepositUsd);
+        }
+
+        if (tvlLimitUsd > 0) {
+            uint256 projectedTvl = getTvlUsd() + depositUsd;
+            if (projectedTvl > tvlLimitUsd) {
+                revert IPool.TvlLimitExceeded(projectedTvl, tvlLimitUsd);
+            }
         }
     }
 
     /// @notice Returns the USD value of `amount` units of `asset` using its registered Chainlink feed.
-    /// @dev Reverts with TvlPriceFeedNotSet if no feed is registered for the asset.
-    ///      Reverts with TvlPriceStale / TvlPriceInvalid on bad feed data.
+    /// @dev Reverts with PriceFeedNotSet if no feed is registered for the asset.
+    ///      Reverts with PriceFeedValueStale / TvlPriceInvalid on bad feed data.
     /// @param asset  The Asset struct (must have usdPriceFeed set).
     /// @param amount Raw token amount (in the asset's native precision).
     /// @return usdValue Amount expressed in 6-decimal USD.
@@ -569,7 +612,7 @@ contract Pool is
         AggregatorV3Interface feed = asset.usdPriceFeed;
 
         if (address(feed) == address(0)) {
-            revert IPool.TvlPriceFeedNotSet(asset.id);
+            revert IPool.PriceFeedNotSet(asset.id);
         }
 
         uint8 feedDecimals = feed.decimals();
@@ -580,9 +623,9 @@ contract Pool is
         }
         if (
             updatedAt > block.timestamp ||
-            block.timestamp - updatedAt > tvlPriceStalenessTreshold
+            block.timestamp - updatedAt > priceFeedStalenessThreshold
         ) {
-            revert IPool.TvlPriceStale(asset.id, updatedAt);
+            revert IPool.PriceFeedValueStale(asset.id, updatedAt);
         }
 
         uint256 baseExp = uint256(asset.precision) + uint256(feedDecimals);
@@ -603,11 +646,38 @@ contract Pool is
             uint24 assetId = uint24(bytes3(bytes31(stx.pubAssets[i])));
             uint224 amount = uint224(stx.pubAssets[i]);
             Asset memory asset = _assets[assetId];
-            if (!asset.isActive || address(asset.usdPriceFeed) == address(0)) {
+            if (!asset.isActive) {
+                revert IPool.InactiveAsset(assetId);
+            }
+            if (address(asset.usdPriceFeed) == address(0)) {
                 revert IPool.DepositRestrictedAsAssetFeedNotSet(assetId);
             }
             depositUsd += _getUsdValue(asset, uint256(amount));
 
+            unchecked {
+                ++i;
+            }
+        }
+    }
+
+    /// @dev Validates that no assetId appears more than once in stx.pubAssets.
+    ///      A well-formed shielded transaction must list each asset at most once:
+    ///      duplicates would cause _receivePubAssets to double-pull ERC20s or
+    ///      _transferPubAssets to double-send on withdraw.
+    ///      The ZK circuit is the primary enforcer; this check adds defense-in-depth.
+    function _validateNoDuplicatePubAssets(
+        ShieldedTransaction calldata stx
+    ) private pure {
+        uint256 n = stx.pubAssets.length;
+        for (uint256 i; i < n; ) {
+            uint24 idI = uint24(bytes3(bytes31(stx.pubAssets[i])));
+            for (uint256 j = i + 1; j < n; ) {
+                uint24 idJ = uint24(bytes3(bytes31(stx.pubAssets[j])));
+                if (idI == idJ) revert IPool.DuplicatePubAssetId(idI);
+                unchecked {
+                    ++j;
+                }
+            }
             unchecked {
                 ++i;
             }
@@ -633,7 +703,7 @@ contract Pool is
     ///         - `wToken` must be configured and registered as an active
     ///           ERC20 asset (otherwise wrapping has no destination).
     ///         - exactly one pubAsset must reference the wToken's asset id.
-    ///         - `msg.value` must be `<=` that pubAsset's full (pre-fee) value
+    ///         - `msg.value` must be `<=` that pubAsset's full value
     ///           so no surplus ETH is locked in the Pool. Strict-less means
     ///           the caller has chosen to top up the deposit by approving the
     ///           remainder in wToken (ERC20) form; we pull that delta with
@@ -661,12 +731,6 @@ contract Pool is
             revert IPool.WTokenNotConfigured();
         }
 
-        // Locate the wToken pubAsset entry. pubAssets uses (assetId | value)
-        // packed into a uint248. We compare against the full pre-fee pubAsset
-        // value: this is the on-chain inflow the user is committing to. A
-        // paymaster fee, if any, is later subtracted from this value inside
-        // the library and credited to the paymaster, so the Pool must hold
-        // the entire pre-fee amount before execution proceeds.
         uint256 nPubs = stx.pubAssets.length;
         bool found;
         uint256 wTokenValue;
