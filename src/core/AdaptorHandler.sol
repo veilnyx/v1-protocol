@@ -8,8 +8,8 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {IAdaptorHandler} from "../interfaces/IAdaptorHandler.sol";
 import {IAdaptor, AssetAmount} from "../interfaces/IAdaptor.sol";
 import {IPool} from "../interfaces/IPool.sol";
-import {Asset, AssetType} from "../libraries/Asset.sol";
-import {PubAsset} from "../libraries/ShieldedTransaction.sol";
+import {Asset, AssetType} from "../libraries/AssetLogic.sol";
+import {PubAsset} from "../libraries/ShieldedTransactionLogic.sol";
 
 contract AdaptorHandler is IAdaptorHandler, ReentrancyGuard, Ownable {
     using SafeERC20 for IERC20;

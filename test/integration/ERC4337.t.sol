@@ -7,7 +7,7 @@ import {PackedUserOperation} from "@account-abstraction/contracts/interfaces/Pac
 import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
 import {Paymaster} from "src/core/Paymaster.sol";
 import {Gateway} from "src/core/Gateway.sol";
-import {ShieldedTransaction, ShieldedTransactionLogic, ShieldedTransactionType} from "src/libraries/ShieldedTransaction.sol";
+import {ShieldedTransaction, ShieldedTransactionLogic, ShieldedTransactionType} from "src/libraries/ShieldedTransactionLogic.sol";
 import {Pool} from "src/core/Pool.sol";
 import {MockPool} from "test/mocks/MockPool.sol";
 import {PoolTest} from "test/fixtures/PoolTest.sol";

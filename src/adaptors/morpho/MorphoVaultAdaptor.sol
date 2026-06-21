@@ -6,7 +6,7 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {IAdaptor, AssetAmount} from "../../interfaces/IAdaptor.sol";
 import {IMorphoVault} from "./IMorphoVault.sol";
 import {AdaptorBase} from "../../base/AdaptorBase.sol";
-import {Asset} from "../../libraries/Asset.sol";
+import {Asset} from "../../libraries/AssetLogic.sol";
 import {IPool} from "../../interfaces/IPool.sol";
 
 contract MorphoVaultAdaptor is AdaptorBase {

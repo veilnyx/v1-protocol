@@ -2,10 +2,10 @@
 pragma solidity ^0.8.24;
 
 import {Pool} from "src/core/Pool.sol";
-import {ShieldedTransaction} from "src/libraries/ShieldedTransaction.sol";
+import {ShieldedTransaction} from "src/libraries/ShieldedTransactionLogic.sol";
 import {IVerifier} from "src/interfaces/IVerifier.sol";
-import {MerkleTree, MerkleTreeLogic} from "src/libraries/MerkleTree.sol";
-import {QueuedMerkleTree, QueuedMerkleTreeLogic, TreeUpdateData} from "src/libraries/QueuedMerkleTree.sol";
+import {MerkleTree, MerkleTreeLogic} from "src/libraries/MerkleTreeLogic.sol";
+import {QueuedMerkleTree, QueuedMerkleTreeLogic, TreeUpdateData} from "src/libraries/QueuedMerkleTreeLogic.sol";
 import {IVerifier} from "src/interfaces/IVerifier.sol";
 import {MockVerifier} from "test/mocks/MockVerifier.sol";
 

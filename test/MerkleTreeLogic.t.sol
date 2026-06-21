@@ -4,7 +4,7 @@ pragma solidity ^0.8.24;
 import {console2} from "forge-std/console2.sol";
 import {BinaryIMT as BinaryIMTLogic, BinaryIMTData} from "@zk-kit/imt.sol/BinaryIMT.sol";
 import {IHasher} from "src/interfaces/IHasher.sol";
-import {MerkleTree, MerkleTreeLogic} from "src/libraries/MerkleTree.sol";
+import {MerkleTree, MerkleTreeLogic} from "src/libraries/MerkleTreeLogic.sol";
 import {FIELD_SIZE, ZERO_LEAF, MERKLE_TREE_DEPTH} from "src/base/Constants.sol";
 import {BaseTest} from "test/fixtures/BaseTest.sol";
 

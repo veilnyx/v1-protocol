@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.24;
 
-import {ShieldedTransaction, ShieldedTransactionType, RevokerData} from "../libraries/ShieldedTransaction.sol";
-import {ShieldedAddressRegistrationData} from "../libraries/ShieldedAddress.sol";
-import {TreeUpdateData} from "../libraries/QueuedMerkleTree.sol";
-import {AssetType, Asset} from "../libraries/Asset.sol";
+import {ShieldedTransaction, ShieldedTransactionType, RevokerData} from "../libraries/ShieldedTransactionLogic.sol";
+import {ShieldedAddressRegistrationData} from "../libraries/ShieldedAddressLogic.sol";
+import {TreeUpdateData} from "../libraries/QueuedMerkleTreeLogic.sol";
+import {AssetType, Asset} from "../libraries/AssetLogic.sol";
 import {PoolStorage} from "../base/PoolStorage.sol";
 
 import {IVerifier} from "./IVerifier.sol";

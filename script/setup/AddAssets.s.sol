@@ -3,7 +3,7 @@ pragma solidity ^0.8.24;
 
 import {BaseScript} from "../BaseScript.sol";
 import {Pool} from "src/core/Pool.sol";
-import {AssetType} from "src/libraries/Asset.sol";
+import {AssetType} from "src/libraries/AssetLogic.sol";
 
 contract AddAssets is BaseScript {
     function run() external broadcast {

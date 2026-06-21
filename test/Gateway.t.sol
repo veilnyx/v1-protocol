@@ -12,8 +12,8 @@ import {IWToken} from "src/interfaces/IWToken.sol";
 import {IEntryPoint} from "@account-abstraction/contracts/interfaces/IEntryPoint.sol";
 import {IPool} from "src/interfaces/IPool.sol";
 import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
-import {Asset, AssetType} from "src/libraries/Asset.sol";
-import {ShieldedTransaction, ShieldedTransactionType} from "src/libraries/ShieldedTransaction.sol";
+import {Asset, AssetType} from "src/libraries/AssetLogic.sol";
+import {ShieldedTransaction, ShieldedTransactionType} from "src/libraries/ShieldedTransactionLogic.sol";
 import {MockWToken} from "test/mocks/MockWToken.sol";
 import {Fixture, FixtureLib} from "test/fixtures/Fixture.sol";
 

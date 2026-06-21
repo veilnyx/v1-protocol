@@ -5,7 +5,7 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {IVerifier} from "../interfaces/IVerifier.sol";
 import {VerifierRegister} from "../verifiers/VerifierRegister.sol";
 import {VerifierTreeUpdate} from "../verifiers/VerifierTreeUpdate.sol";
-import {MerkleTree} from "../libraries/MerkleTree.sol";
+import {MerkleTree} from "../libraries/MerkleTreeLogic.sol";
 
 struct TransactionVerifierInfo {
     uint16 id;

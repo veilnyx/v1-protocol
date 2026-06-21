@@ -5,9 +5,9 @@ import {Test} from "forge-std/Test.sol";
 import {PoolTest} from "test/fixtures/PoolTest.sol";
 import {IPool} from "src/interfaces/IPool.sol";
 import {MockERC20} from "test/mocks/MockERC20.sol";
-import {AssetType, Asset} from "src/libraries/Asset.sol";
-import {MerkleTree} from "src/libraries/MerkleTree.sol";
-import {RevokerData} from "src/libraries/ShieldedTransaction.sol";
+import {AssetType, Asset} from "src/libraries/AssetLogic.sol";
+import {MerkleTree} from "src/libraries/MerkleTreeLogic.sol";
+import {RevokerData} from "src/libraries/ShieldedTransactionLogic.sol";
 import {PoolStorage} from "src/base/PoolStorage.sol";
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 

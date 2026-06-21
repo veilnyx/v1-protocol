@@ -3,7 +3,7 @@ pragma solidity ^0.8.24;
 
 import {IPool} from "src/interfaces/IPool.sol";
 import {Pool} from "src/core/Pool.sol";
-import {ShieldedTransaction} from "src/libraries/ShieldedTransaction.sol";
+import {ShieldedTransaction} from "src/libraries/ShieldedTransactionLogic.sol";
 import {PoolTest} from "test/fixtures/PoolTest.sol";
 import {MockERC20} from "test/mocks/MockERC20.sol";
 

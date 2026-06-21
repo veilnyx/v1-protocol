@@ -3,10 +3,10 @@ pragma solidity ^0.8.24;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {BinaryIMT as BinaryIMTLogic, BinaryIMTData} from "@zk-kit/imt.sol/BinaryIMT.sol";
-import {MerkleTree, MerkleTreeLogic} from "../src/libraries/MerkleTree.sol";
+import {MerkleTree, MerkleTreeLogic} from "../src/libraries/MerkleTreeLogic.sol";
 import {IHasher} from "src/interfaces/IHasher.sol";
 import {IPool} from "src/interfaces/IPool.sol";
-import {QueuedMerkleTree, QueuedMerkleTreeLogic, TreeUpdateData} from "src/libraries/QueuedMerkleTree.sol";
+import {QueuedMerkleTree, QueuedMerkleTreeLogic, TreeUpdateData} from "src/libraries/QueuedMerkleTreeLogic.sol";
 import {FIELD_SIZE, ZERO_LEAF, COMMITMENT_TREE_DEPTH} from "src/base/Constants.sol";
 import {PoolTest} from "test/fixtures/PoolTest.sol";
 import {BaseTest} from "test/fixtures/BaseTest.sol";
@@ -14,7 +14,7 @@ import {Fixture, FixtureLib} from "./fixtures/Fixture.sol";
 import {Verifier, TransactionVerifierInfo} from "src/core/Verifier.sol";
 import {VerifierTreeUpdate} from "src/verifiers/VerifierTreeUpdate.sol";
 import {VerifierRegister} from "src/verifiers/VerifierRegister.sol";
-import {ShieldedTransaction} from "src/libraries/ShieldedTransaction.sol";
+import {ShieldedTransaction} from "src/libraries/ShieldedTransactionLogic.sol";
 
 import {console2} from "forge-std/console2.sol";
 

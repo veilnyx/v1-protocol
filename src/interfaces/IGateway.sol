@@ -3,7 +3,7 @@ pragma solidity 0.8.24;
 
 import {IAccount} from "@account-abstraction/contracts/interfaces/IAccount.sol";
 import {PackedUserOperation} from "@account-abstraction/contracts/interfaces/PackedUserOperation.sol";
-import {ShieldedTransaction} from "../libraries/ShieldedTransaction.sol";
+import {ShieldedTransaction} from "../libraries/ShieldedTransactionLogic.sol";
 import {IWToken} from "./IWToken.sol";
 import {IEntryPoint} from "@account-abstraction/contracts/interfaces/IEntryPoint.sol";
 

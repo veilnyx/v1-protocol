@@ -4,12 +4,12 @@ pragma solidity ^0.8.24;
 import {Test, console} from "forge-std/Test.sol";
 import {StdCheats} from "forge-std/StdCheats.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {ShieldedTransaction} from "src/libraries/ShieldedTransaction.sol";
+import {ShieldedTransaction} from "src/libraries/ShieldedTransactionLogic.sol";
 import {PoolTest} from "test/fixtures/PoolTest.sol";
 import {MockAttacker} from "test/mocks/MockAttacker.t.sol";
-import {Asset, AssetType} from "src/libraries/Asset.sol";
-import {TreeUpdateData} from "src/libraries/QueuedMerkleTree.sol";
-import {MerkleTree, MerkleTreeLogic} from "src/libraries/MerkleTree.sol";
+import {Asset, AssetType} from "src/libraries/AssetLogic.sol";
+import {TreeUpdateData} from "src/libraries/QueuedMerkleTreeLogic.sol";
+import {MerkleTree, MerkleTreeLogic} from "src/libraries/MerkleTreeLogic.sol";
 
 contract PoolReentrancyTest is PoolTest {
     using MerkleTreeLogic for MerkleTree;

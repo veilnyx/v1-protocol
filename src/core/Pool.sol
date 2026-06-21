@@ -15,11 +15,11 @@ import {IScreener} from "../interfaces/IScreener.sol";
 import {IHasher} from "../interfaces/IHasher.sol";
 import {EIP712_DOMAIN_NAME, EIP712_DOMAIN_VERSION, MAX_WITHDRAW_FEE_BPS, MERKLE_TREE_DEPTH, COMMITMENT_TREE_DEPTH} from "../base/Constants.sol";
 import {PoolStorage} from "../base/PoolStorage.sol";
-import {Asset, AssetType, AssetLogic} from "../libraries/Asset.sol";
-import {MerkleTree, MerkleTreeLogic} from "../libraries/MerkleTree.sol";
-import {QueuedMerkleTree, QueuedMerkleTreeLogic, TreeUpdateData} from "../libraries/QueuedMerkleTree.sol";
-import {ShieldedAddressRegistrationData, ShieldedAddressLogic} from "../libraries/ShieldedAddress.sol";
-import {ShieldedTransaction, ShieldedTransactionLogic, RevokerData} from "../libraries/ShieldedTransaction.sol";
+import {Asset, AssetType, AssetLogic} from "../libraries/AssetLogic.sol";
+import {MerkleTree, MerkleTreeLogic} from "../libraries/MerkleTreeLogic.sol";
+import {QueuedMerkleTree, QueuedMerkleTreeLogic, TreeUpdateData} from "../libraries/QueuedMerkleTreeLogic.sol";
+import {ShieldedAddressRegistrationData, ShieldedAddressLogic} from "../libraries/ShieldedAddressLogic.sol";
+import {ShieldedTransaction, ShieldedTransactionLogic, RevokerData} from "../libraries/ShieldedTransactionLogic.sol";
 
 contract Pool is
     IPool,

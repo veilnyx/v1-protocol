@@ -4,11 +4,11 @@ pragma abicoder v2;
 
 import {PoolTest} from "test/fixtures/PoolTest.sol";
 import {Pool} from "src/core/Pool.sol";
-import {ShieldedTransaction} from "src/libraries/ShieldedTransaction.sol";
+import {ShieldedTransaction} from "src/libraries/ShieldedTransactionLogic.sol";
 import {EthenaAdaptor} from "src/adaptors/ethena/EthenaAdaptor.sol";
 import {IAdaptorHandler} from "src/interfaces/IAdaptorHandler.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {Asset, AssetType} from "src/libraries/Asset.sol";
+import {Asset, AssetType} from "src/libraries/AssetLogic.sol";
 import {IEthena} from "src/adaptors/ethena/IEthena.sol";
 import {console} from "forge-std/console.sol";
 
