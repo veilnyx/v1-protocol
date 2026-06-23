@@ -5,7 +5,7 @@ import {Test} from "forge-std/Test.sol";
 import {console2} from "forge-std/console2.sol";
 import {IPool} from "src/interfaces/IPool.sol";
 import {Pool} from "src/core/Pool.sol";
-import {ShieldedTransaction} from "src/libraries/ShieldedTransaction.sol";
+import {ShieldedTransaction} from "src/libraries/ShieldedTransactionLogic.sol";
 import {PoolTest} from "test/fixtures/PoolTest.sol";
 import {MockERC20} from "test/mocks/MockERC20.sol";
 
@@ -15,11 +15,31 @@ contract PoolTransferTest is PoolTest {
         _makePreDeposit();
     }
 
+    function test_debugQueueState() external view {
+        (
+            uint32 startIdx,
+            uint32 endIdx,
+            uint32 nextLeaf,
+            uint8 queueSz,
+            uint8 rootIdx
+        ) = pool.getQueueRawState();
+        console2.log("startIdx:", startIdx);
+        console2.log("endIdx:", endIdx);
+        console2.log("nextLeaf:", nextLeaf);
+        console2.log("queueSz:", queueSz);
+        console2.log("rootIdx:", rootIdx);
+    }
+
     function test_transferWithoutFee() external {
         uint256 balance1 = token1.balanceOf(address(pool));
         ShieldedTransaction memory stx = _loadShieldedTransaction(
             "transfer_20_weth_without_fee"
         );
+        console2.log(
+            "Fixture::transfer_20_weth_without_fee::MerkleRoot:",
+            stx.commitmentTreeRoot
+        );
+
         _checkEventEmits(stx);
         assertEq(token1.balanceOf(address(pool)), balance1);
     }

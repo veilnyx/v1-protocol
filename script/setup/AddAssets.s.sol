@@ -3,7 +3,7 @@ pragma solidity ^0.8.24;
 
 import {BaseScript} from "../BaseScript.sol";
 import {Pool} from "src/core/Pool.sol";
-import {AssetType} from "src/libraries/Asset.sol";
+import {AssetType} from "src/libraries/AssetLogic.sol";
 import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
 
 contract AddAssets is BaseScript {

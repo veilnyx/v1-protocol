@@ -105,8 +105,6 @@ contract PoolBaseTest is BaseTest {
         bytes memory initData = abi.encodeCall(
             Pool.initialize,
             (
-                fixture.addressTreeDepth,
-                fixture.commitmentTreeDepth,
                 fixture.commitmentTreeQueueSize,
                 initAddressParams,
                 configParams

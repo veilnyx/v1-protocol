@@ -2,6 +2,7 @@ import hre from "hardhat";
 import { parseEther, parseUnits } from "viem";
 
 const PAYMASTER_FUNDING_AMT = parseEther("0.5");
+const PRICEFEED_STALENESS_THRESHOLD = 24 * 60 * 60; // 1 DAY
 
 export const deployErc4337Infra = async (chainParams, poolAddress, deployConfig) => {
     // ERC4337 infra setup
@@ -26,7 +27,8 @@ export const deployPaymaster = async (entryPoint, poolAddress, sender, chainPara
     const paymaster = await hre.viem.deployContract("Paymaster", [
         entryPoint,
         sender,
-        poolAddress
+        poolAddress,
+        PRICEFEED_STALENESS_THRESHOLD
     ], deployConfig);
     console.log("Paymaster deployed:", paymaster.address);
 

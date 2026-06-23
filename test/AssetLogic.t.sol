@@ -3,7 +3,7 @@ pragma solidity ^0.8.24;
 
 import {Test} from "forge-std/Test.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {AssetType, Asset, AssetLogic} from "src/libraries/Asset.sol";
+import {AssetType, Asset, AssetLogic} from "src/libraries/AssetLogic.sol";
 import {IPool} from "src/interfaces/IPool.sol";
 import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
 

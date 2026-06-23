@@ -4,7 +4,7 @@ pragma abicoder v2;
 
 import {PoolTest} from "test/fixtures/PoolTest.sol";
 import {Pool} from "src/core/Pool.sol";
-import {ShieldedTransaction} from "src/libraries/ShieldedTransaction.sol";
+import {ShieldedTransaction} from "src/libraries/ShieldedTransactionLogic.sol";
 import {CurveNGAdaptor as CurveAdaptor, Payload} from "src/adaptors/curveNG/CurveNGAdaptor.sol";
 import {IAdaptor} from "src/interfaces/IAdaptor.sol";
 import {IAdaptorHandler} from "src/interfaces/IAdaptorHandler.sol";
@@ -12,7 +12,7 @@ import {AssetAmount} from "src/interfaces/IAdaptor.sol";
 import {IWToken} from "src/interfaces/IWToken.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {Asset, AssetType} from "src/libraries/Asset.sol";
+import {Asset, AssetType} from "src/libraries/AssetLogic.sol";
 import {ICurvePool} from "src/adaptors/curveNG/ICurvePool.sol";
 import {console} from "forge-std/Test.sol";
 

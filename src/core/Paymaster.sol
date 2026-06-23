@@ -10,8 +10,8 @@ import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interf
 import {IPaymaster} from "@account-abstraction/contracts/interfaces/IPaymaster.sol";
 import {IEntryPoint} from "@account-abstraction/contracts/interfaces/IEntryPoint.sol";
 import {PackedUserOperation} from "@account-abstraction/contracts/interfaces/PackedUserOperation.sol";
-import {ShieldedTransaction} from "../libraries/ShieldedTransaction.sol";
-import {Asset, AssetLogic} from "../libraries/Asset.sol";
+import {ShieldedTransaction} from "../libraries/ShieldedTransactionLogic.sol";
+import {Asset, AssetLogic} from "../libraries/AssetLogic.sol";
 import {IPool} from "../interfaces/IPool.sol";
 import {MIN_PRICE_STALENESS_THRESHOLD} from "../base/Constants.sol";
 

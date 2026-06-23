@@ -4,7 +4,7 @@ pragma abicoder v2;
 
 import {PoolTest} from "test/fixtures/PoolTest.sol";
 import {Pool} from "src/core/Pool.sol";
-import {ShieldedTransaction} from "src/libraries/ShieldedTransaction.sol";
+import {ShieldedTransaction} from "src/libraries/ShieldedTransactionLogic.sol";
 import {LidoAdaptor} from "src/adaptors/lido/LidoAdaptor.sol";
 import {ILido} from "src/adaptors/lido/ILido.sol";
 import {IWithdrawQueueERC721} from "src/adaptors/lido/IWithdrawQueueERC721.sol";
@@ -14,7 +14,7 @@ import {AssetAmount} from "src/interfaces/IAdaptor.sol";
 import {IWToken} from "src/interfaces/IWToken.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
-import {Asset, AssetType} from "src/libraries/Asset.sol";
+import {Asset, AssetType} from "src/libraries/AssetLogic.sol";
 import {console2} from "forge-std/console2.sol";
 
 enum Action {

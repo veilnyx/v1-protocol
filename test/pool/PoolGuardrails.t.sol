@@ -3,10 +3,10 @@ pragma solidity ^0.8.24;
 
 import {Test} from "forge-std/Test.sol";
 import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
-import {Asset, AssetType} from "src/libraries/Asset.sol";
+import {Asset, AssetType} from "src/libraries/AssetLogic.sol";
 import {IPool} from "src/interfaces/IPool.sol";
 import {MockAggregatorV3} from "test/mocks/MockAggregatorV3.sol";
-import {ShieldedTransaction} from "src/libraries/ShieldedTransaction.sol";
+import {ShieldedTransaction} from "src/libraries/ShieldedTransactionLogic.sol";
 import {MockERC20} from "test/mocks/MockERC20.sol";
 import {TVL_USD_DECIMALS, MIN_PRICE_STALENESS_THRESHOLD} from "src/base/Constants.sol";
 import {PoolTest} from "test/fixtures/PoolTest.sol";

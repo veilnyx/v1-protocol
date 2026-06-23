@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {ShieldedTransaction} from "src/libraries/ShieldedTransaction.sol";
+import {ShieldedTransaction} from "src/libraries/ShieldedTransactionLogic.sol";
 import {IPool} from "src/interfaces/IPool.sol";
 import {IWToken} from "src/interfaces/IWToken.sol";
 import {ZERO_LEAF} from "src/base/Constants.sol";

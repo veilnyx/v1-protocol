@@ -1,11 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.24;
 
-import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
-import {ShieldedTransaction, ShieldedTransactionType, RevokerData} from "../libraries/ShieldedTransaction.sol";
-import {ShieldedAddressRegistrationData} from "../libraries/ShieldedAddress.sol";
-import {TreeUpdateData} from "../libraries/QueuedMerkleTree.sol";
-import {AssetType, Asset} from "../libraries/Asset.sol";
+import {ShieldedTransaction, ShieldedTransactionType, RevokerData} from "../libraries/ShieldedTransactionLogic.sol";
+import {ShieldedAddressRegistrationData} from "../libraries/ShieldedAddressLogic.sol";
+import {TreeUpdateData} from "../libraries/QueuedMerkleTreeLogic.sol";
+import {AssetType, Asset} from "../libraries/AssetLogic.sol";
 import {PoolStorage} from "../base/PoolStorage.sol";
 
 import {IVerifier} from "./IVerifier.sol";
@@ -13,6 +12,7 @@ import {IAdaptorHandler} from "./IAdaptorHandler.sol";
 import {IScreener} from "./IScreener.sol";
 import {IHasher} from "./IHasher.sol";
 import {IWToken} from "./IWToken.sol";
+import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
 
 /// @param verifier The address of the verifier contract. Verifier contract verifies the stx's zk proof, address proof and merkle tree queue proof.
 /// @param adaptorHandler The address of the adaptor handler contract, responsible for delegate calling adaptors of external DeFi protocols.
@@ -263,7 +263,7 @@ interface IPool {
         ShieldedAddressRegistrationData calldata addressRegData
     ) external;
 
-    /// @notice Updates the commitment tree with a queue of leaves. It uses zk proof under the hood to prove the `newRoot` and `newSubtrees` are valid.
+    /// @notice Updates the commitment tree with a queue of leaves. It uses zk proof under the hood to prove the `newRoot` and `newLevelSubtrees` are valid.
     /// @param updatedCommitmentTreeInputs The inputs needed by the zk verifier to verify the authenticity of the queued merkle tree update.
     function updateCommitmentTree(
         TreeUpdateData memory updatedCommitmentTreeInputs

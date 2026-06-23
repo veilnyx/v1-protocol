@@ -16,13 +16,18 @@ import {IHasher} from "../interfaces/IHasher.sol";
 import {IWToken} from "../interfaces/IWToken.sol";
 import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {EIP712_DOMAIN_NAME, EIP712_DOMAIN_VERSION, MAX_WITHDRAW_FEE_BPS, TVL_USD_DECIMALS, MIN_PRICE_STALENESS_THRESHOLD} from "../base/Constants.sol";
+import {EIP712_DOMAIN_NAME, EIP712_DOMAIN_VERSION, MAX_WITHDRAW_FEE_BPS, MERKLE_TREE_DEPTH, COMMITMENT_TREE_DEPTH, TVL_USD_DECIMALS, MIN_PRICE_STALENESS_THRESHOLD} from "../base/Constants.sol";
 import {PoolStorage} from "../base/PoolStorage.sol";
-import {Asset, AssetType, AssetLogic} from "../libraries/Asset.sol";
-import {MerkleTree, MerkleTreeLogic} from "../libraries/MerkleTree.sol";
-import {QueuedMerkleTree, QueuedMerkleTreeLogic, TreeUpdateData} from "../libraries/QueuedMerkleTree.sol";
-import {ShieldedAddressRegistrationData, ShieldedAddressLogic} from "../libraries/ShieldedAddress.sol";
-import {ShieldedTransaction, ShieldedTransactionLogic, ShieldedTransactionType, RevokerData} from "../libraries/ShieldedTransaction.sol";
+import {Asset, AssetType, AssetLogic} from "../libraries/AssetLogic.sol";
+import {MerkleTree, MerkleTreeLogic} from "../libraries/MerkleTreeLogic.sol";
+import {QueuedMerkleTree, QueuedMerkleTreeLogic, TreeUpdateData} from "../libraries/QueuedMerkleTreeLogic.sol";
+import {ShieldedAddressRegistrationData, ShieldedAddressLogic} from "../libraries/ShieldedAddressLogic.sol";
+import {ShieldedTransaction, ShieldedTransactionLogic, RevokerData} from "../libraries/ShieldedTransactionLogic.sol";
+import {Asset, AssetType, AssetLogic} from "../libraries/AssetLogic.sol";
+import {MerkleTree, MerkleTreeLogic} from "../libraries/MerkleTreeLogic.sol";
+import {QueuedMerkleTree, QueuedMerkleTreeLogic, TreeUpdateData} from "../libraries/QueuedMerkleTreeLogic.sol";
+import {ShieldedAddressRegistrationData, ShieldedAddressLogic} from "../libraries/ShieldedAddressLogic.sol";
+import {ShieldedTransaction, ShieldedTransactionLogic, ShieldedTransactionType, RevokerData} from "../libraries/ShieldedTransactionLogic.sol";
 
 contract Pool is
     IPool,
@@ -46,12 +51,8 @@ contract Pool is
 
     /// @notice Initializes the Pool contract with the given parameters.
     /// @dev Pool is an UUPSUpgradeable contract, so it needs to be initialized.
-    /// @param addressTreeDepth The depth of the address tree.
-    /// @param commitmentTreeDepth The depth of the commitment tree.
     /// @param commitmentTreeQueueSize The size of the queue for the commitment tree. This determines how many leaves can be queued at MAX before a tree update is required. Defined by the circuit `treeUpdate::nLeaves`
     function initialize(
-        uint8 addressTreeDepth,
-        uint8 commitmentTreeDepth,
         uint8 commitmentTreeQueueSize,
         InitAddressParams calldata initAddressParams,
         PoolConfigParams calldata configParams
@@ -93,9 +94,8 @@ contract Pool is
         priceFeedStalenessThreshold = configParams.priceFeedStalenessThreshold;
         wToken = configParams.wToken;
 
-        _addressTree.init(addressTreeDepth, hasher);
+        _addressTree.init(hasher);
         _commitmentTree.init(
-            commitmentTreeDepth,
             commitmentTreeQueueSize,
             hasher,
             verifier
@@ -504,7 +504,7 @@ contract Pool is
         view
         returns (
             uint256[] memory queuedLeaves,
-            uint256[] memory lastSubtrees,
+            uint256[COMMITMENT_TREE_DEPTH] memory lastSubtrees,
             uint256 lastRoot,
             uint8 currentRootIndex,
             uint32 nextLeafIndex
@@ -523,7 +523,7 @@ contract Pool is
         external
         view
         returns (
-            uint256[] memory lastSubtrees,
+            uint256[MERKLE_TREE_DEPTH] memory lastSubtrees,
             uint256 lastRoot,
             uint8 currentRootIndex,
             uint32 nextLeafIndex

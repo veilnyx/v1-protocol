@@ -18,7 +18,7 @@ interface IPaymaster {
 }
 
 contract PaymasterOps is BaseScript {
-    address paymaster = 0x09Ddf21234094e89029451Fa677907Ad9fD9d06b;
+    address paymaster = 0x63F7a75d7cf330A8a0eb7d7FF9E760dC2B094729;
 
     function _readChainlinkFeed() internal view {
         uint24 gasAssetId = 65538; // GAS_ASSET_ID (WETH)
@@ -44,9 +44,24 @@ contract PaymasterOps is BaseScript {
         }
     }
 
-    function run() external broadcast {
+    function _withdrawFromPaymaster() internal {
+        uint256 deposit = IPaymaster(paymaster).getEntryPointDeposit();
+        console2.log("Current deposit: ", deposit);
+
+        uint256 privateKey = vm.envUint("PRIVATE_KEY");
+        vm.startBroadcast(privateKey);
+        IPaymaster(paymaster).withdrawFromEntryPoint(
+            payable(vm.envAddress("PUBLIC_ADDRESS")),
+            deposit
+        );
+        vm.stopBroadcast();
+        console2.log("Withdrew ", deposit, " from Paymaster.");
+    }
+
+    function run() external {
         // _readChainlinkFeed();
 
-        _checkPaymasterDeposit();
+        // _checkPaymasterDeposit();
+        _withdrawFromPaymaster();
     }
 }

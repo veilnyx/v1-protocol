@@ -4,11 +4,22 @@ import { TransactionType } from "@labyrinthac/shared-types";
 import { fixture, generateTestTransactions, generateTestTxsWithOutsourcedProofVerification } from "./fixture";
 
 const {
-  assets: { weth, usdc, testnetWeth, testnetUsdc },
+  assets: { weth, usdc, testnetWeth, testnetUsdc, reentrantToken },
   sender: { account: senderAccount },
 } = fixture;
 
 export const reqs = {
+  deposit_1000_reentrantToken_without_fee: {
+    type: TransactionType.DEPOSIT,
+    assetIds: [reentrantToken],
+    values: [parseEther("1000")],
+    feeAssetId: 0,
+    to: senderAccount.shieldedAddress.pack(),
+    viaBundler: false,
+    paymaster: zeroAddress,
+    revokerId: 0,
+  }
+  /**,
   deposit_2_testnet_weth: {
     type: TransactionType.DEPOSIT,
     assetIds: [testnetWeth],
@@ -97,16 +108,6 @@ export const reqs = {
    type: TransactionType.DEPOSIT,
    assetIds: [testnetWeth, testnetUsdc],
    values: [parseEther("10"), parseUnits("10", 6)],
-   feeAssetId: 0,
-   to: senderAccount.shieldedAddress.pack(),
-   viaBundler: false,
-   paymaster: zeroAddress,
-   revokerId: 0,
- },
- deposit_1000_reentrantToken_without_fee: {
-   type: TransactionType.DEPOSIT,
-   assetIds: [reentrantToken],
-   values: [parseEther("1000")],
    feeAssetId: 0,
    to: senderAccount.shieldedAddress.pack(),
    viaBundler: false,

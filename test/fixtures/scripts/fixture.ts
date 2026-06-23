@@ -373,7 +373,7 @@ export const generatePackedUserOps = async (name: string, req: TransactionReques
   // writeFileSync(`${dirFixtureData}/${name}_preVerificationEncodedStruct.txt`, encodedPreVerification);
 
   // Generating & Updating calldata in UserOp
-  const gatewayAbi = JSON.parse(readFileSync("out/Gateway.sol/Gateway.json", "utf-8")).abi;
+  const gatewayAbi = JSON.parse(readFileSync("artifacts/Gateway.sol/Gateway.json", "utf-8")).abi;
   userOp.callData = encodeFunctionData({
     abi: gatewayAbi,
     functionName: "handleUserOp",

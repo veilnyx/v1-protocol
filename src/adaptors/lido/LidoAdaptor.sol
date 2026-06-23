@@ -3,7 +3,7 @@
 pragma solidity 0.8.24;
 
 import {AdaptorBase} from "../../base/AdaptorBase.sol";
-import {Asset, AssetType} from "../../libraries/Asset.sol";
+import {Asset, AssetType} from "../../libraries/AssetLogic.sol";
 import {ILido} from "./ILido.sol";
 import {IWithdrawQueueERC721} from "./IWithdrawQueueERC721.sol";
 import {IWstEthToken} from "./IWstEthToken.sol";

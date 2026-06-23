@@ -2,7 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {Script} from "forge-std/Script.sol";
-import {AssetType} from "src/libraries/Asset.sol";
+import {AssetType} from "src/libraries/AssetLogic.sol";
 
 struct CommonConfig {
     uint256[] revokerPublicKey;

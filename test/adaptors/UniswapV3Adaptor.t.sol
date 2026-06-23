@@ -8,12 +8,12 @@ import {PoolTest} from "test/fixtures/PoolTest.sol";
 import {Pool} from "src/core/Pool.sol";
 import {IPool} from "src/interfaces/IPool.sol";
 import {IAdaptorHandler} from "src/interfaces/IAdaptorHandler.sol";
-import {ShieldedTransaction} from "src/libraries/ShieldedTransaction.sol";
+import {ShieldedTransaction} from "src/libraries/ShieldedTransactionLogic.sol";
 import {UniswapV3Adapter} from "src/adaptors/uniswap-v3/UniswapV3Adapter.sol";
 import {ISwapRouter02} from "src/adaptors/uniswap-v3/ISwapRouter02.sol";
 import {IWToken} from "src/interfaces/IWToken.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {Asset, AssetType} from "src/libraries/Asset.sol";
+import {Asset, AssetType} from "src/libraries/AssetLogic.sol";
 import {console} from "forge-std/console.sol";
 
 contract UniswapV3AdaptorTest is PoolTest {

@@ -3,7 +3,7 @@ pragma solidity 0.8.24;
 
 import {IAdaptor} from "../interfaces/IAdaptor.sol";
 import {IPool} from "../interfaces/IPool.sol";
-import {Asset, AssetType} from "../libraries/Asset.sol";
+import {Asset, AssetType} from "../libraries/AssetLogic.sol";
 
 /// NOTE: THIS SHOULD BE STATELESS - NO STORAGE VARS!!
 abstract contract AdaptorBase is IAdaptor {

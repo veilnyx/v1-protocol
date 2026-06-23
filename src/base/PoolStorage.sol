@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.24;
 
-import {MerkleTree} from "../libraries/MerkleTree.sol";
-import {QueuedMerkleTree} from "../libraries/QueuedMerkleTree.sol";
-import {Asset, AssetType} from "../libraries/Asset.sol";
-import {RevokerData} from "../libraries/ShieldedTransaction.sol";
+import {MerkleTree} from "../libraries/MerkleTreeLogic.sol";
+import {QueuedMerkleTree} from "../libraries/QueuedMerkleTreeLogic.sol";
+import {Asset, AssetType} from "../libraries/AssetLogic.sol";
+import {RevokerData} from "../libraries/ShieldedTransactionLogic.sol";
 import {IVerifier} from "../interfaces/IVerifier.sol";
 import {IAdaptorHandler} from "../interfaces/IAdaptorHandler.sol";
 import {IHasher} from "../interfaces/IHasher.sol";
@@ -28,7 +28,7 @@ abstract contract PoolStorage {
     mapping(address assetAddress => uint24 assetId) _assetIds;
     mapping(uint24 assetId => Asset asset) _assets;
 
-    mapping(uint256 nullifier => uint32 markLeafIndex)
+    mapping(uint256 nullifier => uint32 markNullifierIndex)
         internal _markedNullifiers;
 
     mapping(IAdaptorHandler => bool) internal _adaptors;

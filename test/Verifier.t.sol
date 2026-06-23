@@ -10,7 +10,7 @@ import {VerifierTransact22} from "src/verifiers/VerifierTransact22.sol";
 import {VerifierTransact23} from "src/verifiers/VerifierTransact23.sol";
 import {VerifierRegister} from "src/verifiers/VerifierRegister.sol";
 import {VerifierTreeUpdate} from "src/verifiers/VerifierTreeUpdate.sol";
-import {ShieldedTransaction, ShieldedTransactionType} from "src/libraries/ShieldedTransaction.sol";
+import {ShieldedTransaction, ShieldedTransactionType} from "src/libraries/ShieldedTransactionLogic.sol";
 import {BaseTest} from "test/fixtures/BaseTest.sol";
 
 contract VerifierTest is BaseTest {

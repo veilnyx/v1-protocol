@@ -3,8 +3,8 @@ pragma solidity ^0.8.24;
 
 import {Test} from "forge-std/Test.sol";
 import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
-import {Asset} from "src/libraries/Asset.sol";
-import {ShieldedTransaction} from "src/libraries/ShieldedTransaction.sol";
+import {Asset} from "src/libraries/AssetLogic.sol";
+import {ShieldedTransaction} from "src/libraries/ShieldedTransactionLogic.sol";
 import {IPool} from "src/interfaces/IPool.sol";
 import {IWToken} from "src/interfaces/IWToken.sol";
 import {MockAggregatorV3} from "test/mocks/MockAggregatorV3.sol";

@@ -8,21 +8,21 @@ import {AdaptorHandler} from "src/core/AdaptorHandler.sol";
 import {VerifierTransact21} from "src/verifiers/VerifierTransact21.sol";
 import {VerifierTransact22} from "src/verifiers/VerifierTransact22.sol";
 import {VerifierRegister} from "src/verifiers/VerifierRegister.sol";
-import {Asset, AssetType} from "src/libraries/Asset.sol";
-import {ShieldedTransaction, ShieldedTransactionType, RevokerData} from "src/libraries/ShieldedTransaction.sol";
-import {MerkleTree, MerkleTreeLogic} from "src/libraries/MerkleTree.sol";
-import {TreeUpdateData} from "src/libraries/QueuedMerkleTree.sol";
-import {ShieldedAddressRegistrationData, ShieldedAddressLogic} from "src/libraries/ShieldedAddress.sol";
+import {Asset, AssetType} from "src/libraries/AssetLogic.sol";
+import {ShieldedTransaction, ShieldedTransactionType, RevokerData} from "src/libraries/ShieldedTransactionLogic.sol";
+import {BinaryIMT as BinaryIMTLogic, BinaryIMTData} from "@zk-kit/imt.sol/BinaryIMT.sol";
+import {COMMITMENT_TREE_DEPTH, ZERO_LEAF} from "src/base/Constants.sol";
+import {TreeUpdateData} from "src/libraries/QueuedMerkleTreeLogic.sol";
+import {ShieldedAddressRegistrationData, ShieldedAddressLogic} from "src/libraries/ShieldedAddressLogic.sol";
 import {IPool} from "src/interfaces/IPool.sol";
 import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
 import {MockScreener} from "test/mocks/MockScreener.sol";
 import {MockVerifier} from "test/mocks/MockVerifier.sol";
 import {MockERC20} from "test/mocks/MockERC20.sol";
-import {MockVerifier} from "test/mocks/MockVerifier.sol";
 import {PoolBaseTest} from "./PoolBaseTest.sol";
 import {MockAggregatorV3} from "test/mocks/MockAggregatorV3.sol";
 import {BaseScript} from "script/BaseScript.sol";
-import {console} from "forge-std/console.sol";
+import {console2} from "forge-std/console2.sol";
 
 /// @dev PoolTest is a test setup contract providing the following functionalities:
 /// 1. Adding asset support to the pool.
@@ -31,8 +31,6 @@ import {console} from "forge-std/console.sol";
 /// 4. Commonly used modifiers and functions for testing pool ops.
 /// 5. Mocking the verifier contract.
 contract PoolTest is PoolBaseTest, BaseScript {
-    using MerkleTreeLogic for MerkleTree;
-
     MockVerifier internal _mockVerifier = new MockVerifier();
 
     /// @dev Shared $1 mock price feed used for test-only assets that have no real Chainlink feed.
@@ -42,7 +40,11 @@ contract PoolTest is PoolBaseTest, BaseScript {
     Asset public asset1;
     Asset public asset2;
 
-    MerkleTree internal _helperTree;
+    /// @dev Reference tree used to compute the correct newRoot and newLevelSubtrees for
+    ///      TreeUpdateData before calling pool.updateCommitmentTree(). Uses BinaryIMTData
+    ///      so the depth can be set to COMMITMENT_TREE_DEPTH (25) at runtime, matching
+    ///      the on-chain QueuedMerkleTree (the fixed-depth MerkleTree only supports depth 20).
+    BinaryIMTData internal _helperTree;
 
     bytes revokerMetaData = abi.encode("Revoker 1", "Organization 1");
 
@@ -283,24 +285,46 @@ contract PoolTest is PoolBaseTest, BaseScript {
     }
 
     function _processCommitmentTreeQueue() internal {
-        // Process the batch
-        uint8 depth = fixture.commitmentTreeDepth;
-        _helperTree.init(depth, hasher);
-        console.log("Inside _processCommitmentTreeQueue");
-        (uint256[] memory leaves, , , , uint32 nextLeafIndex) = pool
-            .getCommitmentTreeState();
-        console.log("Leaves in the queue:", leaves.length);
-        for (uint256 i = 0; i < leaves.length; ++i) {
-            _helperTree.insert(leaves[i]);
+        // queuedLeaves.length == queueSize (always 10): real leaves at the front, the rest
+        // are ZERO_LEAF pads. This is the fixed-width array the ZK circuit consumes.
+        (
+            uint256[] memory queuedLeaves,
+            uint256[COMMITMENT_TREE_DEPTH] memory currentSubtrees,
+            uint256 currentRoot,
+            ,
+            uint32 nextLeafIndex
+        ) = pool.getCommitmentTreeState();
+
+        // Calculating actual count of real no. of queued leaves in the queue (`queuedLeaves` is padded to queueSize i.e. 10).
+        // `actualBatchSize` must NOT equal queuedLeaves.length (10)
+        (uint32 startIdx, uint32 endIdx, , , ) = pool.getQueueRawState();
+        uint32 actualBatchSize = endIdx - startIdx;
+
+        BinaryIMTLogic.init(_helperTree, COMMITMENT_TREE_DEPTH, ZERO_LEAF);
+
+        _helperTree.root = currentRoot;
+        _helperTree.numberOfLeaves = nextLeafIndex;
+        for (uint256 i = 0; i < COMMITMENT_TREE_DEPTH; i++) {
+            _helperTree.lastSubtrees[i][0] = currentSubtrees[i];
         }
 
-        (uint256[] memory lastSubtrees, uint256 lastRoot, , ) = _helperTree
-            .getState();
+        // Insert the full padded array (real leaves + ZERO_LEAF pads) so the helper tree
+        // computes the same root the ZK circuit would produce for this batch.
+        for (uint256 i = 0; i < queuedLeaves.length; i++) {
+            BinaryIMTLogic.insert(_helperTree, queuedLeaves[i]);
+        }
+
+        uint256 newRoot = _helperTree.root;
+
+        uint256[COMMITMENT_TREE_DEPTH] memory newSubtrees;
+        for (uint256 i = 0; i < COMMITMENT_TREE_DEPTH; i++) {
+            newSubtrees[i] = _helperTree.lastSubtrees[i][0];
+        }
 
         TreeUpdateData memory treeUpdateData = TreeUpdateData({
-            newRoot: lastRoot,
-            batchSize: nextLeafIndex,
-            newSubtrees: lastSubtrees,
+            newRoot: newRoot,
+            batchSize: actualBatchSize,
+            newLevelSubtrees: newSubtrees,
             proof: bytes("")
         });
 

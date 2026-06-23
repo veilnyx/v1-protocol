@@ -3,7 +3,7 @@ pragma solidity 0.8.24;
 
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {FIELD_SIZE, FIELD_SIZE_DIV_2, EIP712_TYPEHASH_REGISTER_ADDRESS, MESSAGE_REGISTER_ADDRESS} from "../base/Constants.sol";
-import {MerkleTree, MerkleTreeLogic} from "./MerkleTree.sol";
+import {MerkleTree, MerkleTreeLogic} from "./MerkleTreeLogic.sol";
 import {IPool} from "../interfaces/IPool.sol";
 import {IVerifier} from "../interfaces/IVerifier.sol";
 

@@ -4,7 +4,7 @@ pragma solidity 0.8.24;
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {AdaptorBase} from "../../base/AdaptorBase.sol";
-import {Asset, AssetType} from "../../libraries/Asset.sol";
+import {Asset, AssetType} from "../../libraries/AssetLogic.sol";
 import {ISwapRouter02} from "./ISwapRouter02.sol";
 import {AssetAmount} from "../../interfaces/IAdaptor.sol";
 import {IPool} from "../../interfaces/IPool.sol";
