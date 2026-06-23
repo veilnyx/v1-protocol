@@ -55,7 +55,7 @@ contract MorphoAdaptorTest is PoolTest {
         uint8[] memory precisions = new uint8[](1);
         precisions[0] = 18;
 
-        pool.addAssets(assetType, assetAddresses, precisions);
+        pool.addAssets(assetType, assetAddresses, precisions, _mockFeedsArray(assetAddresses.length));
         vm.stopPrank();
     }
 

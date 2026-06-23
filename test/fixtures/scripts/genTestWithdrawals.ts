@@ -4,7 +4,7 @@ import { TransactionType } from "@labyrinthac/shared-types";
 import { fixture, generateTestTransactions, mockNotes, PAYMASTER_ADDR_FIXTURE } from "./fixture";
 
 const {
-  assets: { weth, usdc, reentrantToken },
+  assets: { weth, usdc, reentrantToken, testnetWeth },
   sender: { account: senderAccount, pubAddress: senderPubAddress },
 } = fixture;
 
@@ -19,17 +19,18 @@ export const reqs = {
     paymaster: zeroAddress,
     revokerId: 0,
   }
-  /**,
-  withdraw_100_weth_without_fee: {
+  /**
+  withdraw_10_weth_with_usdc_fee: {
     type: TransactionType.WITHDRAW,
     assetIds: [weth],
-    values: [parseEther("100")],
-    feeAssetId: 0,
+    values: [parseEther("10")],
+    feeAssetId: usdc,
     to: senderPubAddress,
-    viaBundler: false,
-    paymaster: zeroAddress,
+    viaBundler: true,
+    paymaster: PAYMASTER_ADDR_FIXTURE as `0x${string}`,
     revokerId: 0,
-  },
+  }
+  /**
   withdraw_10_weth_with_weth_fee: {
     type: TransactionType.WITHDRAW,
     assetIds: [weth],
@@ -39,15 +40,26 @@ export const reqs = {
     viaBundler: true,
     paymaster: PAYMASTER_ADDR_FIXTURE as `0x${string}`,
     revokerId: 0
+  }
+  /**,
+  withdraw_1_testnet_weth_without_fee: {
+    type: TransactionType.WITHDRAW,
+    assetIds: [testnetWeth],
+    values: [parseEther("1")],
+    feeAssetId: 0,
+    to: senderPubAddress,
+    viaBundler: false,
+    paymaster: zeroAddress,
+    revokerId: 0,
   },
-  withdraw_10_weth_with_usdc_fee: {
+  withdraw_100_weth_without_fee: {
     type: TransactionType.WITHDRAW,
     assetIds: [weth],
-    values: [parseEther("10")],
-    feeAssetId: usdc,
+    values: [parseEther("100")],
+    feeAssetId: 0,
     to: senderPubAddress,
-    viaBundler: true,
-    paymaster: PAYMASTER_ADDR_FIXTURE as `0x${string}`,
+    viaBundler: false,
+    paymaster: zeroAddress,
     revokerId: 0,
   },
 withdraw_500_weth_without_fee: {

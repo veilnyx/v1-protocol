@@ -11,6 +11,8 @@ import {IVerifier} from "./IVerifier.sol";
 import {IAdaptorHandler} from "./IAdaptorHandler.sol";
 import {IScreener} from "./IScreener.sol";
 import {IHasher} from "./IHasher.sol";
+import {IWToken} from "./IWToken.sol";
+import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
 
 /// @param verifier The address of the verifier contract. Verifier contract verifies the stx's zk proof, address proof and merkle tree queue proof.
 /// @param adaptorHandler The address of the adaptor handler contract, responsible for delegate calling adaptors of external DeFi protocols.
@@ -21,6 +23,24 @@ struct InitAddressParams {
     IAdaptorHandler adaptorHandler;
     IScreener screener;
     IHasher hasher;
+}
+
+/// @param withdrawFeeBps Withdrawal fee in basis points (1 bps = 0.01%).
+/// @param tvlLimitUsd Maximum allowed TVL in USD (6-decimal). 0 = disabled.
+/// @param minDepositUsd Minimum single-deposit value in USD (6-decimal). 0 = disabled.
+/// @param maxDepositUsd Maximum single-deposit value in USD (6-decimal). 0 = disabled.
+/// @param priceFeedStalenessThreshold Maximum age in seconds for a Chainlink price answer before it is considered stale.
+/// @param wToken Wrapped native token (e.g. WETH) used to wrap incoming msg.value
+///        into the corresponding ERC20 deposit during DEPOSIT transactions.
+///        Pass address(0) to disable native ETH deposits at deploy time; can
+///        later be enabled by the owner via `setWToken`.
+struct PoolConfigParams {
+    uint256 withdrawFeeBps;
+    uint256 tvlLimitUsd;
+    uint256 minDepositUsd;
+    uint256 maxDepositUsd;
+    uint256 priceFeedStalenessThreshold;
+    IWToken wToken;
 }
 
 interface IPool {
@@ -44,6 +64,7 @@ interface IPool {
     event VersionUpdated(uint64 indexed version);
 
     event AssetAdded(address indexed assetAddress, uint24 indexed assetId);
+    event AssetStatusUpdated(uint24 indexed assetId, bool isActive);
 
     event NullifierMarked(uint256 indexed nullifier, uint32 indexed leafIndex);
     // Commitments
@@ -62,6 +83,15 @@ interface IPool {
         bytes notesMemo,
         bytes refundMemo
     );
+
+    event WithdrawFeeUpdated(uint256 feeBps);
+
+    event AssetUsdPriceFeedSet(uint24 indexed assetId, address indexed feed);
+    event TvlLimitUpdated(uint256 limit);
+    event MinDepositUpdated(uint256 limit);
+    event MaxDepositUpdated(uint256 limit);
+    event PriceFeedStalenessThresholdUpdated(uint256 threshold);
+    event WTokenUpdated(address indexed wToken);
 
     /////////////////////////////////////////
     //            ERRORS                   //
@@ -88,6 +118,38 @@ interface IPool {
     error NoFeeToClaim(address paymaster, uint24 assetId);
     error WithdrawalFeeTooHigh(uint256 feeBps, uint256 maxFeeBps);
     error PubAssetsCannotExceedCommitments();
+    error PriceFeedNotSet(uint24 assetId);
+    error PriceFeedValueStale(uint24 assetId, uint256 updatedAt);
+    error TvlPriceInvalid(uint24 assetId, int256 price);
+    error TvlLimitExceeded(uint256 projectedTvl, uint256 limit);
+    error PriceFeedStalenessThresholdTooLow(uint256 given, uint256 minimum);
+    error DepositRestrictedAsAssetFeedNotSet(uint24 assetId);
+    error DepositBelowMinimum(uint256 depositUsd, uint256 minDepositUsd);
+    error DepositAboveMaximum(uint256 depositUsd, uint256 maxDepositUsd);
+
+    /// @dev msg.value was sent for a non-DEPOSIT transaction. Native ETH is only
+    ///      accepted on DEPOSIT to be wrapped into the configured wToken.
+    error NativeEthOnlyForDeposit();
+
+    /// @dev Native ETH was sent but the wrapped-native token (wToken) is not
+    ///      configured on this Pool, or the wToken has not been registered as
+    ///      an active asset.
+    error WTokenNotConfigured();
+
+    /// @dev Native ETH was sent but the deposit transaction has no pubAsset
+    ///      entry for the configured wToken to match against.
+    error WTokenNotInPubAssets();
+
+    /// @dev pubAssets contains more than one entry for the same assetId.
+    ///      A well-formed shielded transaction must list each asset at most
+    ///      once.
+    error DuplicatePubAssetId(uint24 assetId);
+
+    /// @dev msg.value exceeds the (pre-fee) wToken pubAsset value of the
+    ///      deposit. Refusing to wrap to avoid locking the surplus ETH in the
+    ///      Pool. Send `msg.value <= wTokenValue` and approve the wToken
+    ///      remainder if msg.value < wTokenValue.
+    error NativeEthExceedsDeposit(uint256 sent, uint256 expected);
 
     /////////////////////////////////////////
     //         ADMIN WRITE METHODS         //
@@ -106,10 +168,12 @@ interface IPool {
     /// @param assetType The type of the asset to be added.
     /// @param assetAddresses The addresses of the assets.
     /// @param precisions The decimal precision (e.g. 18 for ETH) for each asset, supplied by the protocol owner.
+    /// @param usdPriceFeeds Parallel array of Chainlink-compatible USD price feed addresses (address(0) = no feed).
     function addAssets(
         AssetType assetType,
         address[] calldata assetAddresses,
-        uint8[] calldata precisions
+        uint8[] calldata precisions,
+        AggregatorV3Interface[] calldata usdPriceFeeds
     ) external;
 
     /// @notice Adds support for an external adaptor to a DeFi protocol.
@@ -120,6 +184,12 @@ interface IPool {
         IAdaptorHandler adaptorAddress,
         bool enable
     ) external;
+
+    /// @notice Activates or deactivates an existing asset.
+    /// @notice Can only be called by the owner.
+    /// @param assetId The 3-byte id of the asset to update.
+    /// @param isActive Whether the asset should be active or inactive.
+    function updateAssetStatus(uint24 assetId, bool isActive) external;
 
     /// @notice Registers a new revoker. Revokers are responsible for deanonymizing transactions along with a network of Guardians.
     /// @notice Can only be called by the owner.
@@ -152,7 +222,35 @@ interface IPool {
     /// @notice Can only be called by the owner.
     function setWithdrawFeeBips(uint256 feeBips) external;
 
-    event WithdrawFeeUpdated(uint256 feeBps);
+    /// @notice Registers a Chainlink-compatible USD price feed for an ERC20 asset.
+    ///         Required for getTvlUsd() to include the asset in TVL calculation.
+    /// @param assetId The 3-byte asset id to register the feed for.
+    /// @param feed    Chainlink AggregatorV3Interface feed returning the asset price in USD.
+    function setAssetPriceFeed(
+        uint24 assetId,
+        AggregatorV3Interface feed
+    ) external;
+
+    /// @notice Sets the maximum allowed TVL in USD (6-decimal precision). Set to 0 to disable.
+    function setTvlLimitUsd(uint256 limitUsd) external;
+
+    /// @notice Sets the minimum single-deposit value in USD (6-decimal precision). Set to 0 to disable.
+    function setMinDepositUsd(uint256 limitUsd) external;
+
+    /// @notice Sets the maximum single-deposit value in USD (6-decimal precision). Set to 0 to disable.
+    function setMaxDepositUsd(uint256 limitUsd) external;
+
+    /// @notice Sets the maximum age of a Chainlink price answer before it is considered stale.
+    /// @param threshold Age in seconds. Can only be called by the owner.
+    function setPriceFeedStalenessThreshold(uint256 threshold) external;
+
+    /// @notice Sets the wrapped native token (e.g. WETH) used to convert any
+    ///         incoming `msg.value` into the corresponding ERC20 deposit during
+    ///         a DEPOSIT transaction.
+    /// @notice Can only be called by the owner.
+    /// @param wToken The wrapped native token contract. Pass address(0) to
+    ///        disable native ETH deposits via this Pool.
+    function setWToken(IWToken wToken) external;
 
     /////////////////////////////////////////
     //        PUBLIC WRITE METHODS         //
@@ -173,8 +271,15 @@ interface IPool {
 
     /// @notice Validates and executes a stx.
     /// @notice Can only be called when the contract is not paused.
+    /// @notice Payable: when the transaction is a DEPOSIT and `wToken` is set,
+    ///         the caller may attach native ETH equal to the (pre-fee) wToken
+    ///         pubAsset value. The Pool then wraps the ETH into wToken on
+    ///         behalf of the caller in lieu of pulling wToken from the caller's
+    ///         wallet via `transferFrom`. msg.value of 0 preserves the
+    ///         pre-existing ERC20 transferFrom flow for any asset (including
+    ///         wToken).
     /// @param stx The stx to be executed.
-    function transact(ShieldedTransaction calldata stx) external;
+    function transact(ShieldedTransaction calldata stx) external payable;
 
     /// @notice A function to call by a paymaster contract to claim the asset wise fees collected for the ERC-4337 transactions they catered to.
     /// @notice Can only be called when the contract is not paused.
@@ -280,4 +385,27 @@ interface IPool {
     /// @param root The root value to check.
     function isKnownAddressTreeRoot(uint256 root) external view returns (bool);
      */
+
+    /// @notice Validates that the deposit amount in `stx` falls within the configured USD limits.
+    /// @dev Call this before submitting a DEPOSIT transaction to surface limit violations early,
+    ///      without spending gas on a full transaction. Non-DEPOSIT transactions always pass.
+    ///      Limits are expressed in 6-decimal USD (e.g. 5_000_000 = $5.00).
+    ///      A limit value of 0 means the corresponding check is disabled.
+    /// @param stx The shielded transaction to validate.
+    /// @custom:error DepositBelowMinimum Thrown when `minDepositUsd > 0` and the deposit
+    ///               value is strictly less than `minDepositUsd`.
+    /// @custom:error DepositAboveMaximum Thrown when `maxDepositUsd > 0` and the deposit
+    ///               value is strictly greater than `maxDepositUsd`.
+    function checkDepositWithinLimits(
+        ShieldedTransaction calldata stx
+    ) external view returns (bool);
+
+    /// @notice Checks whether a pending deposit would push TVL above tvlLimitUsd.
+    /// @dev Returns false when tvlLimitUsd is 0 (disabled) or stx is not a DEPOSIT.
+    ///      Assets with no feed registered are excluded from the deposit-side sum.
+    /// @param stx The shielded transaction to evaluate.
+    /// @return crossed True if the deposit would cause TVL to exceed the limit.
+    function isTvlLimitCrossed(
+        ShieldedTransaction calldata stx
+    ) external view returns (bool crossed);
 }

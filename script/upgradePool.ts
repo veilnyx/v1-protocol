@@ -42,7 +42,6 @@ const setup = async () => {
 }
 
 const deployPoolImpl = async (commonLibs: any) => {
-    /**
     console.log("Starting to deploy new Pool");
     const shieldedAddress = await hre.viem.deployContract(
         "ShieldedAddressLogic",
@@ -54,15 +53,13 @@ const deployPoolImpl = async (commonLibs: any) => {
         }
     );
     console.log("ShieldedAddressLogic deployed:", shieldedAddress.address);
- */
-    const shieldedAddress = `0x50909c7ecda3625a970f6986eb2f51d3072c1d97` as `0x${string}`;
 
     const poolImpl = await hre.viem.deployContract("Pool", [], {
         libraries: {
             AssetLogic: commonLibs.asset,
             MerkleTreeLogic: commonLibs.merkleTree,
             QueuedMerkleTreeLogic: commonLibs.queuedMerkleTree,
-            ShieldedAddressLogic: shieldedAddress,
+            ShieldedAddressLogic: shieldedAddress.address,
             ShieldedTransactionLogic: commonLibs.shieldedTransaction,
         },
     });
@@ -80,7 +77,7 @@ const deployPoolImpl = async (commonLibs: any) => {
             AssetLogic: commonLibs.asset,
             MerkleTreeLogic: commonLibs.merkleTree,
             QueuedMerkleTreeLogic: commonLibs.queuedMerkleTree,
-            ShieldedAddressLogic: shieldedAddress,
+            ShieldedAddressLogic: shieldedAddress.address,
             ShieldedTransactionLogic: commonLibs.shieldedTransaction,
         },
     }
@@ -125,7 +122,6 @@ const upgradePoolProxy = async (newPoolImpl: `0x${string}`) => {
 }
 
 const deployCommonLibs = async () => {
-    /**
     // deploying common libraries
     const asset = await hre.viem.deployContract("AssetLogic");
     console.log("AssetLogic deployed:", asset.address);
@@ -137,25 +133,24 @@ const deployCommonLibs = async () => {
         "QueuedMerkleTreeLogic"
     );
     console.log("QueuedMerkleTreeLogic deployed:", queuedMerkleTree.address);
-    */
 
     const shieldedTransaction = await hre.viem.deployContract(
         "ShieldedTransactionLogic",
         [],
         {
             libraries: {
-                AssetLogic: `0xf1c30e64f8df25853e8494b747d6e1d1fa1774a9` as `0x${string}`,
-                MerkleTreeLogic: `0x217fca85531cf12282f663457bbbd97b57811804` as `0x${string}`,
-                QueuedMerkleTreeLogic: `0x7858b96b94ea5069ab11e3908b3db10ab7278ba1` as `0x${string}`,
+                AssetLogic: asset.address as `0x${string}`,
+                MerkleTreeLogic: merkleTree.address as `0x${string}`,
+                QueuedMerkleTreeLogic: queuedMerkleTree.address as `0x${string}`,
             }
         }
     );
     console.log("ShieldedTransactionLogic deployed:", shieldedTransaction.address);
 
     return {
-        asset: `0xf1c30e64f8df25853e8494b747d6e1d1fa1774a9` as `0x${string}`,
-        merkleTree: `0x217fca85531cf12282f663457bbbd97b57811804` as `0x${string}`,
-        queuedMerkleTree: `0x7858b96b94ea5069ab11e3908b3db10ab7278ba1` as `0x${string}`,
+        asset: asset.address as `0x${string}`,
+        merkleTree: merkleTree.address as `0x${string}`,
+        queuedMerkleTree: queuedMerkleTree.address as `0x${string}`,
         shieldedTransaction: shieldedTransaction.address
     }
 }
@@ -167,21 +162,11 @@ const main = async () => {
     const commonLibs = await deployCommonLibs();
 
     // ERC4337 infra
-    // const erc4337Contracts = await deployErc4337Infra(chainParams, existingPoolProxy, deployConfig);
+    const erc4337Contracts = await deployErc4337Infra(chainParams, existingPoolProxy, deployConfig);
 
     const newPoolImpl = await deployPoolImpl(commonLibs);
 
-    // await upgradePoolProxy(newPoolImpl);
-}
-
-const upgradePoolOnly = async () => {
-    await setup();
-
-    const commonLibs = await deployCommonLibs();
-
-    const newPoolImpl = await deployPoolImpl(commonLibs);
     await upgradePoolProxy(newPoolImpl);
 }
 
-// main().catch((err) => { console.log(err) });
-upgradePoolOnly();
+main().catch((err) => { console.log(err) });

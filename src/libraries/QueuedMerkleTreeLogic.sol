@@ -217,6 +217,10 @@ library QueuedMerkleTreeLogic {
             uint32 nextLeafIndex
         )
     {
+        // queuedLeaves is always padded to queueSize with ZERO_LEAF. Real leaves occupy the
+        // front (indices 0 .. queueEndIndex-queueStartIndex-1); the remainder are ZERO_LEAF
+        // sentinels. This fixed-length array matches the ZK circuit's treeUpdate input width
+        // so the off-chain update service can pass it directly without reshaping.
         queuedLeaves = _getQueuedLeaves(self);
         subtrees = self.levelSubtrees;
         nextLeafIndex = self.nextLeafIndex;

@@ -46,11 +46,11 @@ const commitmentTreeDepth = Number(config.commitmentTreeDepth);
 const commitmentTreeQueueSize = Number(config.commitmentTreeQueueSize);
 const qmtQueueSize = Number(config.qmtQueueSize);
 
-export const USER_OP_CALL_GAS_LIMIT = BigInt(25_00_000);
+export const USER_OP_CALL_GAS_LIMIT = BigInt(9_00_000);
 export const USER_OP_VERIFICATION_GAS_LIMIT = BigInt(75_000);
 export const USER_OP_PRE_VERIFICATION_GAS = BigInt(75_000);
-export const USER_OP_MAX_FEE_PER_GAS = BigInt(150_000_000);
-export const USER_OP_MAX_PRIORITY_FEE_PER_GAS = BigInt(150_000_000);
+export const USER_OP_MAX_FEE_PER_GAS = BigInt(43484312091);
+export const USER_OP_MAX_PRIORITY_FEE_PER_GAS = BigInt(1155000000);
 export const USER_OP_PAYMASTER_VERIFICATION_GAS = BigInt(50_000);
 export const PAYMASTER_ADDR_FIXTURE = config.paymaster;
 export const GATEWAY_ADDR_FIXTURE = config.gateway;
@@ -373,7 +373,7 @@ export const generatePackedUserOps = async (name: string, req: TransactionReques
   // writeFileSync(`${dirFixtureData}/${name}_preVerificationEncodedStruct.txt`, encodedPreVerification);
 
   // Generating & Updating calldata in UserOp
-  const gatewayAbi = JSON.parse(readFileSync("out/Gateway.sol/Gateway.json", "utf-8")).abi;
+  const gatewayAbi = JSON.parse(readFileSync("artifacts/Gateway.sol/Gateway.json", "utf-8")).abi;
   userOp.callData = encodeFunctionData({
     abi: gatewayAbi,
     functionName: "handleUserOp",

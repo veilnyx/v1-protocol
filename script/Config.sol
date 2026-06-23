@@ -29,6 +29,7 @@ contract Config is Script {
     address[] internal _initAssetAddresses;
     uint8[] internal _initAssetsPrecision;
     uint24[] internal _initAssetIdsVeilnyx;
+    address[] internal _initAssetToUSDChainlinkFeeds;
 
     constructor() {
         string memory path = string.concat(
@@ -126,6 +127,11 @@ contract Config is Script {
         for (uint i = 0; i < initAssetIdsUint256.length; i++) {
             _initAssetIdsVeilnyx[i] = uint24(initAssetIdsUint256[i]);
         }
+
+        _initAssetToUSDChainlinkFeeds = vm.parseJsonAddressArray(
+            configJson,
+            string.concat(chainPrefix, ".initAssetToUSDChainlinkFeeds")
+        );
     }
 
     function revokerPublicKey() external view returns (uint256[2] memory) {
@@ -142,5 +148,17 @@ contract Config is Script {
 
     function initAssetsPrecision() external view returns (uint8[] memory) {
         return _initAssetsPrecision;
+    }
+
+    function initAssetIdsVeilnyx() external view returns (uint24[] memory) {
+        return _initAssetIdsVeilnyx;
+    }
+
+    function initAssetToUSDChainlinkFeeds()
+        external
+        view
+        returns (address[] memory)
+    {
+        return _initAssetToUSDChainlinkFeeds;
     }
 }

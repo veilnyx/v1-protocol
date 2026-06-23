@@ -20,4 +20,28 @@ contract MockPool is Pool {
     function mock_queueCommitments(uint256[] memory commitments) public {
         _commitmentTree.queueLeaves(commitments);
     }
+
+    function getDepositUsd(
+        ShieldedTransaction calldata stx
+    ) public view returns (uint256 depositUsd) {
+        return super._getDepositUsd(stx);
+    }
+
+    function getQueueRawState()
+        external
+        view
+        returns (
+            uint32 startIdx,
+            uint32 endIdx,
+            uint32 nextLeaf,
+            uint8 queueSz,
+            uint8 rootIdx
+        )
+    {
+        startIdx = _commitmentTree.queueStartIndex;
+        endIdx = _commitmentTree.queueEndIndex;
+        nextLeaf = _commitmentTree.nextLeafIndex;
+        queueSz = _commitmentTree.queueSize;
+        rootIdx = _commitmentTree.currentRootIndex;
+    }
 }

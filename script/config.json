@@ -67,7 +67,8 @@
       }
     ],
     "withdrawFeeBps": 5,
-    "protocolVersion": 1
+    "protocolVersion": 2,
+    "veilnyxMultiSigAddress": "0x9bAf694B165c42850BD3c9c944E16d48d566C617"
   },
   "31337": {
     "chain": "local",
@@ -88,7 +89,11 @@
       18,
       6
     ],
-    "initAssetChainlinkFeeds": [
+    "initNativeGasTokenToAssetChainlinkFeeds": [
+      "0x0000000000000000000000000000000000000000",
+      "0x0000000000000000000000000000000000000000"
+    ],
+    "initAssetToUSDChainlinkFeeds": [
       "0x0000000000000000000000000000000000000000",
       "0x0000000000000000000000000000000000000000"
     ],
@@ -122,9 +127,16 @@
       18,
       6
     ],
-    "initAssetChainlinkFeeds": [
+    "initNativeGasTokenToAssetChainlinkFeeds": [
       "0x0000000000000000000000000000000000000000",
       "0x694AA1769357215DE4FAC081bf1f309aDC325306",
+      "0x0000000000000000000000000000000000000000",
+      "0x0000000000000000000000000000000000000000",
+      "0x0000000000000000000000000000000000000000"
+    ],
+    "initAssetToUSDChainlinkFeeds": [
+      "0x694AA1769357215DE4FAC081bf1f309aDC325306",
+      "0xA2F78ab2355fe2f984D808B5CeE7FD0A93D5270E",
       "0x0000000000000000000000000000000000000000",
       "0x0000000000000000000000000000000000000000",
       "0x0000000000000000000000000000000000000000"
@@ -156,9 +168,13 @@
       18,
       6
     ],
-    "initAssetChainlinkFeeds": [
+    "initNativeGasTokenToAssetChainlinkFeeds": [
       "0x0000000000000000000000000000000000000000",
       "0x61Ec26aA57019C486B10502285c5A3D4A4750AD7"
+    ],
+    "initAssetToUSDChainlinkFeeds": [
+      "0x61Ec26aA57019C486B10502285c5A3D4A4750AD7",
+      "0x6e44e50E3cc14DD16e01C590DC1d7020cb36eD4C"
     ],
     "initAssetIdsVeilnyx": [
       65537,
@@ -184,9 +200,13 @@
       18,
       6
     ],
-    "initAssetChainlinkFeeds": [
+    "initNativeGasTokenToAssetChainlinkFeeds": [
       "0x0000000000000000000000000000000000000000",
       "0xF0d50568e3A7e8259E16663972b11910F89BD8e7"
+    ],
+    "initAssetToUSDChainlinkFeeds": [
+      "0xF0d50568e3A7e8259E16663972b11910F89BD8e7",
+      "0x1b8739bB4CdF0089d07097A9Ae5Bd274b29C6F16"
     ],
     "initAssetIdsVeilnyx": [
       65537,
@@ -212,9 +232,13 @@
       18,
       6
     ],
-    "initAssetChainlinkFeeds": [
+    "initNativeGasTokenToAssetChainlinkFeeds": [
       "0x0000000000000000000000000000000000000000",
       "0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419"
+    ],
+    "initAssetToUSDChainlinkFeeds": [
+      "0x5147eA642CAEF7BD9c1265AadcA78f997AbB9649",
+      "0x84E045745ED829c5b778aBB17104FC2600020850"
     ],
     "initAssetIdsVeilnyx": [
       65537,
@@ -240,9 +264,13 @@
       18,
       6
     ],
-    "initAssetChainlinkFeeds": [
+    "initNativeGasTokenToAssetChainlinkFeeds": [
       "0x0000000000000000000000000000000000000000",
       "0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419"
+    ],
+    "initAssetToUSDChainlinkFeeds": [
+      "0x0000000000000000000000000000000000000000",
+      "0x0000000000000000000000000000000000000000"
     ],
     "initAssetIdsVeilnyx": [
       65537,
@@ -272,7 +300,12 @@
       6,
       18
     ],
-    "initAssetChainlinkFeeds": [
+    "initNativeGasTokenToAssetChainlinkFeeds": [
+      "0x0000000000000000000000000000000000000000",
+      "0x0000000000000000000000000000000000000000",
+      "0x0000000000000000000000000000000000000000"
+    ],
+    "initAssetToUSDChainlinkFeeds": [
       "0x0000000000000000000000000000000000000000",
       "0x0000000000000000000000000000000000000000",
       "0x0000000000000000000000000000000000000000"
@@ -302,7 +335,11 @@
       18,
       6
     ],
-    "initAssetChainlinkFeeds": [
+    "initNativeGasTokenToAssetChainlinkFeeds": [
+      "0x0000000000000000000000000000000000000000",
+      "0x0000000000000000000000000000000000000000"
+    ],
+    "initAssetToUSDChainlinkFeeds": [
       "0x0000000000000000000000000000000000000000",
       "0x0000000000000000000000000000000000000000"
     ],
@@ -328,7 +365,10 @@
     "initAssetsPrecision": [
       6
     ],
-    "initAssetChainlinkFeeds": [
+    "initNativeGasTokenToAssetChainlinkFeeds": [
+      "0x0000000000000000000000000000000000000000"
+    ],
+    "initAssetToUSDChainlinkFeeds": [
       "0x0000000000000000000000000000000000000000"
     ],
     "initAssetIdsVeilnyx": [

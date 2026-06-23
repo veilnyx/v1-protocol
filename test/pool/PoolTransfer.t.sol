@@ -15,11 +15,31 @@ contract PoolTransferTest is PoolTest {
         _makePreDeposit();
     }
 
+    function test_debugQueueState() external view {
+        (
+            uint32 startIdx,
+            uint32 endIdx,
+            uint32 nextLeaf,
+            uint8 queueSz,
+            uint8 rootIdx
+        ) = pool.getQueueRawState();
+        console2.log("startIdx:", startIdx);
+        console2.log("endIdx:", endIdx);
+        console2.log("nextLeaf:", nextLeaf);
+        console2.log("queueSz:", queueSz);
+        console2.log("rootIdx:", rootIdx);
+    }
+
     function test_transferWithoutFee() external {
         uint256 balance1 = token1.balanceOf(address(pool));
         ShieldedTransaction memory stx = _loadShieldedTransaction(
             "transfer_20_weth_without_fee"
         );
+        console2.log(
+            "Fixture::transfer_20_weth_without_fee::MerkleRoot:",
+            stx.commitmentTreeRoot
+        );
+
         _checkEventEmits(stx);
         assertEq(token1.balanceOf(address(pool)), balance1);
     }

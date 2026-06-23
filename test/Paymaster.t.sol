@@ -15,8 +15,8 @@ import {IWToken} from "src/interfaces/IWToken.sol";
 import {IPool} from "src/interfaces/IPool.sol";
 import {MockPool} from "test/mocks/MockPool.sol";
 import {PoolTest} from "test/fixtures/PoolTest.sol";
-import {console2} from "forge-std/console2.sol";
 import {StdCheats} from "forge-std/StdCheats.sol";
+import {console2} from "forge-std/console2.sol";
 
 // import {PoolTransactTest} from "test/helpers/PoolTransact.t.sol";
 
@@ -76,7 +76,7 @@ contract PaymasterTest is PoolTest {
 
         StdCheats.deployCodeTo(
             "Paymaster.sol:Paymaster",
-            abi.encode(entryPoint, address(gateway), address(pool)),
+            abi.encode(entryPoint, address(gateway), address(pool), pool.priceFeedStalenessThreshold()),
             fixture.paymaster
         );
         console2.log("paymaster:", fixture.paymaster);
@@ -139,8 +139,14 @@ contract PaymasterTest is PoolTest {
             feeAssetIdUSDC
         );
 
-        (int256 ethInUSDC, , uint8 feedDecimals) = _getEthUsdcFeedData();
-
+        (
+            int256 ethInUSDC,
+            uint256 updatedAt,
+            uint8 feedDecimals
+        ) = _getEthUsdcFeedData();
+        console2.log("Feed Updated at:", updatedAt);
+        console2.log("Current block timestamp:", block.timestamp);
+        console2.log("ETH in USDC:", ethInUSDC);
         uint256 expectedFeeValueInUSDC = (feeValueInEth *
             uint256(ethInUSDC) *
             10 ** USDC_DECIMALS) / 10 ** (ETH_DECIMALS + feedDecimals);
@@ -224,7 +230,11 @@ contract PaymasterTest is PoolTest {
             uint8 feedDecimals
         ) = _getEthUsdcFeedData();
 
-        vm.warp(block.timestamp + 2 hours); // Move forward in time to make the price feed stale
+        vm.warp(
+            block.timestamp +
+                paymaster.priceStalenessThreshold() +
+                2 hours
+        ); // Move forward in time to make the price feed stale
         vm.expectRevert(
             abi.encodeWithSelector(
                 Paymaster.ChainlinkPriceInvalid.selector,

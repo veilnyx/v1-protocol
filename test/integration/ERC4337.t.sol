@@ -52,7 +52,7 @@ contract ERC4337 is PoolTest {
 
         StdCheats.deployCodeTo(
             "Paymaster.sol:Paymaster",
-            abi.encode(entryPointContract, fixture.gateway, address(pool)),
+            abi.encode(entryPointContract, fixture.gateway, address(pool), pool.priceFeedStalenessThreshold()),
             fixture.paymaster
         );
         console2.log("paymaster:", fixture.paymaster);

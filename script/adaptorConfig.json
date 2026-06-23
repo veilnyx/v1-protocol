@@ -15,6 +15,10 @@
             "assetsPrecision": {
                 "staticAWeth": 18,
                 "staticAUsdc": 6
+            },
+            "assetsUsdPriceFeeds": {
+                "staticAWeth": "0x5424384B256154046E9667dDFaaa5e550145215e",
+                "staticAUsdc": "0xB00341502DfEA6Ced8A5786b4059d29dA5E4D1FD"
             }
         },
         "lido": {
@@ -28,6 +32,9 @@
             },
             "assetsPrecision": {
                 "wstEth": 18
+            },
+            "assetsUsdPriceFeeds": {
+                "wstEth": "0x0000000000000000000000000000000000000000"
             }
         },
         "curve": {
@@ -42,6 +49,12 @@
                 "crvUsd": 6,
                 "crvUsdUsdtLPToken": 6,
                 "crvUsdSusdeLPToken": 6
+            },
+            "assetsUsdPriceFeeds": {
+                "usdt": "0x3E7d1eAB13ad0104d2750B8863b489D65364e32D",
+                "crvUsd": "0xEEf0C605546958c1f899b6fB336C20671f9cD49F",
+                "crvUsdUsdtLPToken": "0x0000000000000000000000000000000000000000",
+                "crvUsdSusdeLPToken": "0x0000000000000000000000000000000000000000"
             }
         },
         "ethena": {
@@ -54,6 +67,10 @@
             "assetsPrecision": {
                 "usde": 6,
                 "sUsde": 6
+            },
+            "assetsUsdPriceFeeds": {
+                "usde": "0xa569d910839Ae8865Da8F8e70FfFb0cBA869F961",
+                "sUsde": "0xFF3BC18cCBd5999CE63E788A1c250a88626aD099"
             }
         },
         "beefy": {
@@ -62,6 +79,9 @@
             },
             "assetsPrecision": {
                 "mooCurveCrvUSDsUSDe": 18
+            },
+            "assetsUsdPriceFeeds": {
+                "mooCurveCrvUSDsUSDe": "0x0000000000000000000000000000000000000000"
             }
         },
         "morpho": {
@@ -70,6 +90,9 @@
             },
             "assetsPrecision": {
                 "gauntletWETHPrimeVault": 18
+            },
+            "assetsUsdPriceFeeds": {
+                "gauntletWETHPrimeVault": "0x0000000000000000000000000000000000000000"
             }
         },
         "rocketPool": {
@@ -80,6 +103,9 @@
             },
             "assetsPrecision": {
                 "rETH": 18
+            },
+            "assetsUsdPriceFeeds": {
+                "rETH": "0x0000000000000000000000000000000000000000"
             }
         },
         "oneInch": {
@@ -102,7 +128,11 @@
             "assetsPrecision": {
                 "staticAWeth": 18,
                 "staticAUsdc": 6
-            }
+            },
+                "assetsUsdPriceFeeds": {
+                    "staticAWeth": "0x5424384B256154046E9667dDFaaa5e550145215e",
+                    "staticAUsdc": "0xB00341502DfEA6Ced8A5786b4059d29dA5E4D1FD"
+                }
         },
         "lido": {
             "lido": "0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84",
@@ -115,6 +145,9 @@
             },
             "assetsPrecision": {
                 "wstEth": 18
+            },
+            "assetsUsdPriceFeeds": {
+                "wstEth": "0x0000000000000000000000000000000000000000"
             }
         },
         "curve": {
@@ -129,6 +162,12 @@
                 "crvUsd": 6,
                 "crvUsdUsdtLPToken": 6,
                 "crvUsdSusdeLPToken": 6
+            },
+            "assetsUsdPriceFeeds": {
+                "usdt": "0x0000000000000000000000000000000000000000",
+                "crvUsd": "0x0000000000000000000000000000000000000000",
+                "crvUsdUsdtLPToken": "0x0000000000000000000000000000000000000000",
+                "crvUsdSusdeLPToken": "0x0000000000000000000000000000000000000000"
             }
         },
         "ethena": {
@@ -141,6 +180,10 @@
             "assetsPrecision": {
                 "usde": 6,
                 "sUsde": 6
+            },
+            "assetsUsdPriceFeeds": {
+                "usde": "0x0000000000000000000000000000000000000000",
+                "sUsde": "0x0000000000000000000000000000000000000000"
             }
         },
         "beefy": {
@@ -149,6 +192,9 @@
             },
             "assetsPrecision": {
                 "mooCurveCrvUSDsUSDe": 18
+            },
+            "assetsUsdPriceFeeds": {
+                "mooCurveCrvUSDsUSDe": "0x0000000000000000000000000000000000000000"
             }
         },
         "morpho": {
@@ -157,6 +203,9 @@
             },
             "assetsPrecision": {
                 "gauntletWETHPrimeVault": 18
+            }, 
+            "assetsUsdPriceFeeds": {
+                "gauntletWETHPrimeVault": "0x0000000000000000000000000000000000000000"
             }
         },
         "rocketPool": {
@@ -167,6 +216,9 @@
             },
             "assetsPrecision": {
                 "rETH": 18
+            },
+            "assetsUsdPriceFeeds": {
+                "rETH": "0x0000000000000000000000000000000000000000"
             }
         },
         "oneInch": {
@@ -189,6 +241,10 @@
             "assetsPrecision": {
                 "staticAWeth": 18,
                 "staticAUsdc": 6
+            },
+            "assetsUsdPriceFeeds": {
+                "staticAWeth": "0x694AA1769357215DE4FAC081bf1f309aDC325306",
+                "staticAUsdc": "0xA2F78ab2355fe2f984D808B5CeE7FD0A93D5270E"
             }
         },
         "lido": {
@@ -202,6 +258,9 @@
             },
             "assetsPrecision": {
                 "wstEth": 18
+            },
+            "assetsUsdPriceFeeds": {
+                "wstEth": "0xaaabb530434B0EeAAc9A42E25dbC6A22D7bE218E"
             }
         },
         "curve": {
@@ -216,6 +275,12 @@
                 "crvUsd": 6,
                 "crvUsdUsdtLPToken": 6,
                 "crvUsdSusdeLPToken": 6
+            },
+            "assetsUsdPriceFeeds": {
+                "usdt": "0xA2F78ab2355fe2f984D808B5CeE7FD0A93D5270E",
+                "crvUsd": "0x0000000000000000000000000000000000000000",
+                "crvUsdUsdtLPToken": "0x0000000000000000000000000000000000000000",
+                "crvUsdSusdeLPToken": "0x0000000000000000000000000000000000000000"
             }
         },
         "ethena": {
@@ -228,6 +293,10 @@
             "assetsPrecision": {
                 "usde": 6,
                 "sUsde": 6
+            },
+            "assetsUsdPriceFeeds": {
+                "usde": "0x55ec7c3ed0d7CB5DF4d3d8bfEd2ecaf28b4638fb",
+                "sUsde": "0x6f7be09227d98Ce1Df812d5Bc745c0c775507E92"
             }
         },
         "beefy": {
@@ -236,6 +305,9 @@
             },
             "assetsPrecision": {
                 "mooCurveCrvUSDsUSDe": 18
+            },
+            "assetsUsdPriceFeeds": {
+                "mooCurveCrvUSDsUSDe": "0x0000000000000000000000000000000000000000"
             }
         },
         "morpho": {
@@ -244,6 +316,9 @@
             },
             "assetsPrecision": {
                 "gauntletWETHPrimeVault": 18
+            },
+            "assetsUsdPriceFeeds": {
+                "gauntletWETHPrimeVault": "0x0000000000000000000000000000000000000000"
             }
         },
         "rocketPool": {
@@ -254,6 +329,9 @@
             },
             "assetsPrecision": {
                 "rETH": 18
+            },
+            "assetsUsdPriceFeeds": {
+                "rETH": "0x694AA1769357215DE4FAC081bf1f309aDC325306"
             }
         },
         "oneInch": {

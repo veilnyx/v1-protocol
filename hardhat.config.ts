@@ -6,12 +6,14 @@ import "@nomicfoundation/hardhat-ignition";
 import "@nomicfoundation/hardhat-ignition-viem";
 import "@openzeppelin/hardhat-upgrades";
 import "hardhat-contract-sizer";
+import "@nomicfoundation/hardhat-verify";
 // import * as tdly from "@tenderly/hardhat-tenderly";
 
 // tdly.setup({ automaticVerifications: true });
 dotenv.config();
 
 const rpcEthereumSepolia = process.env.RPC_ETHEREUM_SEPOLIA as string;
+const etherscanApiKey = process.env.ETHERSCAN_API_KEY as string;
 const rpcOptimismSepolia = process.env.RPC_OPTIMISM_SEPOLIA as string;
 const rpcTenderlyMainnet = process.env.RPC_TENDERLY_MAINNET as string;
 const rpcVeilnyxTestnet = process.env.RPC_VEILNYX_TESTNET as string;
@@ -23,13 +25,32 @@ const forkEnabled = process.env.HARDHAT_FORK === "true";
 
 const config: HardhatUserConfig = {
   solidity: {
-    version: "0.8.24",
-    settings: {
-      optimizer: {
-        enabled: true,
-        runs: 1_000_000,
+    compilers: [
+      {
+        version: "0.8.24",
+        settings: {
+          optimizer: {
+            enabled: true,
+            runs: 10_00_000,
+          },
+        },
       },
-    }
+    ],
+    // Mirror the foundry.toml `compilation_restrictions` override: Pool sits
+    // close to the EIP-170 24,576-byte limit, so compile it with low runs to
+    // shrink runtime bytecode at the cost of a tiny gas overhead on the thin
+    // dispatch shell. All other contracts keep the global 1M runs.
+    overrides: {
+      "src/core/Pool.sol": {
+        version: "0.8.24",
+        settings: {
+          optimizer: {
+            enabled: true,
+            runs: 200,
+          },
+        },
+      },
+    },
   },
   networks: {
     hardhat: {
@@ -40,7 +61,7 @@ const config: HardhatUserConfig = {
         blockNumber: 16229898,
       },
     },
-    ethereumSepolia: {
+    sepolia: {
       url: rpcEthereumSepolia,
       accounts: privateKeys,
       chainId: 11155111
@@ -75,7 +96,22 @@ const config: HardhatUserConfig = {
     runOnCompile: true,
     strict: true,
     unit: "kB"
-  }
+  },
+  etherscan: {
+    apiKey: {
+      sepolia: etherscanApiKey,
+    },
+    customChains: [
+      {
+        network: "sepolia",
+        chainId: 11155111,
+        urls: {
+          apiURL: "https://api.etherscan.io/v2/api?chainid=11155111",
+          browserURL: "https://sepolia.etherscan.io",
+        },
+      },
+    ],
+  } as any
 };
 
 export default config;

@@ -39,7 +39,8 @@ contract MockPool {
             assetType: AssetType.ERC20,
             assetAddress: address(0),
             isActive: true,
-            precision: 6
+            precision: 6,
+            usdPriceFeed: AggregatorV3Interface(address(0))
         });
 
         return feeAsset;
@@ -78,7 +79,7 @@ contract GatewayTest is Test {
 
         StdCheats.deployCodeTo(
             "Paymaster.sol:Paymaster",
-            abi.encode(entryPoint, address(gateway), address(pool)),
+            abi.encode(entryPoint, address(gateway), address(pool), uint256(1 days)),
             fixture.paymaster
         );
         console2.log("paymaster:", fixture.paymaster);

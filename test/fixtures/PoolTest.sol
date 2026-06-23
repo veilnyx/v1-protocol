@@ -10,18 +10,19 @@ import {VerifierTransact22} from "src/verifiers/VerifierTransact22.sol";
 import {VerifierRegister} from "src/verifiers/VerifierRegister.sol";
 import {Asset, AssetType} from "src/libraries/AssetLogic.sol";
 import {ShieldedTransaction, ShieldedTransactionType, RevokerData} from "src/libraries/ShieldedTransactionLogic.sol";
-import {MerkleTree, MerkleTreeLogic} from "src/libraries/MerkleTreeLogic.sol";
-import {MERKLE_TREE_DEPTH, COMMITMENT_TREE_DEPTH} from "src/base/Constants.sol";
+import {BinaryIMT as BinaryIMTLogic, BinaryIMTData} from "@zk-kit/imt.sol/BinaryIMT.sol";
+import {COMMITMENT_TREE_DEPTH, ZERO_LEAF} from "src/base/Constants.sol";
 import {TreeUpdateData} from "src/libraries/QueuedMerkleTreeLogic.sol";
 import {ShieldedAddressRegistrationData, ShieldedAddressLogic} from "src/libraries/ShieldedAddressLogic.sol";
 import {IPool} from "src/interfaces/IPool.sol";
+import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
 import {MockScreener} from "test/mocks/MockScreener.sol";
 import {MockVerifier} from "test/mocks/MockVerifier.sol";
 import {MockERC20} from "test/mocks/MockERC20.sol";
-import {MockVerifier} from "test/mocks/MockVerifier.sol";
 import {PoolBaseTest} from "./PoolBaseTest.sol";
+import {MockAggregatorV3} from "test/mocks/MockAggregatorV3.sol";
 import {BaseScript} from "script/BaseScript.sol";
-import {console} from "forge-std/console.sol";
+import {console2} from "forge-std/console2.sol";
 
 /// @dev PoolTest is a test setup contract providing the following functionalities:
 /// 1. Adding asset support to the pool.
@@ -30,14 +31,20 @@ import {console} from "forge-std/console.sol";
 /// 4. Commonly used modifiers and functions for testing pool ops.
 /// 5. Mocking the verifier contract.
 contract PoolTest is PoolBaseTest, BaseScript {
-    using MerkleTreeLogic for MerkleTree;
-
     MockVerifier internal _mockVerifier = new MockVerifier();
+
+    /// @dev Shared $1 mock price feed used for test-only assets that have no real Chainlink feed.
+    ///      Allows the TVL guard to work correctly whenever tvlLimitUsd is set in tests.
+    MockAggregatorV3 internal _defaultMockFeed;
 
     Asset public asset1;
     Asset public asset2;
 
-    MerkleTree internal _helperTree;
+    /// @dev Reference tree used to compute the correct newRoot and newLevelSubtrees for
+    ///      TreeUpdateData before calling pool.updateCommitmentTree(). Uses BinaryIMTData
+    ///      so the depth can be set to COMMITMENT_TREE_DEPTH (25) at runtime, matching
+    ///      the on-chain QueuedMerkleTree (the fixed-depth MerkleTree only supports depth 20).
+    BinaryIMTData internal _helperTree;
 
     bytes revokerMetaData = abi.encode("Revoker 1", "Organization 1");
 
@@ -122,6 +129,8 @@ contract PoolTest is PoolBaseTest, BaseScript {
     function _setUp() internal virtual override {
         PoolBaseTest._setUp();
 
+        _defaultMockFeed = new MockAggregatorV3(int256(1e8), 8); // $1 / 8-dec
+
         AssetType assetType = AssetType.ERC20;
         uint256 initAssetLength = block.chainid == 31337
             ? 0
@@ -129,9 +138,14 @@ contract PoolTest is PoolBaseTest, BaseScript {
 
         address[] memory assetAddresses = new address[](3 + initAssetLength);
         uint8[] memory assetsPrecision = new uint8[](3 + initAssetLength);
+        AggregatorV3Interface[]
+            memory usdPriceFeeds = new AggregatorV3Interface[](
+                3 + initAssetLength
+            );
         // for local testing env, we deploy mock tokens and add them as supported assets in the pool. The script/config.json will showcase arrays for initAssetAddresses, etc, which should be considered dummies, except the initAssetIdsVeilnyx used by the SDK. For testnet/mainnet, we rely on mock + existing onchain tokens, so supporting both sets of assets configured in the script/config.json file, which should include the assets needed for adaptor testing.
 
         // testnets/mainnet fork testing case
+        // will include both the mock tokens (asset1, asset2, assetReent) and the real tokens specified in the config, which should cover most of the fork testing needs. Adaptor tokens will be added by respective adaptor test contracts.
         if (block.chainid != 31337) {
             assetAddresses[0] = address(token1);
             assetAddresses[1] = address(token2);
@@ -140,11 +154,23 @@ contract PoolTest is PoolBaseTest, BaseScript {
             assetsPrecision[0] = MockERC20(assetAddresses[0]).decimals();
             assetsPrecision[1] = MockERC20(assetAddresses[1]).decimals();
             assetsPrecision[2] = MockERC20(assetAddresses[2]).decimals();
+            // mock tokens use _defaultMockFeed; real price feeds come from config
+            usdPriceFeeds[0] = AggregatorV3Interface(address(_defaultMockFeed));
+            usdPriceFeeds[1] = AggregatorV3Interface(address(_defaultMockFeed));
+            usdPriceFeeds[2] = AggregatorV3Interface(address(_defaultMockFeed));
 
+            // real feeds for fork testing. To test against them, keep tvlLimitUsd > 0 and a deposit tx.
+            address[] memory configFeeds = _config
+                .initAssetToUSDChainlinkFeeds();
             uint i = 0;
             do {
                 assetAddresses[3 + i] = _config.initAssetAddresses()[i];
                 assetsPrecision[3 + i] = _config.initAssetsPrecision()[i];
+                if (i < configFeeds.length) {
+                    usdPriceFeeds[3 + i] = AggregatorV3Interface(
+                        configFeeds[i]
+                    );
+                }
                 ++i;
             } while (i < initAssetLength);
         } else {
@@ -155,10 +181,19 @@ contract PoolTest is PoolBaseTest, BaseScript {
             assetsPrecision[0] = MockERC20(assetAddresses[0]).decimals();
             assetsPrecision[1] = MockERC20(assetAddresses[1]).decimals();
             assetsPrecision[2] = MockERC20(assetAddresses[2]).decimals();
+
+            usdPriceFeeds[0] = AggregatorV3Interface(address(_defaultMockFeed));
+            usdPriceFeeds[1] = AggregatorV3Interface(address(_defaultMockFeed));
+            usdPriceFeeds[2] = AggregatorV3Interface(address(_defaultMockFeed));
         }
 
         // adding support for testnet tokens if any to provide support of adaptor testing
-        pool.addAssets(assetType, assetAddresses, assetsPrecision);
+        pool.addAssets(
+            assetType,
+            assetAddresses,
+            assetsPrecision,
+            usdPriceFeeds
+        );
 
         asset1 = pool.getAsset(assetAddresses[0]);
         asset2 = pool.getAsset(assetAddresses[1]);
@@ -204,6 +239,16 @@ contract PoolTest is PoolBaseTest, BaseScript {
         pool.transact(stx);
     }
 
+    /// @dev Returns an address array of length `len` filled with address(_defaultMockFeed).
+    ///      Use this when adding test-only assets that need a working price feed.
+    function _mockFeedsArray(
+        uint256 len
+    ) internal view returns (AggregatorV3Interface[] memory feeds) {
+        feeds = new AggregatorV3Interface[](len);
+        for (uint256 i; i < len; ++i)
+            feeds[i] = AggregatorV3Interface(address(_defaultMockFeed));
+    }
+
     function _mintAsset(
         Asset storage asset,
         address to,
@@ -240,32 +285,46 @@ contract PoolTest is PoolBaseTest, BaseScript {
     }
 
     function _processCommitmentTreeQueue() internal {
-        // Process the batch
-        _helperTree.init(hasher);
-        console.log("Inside _processCommitmentTreeQueue");
-        (uint256[] memory leaves, , , , uint32 nextLeafIndex) = pool
-            .getCommitmentTreeState();
-        console.log("Leaves in the queue:", leaves.length);
-        for (uint256 i = 0; i < leaves.length; ++i) {
-            _helperTree.insert(leaves[i]);
+        // queuedLeaves.length == queueSize (always 10): real leaves at the front, the rest
+        // are ZERO_LEAF pads. This is the fixed-width array the ZK circuit consumes.
+        (
+            uint256[] memory queuedLeaves,
+            uint256[COMMITMENT_TREE_DEPTH] memory currentSubtrees,
+            uint256 currentRoot,
+            ,
+            uint32 nextLeafIndex
+        ) = pool.getCommitmentTreeState();
+
+        // Calculating actual count of real no. of queued leaves in the queue (`queuedLeaves` is padded to queueSize i.e. 10).
+        // `actualBatchSize` must NOT equal queuedLeaves.length (10)
+        (uint32 startIdx, uint32 endIdx, , , ) = pool.getQueueRawState();
+        uint32 actualBatchSize = endIdx - startIdx;
+
+        BinaryIMTLogic.init(_helperTree, COMMITMENT_TREE_DEPTH, ZERO_LEAF);
+
+        _helperTree.root = currentRoot;
+        _helperTree.numberOfLeaves = nextLeafIndex;
+        for (uint256 i = 0; i < COMMITMENT_TREE_DEPTH; i++) {
+            _helperTree.lastSubtrees[i][0] = currentSubtrees[i];
         }
 
-        (
-            uint256[MERKLE_TREE_DEPTH] memory lastSubtreesFixed,
-            uint256 lastRoot,
-            ,
+        // Insert the full padded array (real leaves + ZERO_LEAF pads) so the helper tree
+        // computes the same root the ZK circuit would produce for this batch.
+        for (uint256 i = 0; i < queuedLeaves.length; i++) {
+            BinaryIMTLogic.insert(_helperTree, queuedLeaves[i]);
+        }
 
-        ) = _helperTree.getState();
+        uint256 newRoot = _helperTree.root;
 
-        uint256[COMMITMENT_TREE_DEPTH] memory lastSubtrees;
-        for (uint256 i = 0; i < MERKLE_TREE_DEPTH; ++i) {
-            lastSubtrees[i] = lastSubtreesFixed[i];
+        uint256[COMMITMENT_TREE_DEPTH] memory newSubtrees;
+        for (uint256 i = 0; i < COMMITMENT_TREE_DEPTH; i++) {
+            newSubtrees[i] = _helperTree.lastSubtrees[i][0];
         }
 
         TreeUpdateData memory treeUpdateData = TreeUpdateData({
-            newRoot: lastRoot,
-            batchSize: nextLeafIndex,
-            newLevelSubtrees: lastSubtrees,
+            newRoot: newRoot,
+            batchSize: actualBatchSize,
+            newLevelSubtrees: newSubtrees,
             proof: bytes("")
         });
 

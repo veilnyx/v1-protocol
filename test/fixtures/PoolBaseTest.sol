@@ -4,7 +4,7 @@ pragma solidity ^0.8.24;
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 import {Pool} from "src/core/Pool.sol";
-import {InitAddressParams} from "src/interfaces/IPool.sol";
+import {InitAddressParams, PoolConfigParams} from "src/interfaces/IPool.sol";
 import {MESSAGE_REGISTER_ADDRESS, EIP712_DOMAIN_NAME, EIP712_DOMAIN_VERSION, EIP712_TYPEHASH_REGISTER_ADDRESS} from "src/base/Constants.sol";
 import {VerifierTransact21} from "src/verifiers/VerifierTransact21.sol";
 import {VerifierTransact22} from "src/verifiers/VerifierTransact22.sol";
@@ -19,6 +19,7 @@ import {IAdaptorHandler} from "src/interfaces/IAdaptorHandler.sol";
 import {IHasher} from "src/interfaces/IHasher.sol";
 import {IScreener} from "src/interfaces/IScreener.sol";
 import {IPool} from "src/interfaces/IPool.sol";
+import {IWToken} from "src/interfaces/IWToken.sol";
 import {MockPool} from "test/mocks/MockPool.sol";
 import {MockScreener} from "test/mocks/MockScreener.sol";
 import {MockERC20} from "test/mocks/MockERC20.sol";
@@ -92,17 +93,26 @@ contract PoolBaseTest is BaseTest {
             hasher: IHasher(address(hasher))
         });
 
+        PoolConfigParams memory configParams = PoolConfigParams({
+            withdrawFeeBps: fixture.withdrawFeeBps,
+            tvlLimitUsd: 0,
+            minDepositUsd: 0,
+            maxDepositUsd: 0,
+            priceFeedStalenessThreshold: 1 days,
+            wToken: IWToken(config.wToken())
+        });
+
         bytes memory initData = abi.encodeCall(
             Pool.initialize,
             (
                 fixture.commitmentTreeQueueSize,
                 initAddressParams,
-                fixture.withdrawFeeBps
+                configParams
             )
         );
 
         ERC1967Proxy poolProxy = new ERC1967Proxy(address(pool), initData);
-        pool = MockPool(address(poolProxy));
+        pool = MockPool(payable(address(poolProxy)));
         adaptorHandler.setVeilnyxPool(IPool(address(pool)));
     }
 
