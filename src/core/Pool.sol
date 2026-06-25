@@ -95,23 +95,36 @@ contract Pool is
         wToken = configParams.wToken;
 
         _addressTree.init(hasher);
-        _commitmentTree.init(
-            commitmentTreeQueueSize,
-            hasher,
-            verifier
-        );
+        _commitmentTree.init(commitmentTreeQueueSize, hasher, verifier);
+    }
+
+    /////////////////////////////////////////
+    //            MODIFIERS               //
+    ////////////////////////////////////////
+
+    /// @dev Reverts unless the caller is the designated pauser or the owner.
+    modifier onlyPauserOrOwner() {
+        if (msg.sender != pauser && msg.sender != owner())
+            revert IPool.NotPauser();
+        _;
     }
 
     /////////////////////////////////////////
     //         ADMIN WRITE METHODS         //
     ////////////////////////////////////////
     /// @custom:invariant ACCESS-1 Owner can upgrade, pause, add assets/adaptors, register revokers
-    function pause() external onlyOwner {
+    function pause() external onlyPauserOrOwner {
         _pause();
     }
 
     function unpause() external onlyOwner {
         _unpause();
+    }
+
+    /// @custom:invariant ACCESS-1 Owner can delegate pausing to a separate address
+    function setPauser(address newPauser) external onlyOwner {
+        emit IPool.PauserUpdated(pauser, newPauser);
+        pauser = newPauser;
     }
 
     function addAssets(

@@ -92,6 +92,7 @@ interface IPool {
     event MaxDepositUpdated(uint256 limit);
     event PriceFeedStalenessThresholdUpdated(uint256 threshold);
     event WTokenUpdated(address indexed wToken);
+    event PauserUpdated(address indexed oldPauser, address indexed newPauser);
 
     /////////////////////////////////////////
     //            ERRORS                   //
@@ -150,18 +151,25 @@ interface IPool {
     ///      Pool. Send `msg.value <= wTokenValue` and approve the wToken
     ///      remainder if msg.value < wTokenValue.
     error NativeEthExceedsDeposit(uint256 sent, uint256 expected);
+    error NotPauser();
 
     /////////////////////////////////////////
     //         ADMIN WRITE METHODS         //
     ////////////////////////////////////////
 
     /// @notice Pauses the contract. While paused, no transactions can be executed.
-    /// @notice Can only be called by the owner.
+    /// @notice Can only be called by the pauser or the owner.
     function pause() external;
 
     /// @notice Unpauses the contract.
     /// @notice Can only be called by the owner.
     function unpause() external;
+
+    /// @notice Delegates only the pausing right to `newPauser`. `unpause()` can still only be called by the owner.
+    /// @notice Can only be called by the owner.
+    /// @notice Even with an external pauser, the owner can still call `pause()` and `unpause()`.
+    /// @param newPauser The address of the new pauser. Pass address(0) to revoke the dedicated pauser and revert control back to the owner exclusively.
+    function setPauser(address newPauser) external;
 
     /// @notice Adds support for new assets in the protocol.
     /// @notice Can only be called by the owner.

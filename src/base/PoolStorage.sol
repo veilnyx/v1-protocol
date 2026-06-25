@@ -60,4 +60,8 @@ abstract contract PoolStorage {
     ///      are accepted; while unset (address(0)) any `transact` call carrying
     ///      msg.value > 0 reverts. ERC20-only deposits are unaffected.
     IWToken public wToken;
+
+    /// @dev Address authorised to call `pause()`. Set by the owner via `setPauser`.
+    ///      Defaults to address(0).
+    address public pauser;
 }
