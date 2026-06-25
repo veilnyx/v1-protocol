@@ -7,17 +7,17 @@ import {IPool} from "src/interfaces/IPool.sol";
 contract RegisterRevoker is BaseScript {
     // DECOM_GRP revoker keys
     uint256 constant REVOKER_X =
-        16481715428292641414090788527523849067643249410247738079187244265915987843343;
+        20166730020419159052286555107141035920946760385383107576039955225567455300207;
     uint256 constant REVOKER_Y =
-        11269818143449338126502809473506237318599117872770962832972091717245533415863;
+        18439266136563662170719450990945300828423393702749802977743662490195521743390;
 
     uint256 constant ENC_X =
-        4321126899491414688643883332441835950049136153055686387487184312703532041125;
+        1415297768191015876969734831367396850794970386289866514910293184189216114711;
     uint256 constant ENC_Y =
-        16613246411751272682575178888266382768090179459423720344501284773500017351901;
+        10435528812585515475307388160094137747296379532862976260464438917842987448252;
 
     function run() external broadcast {
-        string memory name = "Veilnyx Internal Group";
+        string memory name = "Veilnyx Internal Group 2";
         string
             memory description = "A revoker group for decentralized applications, ensuring secure and reliable revocation processes.";
         bytes memory metadata = abi.encode(name, description);
@@ -25,7 +25,7 @@ contract RegisterRevoker is BaseScript {
         uint256[2] memory revokerPublicKey = [REVOKER_X, REVOKER_Y];
         uint256[2] memory encryptionPublicKey = [ENC_X, ENC_Y];
 
-        IPool(address(0xd971f6C35e7a71f25d912CD652bA182ca0778f5b))
+        IPool(address(0xef7585dFCdB91b0dc9fC9f920c4fb72bfb7B3E1f))
             .registerRevoker(revokerPublicKey, encryptionPublicKey, metadata);
     }
 }
