@@ -10,6 +10,7 @@
     "test:prepare": "ts-node test/fixtures/scripts/index.ts",
     "genAdpPayload": "forge script script/setup/GenerateAdaptorPayload.s.sol:GenerateAdaptorPayload",
     "registerRevoker": "source .env && forge script script/setup/RegisterRevoker.s.sol:RegisterRevoker --rpc-url $RPC_ETHEREUM_SEPOLIA --broadcast",
+    "deployVerifier:sepolia": "source .env && forge script script/setup/AddTransact42Verifier.s.sol --rpc-url $RPC_ETHEREUM_SEPOLIA --broadcast",
     "deploy:test": "cross-env HARDHAT_FORK=true hardhat run script/deploy.ts --network hardhat",
     "upgrade:test": "cross-env HARDHAT_FORK=true HARDHAT_SHOW_STACK_TRACES=true HARDHAT_VERBOSE=true DEBUG=hardhat:* hardhat --verbose run script/upgrade.ts --network hardhat",
     "deployCoreWithAdp:tenderly": "hardhat run script/deployCoreWithAdp.ts --network tenderlyMainnetCustomId",

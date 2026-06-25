@@ -86,6 +86,22 @@ export const reqs = {
 	*/
 };
 
+// 4-input 4-output transfer reusing the same 4x2 pre-deposits.
+// Transfer amounts exceed the single-note value (1000 each) so the SDK must
+// select BOTH notes per asset — 4 real inputs, 4 outputs, exercising transact44.
+export const reqs4x4 = {
+	transfer_4x4_weth_usdc_without_fee: {
+		type: TransactionType.TRANSFER,
+		assetIds: [weth, usdc],
+		values: [parseEther("1500"), parseUnits("1500", 6)],
+		feeAssetId: 0,
+		to: receiverAccount.shieldedAddress.pack(),
+		viaBundler: false,
+		paymaster: zeroAddress,
+		revokerId: 0,
+	},
+};
+
 // 4-input 2-output transfer consuming all notes from both 4x2 pre-deposits.
 // Transfers 2000 WETH + 2000 USDC to receiver with no fee, producing exactly
 // 2 output notes — exercising the transact42 circuit.
@@ -100,6 +116,13 @@ export const reqs4x2 = {
 		paymaster: zeroAddress,
 		revokerId: 0,
 	},
+};
+
+export const genTestTransfersWith4Input4OutputNotes = async (sdk: Core) => {
+	// Same two deposits as the 4x2 case: notes at leafIndex 0,1 and 2,3.
+	await mockNotes("deposit_pre_tx_4x2_a", sdk);
+	await mockNotesWithOffset("deposit_pre_tx_4x2_b", sdk, 2);
+	await generateTestTransactions(reqs4x4, sdk);
 };
 
 export const genTestTransfersWith4Input2OutputNotes = async (sdk: Core) => {

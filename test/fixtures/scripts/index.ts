@@ -1,7 +1,7 @@
 import { genAddressRegistrations, genAddrRegWithOutsourceProofVerification } from "./genTestAddressRegistration";
 import { genTestDeposits4x2 } from "./genTestDeposits";
 import { genTestWithdrawals } from "./genTestWithdrawals";
-import { genTestTransfers, genTestTransfersWith4Input2OutputNotes, genTestTransfersWithOutsourceProofVerification, genTransferPackedUserOp, genTransferPackedUserOpPreVerified } from "./genTestTransfers";
+import { genTestTransfers, genTestTransfersWith4Input2OutputNotes, genTestTransfersWith4Input4OutputNotes, genTestTransfersWithOutsourceProofVerification, genTransferPackedUserOp, genTransferPackedUserOpPreVerified } from "./genTestTransfers";
 import { genTestCallAdaptors } from './genTestCallAdaptor';
 
 import { getSDKInstance } from "./sdk";
@@ -16,8 +16,9 @@ const main = async () => {
 	// await genTestDeposits(sdk); // already generated; transact21 wasm not compiled - only regenerate if assets change
 	// await genTestDepositsWithOutsourceProofVerification(sdk, nebraClient);
 	// await genTestTransfers(sdk);
-	await genTestDeposits4x2(sdk);
-	await genTestTransfersWith4Input2OutputNotes(sdk);
+	// await genTestDeposits4x2(sdk);
+	// await genTestTransfersWith4Input2OutputNotes(sdk);
+	await genTestTransfersWith4Input4OutputNotes(sdk);
 	// await genTestTransfersWithOutsourceProofVerification(sdk, nebraClient);
 	// await genTransferPackedUserOp(sdk, nebraClient);
 	// await genAddressRegistrations(sdk);
