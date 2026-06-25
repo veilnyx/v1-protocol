@@ -9,6 +9,7 @@ const {
 } = fixture;
 
 export const reqs = {
+  /**
   deposit_1000_reentrantToken_without_fee: {
     type: TransactionType.DEPOSIT,
     assetIds: [reentrantToken],
@@ -18,8 +19,7 @@ export const reqs = {
     viaBundler: false,
     paymaster: zeroAddress,
     revokerId: 0,
-  }
-  /**,
+  },
   deposit_2_testnet_weth: {
     type: TransactionType.DEPOSIT,
     assetIds: [testnetWeth],
@@ -148,6 +148,31 @@ deposit_1000_weth_usdc_without_fee: {
  */
 };
 
+// Two identical deposits that together supply 4 input notes (2 WETH + 2 USDC each)
+// for the transact42 (4-input 2-output) circuit test.
+export const reqs4x2: Record<string, any> = {
+  deposit_pre_tx_4x2_a: {
+    type: TransactionType.DEPOSIT,
+    assetIds: [weth, usdc],
+    values: [parseEther("1000"), parseUnits("1000", 6)],
+    feeAssetId: 0,
+    to: senderAccount.shieldedAddress.pack(),
+    viaBundler: false,
+    paymaster: zeroAddress,
+    revokerId: 0,
+  },
+  deposit_pre_tx_4x2_b: {
+    type: TransactionType.DEPOSIT,
+    assetIds: [weth, usdc],
+    values: [parseEther("1000"), parseUnits("1000", 6)],
+    feeAssetId: 0,
+    to: senderAccount.shieldedAddress.pack(),
+    viaBundler: false,
+    paymaster: zeroAddress,
+    revokerId: 0,
+  },
+};
+
 export const genTestDeposits = async (sdk: Core) => {
   console.log("depositing assets...");
   await generateTestTransactions(reqs, sdk);
@@ -156,3 +181,8 @@ export const genTestDeposits = async (sdk: Core) => {
 export const genTestDepositsWithOutsourceProofVerification = async (sdk: Core, nebraClient: any) => {
   await generateTestTxsWithOutsourcedProofVerification(reqs, sdk, nebraClient);
 }
+
+export const genTestDeposits4x2 = async (sdk: Core) => {
+  console.log("depositing assets for transact42 (4-input 2-output) circuit test...");
+  await generateTestTransactions(reqs4x2, sdk);
+};

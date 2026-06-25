@@ -319,6 +319,47 @@ export async function mockNotes(depositName: string, sdk: Core) {
   console.log("commit tree root after Mock Notes", sdk.commitmentTreeSource.root);
 }
 
+// Like mockNotes but:
+//  1. Assigns leafIndex starting at `leafIndexOffset` (so the note's Merkle path is correct)
+//  2. Appends to existing notes per assetId rather than replacing them
+// Use this when mocking notes from a second (or later) deposit batch so that notes from
+// earlier batches are not evicted from MockNotesSource.
+export async function mockNotesWithOffset(depositName: string, sdk: Core, leafIndexOffset: number) {
+  const encoded = readFileSync(
+    `${dirFixtureData}/${depositName}.txt`,
+    "utf-8"
+  ) as Hex;
+  const ztx = ZTransaction.decode(encoded) as any;
+  const revokerData = await sdk.getRevokerData(0);
+  const revokerPublicKey: PointType = revokerData.revokerPublicKey;
+
+  const [, ...encryptedNotesKeys] = splitToChunks(
+    ztx.keysMemo,
+    SIZE_ENCRYPTED_DECRYPTION_KEY
+  );
+  const encryptedNotesHex = sliceHex(ztx.notesMemo, 7 * 32);
+  const encryptedNotes = splitToChunks(encryptedNotesHex, SIZE_FULLY_ENCRYPTED_NOTE_DATA);
+  console.log("Encrypted notes length:", encryptedNotes.length);
+
+  for (let i = 0; i < encryptedNotes.length; i++) {
+    const n = Note.decrypt(0, encryptedNotesKeys[i], encryptedNotes[i], {
+      account: senderAccount,
+      revoker: revokerPublicKey,
+      leafIndex: leafIndexOffset + i,
+    });
+    if (n) {
+      console.log("Note Nullifier: ", n.getNullifier(senderAccount.viewer));
+      // @ts-ignore
+      const existing = (await sdk.notesSource.getUnspent(n.assetId)) ?? [];
+      // @ts-ignore
+      sdk.notesSource.mockNotes(n.assetId, [...existing, n]);
+      // @ts-ignore
+      sdk.commitmentTreeSource.insert(n.commitment);
+    }
+  }
+  console.log("commit tree root after mockNotesWithOffset", sdk.commitmentTreeSource.root);
+}
+
 export const generatePackedUserOps = async (name: string, req: TransactionRequest & TransactionOptions, sdk: Core, isPreVerified: boolean, nebraClient) => {
 
   const nonce = concatHex([

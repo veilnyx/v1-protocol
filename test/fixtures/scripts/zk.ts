@@ -25,7 +25,7 @@ export const circuits: Record<string, CircuitPath> = {
   transact21: getCircuitPath("transact21"),
   transact22: getCircuitPath("transact22"),
   transact23: getCircuitPath("transact23"),
-  // transact44: getCircuitPath("transact44"),
+  transact42: getCircuitPath("../transact42"),
   register: getCircuitPath("register"),
   treeUpdate: getCircuitPath("treeUpdate"),
 };

@@ -285,8 +285,6 @@ contract PoolTest is PoolBaseTest, BaseScript {
     }
 
     function _processCommitmentTreeQueue() internal {
-        // queuedLeaves.length == queueSize (always 10): real leaves at the front, the rest
-        // are ZERO_LEAF pads. This is the fixed-width array the ZK circuit consumes.
         (
             uint256[] memory queuedLeaves,
             uint256[COMMITMENT_TREE_DEPTH] memory currentSubtrees,
@@ -295,22 +293,24 @@ contract PoolTest is PoolBaseTest, BaseScript {
             uint32 nextLeafIndex
         ) = pool.getCommitmentTreeState();
 
-        // Calculating actual count of real no. of queued leaves in the queue (`queuedLeaves` is padded to queueSize i.e. 10).
-        // `actualBatchSize` must NOT equal queuedLeaves.length (10)
         (uint32 startIdx, uint32 endIdx, , , ) = pool.getQueueRawState();
         uint32 actualBatchSize = endIdx - startIdx;
 
         BinaryIMTLogic.init(_helperTree, COMMITMENT_TREE_DEPTH, ZERO_LEAF);
 
+        // Resume from the pool's stored subtree state.
+        // nextLeafIndex counts only real commitments, which is consistent with the
+        // stored levelSubtrees when only real leaves are inserted per flush.
         _helperTree.root = currentRoot;
         _helperTree.numberOfLeaves = nextLeafIndex;
         for (uint256 i = 0; i < COMMITMENT_TREE_DEPTH; i++) {
             _helperTree.lastSubtrees[i][0] = currentSubtrees[i];
         }
 
-        // Insert the full padded array (real leaves + ZERO_LEAF pads) so the helper tree
-        // computes the same root the ZK circuit would produce for this batch.
-        for (uint256 i = 0; i < queuedLeaves.length; i++) {
+        // Insert only the real leaves — ZERO_LEAF pads are inert (they equal the
+        // implicit empty-slot value) so omitting them produces the same root while
+        // keeping levelSubtrees consistent with nextLeafIndex for subsequent flushes.
+        for (uint256 i = 0; i < actualBatchSize; i++) {
             BinaryIMTLogic.insert(_helperTree, queuedLeaves[i]);
         }
 

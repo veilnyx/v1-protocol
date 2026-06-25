@@ -1,7 +1,7 @@
-import { parseEther, zeroAddress } from "viem";
+import { parseEther, parseUnits, zeroAddress } from "viem";
 import { Core } from "@labyrinthac/core";
 import { TransactionType } from "@labyrinthac/shared-types";
-import { fixture, generateTestTransactions, generateTestTxsWithOutsourcedProofVerification, mockNotes, generatePackedUserOps, PAYMASTER_ADDR_FIXTURE } from "./fixture";
+import { fixture, generateTestTransactions, generateTestTxsWithOutsourcedProofVerification, mockNotes, mockNotesWithOffset, generatePackedUserOps, PAYMASTER_ADDR_FIXTURE } from "./fixture";
 
 const {
 	assets: { weth, usdc },
@@ -84,6 +84,42 @@ export const reqs = {
 		revokerId: 0,
 	}
 	*/
+};
+
+// 4-input 2-output transfer consuming all notes from both 4x2 pre-deposits.
+// Transfers 2000 WETH + 2000 USDC to receiver with no fee, producing exactly
+// 2 output notes — exercising the transact42 circuit.
+export const reqs4x2 = {
+	transfer_4x2_weth_usdc_without_fee: {
+		type: TransactionType.TRANSFER,
+		assetIds: [weth, usdc],
+		values: [parseEther("2000"), parseUnits("2000", 6)],
+		feeAssetId: 0,
+		to: receiverAccount.shieldedAddress.pack(),
+		viaBundler: false,
+		paymaster: zeroAddress,
+		revokerId: 0,
+	},
+};
+
+export const genTestTransfersWith4Input2OutputNotes = async (sdk: Core) => {
+	const { commitmentTreeQueueSize: queueSize, zeroLeaf } = fixture;
+	const zeroLeafBigInt = BigInt(zeroLeaf);
+
+	// First deposit: notes land at leafIndex 0, 1
+	await mockNotes("deposit_pre_tx_4x2_a", sdk);
+
+	// deposit_pre_tx_4x2_a contributes 2 real leaves
+	// This keeps the SDK commitment tree root in sync with the on-chain root after _processCommitmentTreeQueue.
+	// for (let i = 2; i < batchSize; i++) {
+	// 	// @ts-ignore
+	// 	sdk.commitmentTreeSource.insert(zeroLeafBigInt);
+	// }
+
+	// Second deposit: notes land at leafIndex batchSize (2) onwards.
+	// mockNotesWithOffset appends to existing notes instead of replacing them.
+	await mockNotesWithOffset("deposit_pre_tx_4x2_b", sdk, 2);
+	await generateTestTransactions(reqs4x2, sdk);
 };
 
 export const genTestTransfers = async (sdk: Core) => {
