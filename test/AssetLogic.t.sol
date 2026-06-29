@@ -3,7 +3,7 @@ pragma solidity ^0.8.24;
 
 import {Test} from "forge-std/Test.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {AssetType, Asset, AssetLogic} from "src/libraries/AssetLogic.sol";
+import {AssetType, Asset, AssetLogic, AssetInitParams} from "src/libraries/AssetLogic.sol";
 import {IPool} from "src/interfaces/IPool.sol";
 import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
 
@@ -51,27 +51,20 @@ contract AssetLogicTest is Test {
     function test_addAssets() public {
         AssetType assetType = AssetType.ERC20;
 
-        address[] memory assetAddresses = new address[](3);
-        assetAddresses[0] = t1;
-        assetAddresses[1] = t2;
-        assetAddresses[2] = t3;
-
-        uint8[] memory precisions = new uint8[](3);
-        precisions[0] = 18;
-        precisions[1] = 6;
-        precisions[2] = 18;
+        AssetInitParams[] memory params = new AssetInitParams[](3);
+        params[0] = AssetInitParams({assetAddress: t1, precision: 18, usdPriceFeed: AggregatorV3Interface(address(0))});
+        params[1] = AssetInitParams({assetAddress: t2, precision: 6,  usdPriceFeed: AggregatorV3Interface(address(0))});
+        params[2] = AssetInitParams({assetAddress: t3, precision: 18, usdPriceFeed: AggregatorV3Interface(address(0))});
 
         uint16 count = AssetLogic.addAssets(
             _assetIds,
             _assets,
             _counter,
             assetType,
-            assetAddresses,
-            precisions,
-            new AggregatorV3Interface[](0)
+            params
         );
 
-        assertEq(count, _counter + assetAddresses.length);
+        assertEq(count, _counter + params.length);
     }
 
     function test_duplicateAssetCheck() public {

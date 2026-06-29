@@ -26,5 +26,5 @@ uint8 constant COMMITMENT_TREE_DEPTH = 25;
 /// @dev TVL values use 6-decimal precision (USDC/USDT DeFi standard).
 uint8 constant TVL_USD_DECIMALS = 6;
 /// @dev Minimum allowed price staleness threshold (seconds). Prevents operator from
-///      accidentally setting it to 0, which would brick all deposit checks.
-uint256 constant MIN_PRICE_STALENESS_THRESHOLD = 1 * 60 * 60; // 1 hour in seconds
+///      accidentally setting it too low (minimum buffer is 1 hour), which would brick all deposit checks.
+uint256 constant MIN_PRICE_STALENESS_THRESHOLD = 1 hours;

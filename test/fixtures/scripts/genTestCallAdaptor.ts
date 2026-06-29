@@ -16,45 +16,6 @@ enum Action {
 
 // @todo: implement this payload encoding for other test fixtures
 export const reqs = {
-    stake_2_usde_on_ethena: {
-        type: TransactionType.CALL_ADAPTER,
-        assetIds: [usde],
-        values: [parseEther("2")],
-        to: "0xbF71c5Ae43827387dAAF7358acAB5C81642b74b8", // adaptor addr. which the ZkFi adaptor handler will call to execute this convert req
-        revokerId: 0,
-        feeAssetId: 0,
-        viaBundler: false,
-        paymaster: zeroAddress,
-        payload: "0x0000000000000000000000000000000000000000000000000000000000000000" as `0x${string}`
-    }
-    /**
-    swap_1_testnet_weth_to_usdc_via_bundler: {
-        type: TransactionType.CALL_ADAPTER,
-        assetIds: [testnetWeth],
-        values: [parseEther("1")],
-        to: "0xbF71c5Ae43827387dAAF7358acAB5C81642b74b8", // adaptor to which the ZkFi Convertor will call to execute swap
-        revokerId: 0,
-        feeAssetId: testnetWeth,
-        viaBundler: true,
-        paymaster: PAYMASTER_ADDR_FIXTURE as `0x${string}`,
-        payload:
-            "0x000000000000000000000000000000000000000000000000000000000001000500000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000" as `0x${string}`, // refund: pool address (address(0))
-    }
-    /**,
-    swap_1_testnet_weth_to_usdc: {
-        type: TransactionType.CALL_ADAPTER,
-        assetIds: [testnetWeth],
-        values: [parseEther("1")],
-        feeAssetId: 0,
-        // adaptor to which the ZkFi AdaptorHandler will call to execute swap
-        to: "0xbF71c5Ae43827387dAAF7358acAB5C81642b74b8",
-        // payload:: refund: pool address (address(0)), outToken: testnetUsdc
-        payload: "0x000000000000000000000000000000000000000000000000000000000001000500000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000" as `0x${string}`,
-        revokerId: 0,
-        viaBundler: false,
-        paymaster: zeroAddress
-    }
-    /**
     stake_1_testnet_weth_rocketpool: {
         type: TransactionType.CALL_ADAPTER,
         assetIds: [testnetWeth],
@@ -82,6 +43,58 @@ export const reqs = {
         revokerId: 0,
         viaBundler: false,
         paymaster: zeroAddress
+    }
+    /**
+    swap_1_testnet_weth_to_usdc: {
+        type: TransactionType.CALL_ADAPTER,
+        assetIds: [testnetWeth],
+        values: [parseEther("1")],
+        feeAssetId: 0,
+        // adaptor to which the ZkFi AdaptorHandler will call to execute swap
+        to: "0xbF71c5Ae43827387dAAF7358acAB5C81642b74b8",
+        // payload:: refund: pool address (address(0)), outToken: testnetUsdc
+        payload: "0x000000000000000000000000000000000000000000000000000000000001000500000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000" as `0x${string}`,
+        revokerId: 0,
+        viaBundler: false,
+        paymaster: zeroAddress
+    }
+    /**
+    swap_1_testnet_weth_to_usdc_via_bundler: {
+        type: TransactionType.CALL_ADAPTER,
+        assetIds: [testnetWeth],
+        values: [parseEther("1")],
+        to: "0xbF71c5Ae43827387dAAF7358acAB5C81642b74b8", // adaptor to which the ZkFi Convertor will call to execute swap
+        revokerId: 0,
+        feeAssetId: testnetWeth,
+        viaBundler: true,
+        paymaster: PAYMASTER_ADDR_FIXTURE as `0x${string}`,
+        payload:
+            "0x000000000000000000000000000000000000000000000000000000000001000500000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000" as `0x${string}`, // refund: pool address (address(0))
+    },
+    stake_1_testnet_weth_lido: {
+        type: TransactionType.CALL_ADAPTER,
+        assetIds: [testnetWeth],
+        values: [parseEther("1")],
+        feeAssetId: 0,
+        // adaptor to which the ZkFi AdaptorHandler will call to execute swap
+        to: "0xbF71c5Ae43827387dAAF7358acAB5C81642b74b8",
+        // payload:: refund: pool address (address(0)), outToken: testnetUsdc
+        payload: "0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000" as `0x${string}`,
+        revokerId: 0,
+        viaBundler: false,
+        paymaster: zeroAddress
+    }
+    /**
+    stake_2_usde_on_ethena: {
+        type: TransactionType.CALL_ADAPTER,
+        assetIds: [usde],
+        values: [parseEther("2")],
+        to: "0xbF71c5Ae43827387dAAF7358acAB5C81642b74b8", // adaptor addr. which the ZkFi adaptor handler will call to execute this convert req
+        revokerId: 0,
+        feeAssetId: 0,
+        viaBundler: false,
+        paymaster: zeroAddress,
+        payload: "0x0000000000000000000000000000000000000000000000000000000000000000" as `0x${string}`
     }
     /**
     withdraw_2_morphoLoanToken: {
@@ -128,22 +141,7 @@ export const reqs = {
         revokerId: 0,
         viaBundler: false,
         paymaster: zeroAddress
-    }
-    /**,
-    stake_1_testnet_weth_lido: {
-        type: TransactionType.CALL_ADAPTER,
-        assetIds: [testnetWeth],
-        values: [parseEther("1")],
-        feeAssetId: 0,
-        // adaptor to which the ZkFi AdaptorHandler will call to execute swap
-        to: "0xbF71c5Ae43827387dAAF7358acAB5C81642b74b8",
-        // payload:: refund: pool address (address(0)), outToken: testnetUsdc
-        payload: "0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000" as `0x${string}`,
-        revokerId: 0,
-        viaBundler: false,
-        paymaster: zeroAddress
-    }
-    /**
+    },
     supply_5_usdt_crvUsd_on_curve: {
         type: TransactionType.CALL_ADAPTER,
         assetIds: [testnetUsdt, testnetCrvUsd],
@@ -249,6 +247,6 @@ export const reqs = {
 
 // Uses mock deposit notes to generate call adp tx
 export const genTestCallAdaptors = async (sdk: Core) => {
-    await mockNotes("deposit_2_usde", sdk);
+    await mockNotes("deposit_2_testnet_weth", sdk);
     await generateTestTransactions(reqs, sdk);
 };

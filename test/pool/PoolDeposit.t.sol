@@ -135,17 +135,24 @@ contract PoolDepositTest is PoolTest {
             vm.skip(true);
         }
         address testnet_weth = config.wToken();
-        uint256 deposit1 = 2 ether;
+        uint256 depositAmt = 2 ether;
         uint256 ethPortion = 1 ether;
-        uint256 wethPortion = deposit1 - ethPortion;
-        uint256 balance1 = IWToken(testnet_weth).balanceOf(address(pool));
+        uint256 wethPortion = depositAmt - ethPortion;
 
-        // Fund the caller with `deposit1` ETH; wrap half of it ahead of time
+        // Fund the caller with `depositAmt` ETH; wrap half of it ahead of time
         // and approve the resulting WETH to the Pool. The remaining ETH is
         // sent as msg.value.
-        vm.deal(address(this), deposit1);
+        vm.deal(address(this), depositAmt);
         IWToken(testnet_weth).deposit{value: wethPortion}();
         IWToken(testnet_weth).approve(address(pool), wethPortion);
+
+        uint256 poolWETHBalance = IWToken(testnet_weth).balanceOf(
+            address(pool)
+        );
+        uint256 ethBalanceBefore = address(this).balance;
+        uint256 wethBalanceBefore = IWToken(testnet_weth).balanceOf(
+            address(this)
+        );
 
         ShieldedTransaction memory stx = _loadShieldedTransaction(
             "deposit_2_testnet_weth"
@@ -156,10 +163,13 @@ contract PoolDepositTest is PoolTest {
         // the caller's leftover ETH/WETH balance should be zero.
         assertEq(
             IWToken(testnet_weth).balanceOf(address(pool)),
-            balance1 + deposit1
+            poolWETHBalance + depositAmt
         );
-        assertEq(IWToken(testnet_weth).balanceOf(address(this)), 0);
-        assertEq(address(this).balance, 0);
+        assertEq(
+            IWToken(testnet_weth).balanceOf(address(this)),
+            wethBalanceBefore - wethPortion
+        );
+        assertEq(address(this).balance, ethBalanceBefore - ethPortion);
     }
 
     /// @dev msg.value strictly exceeds the wToken pubAsset value: Pool refuses
@@ -197,13 +207,13 @@ contract PoolDepositTest is PoolTest {
         uint256 deposit1 = 2 ether;
         vm.deal(address(this), deposit1);
 
-        // Temporarily set wToken to address(0) to simulate unconfigured state. The fixture sets a valid wToken address, so we need to override it here to test this scenario.
-        pool.setWToken(IWToken(address(0)));
+        // Temporarily set nativeWToken to address(0) to simulate unconfigured state. The fixture sets a valid address, so we override it here to test this scenario.
+        pool.setNativeWToken(IWToken(address(0)));
         ShieldedTransaction memory stx = _loadShieldedTransaction(
             "deposit_2_testnet_weth"
         );
 
-        vm.expectRevert(IPool.WTokenNotConfigured.selector);
+        vm.expectRevert(IPool.NativeWTokenNotConfigured.selector);
         pool.transact{value: deposit1}(stx);
     }
 

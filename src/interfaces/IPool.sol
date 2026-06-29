@@ -4,7 +4,7 @@ pragma solidity 0.8.24;
 import {ShieldedTransaction, ShieldedTransactionType, RevokerData} from "../libraries/ShieldedTransactionLogic.sol";
 import {ShieldedAddressRegistrationData} from "../libraries/ShieldedAddressLogic.sol";
 import {TreeUpdateData} from "../libraries/QueuedMerkleTreeLogic.sol";
-import {AssetType, Asset} from "../libraries/AssetLogic.sol";
+import {AssetType, Asset, AssetInitParams} from "../libraries/AssetLogic.sol";
 import {PoolStorage} from "../base/PoolStorage.sol";
 
 import {IVerifier} from "./IVerifier.sol";
@@ -26,21 +26,21 @@ struct InitAddressParams {
 }
 
 /// @param withdrawFeeBps Withdrawal fee in basis points (1 bps = 0.01%).
-/// @param tvlLimitUsd Maximum allowed TVL in USD (6-decimal). 0 = disabled.
-/// @param minDepositUsd Minimum single-deposit value in USD (6-decimal). 0 = disabled.
-/// @param maxDepositUsd Maximum single-deposit value in USD (6-decimal). 0 = disabled.
+/// @param tvlLimitUsd Maximum allowed TVL in USD (6-decimal). type(uint256).max = no cap (unlimited).
+/// @param minDepositUsd Minimum single-deposit value in USD (6-decimal). 0 = no minimum.
+/// @param maxDepositUsd Maximum single-deposit value in USD (6-decimal). type(uint256).max = no maximum.
 /// @param priceFeedStalenessThreshold Maximum age in seconds for a Chainlink price answer before it is considered stale.
-/// @param wToken Wrapped native token (e.g. WETH) used to wrap incoming msg.value
+/// @param nativeWToken Wrapped native token (e.g. WETH) used to wrap incoming msg.value
 ///        into the corresponding ERC20 deposit during DEPOSIT transactions.
 ///        Pass address(0) to disable native ETH deposits at deploy time; can
-///        later be enabled by the owner via `setWToken`.
+///        later be enabled by the owner via `setNativeWToken`.
 struct PoolConfigParams {
     uint256 withdrawFeeBps;
     uint256 tvlLimitUsd;
     uint256 minDepositUsd;
     uint256 maxDepositUsd;
     uint256 priceFeedStalenessThreshold;
-    IWToken wToken;
+    IWToken nativeWToken;
 }
 
 interface IPool {
@@ -86,13 +86,17 @@ interface IPool {
 
     event WithdrawFeeUpdated(uint256 feeBps);
 
-    event AssetUsdPriceFeedSet(uint24 indexed assetId, address indexed feed);
+    event AssetUsdPriceFeedSet(
+        uint24 indexed assetId,
+        AggregatorV3Interface indexed feed
+    );
     event TvlLimitUpdated(uint256 limit);
     event MinDepositUpdated(uint256 limit);
     event MaxDepositUpdated(uint256 limit);
     event PriceFeedStalenessThresholdUpdated(uint256 threshold);
-    event WTokenUpdated(address indexed wToken);
+    event NativeWTokenUpdated(IWToken indexed nativeWToken);
     event PauserUpdated(address indexed oldPauser, address indexed newPauser);
+    event PriceStalenessThresholdUpdated(uint256 threshold);
 
     /////////////////////////////////////////
     //            ERRORS                   //
@@ -129,16 +133,17 @@ interface IPool {
     error DepositAboveMaximum(uint256 depositUsd, uint256 maxDepositUsd);
 
     /// @dev msg.value was sent for a non-DEPOSIT transaction. Native ETH is only
-    ///      accepted on DEPOSIT to be wrapped into the configured wToken.
-    error NativeEthOnlyForDeposit();
+    ///      accepted on DEPOSIT to be wrapped into the configured nativeWToken.
+    error NativeEthProvidedForNonDepositTx();
 
-    /// @dev Native ETH was sent but the wrapped-native token (wToken) is not
-    ///      configured on this Pool, or the wToken has not been registered as
-    ///      an active asset.
-    error WTokenNotConfigured();
+    /// @dev Native ETH received in receive() but nativeWToken has not been configured (address(0)).
+    error NativeWTokenNotConfigured();
+
+    /// @dev Native ETH received in receive() from an unexpected address (not nativeWToken).
+    error UnexpectedNativeEthSender(address sender);
 
     /// @dev Native ETH was sent but the deposit transaction has no pubAsset
-    ///      entry for the configured wToken to match against.
+    ///      entry for the configured nativeWToken to match against.
     error WTokenNotInPubAssets();
 
     /// @dev pubAssets contains more than one entry for the same assetId.
@@ -174,14 +179,10 @@ interface IPool {
     /// @notice Adds support for new assets in the protocol.
     /// @notice Can only be called by the owner.
     /// @param assetType The type of the asset to be added.
-    /// @param assetAddresses The addresses of the assets.
-    /// @param precisions The decimal precision (e.g. 18 for ETH) for each asset, supplied by the protocol owner.
-    /// @param usdPriceFeeds Parallel array of Chainlink-compatible USD price feed addresses (address(0) = no feed).
+    /// @param initParams Per-asset parameters (address, precision, optional USD price feed).
     function addAssets(
         AssetType assetType,
-        address[] calldata assetAddresses,
-        uint8[] calldata precisions,
-        AggregatorV3Interface[] calldata usdPriceFeeds
+        AssetInitParams[] calldata initParams
     ) external;
 
     /// @notice Adds support for an external adaptor to a DeFi protocol.
@@ -239,26 +240,25 @@ interface IPool {
         AggregatorV3Interface feed
     ) external;
 
-    /// @notice Sets the maximum allowed TVL in USD (6-decimal precision). Set to 0 to disable.
+    /// @notice Sets the maximum allowed TVL in USD (6-decimal precision).
+    ///         type(uint256).max = no TVL cap (unlimited). Any other value is the hard cap.
     function setTvlLimitUsd(uint256 limitUsd) external;
 
-    /// @notice Sets the minimum single-deposit value in USD (6-decimal precision). Set to 0 to disable.
-    function setMinDepositUsd(uint256 limitUsd) external;
-
-    /// @notice Sets the maximum single-deposit value in USD (6-decimal precision). Set to 0 to disable.
-    function setMaxDepositUsd(uint256 limitUsd) external;
+    /// @notice Sets both deposit limits atomically.
+    /// @dev Reverts with BadArguments if min > 0, max != type(uint256).max, and min > max.
+    function setDepositLimits(uint256 minUsd, uint256 maxUsd) external;
 
     /// @notice Sets the maximum age of a Chainlink price answer before it is considered stale.
-    /// @param threshold Age in seconds. Can only be called by the owner.
+    /// @param threshold Age in seconds. Must be >= MIN_PRICE_STALENESS_THRESHOLD.
     function setPriceFeedStalenessThreshold(uint256 threshold) external;
 
     /// @notice Sets the wrapped native token (e.g. WETH) used to convert any
     ///         incoming `msg.value` into the corresponding ERC20 deposit during
     ///         a DEPOSIT transaction.
     /// @notice Can only be called by the owner.
-    /// @param wToken The wrapped native token contract. Pass address(0) to
+    /// @param nativeWToken The wrapped native token contract. Pass address(0) to
     ///        disable native ETH deposits via this Pool.
-    function setWToken(IWToken wToken) external;
+    function setNativeWToken(IWToken nativeWToken) external;
 
     /////////////////////////////////////////
     //        PUBLIC WRITE METHODS         //

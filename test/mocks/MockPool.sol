@@ -27,6 +27,12 @@ contract MockPool is Pool {
         return super._getDepositUsd(stx);
     }
 
+    function mock_validateNoDuplicatePubAssets(
+        ShieldedTransaction calldata stx
+    ) external pure {
+        _validateNoDuplicatePubAssets(stx);
+    }
+
     function getQueueRawState()
         external
         view

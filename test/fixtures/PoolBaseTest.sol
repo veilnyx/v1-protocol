@@ -95,11 +95,11 @@ contract PoolBaseTest is BaseTest {
 
         PoolConfigParams memory configParams = PoolConfigParams({
             withdrawFeeBps: fixture.withdrawFeeBps,
-            tvlLimitUsd: 0,
+            tvlLimitUsd: type(uint256).max,
             minDepositUsd: 0,
-            maxDepositUsd: 0,
+            maxDepositUsd: type(uint256).max,
             priceFeedStalenessThreshold: 1 days,
-            wToken: IWToken(config.wToken())
+            nativeWToken: IWToken(config.wToken())
         });
 
         bytes memory initData = abi.encodeCall(

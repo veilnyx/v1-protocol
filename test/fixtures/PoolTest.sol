@@ -8,7 +8,7 @@ import {AdaptorHandler} from "src/core/AdaptorHandler.sol";
 import {VerifierTransact21} from "src/verifiers/VerifierTransact21.sol";
 import {VerifierTransact22} from "src/verifiers/VerifierTransact22.sol";
 import {VerifierRegister} from "src/verifiers/VerifierRegister.sol";
-import {Asset, AssetType} from "src/libraries/AssetLogic.sol";
+import {Asset, AssetType, AssetInitParams} from "src/libraries/AssetLogic.sol";
 import {ShieldedTransaction, ShieldedTransactionType, RevokerData} from "src/libraries/ShieldedTransactionLogic.sol";
 import {BinaryIMT as BinaryIMTLogic, BinaryIMTData} from "@zk-kit/imt.sol/BinaryIMT.sol";
 import {COMMITMENT_TREE_DEPTH, ZERO_LEAF} from "src/base/Constants.sol";
@@ -190,9 +190,7 @@ contract PoolTest is PoolBaseTest, BaseScript {
         // adding support for testnet tokens if any to provide support of adaptor testing
         pool.addAssets(
             assetType,
-            assetAddresses,
-            assetsPrecision,
-            usdPriceFeeds
+            _toAssetInitParams(assetAddresses, assetsPrecision, usdPriceFeeds)
         );
 
         asset1 = pool.getAsset(assetAddresses[0]);
@@ -247,6 +245,21 @@ contract PoolTest is PoolBaseTest, BaseScript {
         feeds = new AggregatorV3Interface[](len);
         for (uint256 i; i < len; ++i)
             feeds[i] = AggregatorV3Interface(address(_defaultMockFeed));
+    }
+
+    /// @dev Converts parallel arrays into an AssetInitParams[] array for addAssets.
+    function _toAssetInitParams(
+        address[] memory addrs,
+        uint8[] memory precisions_,
+        AggregatorV3Interface[] memory feeds
+    ) internal pure returns (AssetInitParams[] memory params) {
+        params = new AssetInitParams[](addrs.length);
+        for (uint256 i; i < addrs.length; ++i)
+            params[i] = AssetInitParams({
+                assetAddress: addrs[i],
+                precision: precisions_[i],
+                usdPriceFeed: feeds[i]
+            });
     }
 
     function _mintAsset(

@@ -22,6 +22,16 @@ struct Asset {
     uint8 precision;
     /// @dev Chainlink-compatible USD price feed for TVL calculation. address(0) = not set.
     AggregatorV3Interface usdPriceFeed;
+    /// @dev Cached result of usdPriceFeed.decimals(), set when the feed is assigned.
+    ///      Avoids a cold external call on every TVL/deposit-value query. 0 when feed is unset.
+    uint8 feedDecimals;
+}
+
+/// @dev Parameters for a single asset to be registered via addAssets.
+struct AssetInitParams {
+    address assetAddress;
+    uint8 precision;
+    AggregatorV3Interface usdPriceFeed;
 }
 
 library AssetLogic {
@@ -72,7 +82,8 @@ library AssetLogic {
             assetAddress: address(assetAddress),
             isActive: true,
             precision: precision,
-            usdPriceFeed: usdPriceFeed
+            usdPriceFeed: usdPriceFeed,
+            feedDecimals: address(usdPriceFeed) != address(0) ? usdPriceFeed.decimals() : 0
         });
 
         emit IPool.AssetAdded(address(assetAddress), newAssetId);
@@ -84,28 +95,33 @@ library AssetLogic {
         mapping(uint24 => Asset) storage assets,
         uint16 assetCount,
         AssetType assetType,
-        address[] calldata assetAddresses,
-        uint8[] calldata precisions,
-        AggregatorV3Interface[] calldata usdPriceFeeds
+        AssetInitParams[] calldata initParams
     ) external returns (uint16) {
-        for (uint256 i = 0; i < assetAddresses.length; ) {
+        for (uint256 i = 0; i < initParams.length; ) {
             assetCount = addAsset(
                 assetIds,
                 assets,
                 assetCount,
                 assetType,
-                IERC20(assetAddresses[i]),
-                precisions[i],
-                i < usdPriceFeeds.length
-                    ? usdPriceFeeds[i]
-                    : AggregatorV3Interface(address(0))
+                IERC20(initParams[i].assetAddress),
+                initParams[i].precision,
+                initParams[i].usdPriceFeed
             );
-
             unchecked {
                 ++i;
             }
         }
         return assetCount;
+    }
+
+    function setAssetPriceFeed(
+        mapping(uint24 => Asset) storage assets,
+        uint24 assetId,
+        AggregatorV3Interface feed
+    ) external {
+        Asset storage asset = assets[assetId];
+        asset.usdPriceFeed = feed;
+        asset.feedDecimals = address(feed) != address(0) ? feed.decimals() : 0;
     }
 
     function updateAsset(

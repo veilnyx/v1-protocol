@@ -61,9 +61,11 @@ contract BeefyAdaptorTest is PoolTest {
 
         pool.addAssets(
             assetType,
-            assetAddresses,
-            precisions,
-            _mockFeedsArray(assetAddresses.length)
+            _toAssetInitParams(
+                assetAddresses,
+                precisions,
+                _mockFeedsArray(assetAddresses.length)
+            )
         );
         vm.stopPrank();
     }

@@ -38,7 +38,10 @@ contract PoolGuardrailsTest is PoolTest {
 
     function test_setTvlPriceFeed() public {
         vm.expectEmit(true, true, false, false);
-        emit IPool.AssetUsdPriceFeedSet(asset1.id, address(mockFeed1));
+        emit IPool.AssetUsdPriceFeedSet(
+            asset1.id,
+            AggregatorV3Interface(address(mockFeed1))
+        );
 
         pool.setAssetPriceFeed(
             asset1.id,
@@ -406,39 +409,52 @@ contract PoolGuardrailsTest is PoolTest {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // setMinDepositUsd / setMaxDepositUsd
+    // setDepositLimits
     // ─────────────────────────────────────────────────────────────────────────
 
-    function test_setMinDepositUsd() public {
-        uint256 limit = 5e6; // $5
+    function test_setDepositLimits_minOnly() public {
+        uint256 minLimit = 5e6; // $5
         vm.expectEmit(false, false, false, true);
-        emit IPool.MinDepositUpdated(limit);
+        emit IPool.MinDepositUpdated(minLimit);
 
-        pool.setMinDepositUsd(limit);
-        assertEq(pool.minDepositUsd(), limit);
+        pool.setDepositLimits(minLimit, type(uint256).max);
+        assertEq(pool.minDepositUsd(), minLimit);
+        assertEq(pool.maxDepositUsd(), type(uint256).max);
     }
 
-    function test_revert_setMinDepositUsd_notOwner() public {
+    function test_setDepositLimits_maxOnly() public {
+        uint256 maxLimit = 50e6; // $50
+        vm.expectEmit(false, false, false, true);
+        emit IPool.MaxDepositUpdated(maxLimit);
+
+        pool.setDepositLimits(0, maxLimit);
+        assertEq(pool.minDepositUsd(), 0);
+        assertEq(pool.maxDepositUsd(), maxLimit);
+    }
+
+    function test_setDepositLimits_both() public {
+        uint256 minLimit = 5e6;
+        uint256 maxLimit = 50e6;
+        vm.expectEmit(false, false, false, true);
+        emit IPool.MinDepositUpdated(minLimit);
+        vm.expectEmit(false, false, false, true);
+        emit IPool.MaxDepositUpdated(maxLimit);
+
+        pool.setDepositLimits(minLimit, maxLimit);
+        assertEq(pool.minDepositUsd(), minLimit);
+        assertEq(pool.maxDepositUsd(), maxLimit);
+    }
+
+    function test_revert_setDepositLimits_notOwner() public {
         address notOwner = makeAddr("notOwner");
         vm.prank(notOwner);
         vm.expectRevert();
-        pool.setMinDepositUsd(5e6);
+        pool.setDepositLimits(5e6, 50e6);
     }
 
-    function test_setMaxDepositUsd() public {
-        uint256 limit = 50e6; // $50
-        vm.expectEmit(false, false, false, true);
-        emit IPool.MaxDepositUpdated(limit);
-
-        pool.setMaxDepositUsd(limit);
-        assertEq(pool.maxDepositUsd(), limit);
-    }
-
-    function test_revert_setMaxDepositUsd_notOwner() public {
-        address notOwner = makeAddr("notOwner");
-        vm.prank(notOwner);
-        vm.expectRevert();
-        pool.setMaxDepositUsd(50e6);
+    function test_revert_setDepositLimits_minGtMax() public {
+        vm.expectRevert(IPool.BadArguments.selector);
+        pool.setDepositLimits(100e6, 1e6); // min > max
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -449,7 +465,7 @@ contract PoolGuardrailsTest is PoolTest {
     /// Setting minDepositUsd above that value must trigger DepositBelowMinimum.
     function test_revert_whenDepositWithinLimits_belowMinimum() public {
         _registerAllFeeds();
-        pool.setMinDepositUsd(25_000_000e6); // $25 M > ~$20 M deposit
+        pool.setDepositLimits(25_000_000e6, type(uint256).max); // $25 M > ~$20 M deposit
 
         _mintAsset(asset1, address(this), 10000 ether);
         _mintAsset(asset2, address(this), 10000e6);
@@ -474,7 +490,7 @@ contract PoolGuardrailsTest is PoolTest {
     /// Setting maxDepositUsd below the deposit value must trigger DepositAboveMaximum.
     function test_revert_whenDepositWithinLimits_aboveMaximum() public {
         _registerAllFeeds();
-        pool.setMaxDepositUsd(1_000e6); // $1 000 < ~$20 M deposit
+        pool.setDepositLimits(0, 1_000e6); // $1 000 < ~$20 M deposit
 
         _mintAsset(asset1, address(this), 10000 ether);
         _mintAsset(asset2, address(this), 10000e6);
@@ -499,8 +515,7 @@ contract PoolGuardrailsTest is PoolTest {
     /// When both limits bracket the deposit value, transact() must succeed.
     function test_whenDepositWithinLimits_withinRange() public {
         _registerAllFeeds();
-        pool.setMinDepositUsd(1e6); // $1 — below ~$20 M
-        pool.setMaxDepositUsd(25_000_000e6); // $25 M — above ~$20 M
+        pool.setDepositLimits(1e6, 25_000_000e6); // $1 min, $25 M max — brackets ~$20 M deposit
 
         _mintAsset(asset1, address(this), 10000 ether);
         _mintAsset(asset2, address(this), 10000e6);
@@ -534,9 +549,8 @@ contract PoolGuardrailsTest is PoolTest {
     function test_whenDepositWithinLimits_transferIgnoresLimits() public {
         _makePreDeposit();
 
-        // Arm tight limits — any deposit would fail.
-        pool.setMinDepositUsd(1_000_000_000e6); // $1 B minimum
-        pool.setMaxDepositUsd(1e6); // $1 maximum
+        // Set a $1 B minimum — any realistic deposit would be below this and would fail.
+        pool.setDepositLimits(1_000_000_000e6, type(uint256).max);
 
         ShieldedTransaction memory stx = _loadShieldedTransaction(
             "transfer_20_weth_without_fee"
@@ -548,8 +562,7 @@ contract PoolGuardrailsTest is PoolTest {
     function test_whenDepositWithinLimits_withdrawIgnoresLimits() public {
         _makePreDeposit();
 
-        pool.setMinDepositUsd(1_000_000_000e6);
-        pool.setMaxDepositUsd(1e6);
+        pool.setDepositLimits(1_000_000_000e6, type(uint256).max);
 
         ShieldedTransaction memory stx = _loadShieldedTransaction(
             "withdraw_100_weth_without_fee"
@@ -566,7 +579,7 @@ contract PoolGuardrailsTest is PoolTest {
         pool.setAssetPriceFeed(asset2.id, AggregatorV3Interface(address(0)));
         // Enable min-deposit limit so the oracle path is entered; without a limit
         // the guard returns early (correct post-H-1 behaviour).
-        pool.setMinDepositUsd(1);
+        pool.setDepositLimits(1, type(uint256).max);
 
         _mintAsset(asset1, address(this), 10000 ether);
         _mintAsset(asset2, address(this), 10000e6);

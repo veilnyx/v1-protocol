@@ -61,7 +61,14 @@ contract CurveAdaptorTest is PoolTest {
         precisions[1] = 18;
         precisions[2] = 18;
 
-        pool.addAssets(assetType, assetAddresses, precisions, _mockFeedsArray(assetAddresses.length));
+        pool.addAssets(
+            assetType,
+            _toAssetInitParams(
+                assetAddresses,
+                precisions,
+                _mockFeedsArray(assetAddresses.length)
+            )
+        );
         vm.stopPrank();
 
         vm.startPrank(user);

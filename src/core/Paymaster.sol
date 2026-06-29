@@ -2,6 +2,7 @@
 pragma solidity 0.8.24;
 
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC165} from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -64,15 +65,15 @@ contract Paymaster is IPaymaster, Ownable {
             sender_ == address(0) ||
             address(pool_) == address(0)
         ) revert ZeroAddress();
-        entryPoint = entryPoint_;
-        sender = sender_;
-        pool = pool_;
         if (priceStalenessThreshold_ < MIN_PRICE_STALENESS_THRESHOLD) {
             revert IPool.PriceFeedStalenessThresholdTooLow(
                 priceStalenessThreshold_,
                 MIN_PRICE_STALENESS_THRESHOLD
             );
         }
+        entryPoint = entryPoint_;
+        sender = sender_;
+        pool = pool_;
         priceStalenessThreshold = priceStalenessThreshold_;
     }
 
@@ -85,7 +86,10 @@ contract Paymaster is IPaymaster, Ownable {
                 MIN_PRICE_STALENESS_THRESHOLD
             );
         }
-        priceStalenessThreshold = threshold;
+        if (priceStalenessThreshold != threshold) {
+            priceStalenessThreshold = threshold;
+            emit IPool.PriceStalenessThresholdUpdated(threshold);
+        }
     }
 
     /**
@@ -217,8 +221,11 @@ contract Paymaster is IPaymaster, Ownable {
             ? (maxCostEth *
                 uint256(priceETHInAsset) *
                 10 ** (feePrec - baseExp))
-            : ((maxCostEth * uint256(priceETHInAsset)) /
-                10 ** (baseExp - feePrec));
+            : Math.mulDiv(
+                maxCostEth,
+                uint256(priceETHInAsset),
+                10 ** (baseExp - feePrec)
+            );
 
         if (feeInAsset == 0) {
             revert MaxCostEthToAssetConversionFailed(feeAssetId);

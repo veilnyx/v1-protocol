@@ -72,7 +72,14 @@ contract RocketPoolAdpTest is PoolTest {
         uint8[] memory precisions = new uint8[](1);
         precisions[0] = 18;
 
-        pool.addAssets(assetType, assetAddresses, precisions, _mockFeedsArray(assetAddresses.length));
+        pool.addAssets(
+            assetType,
+            _toAssetInitParams(
+                assetAddresses,
+                precisions,
+                _mockFeedsArray(assetAddresses.length)
+            )
+        );
 
         deal(WETH, user, INITIAL_SUPPLY);
         deal(rETH, user, INITIAL_SUPPLY);

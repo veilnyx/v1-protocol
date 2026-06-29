@@ -83,7 +83,10 @@ contract AaveAdaptorTest is PoolTest {
         AggregatorV3Interface[]
             memory usdPriceFeeds = new AggregatorV3Interface[](1);
         usdPriceFeeds[0] = AggregatorV3Interface(WETH_USDC_PRICE_FEED);
-        pool.addAssets(assetType, assetAddresses, precisions, usdPriceFeeds);
+        pool.addAssets(
+            assetType,
+            _toAssetInitParams(assetAddresses, precisions, usdPriceFeeds)
+        );
         vm.stopPrank();
 
         deal(WETH_AAVE_UNDERLYING, user, INITIAL_SUPPLY);

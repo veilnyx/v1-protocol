@@ -40,7 +40,8 @@ contract MockPool {
             assetAddress: address(0),
             isActive: true,
             precision: 6,
-            usdPriceFeed: AggregatorV3Interface(address(0))
+            usdPriceFeed: AggregatorV3Interface(address(0)),
+            feedDecimals: 0
         });
 
         return feeAsset;
