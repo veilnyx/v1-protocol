@@ -123,9 +123,8 @@ interface IPool {
     error NoFeeToClaim(address paymaster, uint24 assetId);
     error WithdrawalFeeTooHigh(uint256 feeBps, uint256 maxFeeBps);
     error PubAssetsCannotExceedCommitments();
-    error PriceFeedNotSet(uint24 assetId);
     error PriceFeedValueStale(uint24 assetId, uint256 updatedAt);
-    error TvlPriceInvalid(uint24 assetId, int256 price);
+    error PriceFeedValueInvalid(uint24 assetId, int256 price);
     error TvlLimitExceeded(uint256 projectedTvl, uint256 limit);
     error PriceFeedStalenessThresholdTooLow(uint256 given, uint256 minimum);
     error DepositRestrictedAsAssetFeedNotSet(uint24 assetId);

@@ -235,7 +235,7 @@ contract PoolGuardrailsTest is PoolTest {
 
         vm.expectRevert(
             abi.encodeWithSelector(
-                IPool.TvlPriceInvalid.selector,
+                IPool.PriceFeedValueInvalid.selector,
                 asset1.id,
                 int256(-1)
             )
@@ -255,7 +255,7 @@ contract PoolGuardrailsTest is PoolTest {
 
         vm.expectRevert(
             abi.encodeWithSelector(
-                IPool.TvlPriceInvalid.selector,
+                IPool.PriceFeedValueInvalid.selector,
                 asset1.id,
                 int256(0)
             )

@@ -598,8 +598,7 @@ contract Pool is
     }
 
     /// @notice Returns the USD value of `amount` units of `asset` using its registered Chainlink feed.
-    /// @dev Reverts with PriceFeedNotSet if no feed is registered for the asset.
-    ///      Reverts with PriceFeedValueStale / TvlPriceInvalid on bad feed data.
+    /// @dev Reverts with PriceFeedValueStale / PriceFeedValueInvalid on bad feed data.
     /// @param asset  The Asset struct (must have usdPriceFeed set).
     /// @param amount Raw token amount (in the asset's native precision).
     /// @return usdValue Amount expressed in 6-decimal USD.
@@ -612,7 +611,7 @@ contract Pool is
         (, int256 price, , uint256 updatedAt, ) = feed.latestRoundData();
 
         if (price <= 0) {
-            revert IPool.TvlPriceInvalid(asset.id, price);
+            revert IPool.PriceFeedValueInvalid(asset.id, price);
         }
         if (
             updatedAt > block.timestamp ||
@@ -662,7 +661,7 @@ contract Pool is
     ///         across all active ERC20 assets, using registered Chainlink USD price feeds.
     /// @dev Assets with no registered feed or that are inactive contribute 0 to the TVL.
     ///      Reverts with PriceFeedValueStale if a feed's answer is older than TVL_PRICE_STALENESS_THRESHOLD.
-    ///      Reverts with TvlPriceInvalid if a feed returns a non-positive price.
+    ///      Reverts with PriceFeedValueInvalid if a feed returns a non-positive price.
     /// @return tvl Cumulative TVL in 6-decimal USD (e.g. 1_000_000 = $1).
     function getTvlUsd() public view returns (uint256 tvl) {
         uint16 erc20Count = _assetCounts[AssetType.ERC20];
