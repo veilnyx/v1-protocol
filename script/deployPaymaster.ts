@@ -24,9 +24,9 @@ const main = async () => {
 
     const chainParams = config[chainId] as ChainParams;
 
-    const poolAddress = `0xd971f6c35e7a71f25d912cd652ba182ca0778f5b` as `0x${string}`;
-    const senderAddress = `0x1d6549f20d81fcf5b12982ac8742acba623af0cd` as `0x${string}`; // Gateway Contract
-    
+    const poolAddress = `0xef7585dfcdb91b0dc9fc9f920c4fb72bfb7b3e1f` as `0x${string}`;
+    const senderAddress = `0x6465a561c22f7286f1ca97d5f754627b5823b0b9` as `0x${string}`; // Gateway Contract
+
     // New Paymaster deployment
     const paymasterAddress = await deployPaymaster(
         chainParams.entryPoint,

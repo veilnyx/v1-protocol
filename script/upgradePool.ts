@@ -1,13 +1,16 @@
 import hre from "hardhat";
-import { encodeFunctionData } from "viem";
+import { toFunctionSelector } from "viem";
 import { DeployContractConfig } from '@nomicfoundation/hardhat-viem/types';
 import { loadConfigs, ChainParams, CommonParams } from "./configs";
-import { deployErc4337Infra } from "./erc4337Infra";
+import { deployPaymaster, fundPaymaster } from "./erc4337Infra";
 // constants
 const config = loadConfigs();
 const poolAbi = hre.artifacts.readArtifactSync("Pool").abi;
 const poolProxyAbi = hre.artifacts.readArtifactSync("PoolProxy").abi;
+const verifierAbi = hre.artifacts.readArtifactSync("Verifier").abi;
 const existingPoolProxy = process.env.EXISTING_POOL_PROXY_ADDRESS as `0x${string}`;
+const existingVerifier = process.env.VERIFIER_ADDRESS as `0x${string}`;
+const GATEWAY_ADDRESS = `0x6465a561c22f7286f1ca97d5f754627b5823b0b9` as `0x${string}`;
 
 // Deployed library addresses — update these when redeploying libraries.
 const DEPLOYED_LIBS = {
@@ -157,8 +160,28 @@ const deployPoolImpl = async (commonLibs: any) => {
     return poolImpl.address;
 };
 
+const bumpVersion = async () => {
+    const currentVersion = await client.readContract({
+        address: existingPoolProxy,
+        abi: poolAbi,
+        functionName: "version",
+    }) as bigint;
+    console.log("Pool: current version is", currentVersion.toString());
+
+    // @ts-ignore
+    const setVersionHash = await wallet.writeContract({
+        address: existingPoolProxy,
+        abi: poolAbi,
+        functionName: "setVersion",
+        args: [currentVersion + 1n],
+    });
+    await client.waitForTransactionReceipt({ hash: setVersionHash, timeout: 5 * 60 * 1000 });
+    console.log("Pool: version set to", (currentVersion + 1n).toString());
+}
+
 const upgradePoolProxy = async (newPoolImpl: `0x${string}`) => {
 
+    /**
     // set pauser calldata
     const pauserAddress = process.env.PAUSER_ADDRESS as `0x${string}`;
     const setPauserCalldata = encodeFunctionData({
@@ -166,37 +189,28 @@ const upgradePoolProxy = async (newPoolImpl: `0x${string}`) => {
         functionName: "setPauser",
         args: [pauserAddress],
     });
-
+ */
 
     // @ts-ignore
     const upgradeCallHash = await wallet.writeContract({
         address: existingPoolProxy,
         abi: poolAbi,
         functionName: "upgradeToAndCall",
-        args: [newPoolImpl, setPauserCalldata]
+        args: [newPoolImpl, "0x"]
     });
 
     const upgradeRct = await client.waitForTransactionReceipt({ hash: upgradeCallHash, timeout: 5 * 60 * 1000 });
     console.log("rct:Veilnyx Upgraded!!!!!", upgradeRct.status);
 
-    // Set protocol version
-    // @ts-ignore
-    const setVersionHash = await wallet.writeContract({
-        address: existingPoolProxy,
-        abi: poolAbi,
-        functionName: "setVersion",
-        args: [commonParams.protocolVersion + 1n], // incrementing version since upgrading
-    });
-    await client.waitForTransactionReceipt({ hash: setVersionHash, timeout: 5 * 60 * 1000 });
-    console.log("Pool: version set to", commonParams.protocolVersion + 1n);
+    await bumpVersion();
 }
 
 const deployCommonLibs = async () => {
-    /**
+
     // deploying common libraries
     const asset = await hre.viem.deployContract("AssetLogic");
     console.log("AssetLogic deployed:", asset.address);
-
+    /**
     const merkleTree = await hre.viem.deployContract("MerkleTreeLogic");
     console.log("MerkleTreeLogic deployed:", merkleTree.address);
 
@@ -219,11 +233,50 @@ const deployCommonLibs = async () => {
     console.log("ShieldedTransactionLogic deployed:", shieldedTransaction.address);
  */
     return {
-        asset: `0x976b21916c51303a23b6d292e7750fdadabb2b26` as `0x${string}`,
+        asset: asset.address as `0x${string}`,
         merkleTree: `0x3e89cfd1ef7999de608d76e59ca4dfbef07b2cc5` as `0x${string}`,
         queuedMerkleTree: `0x0b84b501e07ee4012f2ef134d65976aa4611cd31` as `0x${string}`,
         shieldedTransaction: `0xaaed44a5d1dec54e79ba1c666264f8e5ec6d576d` as `0x${string}`
     }
+}
+
+const registerNewVerifiers = async () => {
+    const verifier42Abi = hre.artifacts.readArtifactSync("VerifierTransact42").abi;
+    const verifier44Abi = hre.artifacts.readArtifactSync("VerifierTransact44").abi;
+
+    const verifierTransact42 = await hre.viem.deployContract("VerifierTransact42", [], deployConfig);
+    console.log("VerifierTransact42 deployed:", verifierTransact42.address);
+
+    const verifierTransact44 = await hre.viem.deployContract("VerifierTransact44", [], deployConfig);
+    console.log("VerifierTransact44 deployed:", verifierTransact44.address);
+
+    const txvInfos = [
+        { id: 42, selector: toFunctionSelector(verifier42Abi[0]), addr: verifierTransact42.address },
+        { id: 44, selector: toFunctionSelector(verifier44Abi[0]), addr: verifierTransact44.address },
+    ];
+
+    // @ts-ignore
+    const hash = await wallet.writeContract({
+        address: existingVerifier,
+        abi: verifierAbi,
+        functionName: "addTransactionVerifiers",
+        args: [txvInfos],
+    });
+    await client.waitForTransactionReceipt({ hash, timeout: 5 * 60 * 1000 });
+    console.log("✅ VerifierTransact42 and VerifierTransact44 registered in Verifier.");
+}
+
+const deployAndSetupPaymaster = async () => {
+    const paymasterAddress = await deployPaymaster(
+        chainParams.entryPoint,
+        existingPoolProxy,
+        GATEWAY_ADDRESS,
+        chainParams,
+        deployConfig
+    );
+    await fundPaymaster(paymasterAddress, wallet, client);
+    console.log("Paymaster deployed and funded:", paymasterAddress);
+    return paymasterAddress;
 }
 
 const main = async () => {
@@ -238,10 +291,22 @@ const main = async () => {
     // const erc4337Contracts = await deployErc4337Infra(chainParams, existingPoolProxy, deployConfig);
 
     const newPoolImpl = await deployPoolImpl(commonLibs);
-
     await upgradePoolProxy(newPoolImpl);
-
     await recordUpgradeLayout();
+
+    // Extras
+    await deployAndSetupPaymaster();
+    await registerNewVerifiers();
+}
+
+// Recovery path: pool proxy was already upgraded but the script aborted mid-run.
+// Usage: RESUME_AFTER_UPGRADE=true npx hardhat run script/upgradePool.ts --network <network>
+const resumeAfterUpgrade = async () => {
+    await setup();
+    await bumpVersion();
+    // await registerNewVerifiers();
+    // await deployAndSetupPaymaster();
+    // await recordUpgradeLayout();
 }
 
 const entry = process.env.REGISTER_ONLY === "true"

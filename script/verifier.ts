@@ -7,6 +7,8 @@ export const deployVerifier = async (deployConfig, verifierManager: `0x${string}
     const verifier21Abi = hre.artifacts.readArtifactSync("VerifierTransact21").abi;
     const verifier22Abi = hre.artifacts.readArtifactSync("VerifierTransact22").abi;
     const verifier23Abi = hre.artifacts.readArtifactSync("VerifierTransact23").abi;
+    const verifier42Abi = hre.artifacts.readArtifactSync("VerifierTransact42").abi;
+    const verifier44Abi = hre.artifacts.readArtifactSync("VerifierTransact44").abi;
 
     const verifierRegister = await hre.viem.deployContract("VerifierRegister", [], deployConfig);
     console.log("VerifierRegister deployed:", verifierRegister.address);
@@ -24,6 +26,12 @@ export const deployVerifier = async (deployConfig, verifierManager: `0x${string}
     const verifierTransact23 = await hre.viem.deployContract("VerifierTransact23", [], deployConfig);
     console.log("VerifierTransact23 deployed:", verifierTransact23.address);
 
+    const verifierTransact42 = await hre.viem.deployContract("VerifierTransact42", [], deployConfig);
+    console.log("VerifierTransact42 deployed:", verifierTransact42.address);
+
+    const verifierTransact44 = await hre.viem.deployContract("VerifierTransact44", [], deployConfig);
+    console.log("VerifierTransact44 deployed:", verifierTransact44.address);
+
     // Prepare the TransactionVerifierInfo array
     const txVerifierInfos = [
         {
@@ -40,8 +48,17 @@ export const deployVerifier = async (deployConfig, verifierManager: `0x${string}
             id: 23,
             selector: toFunctionSelector(verifier23Abi[0]),
             addr: verifierTransact23.address
+        },
+        {
+            id: 42,
+            selector: toFunctionSelector(verifier42Abi[0]),
+            addr: verifierTransact42.address
+        },
+        {
+            id: 44,
+            selector: toFunctionSelector(verifier44Abi[0]),
+            addr: verifierTransact44.address
         }
-        // Add more TransactionVerifierInfo structs as needed
     ];
 
     const verifier = await hre.viem.deployContract("Verifier", [
