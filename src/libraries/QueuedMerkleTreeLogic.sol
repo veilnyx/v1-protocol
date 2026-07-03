@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-3.0
+// SPDX-License-Identifier: LicenseRef-BUSL
 pragma solidity 0.8.24;
 
 import {ZERO_LEAF, COMMITMENT_MERKLE_TREE_ROOT_HISTORY_SIZE, COMMITMENT_TREE_DEPTH} from "../base/Constants.sol";

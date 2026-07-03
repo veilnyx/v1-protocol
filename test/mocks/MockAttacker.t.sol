@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MTI
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
 import {ShieldedTransaction} from "../../src/libraries/ShieldedTransactionLogic.sol";

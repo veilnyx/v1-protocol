@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-3.0
+// SPDX-License-Identifier: LicenseRef-BUSL
 pragma solidity 0.8.24;
 
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
@@ -83,7 +83,9 @@ library AssetLogic {
             isActive: true,
             precision: precision,
             usdPriceFeed: usdPriceFeed,
-            feedDecimals: address(usdPriceFeed) != address(0) ? usdPriceFeed.decimals() : 0
+            feedDecimals: address(usdPriceFeed) != address(0)
+                ? usdPriceFeed.decimals()
+                : 0
         });
 
         emit IPool.AssetAdded(address(assetAddress), newAssetId);

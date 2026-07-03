@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-3.0
+// SPDX-License-Identifier: LicenseRef-BUSL
 pragma solidity 0.8.24;
 
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
@@ -642,10 +642,7 @@ library ShieldedTransactionLogic {
             // to the Pool out-of-band (e.g. via wrapping native ETH into
             // wToken in `Pool.transact`). Each asset id appears at most once
             // in pubAssets so a single match per id is sufficient.
-            if (
-                prefundedAssetId != 0 &&
-                pubAssets[i].id == prefundedAssetId
-            ) {
+            if (prefundedAssetId != 0 && pubAssets[i].id == prefundedAssetId) {
                 unchecked {
                     ++i;
                 }
