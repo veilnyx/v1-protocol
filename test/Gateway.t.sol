@@ -9,9 +9,11 @@ import {PackedUserOperation} from "@account-abstraction/contracts/interfaces/Pac
 import {Gateway} from "src/core/Gateway.sol";
 import {Paymaster} from "src/core/Paymaster.sol";
 import {IWToken} from "src/interfaces/IWToken.sol";
-import {Asset, AssetType} from "src/libraries/Asset.sol";
-import {ShieldedTransaction, ShieldedTransactionType} from "src/libraries/ShieldedTransaction.sol";
-import {PreVerificationDetails, Mempool} from "src/core/Mempool.sol";
+import {IEntryPoint} from "@account-abstraction/contracts/interfaces/IEntryPoint.sol";
+import {IPool} from "src/interfaces/IPool.sol";
+import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
+import {Asset, AssetType} from "src/libraries/AssetLogic.sol";
+import {ShieldedTransaction, ShieldedTransactionType} from "src/libraries/ShieldedTransactionLogic.sol";
 import {MockWToken} from "test/mocks/MockWToken.sol";
 import {Fixture, FixtureLib} from "test/fixtures/Fixture.sol";
 
@@ -19,7 +21,7 @@ contract MockPool {
     uint256 constant DEPOSIT_VALUE = 100 ether;
     address mockWTokenAddress;
 
-    function transact(ShieldedTransaction calldata, bool) external {
+    function transact(ShieldedTransaction calldata) external {
         // Simulate gas usage
         for (uint256 i = 0; i < 10; i++) {
             new MockWToken();
@@ -37,7 +39,9 @@ contract MockPool {
             assetType: AssetType.ERC20,
             assetAddress: address(0),
             isActive: true,
-            precision: 6
+            precision: 6,
+            usdPriceFeed: AggregatorV3Interface(address(0)),
+            feedDecimals: 0
         });
 
         return feeAsset;
@@ -48,18 +52,8 @@ contract MockPool {
     }
 }
 
-contract MockMempool {
-    function addSTXToMempool() external {
-        // Simulate gas usage
-        for (uint256 i = 0; i < 10; i++) {
-            new MockWToken();
-        }
-    }
-}
-
 contract GatewayTest is Test {
     MockPool public pool;
-    MockMempool public mempool;
     EntryPoint public entryPoint;
     Paymaster paymaster;
 
@@ -75,20 +69,18 @@ contract GatewayTest is Test {
     function setUp() public {
         entryPoint = new EntryPoint();
         pool = new MockPool();
-        mempool = new MockMempool();
         wToken = address(new MockWToken());
         pool.setMockWTokenAddress(wToken);
         gateway = new Gateway(
-            address(entryPoint),
-            address(wToken),
-            address(pool),
-            address(mempool)
+            IEntryPoint(address(entryPoint)),
+            IWToken(address(wToken)),
+            IPool(address(pool))
         );
         Fixture memory fixture = FixtureLib.load(vm);
 
         StdCheats.deployCodeTo(
             "Paymaster.sol:Paymaster",
-            abi.encode(entryPoint, address(gateway), address(pool)),
+            abi.encode(entryPoint, address(gateway), address(pool), uint256(1 days)),
             fixture.paymaster
         );
         console2.log("paymaster:", fixture.paymaster);
@@ -97,7 +89,7 @@ contract GatewayTest is Test {
         // Deposit to entry point
         vm.deal(address(this), DEPOSIT_VALUE);
         paymaster.depositToEntryPoint{value: DEPOSIT_VALUE}();
-        paymaster.setChainlinkFeed(assetId, address(0));
+        paymaster.setChainlinkFeed(assetId, AggregatorV3Interface(address(0)));
     }
 
     function test_handleWrapAndDeposit() public {
@@ -109,7 +101,6 @@ contract GatewayTest is Test {
 
     function test_handleUserOp() public {
         ShieldedTransaction memory stx;
-        PreVerificationDetails memory preVerificationDetails;
         uint24[] memory pubAssetIds = new uint24[](1);
         uint224[] memory pubAssetValues = new uint224[](1);
         uint248[] memory pubAssets = new uint248[](1);
@@ -150,14 +141,9 @@ contract GatewayTest is Test {
             )
         );
 
-        preVerificationDetails.isPreVerified = false;
-
         PackedUserOperation memory userOp;
         userOp.sender = address(gateway);
-        userOp.callData = abi.encodeCall(
-            Gateway.handleUserOp,
-            (stx, preVerificationDetails)
-        );
+        userOp.callData = abi.encodeCall(Gateway.handleUserOp, (stx));
         userOp.accountGasLimits = bytes32(
             bytes.concat(bytes16(verificationGasLimit), bytes16(callGasLimit))
         );

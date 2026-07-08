@@ -3,7 +3,7 @@ pragma solidity 0.8.24;
 
 import {IAdaptor} from "../interfaces/IAdaptor.sol";
 import {IPool} from "../interfaces/IPool.sol";
-import {Asset, AssetType} from "../libraries/Asset.sol";
+import {Asset, AssetType} from "../libraries/AssetLogic.sol";
 
 /// NOTE: THIS SHOULD BE STATELESS - NO STORAGE VARS!!
 abstract contract AdaptorBase is IAdaptor {
@@ -12,11 +12,12 @@ abstract contract AdaptorBase is IAdaptor {
     error InvalidAction();
     error UnsupportedAsset(uint24 assetId);
     error InsufficientBalance();
+    error InvalidInputAssetLength(uint8 actual, uint8 expected);
 
-    IPool immutable _pool;
+    IPool internal immutable _pool;
 
-    constructor(address pool_) {
-        _pool = IPool(pool_);
+    constructor(IPool pool_) {
+        _pool = pool_;
     }
 
     function getAssetId(address assetAddress) public view returns (uint24) {

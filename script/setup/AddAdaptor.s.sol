@@ -3,6 +3,7 @@ pragma solidity 0.8.24;
 
 import {Script} from "forge-std/Script.sol";
 import {IPool} from "src/interfaces/IPool.sol";
+import {IAdaptorHandler} from "src/interfaces/IAdaptorHandler.sol";
 
 contract AddAdaptorScript is Script {
     address public poolAddress = 0xa5FA5D5709DE4A96c737302Ddb07e8aE2CdAE465;
@@ -19,7 +20,7 @@ contract AddAdaptorScript is Script {
 
         vm.startBroadcast(privateKey);
         pool.addAdaptorSupport(
-            0x957e7A83144da8Ac100a83e9f701cddEC8E52a2e,
+            IAdaptorHandler(0x957e7A83144da8Ac100a83e9f701cddEC8E52a2e),
             true
         );
         vm.stopBroadcast();

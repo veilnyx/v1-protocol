@@ -4,12 +4,12 @@ pragma solidity ^0.8.24;
 import {Test, console} from "forge-std/Test.sol";
 import {StdCheats} from "forge-std/StdCheats.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {ShieldedTransaction} from "src/libraries/ShieldedTransaction.sol";
+import {ShieldedTransaction} from "src/libraries/ShieldedTransactionLogic.sol";
 import {PoolTest} from "test/fixtures/PoolTest.sol";
 import {MockAttacker} from "test/mocks/MockAttacker.t.sol";
-import {Asset, AssetType} from "src/libraries/Asset.sol";
-import {TreeUpdateData} from "src/libraries/QueuedMerkleTree.sol";
-import {MerkleTree, MerkleTreeLogic} from "src/libraries/MerkleTree.sol";
+import {Asset, AssetType} from "src/libraries/AssetLogic.sol";
+import {TreeUpdateData} from "src/libraries/QueuedMerkleTreeLogic.sol";
+import {MerkleTree, MerkleTreeLogic} from "src/libraries/MerkleTreeLogic.sol";
 
 contract PoolReentrancyTest is PoolTest {
     using MerkleTreeLogic for MerkleTree;
@@ -32,7 +32,7 @@ contract PoolReentrancyTest is PoolTest {
             memory reentTokenDepositStx = _loadShieldedTransaction(
                 "deposit_1000_reentrantToken_without_fee"
             );
-        pool.transact(reentTokenDepositStx, false);
+        pool.transact(reentTokenDepositStx);
         _processCommitmentTreeQueue();
 
         // `to` address will be that of the attacker contract which
@@ -51,6 +51,6 @@ contract PoolReentrancyTest is PoolTest {
 
     function test_reentrancyAttack() public {
         // initiating the withdraw to attacker that will perform reentrancy attack and check the revert
-        pool.transact(attackerWithdrawStx, false);
+        pool.transact(attackerWithdrawStx);
     }
 }

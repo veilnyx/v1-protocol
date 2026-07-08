@@ -2,6 +2,9 @@
 pragma solidity ^0.8.24;
 
 import {Gateway} from "src/core/Gateway.sol";
+import {IEntryPoint} from "@account-abstraction/contracts/interfaces/IEntryPoint.sol";
+import {IWToken} from "src/interfaces/IWToken.sol";
+import {IPool} from "src/interfaces/IPool.sol";
 import {BaseScript} from "../BaseScript.sol";
 
 contract GatewayDeploy is BaseScript {
@@ -9,7 +12,7 @@ contract GatewayDeploy is BaseScript {
         address entryPoint = _config.entryPoint();
         address wToken = _config.wToken();
         address pool = _getContract("PoolProxy");
-        address mempool = _getContract("MempoolProxy");
-        new Gateway(entryPoint, wToken, pool, mempool);
+
+        new Gateway(IEntryPoint(entryPoint), IWToken(wToken), IPool(pool));
     }
 }

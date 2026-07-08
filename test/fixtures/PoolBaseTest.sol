@@ -1,10 +1,10 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
-import {Mempool} from "src/core/Mempool.sol";
-import {Pool, InitAddressParams} from "src/core/Pool.sol";
+import {Pool} from "src/core/Pool.sol";
+import {InitAddressParams, PoolConfigParams} from "src/interfaces/IPool.sol";
 import {MESSAGE_REGISTER_ADDRESS, EIP712_DOMAIN_NAME, EIP712_DOMAIN_VERSION, EIP712_TYPEHASH_REGISTER_ADDRESS} from "src/base/Constants.sol";
 import {VerifierTransact21} from "src/verifiers/VerifierTransact21.sol";
 import {VerifierTransact22} from "src/verifiers/VerifierTransact22.sol";
@@ -14,6 +14,12 @@ import {VerifierTreeUpdate} from "src/verifiers/VerifierTreeUpdate.sol";
 import {Verifier, TransactionVerifierInfo} from "src/core/Verifier.sol";
 import {AdaptorHandler} from "src/core/AdaptorHandler.sol";
 import {Hasher} from "src/core/Hasher.sol";
+import {IVerifier} from "src/interfaces/IVerifier.sol";
+import {IAdaptorHandler} from "src/interfaces/IAdaptorHandler.sol";
+import {IHasher} from "src/interfaces/IHasher.sol";
+import {IScreener} from "src/interfaces/IScreener.sol";
+import {IPool} from "src/interfaces/IPool.sol";
+import {IWToken} from "src/interfaces/IWToken.sol";
 import {MockPool} from "test/mocks/MockPool.sol";
 import {MockScreener} from "test/mocks/MockScreener.sol";
 import {MockERC20} from "test/mocks/MockERC20.sol";
@@ -26,7 +32,6 @@ contract PoolBaseTest is BaseTest {
             "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
         );
 
-    Mempool public mempool;
     Verifier public verifier;
     AdaptorHandler public adaptorHandler;
     Hasher public hasher;
@@ -68,44 +73,47 @@ contract PoolBaseTest is BaseTest {
             selector: vt23.verifyProof.selector
         });
 
-        verifier = new Verifier(vInfos, address(vr), address(vTreeUpdate));
+        verifier = new Verifier(
+            vInfos,
+            address(vr),
+            address(vTreeUpdate),
+            address(this)
+        );
         adaptorHandler = new AdaptorHandler();
 
         pool = new MockPool();
 
         screener = new MockScreener();
         hasher = _deployHasher();
-        mempool = _deployMempool();
-
-        address poolNebraVerifier = address(mockNebraVerifier) != address(0)
-            ? address(mockNebraVerifier)
-            : config.nebraVerifier();
 
         InitAddressParams memory initAddressParams = InitAddressParams({
-            mempool: address(mempool),
-            verifier: address(verifier),
-            adaptorHandler: address(adaptorHandler),
-            screener: address(screener),
-            hasher: address(hasher),
-            verificationTrackerService: makeAddr("zkVerificationTrackerService"),
-            nebraVerifier: poolNebraVerifier
+            verifier: IVerifier(address(verifier)),
+            adaptorHandler: IAdaptorHandler(address(adaptorHandler)),
+            screener: IScreener(address(screener)),
+            hasher: IHasher(address(hasher))
+        });
+
+        PoolConfigParams memory configParams = PoolConfigParams({
+            withdrawFeeBps: fixture.withdrawFeeBps,
+            tvlLimitUsd: type(uint256).max,
+            minDepositUsd: 0,
+            maxDepositUsd: type(uint256).max,
+            priceFeedStalenessThreshold: 1 days,
+            nativeWToken: IWToken(config.wToken())
         });
 
         bytes memory initData = abi.encodeCall(
             Pool.initialize,
             (
-                fixture.addressTreeDepth,
-                fixture.commitmentTreeDepth,
                 fixture.commitmentTreeQueueSize,
                 initAddressParams,
-                fixture.withdrawFeeBps
+                configParams
             )
         );
 
         ERC1967Proxy poolProxy = new ERC1967Proxy(address(pool), initData);
-        pool = MockPool(address(poolProxy));
-        adaptorHandler.setVeilnyxPool(address(pool));
-        mempool.updatePoolAddress(address(pool));
+        pool = MockPool(payable(address(poolProxy)));
+        adaptorHandler.setVeilnyxPool(IPool(address(pool)));
     }
 
     //////////////////////////////////////////////////////

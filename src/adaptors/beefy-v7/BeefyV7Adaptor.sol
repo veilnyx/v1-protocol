@@ -1,48 +1,54 @@
-// SPDX-License-Identifier: GPL-2.0-or-later
+// SPDX-License-Identifier: LicenseRef-BUSL
 pragma solidity 0.8.24;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IBeefyVault} from "./IBeefyVault.sol";
 import {AdaptorBase} from "../../base/AdaptorBase.sol";
-import {Asset} from "../../libraries/Asset.sol";
-
-enum Action {
-    DEPOSIT,
-    WITHDRAW
-}
+import {Asset} from "../../libraries/AssetLogic.sol";
+import {AssetAmount} from "../../interfaces/IAdaptor.sol";
+import {IPool} from "../../interfaces/IPool.sol";
 
 contract BeefyV7Adaptor is AdaptorBase {
     using SafeERC20 for IERC20;
 
-    constructor(address pool_) AdaptorBase(pool_) {}
+    enum Action {
+        DEPOSIT,
+        WITHDRAW
+    }
+
+    // Intentionally empty: no adaptor-specific constructor logic beyond base initialization.
+    // solhint-disable-next-line no-empty-blocks
+    constructor(IPool pool_) AdaptorBase(pool_) {}
 
     function handleAssets(
-        uint24[] calldata inAssetIds,
-        uint256[] calldata inValues,
+        AssetAmount[] calldata inAssets,
         bytes calldata payload
     )
         external
         payable
         virtual
         override
-        returns (uint24[] memory outAssetIds, uint256[] memory outValues)
+        returns (AssetAmount[] memory outAssets)
     {
+        if (inAssets.length != 1) {
+            revert InvalidInputAssetLength(uint8(inAssets.length), 1);
+        }
+
         (uint8 action, address vault) = abi.decode(payload, (uint8, address));
 
-        outAssetIds = new uint24[](1);
-        outValues = new uint256[](1);
+        outAssets = new AssetAmount[](1);
 
         if (action == uint8(Action.DEPOSIT)) {
-            (outAssetIds[0], outValues[0]) = _deposit(
-                inAssetIds[0],
-                inValues[0],
+            (outAssets[0].assetId, outAssets[0].value) = _deposit(
+                inAssets[0].assetId,
+                inAssets[0].value,
                 vault
             );
         } else if (action == uint8(Action.WITHDRAW)) {
-            (outAssetIds[0], outValues[0]) = _withdraw(
-                inAssetIds[0],
-                inValues[0],
+            (outAssets[0].assetId, outAssets[0].value) = _withdraw(
+                inAssets[0].assetId,
+                inAssets[0].value,
                 vault
             );
         } else {
@@ -60,10 +66,6 @@ contract BeefyV7Adaptor is AdaptorBase {
 
         if (inValue == 0) {
             revert ZeroValue();
-        }
-
-        if (IERC20(inAsset.assetAddress).balanceOf(address(this)) < inValue) {
-            revert InsufficientBalance();
         }
 
         if (inAsset.assetAddress != wantToken) {
@@ -92,19 +94,21 @@ contract BeefyV7Adaptor is AdaptorBase {
             revert ZeroValue();
         }
 
-        if (IERC20(inAsset.assetAddress).balanceOf(address(this)) < inValue) {
-            revert InsufficientBalance();
-        }
-
         if (inAsset.assetAddress != vault) {
             revert UnsupportedAsset(inAsset.id);
         }
 
+        uint256 wantTokenBalBeforeWithdraw = IERC20(wantToken).balanceOf(
+            address(this)
+        );
         IERC20(inAsset.assetAddress).forceApprove(vault, inValue);
         IBeefyVault(vault).withdraw(inValue);
+        uint256 wantTokenBalAfterWithdraw = IERC20(wantToken).balanceOf(
+            address(this)
+        );
 
         outAssetId = getAsset(wantToken).id;
-        outValue = IERC20(wantToken).balanceOf(address(this));
+        outValue = wantTokenBalAfterWithdraw - wantTokenBalBeforeWithdraw;
         return (outAssetId, outValue);
     }
 }

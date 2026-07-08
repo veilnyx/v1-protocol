@@ -1,7 +1,7 @@
-// SPDX-License-Identifier: MTI
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {ShieldedTransaction} from "../../src/libraries/ShieldedTransaction.sol";
+import {ShieldedTransaction} from "../../src/libraries/ShieldedTransactionLogic.sol";
 import {Pool} from "../../src/core/Pool.sol";
 import {console} from "forge-std/console.sol";
 import {MockERC20ForReentrancyTest} from "./MockERC20ForReentrancyTest.sol";
@@ -33,7 +33,7 @@ contract MockAttacker is Test {
                         .selector
                 )
             );
-            pool.transact(withdrawStx, false);
+            pool.transact(withdrawStx);
         }
     }
 }

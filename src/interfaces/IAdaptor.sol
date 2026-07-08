@@ -1,16 +1,14 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.24;
+pragma solidity 0.8.24;
 
-import {Asset, AssetType} from "../libraries/Asset.sol";
+struct AssetAmount {
+    uint24 assetId;
+    uint256 value;
+}
 
 abstract contract IAdaptor {
     function handleAssets(
-        uint24[] calldata inAssetIds,
-        uint256[] calldata inValues,
+        AssetAmount[] calldata inAssets,
         bytes calldata payload
-    )
-        external
-        payable
-        virtual
-        returns (uint24[] memory outAssetIds, uint256[] memory outValues);
+    ) external payable virtual returns (AssetAmount[] memory outAssets);
 }

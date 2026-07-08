@@ -6,21 +6,24 @@ import {BaseScript} from "script/BaseScript.sol";
 import {PoolTest} from "test/fixtures/PoolTest.sol";
 import {Pool} from "src/core/Pool.sol";
 import {IPool} from "src/interfaces/IPool.sol";
-import {ShieldedTransaction} from "src/libraries/ShieldedTransaction.sol";
+import {IAdaptorHandler} from "src/interfaces/IAdaptorHandler.sol";
+import {ShieldedTransaction} from "src/libraries/ShieldedTransactionLogic.sol";
 import {OneInchAdaptor} from "src/adaptors/oneInch-v6/OneInchAdaptor.sol";
-import {SwapDescription} from "src/adaptors/oneInch-v6/IOneInch.sol";
+import {SwapDescription, IOneInch} from "src/adaptors/oneInch-v6/IOneInch.sol";
 import {IWToken} from "src/interfaces/IWToken.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {Asset, AssetType} from "src/libraries/Asset.sol";
+import {Asset, AssetType} from "src/libraries/AssetLogic.sol";
+import {AssetAmount} from "src/interfaces/IAdaptor.sol";
 import {console} from "forge-std/Test.sol";
 
 contract OneInchAdaptorTest is PoolTest {
     error CheckChainConfig();
 
     OneInchAdaptor oneInchAdaptor;
+    IWToken public iWETH;
+    address public oneInchRouter = 0x111111125421cA6dc452d289314280a0f8842A65;
     address public WETH = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
     address public USDC = 0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48;
-    IWToken public iWETH;
     uint256 public constant INITIAL_SUPPLY = 2 ether;
     uint256 public constant SWAP_AMT = 1 ether;
     address public user = 0x689EcF264657302052c3dfBD631e4c20d3ED0baB;
@@ -39,14 +42,14 @@ contract OneInchAdaptorTest is PoolTest {
         iWETH = IWToken(WETH);
 
         // deploying 1Inch adaptor
-        oneInchAdaptor = new OneInchAdaptor(address(pool));
+        oneInchAdaptor = new OneInchAdaptor(pool, IOneInch(oneInchRouter));
 
         /// @dev update convert req fixture with this adaptor addr as `to`
         console.log("OneInch adaptor deployed:", address(oneInchAdaptor));
 
         address poolOwner = pool.owner();
         vm.prank(poolOwner);
-        pool.addAdaptorSupport(address(oneInchAdaptor), true);
+        pool.addAdaptorSupport(IAdaptorHandler(address(oneInchAdaptor)), true);
         deal(WETH, user, INITIAL_SUPPLY);
 
         // iWETH.approve(address(pool), INITIAL_SUPPLY); // depositing weth to pool
@@ -85,23 +88,23 @@ contract OneInchAdaptorTest is PoolTest {
         // bytes
         //     memory oneInchCalldata = hex"000000000000000000000000e37e799d5077682fa0a244d46e5649f71457bd09000000000000000000000000c02aaa39b223fe8d0a0e5c4f27ead9083c756cc2000000000000000000000000a0b86991c6218b36c1d19d4a2e9eb0ce3606eb48000000000000000000000000397ff1542f962076d0bfe58ea045ffa2d347aca0000000000000000000000000bf71c5ae43827387daaf7358acab5c81642b74b80000000000000000000000000000000000000000000000000de0b6b3a7640000000000000000000000000000000000000000000000000000000000007b4070cc00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000120000000000000000000000000000000000000000000000000000000000000009f00000000000000000000000000000000000000000000000000008100001a0020d6bdbf78c02aaa39b223fe8d0a0e5c4f27ead9083c756cc200206ae4071138002dc6c0397ff1542f962076d0bfe58ea045ffa2d347aca0111111125421ca6dc452d289314280a0f8842a650000000000000000000000000000000000000000000000000000000000000001c02aaa39b223fe8d0a0e5c4f27ead9083c756cc20006d4e6c5";
 
-        uint24[] memory inAssetIds = new uint24[](1);
-        inAssetIds[0] = pool.getAsset(WETH).id;
-        uint256[] memory inValues = new uint256[](1);
-        inValues[0] = SWAP_AMT;
+        AssetAmount[] memory inAssets = new AssetAmount[](1);
+        inAssets[0] = AssetAmount({
+            assetId: pool.getAsset(WETH).id,
+            value: SWAP_AMT
+        });
 
         vm.startPrank(user);
         iWETH.transfer(address(oneInchAdaptor), SWAP_AMT);
 
-        (, uint256[] memory outAssetValues) = oneInchAdaptor.handleAssets(
-            inAssetIds,
-            inValues,
+        AssetAmount[] memory outAssets = oneInchAdaptor.handleAssets(
+            inAssets,
             oneInchCalldata
         );
         vm.stopPrank();
 
         // Asserts
-        assert(outAssetValues[0] > 0);
+        assert(outAssets[0].value > 0);
         assert(IERC20(USDC).balanceOf(address(oneInchAdaptor)) > 0);
         assertEq(IERC20(WETH).balanceOf(address(oneInchAdaptor)), 0);
     }

@@ -4,11 +4,12 @@ pragma abicoder v2;
 
 import {PoolTest} from "test/fixtures/PoolTest.sol";
 import {Pool} from "src/core/Pool.sol";
-import {ShieldedTransaction} from "src/libraries/ShieldedTransaction.sol";
+import {ShieldedTransaction} from "src/libraries/ShieldedTransactionLogic.sol";
 import {MorphoVaultAdaptor as MorphoAdp} from "src/adaptors/morpho/MorphoVaultAdaptor.sol";
+import {IAdaptorHandler} from "src/interfaces/IAdaptorHandler.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {Asset, AssetType} from "src/libraries/Asset.sol";
+import {Asset, AssetType} from "src/libraries/AssetLogic.sol";
 import {console} from "forge-std/Test.sol";
 
 contract MorphoAdaptorTest is PoolTest {
@@ -33,7 +34,7 @@ contract MorphoAdaptorTest is PoolTest {
         PoolTest._setUp();
 
         // deploying Ethena adaptor
-        morphoAdp = new MorphoAdp(address(pool));
+        morphoAdp = new MorphoAdp(pool);
 
         /// @dev update convert req fixture with this adaptor addr as `to`
         console.log("Morpho adaptor deployed:", address(morphoAdp));
@@ -46,17 +47,22 @@ contract MorphoAdaptorTest is PoolTest {
         // Adaptor & asset support on Veilnyx Protocol
         address poolOwner = pool.owner();
         vm.startPrank(poolOwner);
-        pool.addAdaptorSupport(fixtureAdaptorAddr, true);
+        pool.addAdaptorSupport(IAdaptorHandler(fixtureAdaptorAddr), true);
         AssetType assetType = AssetType.ERC20;
         address[] memory assetAddresses = new address[](1);
         // assetAddresses[0] = loanToken;
         assetAddresses[0] = vaultToken;
+        uint8[] memory precisions = new uint8[](1);
+        precisions[0] = 18;
 
-        uint8[] memory assetsPrecision = new uint8[](1);
-        // assetAddresses[0] = loanToken;
-        assetsPrecision[0] = 18;
-
-        pool.addAssets(assetType, assetAddresses, assetsPrecision);
+        pool.addAssets(
+            assetType,
+            _toAssetInitParams(
+                assetAddresses,
+                precisions,
+                _mockFeedsArray(assetAddresses.length)
+            )
+        );
         vm.stopPrank();
     }
 
@@ -73,13 +79,13 @@ contract MorphoAdaptorTest is PoolTest {
         ShieldedTransaction memory depositStx = _loadShieldedTransaction(
             "deposit_2_morphoLoanToken"
         );
-        pool.transact(depositStx, false);
+        pool.transact(depositStx);
         _processCommitmentTreeQueue();
 
         ShieldedTransaction memory supplyStx = _loadShieldedTransaction(
             "supply_2_morphoLoanToken"
         );
-        pool.transact(supplyStx, false);
+        pool.transact(supplyStx);
         vm.stopPrank();
 
         console.log("Supplying done!");
@@ -97,13 +103,13 @@ contract MorphoAdaptorTest is PoolTest {
         ShieldedTransaction memory depositStx = _loadShieldedTransaction(
             "deposit_2_morphoVaultToken"
         );
-        pool.transact(depositStx, false);
+        pool.transact(depositStx);
         _processCommitmentTreeQueue();
 
         ShieldedTransaction memory withdrawStx = _loadShieldedTransaction(
             "withdraw_2_morphoLoanToken"
         );
-        pool.transact(withdrawStx, false);
+        pool.transact(withdrawStx);
         vm.stopPrank();
 
         console.log("Withdrawing done!");

@@ -10,7 +10,7 @@ import {VerifierTransact22} from "src/verifiers/VerifierTransact22.sol";
 import {VerifierTransact23} from "src/verifiers/VerifierTransact23.sol";
 import {VerifierRegister} from "src/verifiers/VerifierRegister.sol";
 import {VerifierTreeUpdate} from "src/verifiers/VerifierTreeUpdate.sol";
-import {ShieldedTransaction, ShieldedTransactionType} from "src/libraries/ShieldedTransaction.sol";
+import {ShieldedTransaction, ShieldedTransactionType} from "src/libraries/ShieldedTransactionLogic.sol";
 import {BaseTest} from "test/fixtures/BaseTest.sol";
 
 contract VerifierTest is BaseTest {
@@ -45,7 +45,8 @@ contract VerifierTest is BaseTest {
         _verifier = new Verifier(
             vInfos,
             address(vRegister),
-            address(vTreeUpdate)
+            address(vTreeUpdate),
+            address(this)
         );
     }
 
@@ -66,16 +67,32 @@ contract VerifierTest is BaseTest {
     function test_getVerifierIdRevertsOnUint16Overflow() public {
         // nOuts=0 → noOfDigits=0 → verifierID = nIns * 10^0 + 0 = nIns
         // 65536 > type(uint16).max (65535)
-        vm.expectRevert(IVerifier.VerifierIdOverflow.selector);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IVerifier.VerifierIdOverflow.selector,
+                uint256(655360)
+            )
+        );
         _verifier.getTransactionVerifierId(65536, 0);
 
-        vm.expectRevert(IVerifier.VerifierIdOverflow.selector);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IVerifier.VerifierIdOverflow.selector,
+                uint256(65546)
+            )
+        );
         _verifier.getTransactionVerifierId(6554, 6);
     }
 
     function test_getVerifierIdRevertsWhenNInsZero() public {
         // nIns=0, nOuts=6 → noOfDigits=1, verifierID = 0*10 + 6 = 6
-        vm.expectRevert(IVerifier.BadArguments.selector);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IVerifier.BadArguments.selector,
+                uint256(0),
+                uint256(6)
+            )
+        );
         _verifier.getTransactionVerifierId(0, 6);
     }
 
@@ -172,23 +189,116 @@ contract VerifierTest is BaseTest {
         _verifier.removeTransactionVerifier(99); // Doesn't exist
     }
 
-    function test_revert_addVerifier_notOwner() public {
+    function test_revert_addVerifier_notVerifierManager() public {
         TransactionVerifierInfo memory newVerifier = TransactionVerifierInfo({
             id: 23,
             addr: address(vt23),
             selector: vt23.verifyProof.selector
         });
 
-        address nonOwner = address(0x123);
-        vm.prank(nonOwner);
-        vm.expectRevert();
+        address nonManager = address(0x123);
+        vm.prank(nonManager);
+        vm.expectRevert(Verifier.NotVerifierManager.selector);
         _verifier.addTransactionVerifier(newVerifier);
     }
 
-    function test_revert_removeVerifier_notOwner() public {
+    function test_revert_removeVerifier_notVerifierManager() public {
+        address nonManager = address(0x123);
+        vm.prank(nonManager);
+        vm.expectRevert(Verifier.NotVerifierManager.selector);
+        _verifier.removeTransactionVerifier(21);
+    }
+
+    // ── Verifier Manager Role ────────────────────────────────────────────────
+
+    function test_verifierManager_setAtConstruction() public view {
+        assertEq(_verifier.verifierManager(), address(this));
+    }
+
+    function test_setVerifierManager() public {
+        address newManager = address(0xBEEF);
+
+        vm.expectEmit(true, true, false, false);
+        emit Verifier.VerifierManagerUpdated(address(this), newManager);
+
+        _verifier.setVerifierManager(newManager);
+        assertEq(_verifier.verifierManager(), newManager);
+    }
+
+    function test_revert_setVerifierManager_notOwner() public {
         address nonOwner = address(0x123);
         vm.prank(nonOwner);
         vm.expectRevert();
-        _verifier.removeTransactionVerifier(21);
+        _verifier.setVerifierManager(address(0xBEEF));
+    }
+
+    function test_revert_setVerifierManager_zeroAddress() public {
+        vm.expectRevert(Verifier.ZeroAddress.selector);
+        _verifier.setVerifierManager(address(0));
+    }
+
+    function test_newManagerCanAddVerifier() public {
+        address newManager = address(0xBEEF);
+        _verifier.setVerifierManager(newManager);
+
+        TransactionVerifierInfo memory newVerifier = TransactionVerifierInfo({
+            id: 23,
+            addr: address(vt23),
+            selector: vt23.verifyProof.selector
+        });
+
+        vm.prank(newManager);
+        _verifier.addTransactionVerifier(newVerifier);
+
+        assertEq(_verifier.getTransactionVerifier(23).addr, address(vt23));
+    }
+
+    function test_previousManagerCannotActAfterTransfer() public {
+        address newManager = address(0xBEEF);
+        _verifier.setVerifierManager(newManager);
+
+        // address(this) was the old manager — should now be rejected
+        TransactionVerifierInfo memory newVerifier = TransactionVerifierInfo({
+            id: 23,
+            addr: address(vt23),
+            selector: vt23.verifyProof.selector
+        });
+
+        vm.expectRevert(Verifier.NotVerifierManager.selector);
+        _verifier.addTransactionVerifier(newVerifier);
+    }
+
+    function test_verifierManager_canUpdateTreeUpdateVerifier() public {
+        VerifierTreeUpdate newTreeUpdate = new VerifierTreeUpdate();
+
+        vm.expectEmit(true, false, false, false);
+        emit Verifier.TreeUpdateVerifierUpdated(address(newTreeUpdate));
+
+        _verifier.updateTreeUpdateVerifier(address(newTreeUpdate));
+    }
+
+    function test_revert_updateTreeUpdateVerifier_notVerifierManager() public {
+        VerifierTreeUpdate newTreeUpdate = new VerifierTreeUpdate();
+
+        vm.prank(address(0x123));
+        vm.expectRevert(Verifier.NotVerifierManager.selector);
+        _verifier.updateTreeUpdateVerifier(address(newTreeUpdate));
+    }
+
+    function test_verifierManager_canUpdateAddressVerifier() public {
+        VerifierRegister newRegister = new VerifierRegister();
+
+        vm.expectEmit(true, false, false, false);
+        emit Verifier.AddressVerifierUpdated(address(newRegister));
+
+        _verifier.updateAddressVerifier(address(newRegister));
+    }
+
+    function test_revert_updateAddressVerifier_notVerifierManager() public {
+        VerifierRegister newRegister = new VerifierRegister();
+
+        vm.prank(address(0x123));
+        vm.expectRevert(Verifier.NotVerifierManager.selector);
+        _verifier.updateAddressVerifier(address(newRegister));
     }
 }

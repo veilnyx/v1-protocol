@@ -1,59 +1,63 @@
-// SPDX-License-Identifier: GPL-2.0-or-later
+// SPDX-License-Identifier: LicenseRef-BUSL
 pragma solidity 0.8.24;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {AdaptorBase} from "../../base/AdaptorBase.sol";
-import {Asset, AssetType} from "../../libraries/Asset.sol";
+import {Asset, AssetType} from "../../libraries/AssetLogic.sol";
 import {IWToken} from "../../interfaces/IWToken.sol";
 import {IAave} from "./IAave.sol";
 import {IStaticAToken} from "./IStaticAToken.sol";
 import {IStaticATokenFactory} from "./IStaticATokenFactory.sol";
 import {IAToken} from "./IAToken.sol";
+import {AssetAmount} from "../../interfaces/IAdaptor.sol";
+import {IPool} from "../../interfaces/IPool.sol";
 
 contract AaveV3Adaptor is AdaptorBase {
     using SafeERC20 for IERC20;
 
     IAave public immutable aave;
-    address public immutable STATIC_A_TOKEN_FACTORY;
+    IStaticATokenFactory public immutable STATIC_A_TOKEN_FACTORY;
 
     uint8 constant ACTION_SUPPLY = 0;
     uint8 constant ACTION_WITHDRAW = 1;
 
     constructor(
-        address aave_,
-        address pool_,
-        address staticATokenFactory_
+        IAave aave_,
+        IPool pool_,
+        IStaticATokenFactory staticATokenFactory_
     ) AdaptorBase(pool_) {
-        aave = IAave(aave_);
+        aave = aave_;
         STATIC_A_TOKEN_FACTORY = staticATokenFactory_;
     }
 
     function handleAssets(
-        uint24[] calldata inAssetIds,
-        uint256[] calldata inValues,
+        AssetAmount[] calldata inAssets,
         bytes calldata payload
     )
         external
         payable
         virtual
         override
-        returns (uint24[] memory outAssetIds, uint256[] memory outValues)
+        returns (AssetAmount[] memory outAssets)
     {
+        if (inAssets.length != 1) {
+            revert InvalidInputAssetLength(uint8(inAssets.length), 1);
+        }
+
         uint8 action = abi.decode(payload, (uint8));
 
-        outAssetIds = new uint24[](1);
-        outValues = new uint256[](1);
+        outAssets = new AssetAmount[](1);
 
         if (action == ACTION_SUPPLY) {
-            (outAssetIds[0], outValues[0]) = _supply(
-                inAssetIds[0],
-                uint256(inValues[0])
+            (outAssets[0].assetId, outAssets[0].value) = _supply(
+                inAssets[0].assetId,
+                inAssets[0].value
             );
         } else if (action == ACTION_WITHDRAW) {
-            (outAssetIds[0], outValues[0]) = _withdraw(
-                inAssetIds[0],
-                uint256(inValues[0])
+            (outAssets[0].assetId, outAssets[0].value) = _withdraw(
+                inAssets[0].assetId,
+                inAssets[0].value
             );
         } else {
             revert InvalidAction();
@@ -74,8 +78,9 @@ contract AaveV3Adaptor is AdaptorBase {
         // underlying asset -> static aToken (non-rebasable) -> aToken (rebasable)
         // getting static aToken address for input token
         address underlyingToken = inAsset.assetAddress;
-        address staticAToken = IStaticATokenFactory(STATIC_A_TOKEN_FACTORY)
-            .getStaticAToken(underlyingToken);
+        address staticAToken = STATIC_A_TOKEN_FACTORY.getStaticAToken(
+            underlyingToken
+        );
         address aToken = IStaticAToken(staticAToken).aToken();
 
         if (aToken == address(0)) {
@@ -88,6 +93,8 @@ contract AaveV3Adaptor is AdaptorBase {
             revert InsufficientBalance();
         }
 
+        uint256 aTokensPreSupplyBal = IERC20(aToken).balanceOf(address(this));
+
         IERC20(underlyingToken).forceApprove(address(aave), lendValue);
         aave.supply({
             asset: underlyingToken,
@@ -98,7 +105,8 @@ contract AaveV3Adaptor is AdaptorBase {
         });
 
         // rebasable aTokens by Aave
-        uint256 aTokensReceived = IERC20(aToken).balanceOf(address(this));
+        uint256 aTokensPostSupplyBal = IERC20(aToken).balanceOf(address(this));
+        uint256 aTokensReceived = aTokensPostSupplyBal - aTokensPreSupplyBal;
 
         // Step 2: Convert aToken(rebasable) to static tokens as supported by Veilnyx (non-rebasing)
         IERC20(aToken).forceApprove(staticAToken, aTokensReceived);

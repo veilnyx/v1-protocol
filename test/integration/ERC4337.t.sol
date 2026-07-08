@@ -4,10 +4,10 @@ pragma solidity ^0.8.24;
 import {Test, console} from "forge-std/Test.sol";
 import {EntryPoint} from "@account-abstraction/contracts/core/EntryPoint.sol";
 import {PackedUserOperation} from "@account-abstraction/contracts/interfaces/PackedUserOperation.sol";
+import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
 import {Paymaster} from "src/core/Paymaster.sol";
 import {Gateway} from "src/core/Gateway.sol";
-import {ShieldedTransaction, ShieldedTransactionLogic, ShieldedTransactionType} from "src/libraries/ShieldedTransaction.sol";
-import {Mempool, PreVerificationDetails} from "src/core/Mempool.sol";
+import {ShieldedTransaction, ShieldedTransactionLogic, ShieldedTransactionType} from "src/libraries/ShieldedTransactionLogic.sol";
 import {Pool} from "src/core/Pool.sol";
 import {MockPool} from "test/mocks/MockPool.sol";
 import {PoolTest} from "test/fixtures/PoolTest.sol";
@@ -41,8 +41,7 @@ contract ERC4337 is PoolTest {
             abi.encode(
                 address(entryPointContract),
                 address(new MockWToken()),
-                address(pool),
-                address(mempool)
+                address(pool)
             ),
             fixture.gateway
         );
@@ -51,11 +50,9 @@ contract ERC4337 is PoolTest {
         console2.log("Gateway(Sender) address:");
         console2.logAddress(address(gateway));
 
-        mempool.updateGatewayContract(address(gateway));
-
         StdCheats.deployCodeTo(
             "Paymaster.sol:Paymaster",
-            abi.encode(entryPointContract, fixture.gateway, address(pool)),
+            abi.encode(entryPointContract, fixture.gateway, address(pool), pool.priceFeedStalenessThreshold()),
             fixture.paymaster
         );
         console2.log("paymaster:", fixture.paymaster);
@@ -69,15 +66,15 @@ contract ERC4337 is PoolTest {
         paymaster.depositToEntryPoint{value: 100 ether}();
 
         // Set Chainlink Oracle Price Feed address to fetch prices
-        paymaster.setChainlinkFeed(asset1.id, address(0));
+        paymaster.setChainlinkFeed(asset1.id, AggregatorV3Interface(address(0)));
         if (block.chainid == 11155111) {
             // Sepolia
             paymaster.setChainlinkFeed(
                 asset2.id,
-                CHAINLINK_ETH_USDC_FEED_SEPOLIA
+                AggregatorV3Interface(CHAINLINK_ETH_USDC_FEED_SEPOLIA)
             );
         } else {
-            paymaster.setChainlinkFeed(asset2.id, address(0));
+            paymaster.setChainlinkFeed(asset2.id, AggregatorV3Interface(address(0)));
         }
 
         // Deposit funds to test transfer/withdraw tx supported by ERC4337
@@ -85,7 +82,7 @@ contract ERC4337 is PoolTest {
             "deposit_weth_tx"
         );
 
-        pool.transact(stx, false);
+        pool.transact(stx);
         _processCommitmentTreeQueue();
     }
 

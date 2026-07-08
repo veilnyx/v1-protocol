@@ -1,10 +1,14 @@
-// SPDX-License-Identifier: GPL-3.0
-pragma solidity ^0.8.18;
+// SPDX-License-Identifier: LicenseRef-BUSL
+pragma solidity 0.8.24;
 
-import {PubAsset} from "../libraries/ShieldedTransaction.sol";
+import {PubAsset} from "../libraries/ShieldedTransactionLogic.sol";
 
 interface IAdaptorHandler {
-    error InvalidOutputValue();
+    error InvalidOutputValue(
+        uint24 assetId,
+        uint256 expectedMin,
+        uint256 actualBalance
+    );
     error OnlyPoolCanCall();
     error PoolNotSet();
 

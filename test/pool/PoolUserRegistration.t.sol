@@ -6,7 +6,7 @@ import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/Messa
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import {EIP712Upgradeable} from "@openzeppelin/contracts-upgradeable/utils/cryptography/EIP712Upgradeable.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
-import {ShieldedAddressRegistrationData, ShieldedAddressLogic, PreVerificationDetails} from "src/libraries/ShieldedAddress.sol";
+import {ShieldedAddressRegistrationData, ShieldedAddressLogic} from "src/libraries/ShieldedAddressLogic.sol";
 import {IPool} from "src/interfaces/IPool.sol";
 import {PoolBaseTest} from "test/fixtures/PoolBaseTest.sol";
 
@@ -16,6 +16,8 @@ contract PoolUserRegistration is PoolBaseTest {
     address senderAddr;
     uint256 senderPK;
     bytes shieldedAddress;
+
+    error ShieldedAddrIncorrectLength(uint8 givenLength, uint8 expectedLength);
 
     function setUp() public {
         _setUp();
@@ -66,8 +68,7 @@ contract PoolUserRegistration is PoolBaseTest {
             0,
             shieldedAddress
         );
-        PreVerificationDetails memory emptyPreVerifDetails;
-        pool.registerAddress(addressRegistrationData, emptyPreVerifDetails, false);
+        pool.registerAddress(addressRegistrationData);
 
         assertEq(addressRegistrationData.shieldedAddress, shieldedAddress);
     }
@@ -95,9 +96,14 @@ contract PoolUserRegistration is PoolBaseTest {
             .sender
             .shieldedAddress; // packed
 
-        PreVerificationDetails memory emptyPreVerifDetails;
-        vm.expectRevert(abi.encodeWithSelector(IPool.BadArguments.selector));
-        pool.registerAddress(addressRegistrationData, emptyPreVerifDetails, false);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                ShieldedAddrIncorrectLength.selector,
+                uint8(96),
+                uint8(160)
+            )
+        );
+        pool.registerAddress(addressRegistrationData);
     }
 
     function test_userRegistrationWhenPaused() external {
@@ -107,16 +113,14 @@ contract PoolUserRegistration is PoolBaseTest {
             memory data = _loadShieldedAddressRegistrationData(
                 "register_sender"
             );
-        PreVerificationDetails memory emptyPreVerifDetails;
         vm.expectRevert(
             abi.encodeWithSelector(PausableUpgradeable.EnforcedPause.selector)
         );
-        pool.registerAddress(data, emptyPreVerifDetails, false);
+        pool.registerAddress(data);
     }
 
     function test_revertWhenAlreadyRegistered() external {
-        PreVerificationDetails memory emptyPreVerifDetails;
-        pool.registerAddress(addressRegistrationData, emptyPreVerifDetails, false);
+        pool.registerAddress(addressRegistrationData);
         uint256 rootAddress = uint256(
             bytes32(addressRegistrationData.shieldedAddress)
         );
@@ -127,6 +131,6 @@ contract PoolUserRegistration is PoolBaseTest {
             )
         );
 
-        pool.registerAddress(addressRegistrationData, emptyPreVerifDetails, false);
+        pool.registerAddress(addressRegistrationData);
     }
 }

@@ -31,7 +31,7 @@ import {
   TransactionRequest,
 } from "@labyrinthac/shared-types";
 import { Core } from "@labyrinthac/core";
-import { ZTransaction, PreVerification, PreVerificationDetails } from "@labyrinthac/zk-prover";
+import { ZTransaction } from "@labyrinthac/zk-prover";
 import { Note, SIZE_ENCRYPTED_DECRYPTION_KEY, SIZE_FULLY_ENCRYPTED_NOTE_DATA } from "@labyrinthac/transaction";
 import config from "../config.json";
 
@@ -44,13 +44,13 @@ const receiverPubAddress = config.receiver.pubAddress;
 const addressTreeDepth = Number(config.addressTreeDepth);
 const commitmentTreeDepth = Number(config.commitmentTreeDepth);
 const commitmentTreeQueueSize = Number(config.commitmentTreeQueueSize);
-const qmtBatchSize = Number(config.qmtBatchSize);
+const qmtQueueSize = Number(config.qmtQueueSize);
 
-export const USER_OP_CALL_GAS_LIMIT = BigInt(25_00_000);
+export const USER_OP_CALL_GAS_LIMIT = BigInt(9_00_000);
 export const USER_OP_VERIFICATION_GAS_LIMIT = BigInt(75_000);
 export const USER_OP_PRE_VERIFICATION_GAS = BigInt(75_000);
-export const USER_OP_MAX_FEE_PER_GAS = BigInt(150_000_000);
-export const USER_OP_MAX_PRIORITY_FEE_PER_GAS = BigInt(150_000_000);
+export const USER_OP_MAX_FEE_PER_GAS = BigInt(43484312091);
+export const USER_OP_MAX_PRIORITY_FEE_PER_GAS = BigInt(1155000000);
 export const USER_OP_PAYMASTER_VERIFICATION_GAS = BigInt(50_000);
 export const PAYMASTER_ADDR_FIXTURE = config.paymaster;
 export const GATEWAY_ADDR_FIXTURE = config.gateway;
@@ -61,8 +61,7 @@ const assets = {
   reentrantToken: config.assets.reentrantToken,
   testnetWeth: config.assets.testnetWeth,
   testnetUsdc: config.assets.testnetUsdc,
-  testnetUsdt: config.assets.testnetUsdt,
-  testnetCrvUsd: config.assets.testnetCrvUsd,
+  usde: config.assets.usde
 };
 
 const revokerPublicKey = Point.fromAffine({
@@ -96,7 +95,7 @@ export const fixture = {
   addressTreeDepth,
   commitmentTreeDepth,
   commitmentTreeQueueSize,
-  qmtBatchSize,
+  qmtQueueSize,
   revokerPublicKey,
   encryptionPublicKey,
   assets,
@@ -134,9 +133,12 @@ export const generateTestTransaction = async (
   };
   const tx = await sdk.createTransaction(req, opts);
   // console.log("TX: ", tx);
+
   const signedTx = await sdk.signTransaction(tx);
+
   const ztx = await sdk.proveTransaction(signedTx);
   console.log("ZTX:", ztx);
+
   const encoded = ztx.encode();
   writeFileSync(`${dirFixtureData}/${name}.txt`, encoded);
 };
@@ -174,8 +176,8 @@ export const generateTestTransactionWithOutsourcedProofVerification = async (
   console.log("ZTX Encoded");
   writeFileSync(`${dirFixtureData}/${name}.txt`, encoded);
 
-  const encodedPreVerification = preVerification.encode();
-  writeFileSync(`${dirFixtureData}/${name}_preVerificationEncodedStruct.txt`, encodedPreVerification);
+  // const encodedPreVerification = preVerification.encode();
+  // writeFileSync(`${dirFixtureData}/${name}_preVerificationEncodedStruct.txt`, encodedPreVerification);
 };
 
 export const generateTestAddressRegistrations = async (
@@ -263,7 +265,7 @@ export async function mockNotes(depositName: string, sdk: Core) {
   const ztx = ZTransaction.decode(encoded) as any;
   // let notesMemo: Hex = stringToHex(ztx.notesMemo);
   const revokerData = await sdk.getRevokerData(0);
-  const revokerPublicKey = revokerData.revokerPublicKey;
+  const revokerPublicKey: PointType = revokerData.revokerPublicKey;
   // Parse encrypted data
   const [encryptedRefundDataKey, ...encryptedNotesKeys] = splitToChunks(
     ztx.keysMemo,
@@ -317,6 +319,47 @@ export async function mockNotes(depositName: string, sdk: Core) {
   console.log("commit tree root after Mock Notes", sdk.commitmentTreeSource.root);
 }
 
+// Like mockNotes but:
+//  1. Assigns leafIndex starting at `leafIndexOffset` (so the note's Merkle path is correct)
+//  2. Appends to existing notes per assetId rather than replacing them
+// Use this when mocking notes from a second (or later) deposit batch so that notes from
+// earlier batches are not evicted from MockNotesSource.
+export async function mockNotesWithOffset(depositName: string, sdk: Core, leafIndexOffset: number) {
+  const encoded = readFileSync(
+    `${dirFixtureData}/${depositName}.txt`,
+    "utf-8"
+  ) as Hex;
+  const ztx = ZTransaction.decode(encoded) as any;
+  const revokerData = await sdk.getRevokerData(0);
+  const revokerPublicKey: PointType = revokerData.revokerPublicKey;
+
+  const [, ...encryptedNotesKeys] = splitToChunks(
+    ztx.keysMemo,
+    SIZE_ENCRYPTED_DECRYPTION_KEY
+  );
+  const encryptedNotesHex = sliceHex(ztx.notesMemo, 7 * 32);
+  const encryptedNotes = splitToChunks(encryptedNotesHex, SIZE_FULLY_ENCRYPTED_NOTE_DATA);
+  console.log("Encrypted notes length:", encryptedNotes.length);
+
+  for (let i = 0; i < encryptedNotes.length; i++) {
+    const n = Note.decrypt(0, encryptedNotesKeys[i], encryptedNotes[i], {
+      account: senderAccount,
+      revoker: revokerPublicKey,
+      leafIndex: leafIndexOffset + i,
+    });
+    if (n) {
+      console.log("Note Nullifier: ", n.getNullifier(senderAccount.viewer));
+      // @ts-ignore
+      const existing = (await sdk.notesSource.getUnspent(n.assetId)) ?? [];
+      // @ts-ignore
+      sdk.notesSource.mockNotes(n.assetId, [...existing, n]);
+      // @ts-ignore
+      sdk.commitmentTreeSource.insert(n.commitment);
+    }
+  }
+  console.log("commit tree root after mockNotesWithOffset", sdk.commitmentTreeSource.root);
+}
+
 export const generatePackedUserOps = async (name: string, req: TransactionRequest & TransactionOptions, sdk: Core, isPreVerified: boolean, nebraClient) => {
 
   const nonce = concatHex([
@@ -348,7 +391,7 @@ export const generatePackedUserOps = async (name: string, req: TransactionReques
     entryPoint: ENTRYPOINT_ADDRESS_V07
   });
 
-  // Generating ztx
+  // Generating ztx (preparing userop calldata)
   const opts: TransactionOptions = {
     viaBundler: req.viaBundler,
     paymaster: req.paymaster,
@@ -360,42 +403,22 @@ export const generatePackedUserOps = async (name: string, req: TransactionReques
   console.log("TX: ", tx);
   const signedTx = await sdk.signTransaction(tx);
 
-  let ztx: ZTransaction;
-  let preVerification: PreVerification;
-
-  if (isPreVerified) {
-    const { ztx: preVerifiedTx, preVerification: preVerification_, } = await sdk.proveOutsourcedVerificationTx(
-      tx,
-      nebraClient
-    );
-    ztx = preVerifiedTx;
-    preVerification = preVerification_;
-  } else {
-    ztx = await sdk.proveTransaction(signedTx);
-
-    // generating preVerificationDetails obj since required by Gateway contract
-    const preVeriDetails: PreVerificationDetails = {
-      circuitId: bytesToHex(randomBytes(32)),
-      publicInputs: [BigInt(0), BigInt(0)],
-    };
-
-    preVerification = new PreVerification(preVeriDetails);
-  }
+  let ztx: ZTransaction = await sdk.proveTransaction(signedTx);
 
   console.log("ZTX:", ztx);
   const encodedZTx = ztx.encode();
   writeFileSync(`${dirFixtureData}/${name}.txt`, encodedZTx);
   console.log("ZTX fixture created");
 
-  const encodedPreVerification = preVerification.encode();
-  writeFileSync(`${dirFixtureData}/${name}_preVerificationEncodedStruct.txt`, encodedPreVerification);
+  // const encodedPreVerification = preVerification.encode();
+  // writeFileSync(`${dirFixtureData}/${name}_preVerificationEncodedStruct.txt`, encodedPreVerification);
 
   // Generating & Updating calldata in UserOp
-  const gatewayAbi = JSON.parse(readFileSync("out/Gateway.sol/Gateway.json", "utf-8")).abi;
+  const gatewayAbi = JSON.parse(readFileSync("artifacts/Gateway.sol/Gateway.json", "utf-8")).abi;
   userOp.callData = encodeFunctionData({
     abi: gatewayAbi,
     functionName: "handleUserOp",
-    args: [ztx.toSolidityInput(), preVerification]
+    args: [ztx.toSolidityInput()]
   });
 
   // Generating packed user op

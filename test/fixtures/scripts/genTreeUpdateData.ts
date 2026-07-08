@@ -10,16 +10,17 @@ const dirFixtureData = path.resolve(__dirname, "../data");
 
 export const genTreeUpdateData = async (sdk: Core) => {
   let initialTreeState: MerkleTreeState = getInitialTreeState();
+
   const treeUpdateData1 = await sdk.prover.proveTreeUpdate({
     lastTree: initialTreeState,
     leaves: fixture.leavesQueue1,
-    batchSize: fixture.qmtBatchSize,
+    queueSize: fixture.qmtQueueSize,
   });
 
   const treeUpdateData2 = await sdk.prover.proveTreeUpdate({
     lastTree: treeUpdateData1.newTree,
     leaves: fixture.leavesQueue2,
-    batchSize: fixture.qmtBatchSize,
+    queueSize: fixture.qmtQueueSize,
   });
 
   const encodedTreeUpdateData1 = treeUpdateData1.encode();
@@ -40,30 +41,30 @@ export const genTreeUpdateDataWithPartialQueue = async (sdk: Core) => {
   // adding ZERO_LEAF to make it 10 leaves
   let leavesPartialQueue: bigint[] = [...fixture.leavesQueuePartial];
 
-  const treeUpdateData1 = await sdk.prover.proveTreeUpdate({
+  const partialTreeUpdateData1 = await sdk.prover.proveTreeUpdate({
     lastTree: initialTreeState,
     leaves: leavesPartialQueue,
-    batchSize: fixture.qmtBatchSize,
+    queueSize: fixture.qmtQueueSize,
     forceUpdate: true,
   });
 
-  // const treeUpdateData2 = await sdk.prover.proveTreeUpdate({
-  //   lastTree: treeUpdateData1.newTree,
-  //   leaves: fixture.leavesQueue2,
-  //   batchSize: fixture.qmtBatchSize,
-  // });
+  const treeUpdateDataPostPartialUpdate = await sdk.prover.proveTreeUpdate({
+    lastTree: partialTreeUpdateData1.newTree,
+    leaves: fixture.leavesQueue2,
+    queueSize: fixture.qmtQueueSize,
+  });
 
-  const encodedPartialTreeData = treeUpdateData1.encode();
-  // const encodedFullTreeData = treeUpdateData2.encode();
+  const encodedPartialTreeData = partialTreeUpdateData1.encode();
+  const encodedFullTreeDataPostPartialUpdate = treeUpdateDataPostPartialUpdate.encode();
 
   writeFileSync(
     `${dirFixtureData}/tree_update_data_partial_queue.txt`,
     encodedPartialTreeData
   );
-  // writeFileSync(
-  //   `${dirFixtureData}/tree_update_data_2.txt`,
-  //   encodedFullTreeData
-  // );
+  writeFileSync(
+    `${dirFixtureData}/tree_update_data_post_partial_update.txt`,
+    encodedFullTreeDataPostPartialUpdate
+  );
 };
 
 export const getInitialTreeState = (): MerkleTreeState => {

@@ -4,7 +4,7 @@ pragma solidity ^0.8.24;
 import {console2} from "forge-std/console2.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {Pool} from "src/core/Pool.sol";
-import {AssetType} from "src/libraries/Asset.sol";
+import {AssetType} from "src/libraries/AssetLogic.sol";
 import {BaseScript} from "../BaseScript.sol";
 
 contract PoolProxyDeploy is BaseScript {

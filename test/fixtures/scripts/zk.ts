@@ -10,7 +10,7 @@ import {
 
 const circuitPathBase = path.resolve(
   __dirname,
-  "../../../../v1-circuits/artifacts/"
+  "../../../../v1-circuits/artifacts/testCeremony"
 );
 
 export const getCircuitPath = (name: string) => {
@@ -25,7 +25,8 @@ export const circuits: Record<string, CircuitPath> = {
   transact21: getCircuitPath("transact21"),
   transact22: getCircuitPath("transact22"),
   transact23: getCircuitPath("transact23"),
-  transact44: getCircuitPath("transact44"),
+  transact42: getCircuitPath("transact42"),
+  transact44: getCircuitPath("../transact44"),
   register: getCircuitPath("register"),
   treeUpdate: getCircuitPath("treeUpdate"),
 };

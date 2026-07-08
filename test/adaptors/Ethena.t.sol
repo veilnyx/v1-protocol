@@ -4,11 +4,12 @@ pragma abicoder v2;
 
 import {PoolTest} from "test/fixtures/PoolTest.sol";
 import {Pool} from "src/core/Pool.sol";
-import {ShieldedTransaction} from "src/libraries/ShieldedTransaction.sol";
-import {EthenaAdaptor} from "src/adaptors/ETHENA/EthenaAdaptor.sol";
+import {ShieldedTransaction} from "src/libraries/ShieldedTransactionLogic.sol";
+import {EthenaAdaptor} from "src/adaptors/ethena/EthenaAdaptor.sol";
+import {IAdaptorHandler} from "src/interfaces/IAdaptorHandler.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {Asset, AssetType} from "src/libraries/Asset.sol";
-import {IEthena} from "src/adaptors/Ethena/IEthena.sol";
+import {Asset, AssetType} from "src/libraries/AssetLogic.sol";
+import {IEthena} from "src/adaptors/ethena/IEthena.sol";
 import {console} from "forge-std/console.sol";
 
 contract EthenaAdaptorTest is PoolTest {
@@ -29,7 +30,7 @@ contract EthenaAdaptorTest is PoolTest {
         PoolTest._setUp();
 
         // deploying Ethena adaptor
-        ethenaAdaptor = new EthenaAdaptor(ETHENA, USDe, address(pool));
+        ethenaAdaptor = new EthenaAdaptor(IEthena(ETHENA), IERC20(USDe), pool);
 
         /// @dev update convert req fixture with this adaptor addr as `to`
         console.log("Ethena adaptor deployed:", address(ethenaAdaptor));
@@ -42,17 +43,24 @@ contract EthenaAdaptorTest is PoolTest {
         // Adaptor support on Veilnyx Protocol
         address poolOwner = pool.owner();
         vm.startPrank(poolOwner);
-        pool.addAdaptorSupport(fixtureAdaptorAddr, true);
+        pool.addAdaptorSupport(IAdaptorHandler(fixtureAdaptorAddr), true);
 
         AssetType assetType = AssetType.ERC20;
         address[] memory assetAddresses = new address[](2);
         assetAddresses[0] = USDe;
         assetAddresses[1] = ETHENA;
+        uint8[] memory precisions = new uint8[](2);
+        precisions[0] = 18;
+        precisions[1] = 18;
 
-        uint8[] memory assetsPrecision = new uint8[](2);
-        assetsPrecision[0] = 18;
-        assetsPrecision[1] = 18;
-        pool.addAssets(assetType, assetAddresses, assetsPrecision);
+        pool.addAssets(
+            assetType,
+            _toAssetInitParams(
+                assetAddresses,
+                precisions,
+                _mockFeedsArray(assetAddresses.length)
+            )
+        );
 
         vm.stopPrank();
     }
@@ -69,7 +77,7 @@ contract EthenaAdaptorTest is PoolTest {
         ShieldedTransaction memory ztxDeposit = _loadShieldedTransaction(
             "deposit_2_usde"
         );
-        pool.transact(ztxDeposit, false);
+        pool.transact(ztxDeposit);
         _processCommitmentTreeQueue();
 
         uint256 poolsUSDeBalBeforeStaking = IERC20(ETHENA).balanceOf(
@@ -79,7 +87,7 @@ contract EthenaAdaptorTest is PoolTest {
         ShieldedTransaction memory ztxStake = _loadShieldedTransaction(
             "stake_2_usde_on_ethena"
         );
-        pool.transact(ztxStake, false);
+        pool.transact(ztxStake);
         vm.stopPrank();
 
         // Asserts

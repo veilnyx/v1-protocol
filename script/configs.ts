@@ -13,7 +13,8 @@ export type ChainParams = {
   initAssetType: number;
   initAssetAddresses: Hex[];
   initAssetsPrecision: number[];
-  initAssetChainlinkFeeds: Hex[];
+  initNativeGasTokenToAssetChainlinkFeeds: Hex[];
+  initAssetToUSDChainlinkFeeds: Hex[];
   initAssetIdsVeilnyx: number[];
   nebraVerifier: Hex;
 };
@@ -27,6 +28,7 @@ export type AdaptorParams = {
   beefy: Object;
   morpho: Object;
   rocketPool: Object;
+  oneInch: Object;
 }
 
 export type CommonParams = {
@@ -34,7 +36,8 @@ export type CommonParams = {
   commitmentTreeQueueSize: number;
   addressTreeDepth: number;
   withdrawFeeBps: bigint;
-  protocolVersion: number;
+  protocolVersion: bigint;
+  veilnyxMultiSigAddress: Hex;
   revokers: {
     name: string;
     description: string;
@@ -46,7 +49,7 @@ export type CommonParams = {
 const chainParams: Record<number, ChainParams> = {};
 const adpParams: Record<number, AdaptorParams> = {};
 
-const getHex = (v: any) => {
+export const getHex = (v: any) => {
   if (!isHex(v)) {
     throw new Error(`Invalid hex: ${v}`);
   }
@@ -59,7 +62,8 @@ export function loadConfigs() {
     commitmentTreeQueueSize: Number(common.commitmentTreeQueueSize),
     addressTreeDepth: Number(common.addressTreeDepth),
     withdrawFeeBps: BigInt(common.withdrawFeeBps),
-    protocolVersion: Number(common.protocolVersion),
+    protocolVersion: BigInt(common.protocolVersion),
+    veilnyxMultiSigAddress: getHex(common.veilnyxMultiSigAddress),
     revokers: common.revokers.map((r) => {
       const x = {
         name: r.name,
@@ -76,8 +80,11 @@ export function loadConfigs() {
 
       return x;
     }),
-  };
+  } as CommonParams;
 
+  /// @todo The adaptor assets whose price feeds are not live yet are currently set to have their USD price feed address as 0x0. Once those price feeds are live, update the config with the correct addresses. This is required for Mainnet deployment. Testnet deployments can proceed with the USD price feed addresses set to 0x0, with the drawback of such assets TVL not contributing to the total TVL of the protocol. 
+
+  // Soln for assets who's USD price feeds are not live yet: The approach could be to set the USD price feed addresses of such assets to a mock aggregator that we control, and update the mock aggregator with the correct price. This way we can have an accurate total TVL for the protocol. For now, we'll proceed with setting the USD price feed addresses of such assets to 0x0 for simplicity.
   for (const [chainId, params] of Object.entries(adaptorConfig)) {
     if (isNaN(Number(chainId))) {
       throw new Error(`Invalid chainId: ${chainId}`);
@@ -91,7 +98,8 @@ export function loadConfigs() {
       ethena,
       beefy,
       morpho,
-      rocketPool
+      rocketPool,
+      oneInch
     } = params;
 
     adpParams[Number(chainId)] = {
@@ -110,6 +118,10 @@ export function loadConfigs() {
         assetsPrecision: {
           staticAWeth: Number(aave.assetsPrecision.staticAWeth),
           staticAUsdc: Number(aave.assetsPrecision.staticAUsdc)
+        },
+        assetsUsdPriceFeeds: {
+          staticAWeth: getHex(aave.assetsUsdPriceFeeds.staticAWeth), // @todo update with correct price feed address once it's live
+          staticAUsdc: getHex(aave.assetsUsdPriceFeeds.staticAUsdc) // @todo update with correct price feed address once it's live
         }
       },
       lido: {
@@ -123,6 +135,9 @@ export function loadConfigs() {
         },
         assetsPrecision: {
           wstEth: Number(lido.assetsPrecision.wstEth)
+        },
+        assetsUsdPriceFeeds: {
+          wstEth: getHex(lido.assetsUsdPriceFeeds.wstEth) // @todo update with correct price feed address once it's live
         }
       },
       curve: {
@@ -137,6 +152,12 @@ export function loadConfigs() {
           crvUsd: Number(curve.assetsPrecision.crvUsd),
           crvUsdUsdtLPToken: Number(curve.assetsPrecision.crvUsdUsdtLPToken),
           crvUsdSusdeLPToken: Number(curve.assetsPrecision.crvUsdSusdeLPToken)
+        },
+        assetsUsdPriceFeeds: {
+          usdt: getHex(curve.assetsUsdPriceFeeds.usdt),
+          crvUsd: getHex(curve.assetsUsdPriceFeeds.crvUsd),
+          crvUsdUsdtLPToken: getHex(curve.assetsUsdPriceFeeds.crvUsdUsdtLPToken),
+          crvUsdSusdeLPToken: getHex(curve.assetsUsdPriceFeeds.crvUsdSusdeLPToken)
         }
       },
       ethena: {
@@ -149,6 +170,10 @@ export function loadConfigs() {
         assetsPrecision: {
           usde: Number(ethena.assetsPrecision.usde),
           sUsde: Number(ethena.assetsPrecision.sUsde)
+        },
+        assetsUsdPriceFeeds: {
+          usde: getHex(ethena.assetsUsdPriceFeeds.usde),
+          sUsde: getHex(ethena.assetsUsdPriceFeeds.sUsde)
         }
       },
       beefy: {
@@ -157,6 +182,9 @@ export function loadConfigs() {
         },
         assetsPrecision: {
           mooCurveCrvUSDsUSDe: Number(beefy.assetsPrecision.mooCurveCrvUSDsUSDe)
+        },
+        assetsUsdPriceFeeds: {
+          mooCurveCrvUSDsUSDe: getHex(beefy.assetsUsdPriceFeeds.mooCurveCrvUSDsUSDe)
         }
       },
       morpho: {
@@ -165,6 +193,9 @@ export function loadConfigs() {
         },
         assetsPrecision: {
           gauntletWETHPrimeVault: Number(morpho.assetsPrecision.gauntletWETHPrimeVault)
+        },
+        assetsUsdPriceFeeds: {
+          gauntletWETHPrimeVault: getHex(morpho.assetsUsdPriceFeeds.gauntletWETHPrimeVault)
         }
       },
       rocketPool: {
@@ -175,7 +206,13 @@ export function loadConfigs() {
         },
         assetsPrecision: {
           rETH: Number(rocketPool.assetsPrecision.rETH)
+        },
+        assetsUsdPriceFeeds: {
+          rETH: getHex(rocketPool.assetsUsdPriceFeeds.rETH)
         }
+      },
+      oneInch: {
+        oneInchRouter: getHex(oneInch.oneInchRouter)
       }
     };
   }
@@ -192,7 +229,8 @@ export function loadConfigs() {
       initAssetType,
       initAssetAddresses,
       initAssetsPrecision,
-      initAssetChainlinkFeeds,
+      initNativeGasTokenToAssetChainlinkFeeds,
+      initAssetToUSDChainlinkFeeds,
       initAssetIdsVeilnyx,
       nebraVerifier,
     } = params as ChainParams;
@@ -206,7 +244,8 @@ export function loadConfigs() {
       initAssetType: Number(initAssetType),
       initAssetAddresses: initAssetAddresses.map(getHex),
       initAssetsPrecision: initAssetsPrecision.map(p => Number(p)),
-      initAssetChainlinkFeeds: initAssetChainlinkFeeds.map(getHex),
+      initNativeGasTokenToAssetChainlinkFeeds: initNativeGasTokenToAssetChainlinkFeeds.map(getHex),
+      initAssetToUSDChainlinkFeeds: initAssetToUSDChainlinkFeeds.map(getHex),
       initAssetIdsVeilnyx: initAssetIdsVeilnyx.map(assetId => Number(assetId)),
       nebraVerifier: getHex(nebraVerifier),
     };

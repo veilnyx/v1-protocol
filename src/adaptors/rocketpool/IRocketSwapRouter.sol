@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-2.0-or-later
+// SPDX-License-Identifier: LicenseRef-BUSL
 
 pragma solidity 0.8.24;
 
@@ -20,5 +20,11 @@ interface IRocketSwapRouter {
     /// @param _balancerPortion The portion to swap via Balancer
     /// @param _minTokensOut Swap will revert if at least this amount of ETH is not output
     /// @param _idealTokensOut If the protocol can provide a better swap than this, it will swap as much as possible that way
-    function swapFrom(uint256 _uniswapPortion, uint256 _balancerPortion, uint256 _minTokensOut, uint256 _idealTokensOut, uint256 _tokensIn) external;
+    function swapFrom(
+        uint256 _uniswapPortion,
+        uint256 _balancerPortion,
+        uint256 _minTokensOut,
+        uint256 _idealTokensOut,
+        uint256 _tokensIn
+    ) external;
 }

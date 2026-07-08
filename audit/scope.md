@@ -22,7 +22,7 @@ Veilnyx is a privacy protocol with built-in compliance, enabled by Selective De-
 | src/core/PoolProxy.sol | 8 | UUPS proxy contract for the Veilnyx Pool. | Openzeppelin
 | src/core/Verifier.sol | 79 | Registry and call dispatcher for all Veilnyx's ZK proof verifiers. | -
 | libraries/Asset.sol | 148 | Provides multi-asset ops like adding, updating, transfering, receiving and checkers |  Openzeppelin
-| libraries/MerkleTree.sol | 161 | Leaf insertion logic for Merkle-tree | -
+| libraries/MerkleTree.sol | 206 | Leaf insertion logic for Merkle-tree | -
 | libraries/QueuedMerkleTree.sol | 200 | Merkle tree root update using ZK representing insertion of multiple leaves together | - |
 | libraries/ShieldedAddress.sol | 119 | Validates and manages Shielded address registration using ZK (`registerWithNebraVerifier` excluded — 42 SLOC) |  Openzeppelin
 | libraries/ShieldedTransaction.sol | 619 | Validates and executes Shielded Transaction (STX) | - |
@@ -62,7 +62,8 @@ Veilnyx is a privacy protocol with built-in compliance, enabled by Selective De-
 ### Roles & Actors
 | Role | Privileges | Restrictions |
 |------|-----------|--------------|
-| Admin | 1. Can upgrade the implementation logic <br> 2. Can pause protocol operations <br> 3. Add asset support <br> 4. Add external protocol adaptor support <br> 5. Register new revokers and modify existing revoker's status <br> 6. Withdraw protocol fees <br> 7. Set and update protocol fees <br> 8. Update verification tracker service | Cannot transact |
+| Admin | 1. Can upgrade the implementation logic <br> 2. Can pause protocol operations <br> 3. Add asset support <br> 4. Add external protocol adaptor support <br> 5. Register new revokers and modify existing revoker's status <br> 6. Withdraw protocol fees <br> 7. Set and update protocol fees <br> 8. Update verification tracker service <br> 9. Assign and transfer the Verifier Manager role | Cannot transact |
+| Verifier Manager | 1. Add new transaction verifiers <br> 2. Remove existing transaction verifiers <br> 3. Update the address verifier <br> 4. Update the tree update verifier | Cannot upgrade, pause, or perform any Pool-level admin ops. Role is assigned by the Admin |
 | User | Can transact: deposit, transfer, withdraw, call external protocols privately | Cannot control protocol level ops |
 | Revoker | Can revoke transaction | Cannot decrypt tx without the threshold no. of permissions received from the guardian network |
 | Guardian | Can contribute to a revoke request by providing cryptographic permission | Cannot decrypt tx alone 
@@ -106,6 +107,9 @@ forge coverage
 ```
 #### Pre-generated coverage report available at: 
 `v1-protocol/test/report/coverage.txt`
+
+## Commit Hash
+`b08c4a2431725f702da07300feff9e45e9932767`
 
 ## Deployment Chain(s)
 - Ethereum Sepolia

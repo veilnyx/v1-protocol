@@ -1,5 +1,5 @@
-// SPDX-License-Identifier: MIT
-pragma solidity ^0.8.24;
+// SPDX-License-Identifier: LicenseRef-BUSL
+pragma solidity 0.8.24;
 
 interface IMerkleTree {
     error OutOfRangeMerkleTreeDepth(uint256 depth);

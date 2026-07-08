@@ -6,15 +6,17 @@ import {EntryPoint} from "@account-abstraction/contracts/core/EntryPoint.sol";
 import {PackedUserOperation} from "@account-abstraction/contracts/interfaces/PackedUserOperation.sol";
 import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
 import {Paymaster} from "src/core/Paymaster.sol";
-import {Asset} from "src/libraries/Asset.sol";
-import {ShieldedTransaction, ShieldedTransactionType} from "src/libraries/ShieldedTransaction.sol";
-import {Mempool, PreVerificationDetails} from "src/core/Mempool.sol";
+import {Asset} from "src/libraries/AssetLogic.sol";
+import {ShieldedTransaction, ShieldedTransactionType} from "src/libraries/ShieldedTransactionLogic.sol";
 import {Pool} from "src/core/Pool.sol";
 import {Gateway} from "src/core/Gateway.sol";
+import {IEntryPoint} from "@account-abstraction/contracts/interfaces/IEntryPoint.sol";
+import {IWToken} from "src/interfaces/IWToken.sol";
+import {IPool} from "src/interfaces/IPool.sol";
 import {MockPool} from "test/mocks/MockPool.sol";
 import {PoolTest} from "test/fixtures/PoolTest.sol";
-import {console2} from "forge-std/console2.sol";
 import {StdCheats} from "forge-std/StdCheats.sol";
+import {console2} from "forge-std/console2.sol";
 
 // import {PoolTransactTest} from "test/helpers/PoolTransact.t.sol";
 
@@ -35,7 +37,6 @@ contract PaymasterTest is PoolTest {
     uint256 feeValueForOutsourcedVerification = 0.001 ether;
 
     ShieldedTransaction stx;
-    PreVerificationDetails preVerificationDetails;
     PackedUserOperation userOp;
 
     modifier createPackedUserOps(address gatewayAddr) {
@@ -58,18 +59,8 @@ contract PaymasterTest is PoolTest {
         publicInputs[0] = 0;
         publicInputs[1] = 0;
 
-        preVerificationDetails = PreVerificationDetails({
-            isPreVerified: false,
-            circuitId: bytes32(0),
-            publicInputs: publicInputs,
-            verifierAddr: address(0)
-        });
-
         userOp.sender = gatewayAddr;
-        userOp.callData = abi.encodeCall(
-            MockPool.transactForPaymasterTestSetup,
-            (stx, preVerificationDetails)
-        );
+        userOp.callData = abi.encodeCall(Pool.transact, (stx));
         _;
     }
 
@@ -78,38 +69,43 @@ contract PaymasterTest is PoolTest {
         feeAssetId = asset1.id;
         entryPoint = address(new EntryPoint());
         gateway = new Gateway(
-            address(entryPoint),
-            makeAddr("wToken"),
-            address(pool),
-            address(mempool)
+            IEntryPoint(entryPoint),
+            IWToken(makeAddr("wToken")),
+            IPool(address(pool))
         );
 
         StdCheats.deployCodeTo(
             "Paymaster.sol:Paymaster",
-            abi.encode(entryPoint, address(gateway), address(pool)),
+            abi.encode(entryPoint, address(gateway), address(pool), pool.priceFeedStalenessThreshold()),
             fixture.paymaster
         );
         console2.log("paymaster:", fixture.paymaster);
         paymaster = Paymaster(fixture.paymaster);
 
         // Setting chainlink feed address to fetch prices
-        paymaster.setChainlinkFeed(asset1.id, address(0));
+        paymaster.setChainlinkFeed(
+            asset1.id,
+            AggregatorV3Interface(address(0))
+        );
 
         // asset 2 (USDC)
         if (block.chainid == ETH_SEPOLIA) {
             // Sepolia
             paymaster.setChainlinkFeed(
                 asset2.id,
-                CHAINLINK_ETH_USDC_FEED_SEPOLIA
+                AggregatorV3Interface(CHAINLINK_ETH_USDC_FEED_SEPOLIA)
             );
         } else if (block.chainid == ETH_MAINNET) {
             // Mainnet
             paymaster.setChainlinkFeed(
                 asset2.id,
-                CHAINLINK_ETH_USDC_FEED_MAINNET
+                AggregatorV3Interface(CHAINLINK_ETH_USDC_FEED_MAINNET)
             );
         } else {
-            paymaster.setChainlinkFeed(asset2.id, address(0));
+            paymaster.setChainlinkFeed(
+                asset2.id,
+                AggregatorV3Interface(address(0))
+            );
         }
     }
 
@@ -143,8 +139,14 @@ contract PaymasterTest is PoolTest {
             feeAssetIdUSDC
         );
 
-        (int256 ethInUSDC, , uint8 feedDecimals) = _getEthUsdcFeedData();
-
+        (
+            int256 ethInUSDC,
+            uint256 updatedAt,
+            uint8 feedDecimals
+        ) = _getEthUsdcFeedData();
+        console2.log("Feed Updated at:", updatedAt);
+        console2.log("Current block timestamp:", block.timestamp);
+        console2.log("ETH in USDC:", ethInUSDC);
         uint256 expectedFeeValueInUSDC = (feeValueInEth *
             uint256(ethInUSDC) *
             10 ** USDC_DECIMALS) / 10 ** (ETH_DECIMALS + feedDecimals);
@@ -218,13 +220,21 @@ contract PaymasterTest is PoolTest {
     function test_revert_convertFeeFromGasTokenToFeeAsset_whenPriceIsStale()
         public
     {
+        if (block.chainid != ETH_SEPOLIA && block.chainid != ETH_MAINNET) {
+            vm.skip(true);
+        }
+
         (
             int256 ethInUSDC,
             uint256 updatedAt,
             uint8 feedDecimals
         ) = _getEthUsdcFeedData();
 
-        vm.warp(block.timestamp + 2 hours); // Move forward in time to make the price feed stale
+        vm.warp(
+            block.timestamp +
+                paymaster.priceStalenessThreshold() +
+                2 hours
+        ); // Move forward in time to make the price feed stale
         vm.expectRevert(
             abi.encodeWithSelector(
                 Paymaster.ChainlinkPriceInvalid.selector,
@@ -282,8 +292,8 @@ contract PaymasterTest is PoolTest {
 
         userOp.sender = address(pool);
         userOp.callData = abi.encodeCall(
-            MockPool.transactForPaymasterTestSetup,
-            (stx, preVerificationDetails)
+            Pool.transact,
+            (stx)
         );
 
         vm.prank(entryPoint);
@@ -314,10 +324,7 @@ contract PaymasterTest is PoolTest {
             )
         );
 
-        userOp.callData = abi.encodeCall(
-            MockPool.transactForPaymasterTestSetup,
-            (stx, preVerificationDetails)
-        );
+        userOp.callData = abi.encodeCall(Pool.transact, (stx));
 
         vm.prank(entryPoint);
         vm.expectRevert(
@@ -356,10 +363,7 @@ contract PaymasterTest is PoolTest {
             )
         );
 
-        userOp.callData = abi.encodeCall(
-            MockPool.transactForPaymasterTestSetup,
-            (stx, preVerificationDetails)
-        );
+        userOp.callData = abi.encodeCall(Pool.transact, (stx));
 
         // calc required fee in USDC
         // convert `feeValue` (in ETH) to USDC
@@ -384,7 +388,6 @@ contract PaymasterTest is PoolTest {
     {
         uint256 lowFeeValue = feeValueForOutsourcedVerification - 0.00005 ether;
         // feeding the required values for outsourced verification in userops.calldata
-        preVerificationDetails.isPreVerified = true;
         stx.feeData = uint256(
             bytes32(
                 bytes.concat(
@@ -395,10 +398,7 @@ contract PaymasterTest is PoolTest {
             )
         );
 
-        userOp.callData = abi.encodeCall(
-            MockPool.transactForPaymasterTestSetup,
-            (stx, preVerificationDetails)
-        );
+        userOp.callData = abi.encodeCall(Pool.transact, (stx));
 
         vm.startPrank(entryPoint);
         vm.expectRevert(
@@ -431,10 +431,7 @@ contract PaymasterTest is PoolTest {
             )
         );
 
-        userOp.callData = abi.encodeCall(
-            MockPool.transactForPaymasterTestSetup,
-            (stx, preVerificationDetails)
-        );
+        userOp.callData = abi.encodeCall(Pool.transact, (stx));
 
         vm.prank(entryPoint);
         vm.expectRevert(
@@ -486,10 +483,7 @@ contract PaymasterTest is PoolTest {
             )
         );
 
-        userOp.callData = abi.encodeCall(
-            MockPool.transactForPaymasterTestSetup,
-            (stx, preVerificationDetails)
-        );
+        userOp.callData = abi.encodeCall(Pool.transact, (stx));
 
         vm.prank(entryPoint);
         paymaster.validatePaymasterUserOp(userOp, bytes32(0), feeValue); // feeValue is maxCostEth
@@ -500,7 +494,6 @@ contract PaymasterTest is PoolTest {
         createPackedUserOps(address(gateway))
     {
         // feeding the required values for outsourced verification in userops.calldata
-        preVerificationDetails.isPreVerified = true;
         stx.feeData = uint256(
             bytes32(
                 bytes.concat(
@@ -511,10 +504,7 @@ contract PaymasterTest is PoolTest {
             )
         );
 
-        userOp.callData = abi.encodeCall(
-            MockPool.transactForPaymasterTestSetup,
-            (stx, preVerificationDetails)
-        );
+        userOp.callData = abi.encodeCall(Pool.transact, (stx));
 
         vm.startPrank(entryPoint);
         (, uint256 flag) = paymaster.validatePaymasterUserOp(
@@ -537,7 +527,7 @@ contract PaymasterTest is PoolTest {
         ShieldedTransaction memory withdrawSTX = _loadShieldedTransaction(
             "withdraw_10_weth_with_weth_fee"
         );
-        pool.transact(withdrawSTX, false);
+        pool.transact(withdrawSTX);
 
         uint256 expectedFeeValue = uint256(uint72(withdrawSTX.feeData));
 
@@ -558,7 +548,7 @@ contract PaymasterTest is PoolTest {
         ShieldedTransaction memory withdrawSTX = _loadShieldedTransaction(
             "withdraw_10_weth_with_weth_fee"
         );
-        pool.transact(withdrawSTX, false);
+        pool.transact(withdrawSTX);
 
         vm.startPrank(address(paymaster));
         pool.withdrawPaymasterFee(feeAssetId, address(paymaster));

@@ -4,13 +4,15 @@ pragma abicoder v2;
 
 import {PoolTest} from "test/fixtures/PoolTest.sol";
 import {Pool} from "src/core/Pool.sol";
-import {ShieldedTransaction} from "src/libraries/ShieldedTransaction.sol";
-import {RocketPoolAdaptor} from "src/adaptors/rocketPool/RocketPoolAdaptor.sol";
-import {IAdaptor} from "src/interfaces/IAdaptor.sol";
+import {ShieldedTransaction} from "src/libraries/ShieldedTransactionLogic.sol";
+import {IRocketSwapRouter} from "src/adaptors/rocketpool/IRocketSwapRouter.sol";
+import {RocketPoolAdaptor} from "src/adaptors/rocketpool/RocketPoolAdaptor.sol";
+import {IAdaptorHandler} from "src/interfaces/IAdaptorHandler.sol";
+import {IAdaptor, AssetAmount} from "src/interfaces/IAdaptor.sol";
 import {IWToken} from "src/interfaces/IWToken.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {Asset, AssetType} from "src/libraries/Asset.sol";
+import {Asset, AssetType} from "src/libraries/AssetLogic.sol";
 import {console} from "forge-std/console.sol";
 
 enum Action {
@@ -24,7 +26,8 @@ contract RocketPoolAdpTest is PoolTest {
     error CheckChainConfig();
 
     RocketPoolAdaptor rocketPoolAdp;
-    address rocketSwapRouter = 0x16D5A408e807db8eF7c578279BEeEe6b228f1c1C;
+    IRocketSwapRouter rocketSwapRouter =
+        IRocketSwapRouter(0x16D5A408e807db8eF7c578279BEeEe6b228f1c1C);
     address public rETH = 0xae78736Cd615f374D3085123A210448E74Fc6393;
     address public WETH = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
     IWToken public iWETH = IWToken(WETH);
@@ -37,14 +40,19 @@ contract RocketPoolAdpTest is PoolTest {
     address fixtureAdaptorAddr = 0xbF71c5Ae43827387dAAF7358acAB5C81642b74b8;
 
     function setUp() external {
-        if(!shouldTestRun()) {
+        if (!shouldTestRun()) {
             vm.skip(true);
         }
-        
+
         _setUp();
 
         // deploying Uniswap adaptor
-        rocketPoolAdp = new RocketPoolAdaptor(rETH, WETH, address(pool));
+        rocketPoolAdp = new RocketPoolAdaptor(
+            IERC20(rETH),
+            IWToken(WETH),
+            rocketSwapRouter,
+            pool
+        );
 
         /// @dev update convert req fixture with this adaptor addr as `to`
         console.log("RocketPool adaptor deployed:", address(rocketPoolAdp));
@@ -56,15 +64,22 @@ contract RocketPoolAdpTest is PoolTest {
         // Asset & Adaptor support on Veilnyx Protocol
         address poolOwner = pool.owner();
         vm.prank(poolOwner);
-        pool.addAdaptorSupport(fixtureAdaptorAddr, true);
+        pool.addAdaptorSupport(IAdaptorHandler(fixtureAdaptorAddr), true);
 
         AssetType assetType = AssetType.ERC20;
         address[] memory assetAddresses = new address[](1);
         assetAddresses[0] = rETH;
+        uint8[] memory precisions = new uint8[](1);
+        precisions[0] = 18;
 
-        uint8[] memory assetsPrecision = new uint8[](1);
-        assetsPrecision[0] = 18;
-        pool.addAssets(assetType, assetAddresses, assetsPrecision);
+        pool.addAssets(
+            assetType,
+            _toAssetInitParams(
+                assetAddresses,
+                precisions,
+                _mockFeedsArray(assetAddresses.length)
+            )
+        );
 
         deal(WETH, user, INITIAL_SUPPLY);
         deal(rETH, user, INITIAL_SUPPLY);
@@ -74,7 +89,7 @@ contract RocketPoolAdpTest is PoolTest {
         ShieldedTransaction memory stxWethDeposit = _loadShieldedTransaction(
             "deposit_2_testnet_weth"
         );
-        pool.transact(stxWethDeposit, false);
+        pool.transact(stxWethDeposit);
         vm.stopPrank();
 
         _processCommitmentTreeQueue();
@@ -88,10 +103,11 @@ contract RocketPoolAdpTest is PoolTest {
         vm.prank(user);
         IERC20(WETH).safeTransfer(fixtureAdaptorAddr, STAKE_AMT);
 
-        uint24[] memory inAssetIds = new uint24[](1);
-        uint256[] memory inValues = new uint256[](1);
-        inAssetIds[0] = pool.getAsset(WETH).id;
-        inValues[0] = STAKE_AMT;
+        AssetAmount[] memory inAssets = new AssetAmount[](1);
+        inAssets[0] = AssetAmount({
+            assetId: pool.getAsset(WETH).id,
+            value: STAKE_AMT
+        });
         bytes memory payload = abi.encode(
             Action.STAKE,
             SWAP_PORTIONS,
@@ -101,23 +117,24 @@ contract RocketPoolAdpTest is PoolTest {
 
         console.log("Initiating staking on RocketPool");
 
-        (, uint256[] memory outValues) = IAdaptor(fixtureAdaptorAddr)
-            .handleAssets(inAssetIds, inValues, payload); // staking directly through RocketPoolAdp
+        AssetAmount[] memory outAssets = IAdaptor(fixtureAdaptorAddr)
+            .handleAssets(inAssets, payload); // staking directly through RocketPoolAdp
 
         uint256 rEthBal = IERC20(rETH).balanceOf(fixtureAdaptorAddr);
         console.log("rETH bal:", rEthBal);
         assert(rEthBal > 0);
-        assertEq(outValues[0], rEthBal);
+        assertEq(outAssets[0].value, rEthBal);
     }
 
     function testUnStakingDirectlyOnRocketPool() external {
         vm.prank(user);
         IERC20(rETH).safeTransfer(fixtureAdaptorAddr, STAKE_AMT);
 
-        uint24[] memory inAssetIds = new uint24[](1);
-        uint256[] memory inValues = new uint256[](1);
-        inAssetIds[0] = pool.getAsset(rETH).id;
-        inValues[0] = STAKE_AMT;
+        AssetAmount[] memory inAssets = new AssetAmount[](1);
+        inAssets[0] = AssetAmount({
+            assetId: pool.getAsset(rETH).id,
+            value: STAKE_AMT
+        });
         bytes memory payload = abi.encode(
             Action.UNSTAKE,
             SWAP_PORTIONS,
@@ -126,13 +143,13 @@ contract RocketPoolAdpTest is PoolTest {
         );
 
         console.log("Initiating unstaking on RocketPool");
-        (, uint256[] memory outValues) = IAdaptor(fixtureAdaptorAddr)
-            .handleAssets(inAssetIds, inValues, payload); // unstaking directly through RocketPoolAdp
+        AssetAmount[] memory outAssets = IAdaptor(fixtureAdaptorAddr)
+            .handleAssets(inAssets, payload); // unstaking directly through RocketPoolAdp
 
         uint256 wEthBal = IERC20(WETH).balanceOf(fixtureAdaptorAddr);
         console.log("wETH bal:", wEthBal);
         assert(wEthBal > 0);
-        assertEq(outValues[0], wEthBal);
+        assertEq(outAssets[0].value, wEthBal);
     }
 
     /// @dev Make sure the `RocketPoolAdaptor::receive()` is commented out for this test to work.
@@ -145,7 +162,7 @@ contract RocketPoolAdpTest is PoolTest {
         ShieldedTransaction memory stxStake = _loadShieldedTransaction(
             "stake_1_testnet_weth_rocketpool"
         );
-        pool.transact(stxStake, false);
+        pool.transact(stxStake);
 
         // Asserts
         uint256 poolrETHBalPostStake = IERC20(rETH).balanceOf(address(pool));
@@ -156,7 +173,7 @@ contract RocketPoolAdpTest is PoolTest {
 
     /// @dev Only allowing RocketPool tests to run on Holesky testnet and ETH mainnet. More chains can be added.
     function shouldTestRun() internal view returns (bool) {
-        if ( /* block.chainid != 17000 && */ block.chainid != 1) {
+        if (/* block.chainid != 17000 && */ block.chainid != 1) {
             console.log(
                 "Skipping RocketPool adaptor tests on the current chain as RocketPool protocol may not be deployed. To run RocketPool tests, kindly run the tests on the Tenderly Mainnet/Mainnet fork where RocketPool is deployed."
             );

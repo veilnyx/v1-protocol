@@ -1,10 +1,11 @@
-// SPDX-License-Identifier: GPL-3.0
-pragma solidity ^0.8.18;
+// SPDX-License-Identifier: LicenseRef-BUSL
+pragma solidity 0.8.24;
 
 import {IAccount} from "@account-abstraction/contracts/interfaces/IAccount.sol";
 import {PackedUserOperation} from "@account-abstraction/contracts/interfaces/PackedUserOperation.sol";
-import {ShieldedTransaction} from "../libraries/ShieldedTransaction.sol";
-import {PreVerificationDetails} from "../core/Mempool.sol";
+import {ShieldedTransaction} from "../libraries/ShieldedTransactionLogic.sol";
+import {IWToken} from "./IWToken.sol";
+import {IEntryPoint} from "@account-abstraction/contracts/interfaces/IEntryPoint.sol";
 
 interface IGateway is IAccount {
     function validateUserOp(
@@ -13,10 +14,7 @@ interface IGateway is IAccount {
         uint256
     ) external view returns (uint256);
 
-    function handleUserOp(
-        ShieldedTransaction calldata stx,
-        PreVerificationDetails calldata preVerificationDetails
-    ) external;
+    function handleUserOp(ShieldedTransaction calldata stx) external;
 
     function handleWrapAndDeposit(
         ShieldedTransaction calldata stx
@@ -27,7 +25,7 @@ interface IGateway is IAccount {
         uint256 amount
     ) external;
 
-    function wToken() external view returns (address);
+    function wToken() external view returns (IWToken);
 
-    function entryPoint() external view returns (address);
+    function entryPoint() external view returns (IEntryPoint);
 }

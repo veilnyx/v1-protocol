@@ -1,12 +1,11 @@
-// SPDX-License-Identifier: GPL-3.0
-pragma solidity ^0.8.24;
+// SPDX-License-Identifier: LicenseRef-BUSL
+pragma solidity 0.8.24;
 
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
 import {IPool} from "../interfaces/IPool.sol";
-import {Asset, AssetType} from "../libraries/Asset.sol";
 
 enum AssetType {
     NULL,
@@ -21,13 +20,25 @@ struct Asset {
     address assetAddress;
     bool isActive;
     uint8 precision;
+    /// @dev Chainlink-compatible USD price feed for TVL calculation. address(0) = not set.
+    AggregatorV3Interface usdPriceFeed;
+    /// @dev Cached result of usdPriceFeed.decimals(), set when the feed is assigned.
+    ///      Avoids a cold external call on every TVL/deposit-value query. 0 when feed is unset.
+    uint8 feedDecimals;
+}
+
+/// @dev Parameters for a single asset to be registered via addAssets.
+struct AssetInitParams {
+    address assetAddress;
+    uint8 precision;
+    AggregatorV3Interface usdPriceFeed;
 }
 
 library AssetLogic {
     using SafeERC20 for IERC20;
 
     error ZeroAddress();
-    error PrecisionMismatch();
+    error UnsupportedAssetType(uint24 assetId);
 
     function getAssetOrRevert(
         mapping(uint24 => Asset) storage assets,
@@ -44,67 +55,75 @@ library AssetLogic {
     function addAsset(
         mapping(address => uint24) storage assetIds,
         mapping(uint24 => Asset) storage assets,
-        uint16 counter,
+        uint16 assetCount,
         AssetType assetType,
-        address assetAddress,
-        uint8 assetPrecision
+        IERC20 assetAddress,
+        uint8 precision,
+        AggregatorV3Interface usdPriceFeed
     ) public returns (uint16) {
-        if (_isAssetAdded(assetIds, assetAddress)) {
-            revert IPool.DuplicateAsset(assetAddress);
+        if (_isAssetAdded(assetIds, address(assetAddress))) {
+            revert IPool.DuplicateAsset(address(assetAddress));
         }
 
-        if (assetAddress == address(0)) {
+        if (address(assetAddress) == address(0)) {
             revert ZeroAddress();
         }
 
-        if (IERC20Metadata(assetAddress).decimals() != assetPrecision) {
-            revert PrecisionMismatch();
-        }
+        assetCount += 1;
 
-        // Uid of added asset
-        uint16 uid = counter + 1;
+        // Asset ID: 1 byte type | 2 bytes asset counter
+        uint24 newAssetId = (uint24(uint8(assetType)) << 16) |
+            uint24(assetCount);
 
-        // Concat asset type and uid to get asset id
-        uint24 newAssetId = uint24(
-            bytes3(bytes.concat(bytes1(uint8(assetType)), bytes2(uid)))
-        );
-
-        assetIds[assetAddress] = newAssetId;
+        assetIds[address(assetAddress)] = newAssetId;
         assets[newAssetId] = Asset({
             id: newAssetId,
             assetType: assetType,
-            assetAddress: assetAddress,
+            assetAddress: address(assetAddress),
             isActive: true,
-            precision: assetPrecision
+            precision: precision,
+            usdPriceFeed: usdPriceFeed,
+            feedDecimals: address(usdPriceFeed) != address(0)
+                ? usdPriceFeed.decimals()
+                : 0
         });
 
-        emit IPool.AssetAdded(assetAddress, newAssetId);
-        return uid;
+        emit IPool.AssetAdded(address(assetAddress), newAssetId);
+        return assetCount;
     }
 
     function addAssets(
         mapping(address => uint24) storage assetIds,
         mapping(uint24 => Asset) storage assets,
-        uint16 counter,
+        uint16 assetCount,
         AssetType assetType,
-        address[] calldata assetAddresses,
-        uint8[] calldata assetsPrecision
+        AssetInitParams[] calldata initParams
     ) external returns (uint16) {
-        for (uint256 i = 0; i < assetAddresses.length; ) {
-            counter = addAsset(
+        for (uint256 i = 0; i < initParams.length; ) {
+            assetCount = addAsset(
                 assetIds,
                 assets,
-                counter,
+                assetCount,
                 assetType,
-                assetAddresses[i],
-                assetsPrecision[i]
+                IERC20(initParams[i].assetAddress),
+                initParams[i].precision,
+                initParams[i].usdPriceFeed
             );
-
             unchecked {
                 ++i;
             }
         }
-        return counter;
+        return assetCount;
+    }
+
+    function setAssetPriceFeed(
+        mapping(uint24 => Asset) storage assets,
+        uint24 assetId,
+        AggregatorV3Interface feed
+    ) external {
+        Asset storage asset = assets[assetId];
+        asset.usdPriceFeed = feed;
+        asset.feedDecimals = address(feed) != address(0) ? feed.decimals() : 0;
     }
 
     function updateAsset(
@@ -112,8 +131,10 @@ library AssetLogic {
         uint24 assetId,
         bool isActive
     ) external {
-        Asset storage asset = assets[assetId];
-        asset.isActive = isActive;
+        if (assets[assetId].assetAddress == address(0)) {
+            revert IPool.InactiveAsset(assetId);
+        }
+        assets[assetId].isActive = isActive;
     }
 
     function receiveAsset(
@@ -127,7 +148,7 @@ library AssetLogic {
         if (asset.assetType == AssetType.ERC20) {
             _receiveERC20(asset, from, address(this), value);
         } else {
-            revert IPool.InactiveAsset(assetId);
+            revert UnsupportedAssetType(assetId);
         }
     }
 
@@ -142,7 +163,7 @@ library AssetLogic {
         if (asset.assetType == AssetType.ERC20) {
             _transferERC20(asset, to, value);
         } else {
-            revert IPool.InactiveAsset(assetId);
+            revert UnsupportedAssetType(assetId);
         }
     }
 

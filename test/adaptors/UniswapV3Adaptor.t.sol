@@ -7,11 +7,13 @@ import {BaseScript} from "script/BaseScript.sol";
 import {PoolTest} from "test/fixtures/PoolTest.sol";
 import {Pool} from "src/core/Pool.sol";
 import {IPool} from "src/interfaces/IPool.sol";
-import {ShieldedTransaction} from "src/libraries/ShieldedTransaction.sol";
+import {IAdaptorHandler} from "src/interfaces/IAdaptorHandler.sol";
+import {ShieldedTransaction} from "src/libraries/ShieldedTransactionLogic.sol";
 import {UniswapV3Adapter} from "src/adaptors/uniswap-v3/UniswapV3Adapter.sol";
+import {ISwapRouter02} from "src/adaptors/uniswap-v3/ISwapRouter02.sol";
 import {IWToken} from "src/interfaces/IWToken.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {Asset, AssetType} from "src/libraries/Asset.sol";
+import {Asset, AssetType} from "src/libraries/AssetLogic.sol";
 import {console} from "forge-std/console.sol";
 
 contract UniswapV3AdaptorTest is PoolTest {
@@ -41,8 +43,8 @@ contract UniswapV3AdaptorTest is PoolTest {
 
         // deploying Uniswap adaptor
         uniswapV3Adapter = new UniswapV3Adapter(
-            uniswapSwapRouter02,
-            address(pool)
+            ISwapRouter02(uniswapSwapRouter02),
+            pool
         );
 
         /// @dev update convert req fixture with this adaptor addr as `to`
@@ -55,7 +57,7 @@ contract UniswapV3AdaptorTest is PoolTest {
 
         address poolOwner = pool.owner();
         vm.prank(poolOwner);
-        pool.addAdaptorSupport(fixtureAdaptorAddr, true);
+        pool.addAdaptorSupport(IAdaptorHandler(fixtureAdaptorAddr), true);
 
         vm.deal(user, INITIAL_SUPPLY * 2);
         vm.startPrank(user);
@@ -64,7 +66,7 @@ contract UniswapV3AdaptorTest is PoolTest {
         ShieldedTransaction memory stxWethDeposit = _loadShieldedTransaction(
             "deposit_2_testnet_weth"
         );
-        pool.transact(stxWethDeposit, false);
+        pool.transact(stxWethDeposit);
         vm.stopPrank();
 
         _processCommitmentTreeQueue();
@@ -83,7 +85,7 @@ contract UniswapV3AdaptorTest is PoolTest {
         ShieldedTransaction memory stxSwap = _loadShieldedTransaction(
             "swap_1_testnet_weth_to_usdc"
         );
-        pool.transact(stxSwap, false);
+        pool.transact(stxSwap);
 
         // Asserts
         uint256 poolUSDCBalPostConvert = IERC20(USDC).balanceOf(address(pool));
@@ -101,7 +103,7 @@ contract UniswapV3AdaptorTest is PoolTest {
         ShieldedTransaction memory stxDeposit = _loadShieldedTransaction(
             "swap_1_testnet_weth_to_usdc_via_bundler"
         );
-        pool.transact(stxDeposit, false);
+        pool.transact(stxDeposit);
 
         // Asserts
         uint256 poolUSDCBalPostConvert = IERC20(USDC).balanceOf(address(pool));

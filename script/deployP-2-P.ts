@@ -45,8 +45,6 @@ const main = async () => {
         maxFeePerGas: BigInt(200_000_000_000), // 200 gwei
     }
 
-    const eip712 = await hre.viem.deployContract("EIP712", [], deployConfig);
-    console.log("EIP712 deployed:", eip712.address);
     const asset = await hre.viem.deployContract("AssetLogic", [], deployConfig);
     console.log("AssetLogic deployed:", asset.address);
     const merkleTree = await hre.viem.deployContract("MerkleTreeLogic", [], deployConfig);
@@ -89,7 +87,6 @@ const main = async () => {
     {
         const poolImpl = await hre.viem.deployContract("Pool", [], {
             libraries: {
-                EIP712: eip712.address,
                 AssetLogic: asset.address,
                 MerkleTreeLogic: merkleTree.address,
                 QueuedMerkleTreeLogic: queuedMerkleTree.address,
@@ -103,24 +100,29 @@ const main = async () => {
         const { hasher } = await deployHasher(wallet, client, deployConfig);
         console.log("Hasher deployed:", hasher);
 
-        const verifier = await deployVerifier(deployConfig);
+        const verifier = await deployVerifier(deployConfig, wallet.account.address);
 
         const initAddressParams = {
-            mempool: zeroAddress,
             verifier: verifier,
             adaptorHandler: zeroAddress,
             screener: chainParams.sanctionsList,
-            hasher: hasher,
-            verificationTrackerService: verificationTrackerService,
-            nebraVerifier: chainParams.nebraVerifier,
+            hasher: hasher
         }
 
+        const ONE_DAY = 86400n;
+        const configParams = {
+            withdrawFeeBps: BigInt(commonParams.withdrawFeeBps),
+            tvlLimitUsd: BigInt(5_000e6),    // $5,000 (6-decimal precision)
+            minDepositUsd: BigInt(2e6),      // $2 (6-decimal precision)
+            maxDepositUsd: BigInt(200e6),    // $200 (6-decimal precision)
+            priceFeedStalenessThreshold: ONE_DAY * 5n, // 5 days in seconds
+            wToken: chainParams.wToken,      // wrapped native token (e.g. WETH) for native ETH deposits
+        };
+
         const args = [
-            commonParams.addressTreeDepth,
-            commonParams.commitmentTreeDepth,
             commonParams.commitmentTreeQueueSize,
             initAddressParams,
-            BigInt(commonParams.withdrawFeeBps),
+            configParams,
         ];
 
         const initData = encodeFunctionData({
@@ -147,6 +149,27 @@ const main = async () => {
         console.log("Pool: version set to", commonParams.protocolVersion);
     }
 
+    // pause the protocol immediately after deployment to prevent any interactions before the setup is complete
+    // @ts-ignore
+    const pauseHash = await wallets[0].writeContract({
+        address: poolProxy.address,
+        abi: poolAbi,
+        functionName: "pause",
+    });
+    await client.waitForTransactionReceipt({ hash: pauseHash });
+    console.log("Pool: paused");
+
+    // transfer ownership to a multisig or a Gnosis Safe after deployment. For testing purposes, we can keep the ownership to the deployer wallet
+    // @ts-ignore
+    const transferOwnershipHash = await wallets[0].writeContract({
+        address: poolProxy.address,
+        abi: poolAbi,
+        functionName: "transferOwnership",
+        args: [zeroAddress], // set to zeroAddress to keep ownership to deployer wallet for testing. Update with multisig or Gnosis Safe address for production deployment.
+    });
+    await client.waitForTransactionReceipt({ hash: transferOwnershipHash });
+    console.log("Pool: ownership transferred");
+
     // Asset support and Revoker registrations
     try {
         //@ts-ignore
@@ -154,7 +177,7 @@ const main = async () => {
             address: poolProxy.address,
             abi: poolAbi,
             functionName: "addAssets",
-            args: [chainParams.initAssetType, chainParams.initAssetAddresses],
+            args: [chainParams.initAssetType, chainParams.initAssetAddresses, chainParams.initAssetsPrecision],
         });
 
         const rct = await client.waitForTransactionReceipt({ hash });
@@ -187,7 +210,7 @@ const main = async () => {
 
     // ERC4337 infra
     /* const erc4337Contracts = */
-    await deployErc4337Infra(chainParams, poolProxy.address, zeroAddress, deployConfig);
+    await deployErc4337Infra(chainParams, poolProxy.address, deployConfig);
 };
 
 main().catch(console.error);

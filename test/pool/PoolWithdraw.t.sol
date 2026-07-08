@@ -3,7 +3,7 @@ pragma solidity ^0.8.24;
 
 import {IPool} from "src/interfaces/IPool.sol";
 import {Pool} from "src/core/Pool.sol";
-import {ShieldedTransaction} from "src/libraries/ShieldedTransaction.sol";
+import {ShieldedTransaction} from "src/libraries/ShieldedTransactionLogic.sol";
 import {PoolTest} from "test/fixtures/PoolTest.sol";
 import {MockERC20} from "test/mocks/MockERC20.sol";
 
@@ -34,7 +34,6 @@ contract PoolWithdrawTest is PoolTest {
 
     function test_withdrawWethWithWethFee() public {
         uint256 balance1 = token1.balanceOf(address(pool));
-        uint256 balance2 = token2.balanceOf(address(pool));
 
         ShieldedTransaction memory stx = _loadShieldedTransaction(
             "withdraw_10_weth_with_weth_fee"

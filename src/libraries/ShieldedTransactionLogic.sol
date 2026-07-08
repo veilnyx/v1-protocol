@@ -1,15 +1,18 @@
-// SPDX-License-Identifier: GPL-3.0
-pragma solidity ^0.8.24;
+// SPDX-License-Identifier: LicenseRef-BUSL
+pragma solidity 0.8.24;
 
+import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 import {FIELD_SIZE} from "../base/Constants.sol";
-import {Asset, AssetLogic} from "./Asset.sol";
-import {MerkleTree, MerkleTreeLogic} from "./MerkleTree.sol";
-import {QueuedMerkleTree, QueuedMerkleTreeLogic} from "./QueuedMerkleTree.sol";
+import {ArrayUtils} from "./ArrayUtils.sol";
+import {Asset, AssetLogic} from "./AssetLogic.sol";
+import {MerkleTree, MerkleTreeLogic} from "./MerkleTreeLogic.sol";
+import {QueuedMerkleTree, QueuedMerkleTreeLogic} from "./QueuedMerkleTreeLogic.sol";
 import {IPool} from "../interfaces/IPool.sol";
 import {IVerifier} from "../interfaces/IVerifier.sol";
 import {IHasher} from "../interfaces/IHasher.sol";
 import {IAdaptorHandler} from "../interfaces/IAdaptorHandler.sol";
 import {INebraUpa} from "../interfaces/INebraUpa.sol";
+import {IWToken} from "../interfaces/IWToken.sol";
 
 /// @title ShieldedTransactionType enum representing types of shielded transactions
 enum ShieldedTransactionType {
@@ -46,6 +49,7 @@ struct RevokerData {
 /// @param commitmentTreeRoot   Recent merkle root of commitment tree
 /// @param feeData              Packed fee data (20-byte paymaster address + 12-byte fee value)
 /// @param refundAddress        Blinded address to publicly refund assets to such as in adaptor transactions
+/// @param betaUHF              Beta UHF value generated off-chain from PoseidonEncrytion(encryptedInputs) and used in UHF (gamma) = ∑i (a+β)^i⋅Di modp.
 /// @param pubAssets            Encoded (assetId + value) for publicly spent assets. If applicable, fee asset is
 ///                             the first element in this array
 /// @param nullifiers           Revealed nullifiers of input/spent notes
@@ -63,6 +67,7 @@ struct ShieldedTransaction {
     uint256 commitmentTreeRoot;
     uint256 feeData;
     uint256 refundAddress;
+    uint256 betaUHF;
     uint248[] pubAssets;
     uint256[] nullifiers;
     uint256[] commitments;
@@ -150,12 +155,11 @@ library ShieldedTransactionLogic {
     /// @custom:invariant STX-1: pubAssets length cannot exceed commitments length
     function validate(
         ShieldedTransaction calldata stx,
-        bool isPreVerified,
         MerkleTree storage addressTree,
         QueuedMerkleTree storage commitmentTree,
-        address verifier,
+        IVerifier verifier,
         mapping(uint256 => uint32) storage markedNullifiers,
-        mapping(address => bool) storage supportedAdaptors,
+        mapping(IAdaptorHandler => bool) storage supportedAdaptors,
         mapping(uint256 => RevokerData) storage revokerDataMap
     ) external {
         RevokerData memory revokerData = revokerDataMap[stx.revokerId];
@@ -174,7 +178,9 @@ library ShieldedTransactionLogic {
 
         if (
             stx.txType == ShieldedTransactionType.CALL_ADAPTOR &&
-            !supportedAdaptors[address(bytes20(stx.targetData))]
+            !supportedAdaptors[
+                IAdaptorHandler(address(bytes20(stx.targetData)))
+            ]
         ) {
             revert IPool.UnsupportedAdaptor();
         }
@@ -185,10 +191,8 @@ library ShieldedTransactionLogic {
             revert IPool.PubAssetsCannotExceedCommitments();
         }
 
-        if (!isPreVerified) {
-            if (!verifyProof(stx, revokerData, verifier)) {
-                revert IPool.InvalidTransactionProof();
-            }
+        if (!verifyProof(stx, revokerData, verifier)) {
+            revert IPool.InvalidTransactionProof();
         }
     }
 
@@ -198,52 +202,64 @@ library ShieldedTransactionLogic {
     /// @param assets Mapping of assetId to Asset
     /// @param adaptorHandler Address of the adaptor handler contract responsible for handling DeFi adaptor ops
     /// @param paymasterFees Mapping of paymaster address to assetId to fee value
+    /// @param wToken_ Wrapped native token (e.g. WETH). On DEPOSIT with
+    ///        `msg.value > 0` the wToken was pre-funded by the caller via
+    ///        wrapping, so `transferFrom` is skipped for that asset id. On
+    ///        WITHDRAW, the wToken is unwrapped to native ETH before forwarding
+    ///        to the recipient. Pass address(0) to disable both behaviours.
+    /// @param wTokenAssetId Asset id of `wToken_`. Pass 0 to disable.
     function execute(
         ShieldedTransaction calldata stx,
-        bool isPreVerified,
         QueuedMerkleTree storage commitmentTree,
         mapping(uint24 => Asset) storage assets,
         mapping(address => mapping(uint24 => uint256)) storage paymasterFees,
-        mapping(uint24 => uint256) storage proofSubAndExitMempoolFees,
         mapping(uint24 => uint256) storage withdrawFees,
-        address hasher,
-        address adaptorHandler,
-        uint256 withdrawFeeBps
+        IHasher hasher,
+        IAdaptorHandler adaptorHandler,
+        uint256 withdrawFeeBps,
+        IWToken wToken_,
+        uint24 wTokenAssetId
     ) external {
         Params memory params = _copyParamsToMemory(stx);
         MemoParams memory memoParams = _copyMemoParamsToMemory(stx);
 
         // Credit paymaster fees
-        _creditPaymasterFee(
-            paymasterFees,
-            proofSubAndExitMempoolFees,
-            params,
-            isPreVerified
-        );
+        _creditPaymasterFee(paymasterFees, params);
 
-        // Receive any deposits
+        // Receive any deposits; skip transferFrom for the wToken asset when
+        // msg.value > 0 because the caller already pre-funded it via wrapping.
         if (stx.txType == ShieldedTransactionType.DEPOSIT) {
-            _receivePubAssets(assets, params.pubAssets, msg.sender);
+            uint24 prefundedAssetId = msg.value > 0 ? wTokenAssetId : 0;
+            _receivePubAssets(
+                assets,
+                params.pubAssets,
+                msg.sender,
+                prefundedAssetId
+            );
         }
 
-        // Transfer any withdrawals
+        // Transfer any withdrawals — unwrap wToken to native ETH when applicable
         if (stx.txType == ShieldedTransactionType.WITHDRAW) {
             _transferPubAssets(
                 assets,
                 withdrawFees,
                 params.pubAssets,
                 params.target,
-                withdrawFeeBps
+                withdrawFeeBps,
+                wToken_,
+                wTokenAssetId
             );
         }
 
-        // Perform any conversions
+        // Perform any conversions — adaptors receive ERC20 tokens, no unwrapping
         if (stx.txType == ShieldedTransactionType.CALL_ADAPTOR) {
             _transferPubAssets(
                 assets,
                 withdrawFees,
                 params.pubAssets,
-                adaptorHandler,
+                address(adaptorHandler),
+                0,
+                IWToken(address(0)),
                 0
             );
             _handleAdaptorCall(
@@ -261,14 +277,14 @@ library ShieldedTransactionLogic {
     function verifyProof(
         ShieldedTransaction calldata stx,
         RevokerData memory revokerData,
-        address verifier
+        IVerifier verifier
     ) public view returns (bool) {
-        uint16 vId = IVerifier(verifier).getTransactionVerifierId(
+        uint16 vId = verifier.getTransactionVerifierId(
             stx.nullifiers.length,
             stx.commitments.length
         );
         bytes memory vInp = toVerifierInput(stx, revokerData);
-        return IVerifier(verifier).verifyTransactionProof(vId, vInp);
+        return verifier.verifyTransactionProof(vId, vInp);
     }
 
     /**
@@ -282,43 +298,52 @@ library ShieldedTransactionLogic {
         ShieldedTransaction calldata self,
         RevokerData memory revokerData
     ) public pure returns (bytes memory) {
-        bytes memory pubDataChunk1;
+        bytes memory pubDataChunk1 = abi.encodePacked(
+            self.addressTreeRoot,
+            self.commitmentTreeRoot,
+            hash(self),
+            self.txType == ShieldedTransactionType.DEPOSIT
+                ? uint256(0)
+                : uint256(1)
+        );
+
+        bytes memory pubDataChunk2 = abi.encodePacked(
+            revokerData.revokerPublicKey[0],
+            revokerData.revokerPublicKey[1],
+            self.refundAddress,
+            revokerData.encryptionPublicKey[0],
+            revokerData.encryptionPublicKey[1]
+        );
+
+        // Performing sequential hashing (sha256) of encrypted data derived from notesMemo
+        (uint256 alpha, uint256 gamma) = _computeAlphaGammaForUHF(self);
+
+        return
+            abi.encodePacked(
+                self.proof,
+                pubDataChunk1,
+                pubDataChunk2,
+                alpha,
+                self.betaUHF,
+                gamma
+            );
+    }
+
+    /// @dev Builds pubAsset/pubValue arrays padded to nOuts, then computes UHF (alpha, gamma).
+    ///      Extracted to avoid stack-too-deep in toVerifierInput.
+    function _computeAlphaGammaForUHF(
+        ShieldedTransaction calldata self
+    ) internal pure returns (uint256 alpha, uint256 gamma) {
         uint256 nOuts = self.commitments.length;
         uint256 nPubs = self.pubAssets.length;
         uint256[] memory pubAssetIds = new uint256[](nOuts);
         uint256[] memory pubValues = new uint256[](nOuts);
-        {
-            for (uint256 i; i < nPubs; ++i) {
-                pubAssetIds[i] = uint24(bytes3(bytes31(self.pubAssets[i])));
-                pubValues[i] = uint224(self.pubAssets[i]);
-            }
 
-            // padding to make pubAsset and pubValue arrays match the length of nOuts (commitments), since the circuit expects pubAssets and pubValues of length nOuts
-            for (uint i = nPubs; i < nOuts; ++i) {
-                pubAssetIds[i] = 0;
-                pubValues[i] = 0;
-            }
-
-            pubDataChunk1 = abi.encodePacked(
-                self.addressTreeRoot,
-                self.commitmentTreeRoot,
-                hash(self),
-                self.txType == ShieldedTransactionType.DEPOSIT
-                    ? uint256(0)
-                    : uint256(1)
-            );
+        for (uint256 i; i < nPubs; ++i) {
+            pubAssetIds[i] = uint24(bytes3(bytes31(self.pubAssets[i])));
+            pubValues[i] = uint224(self.pubAssets[i]);
         }
-
-        bytes memory pubDataChunk2;
-        {
-            pubDataChunk2 = abi.encodePacked(
-                revokerData.revokerPublicKey[0],
-                revokerData.revokerPublicKey[1],
-                self.refundAddress,
-                revokerData.encryptionPublicKey[0],
-                revokerData.encryptionPublicKey[1]
-            );
-        }
+        // remaining entries are already zero-initialised
 
         UHFArrays memory uhfArrays = UHFArrays({
             pubAssetIds: pubAssetIds,
@@ -333,77 +358,10 @@ library ShieldedTransactionLogic {
             uhfArrays.encryptedDataEncryptionKeySeed,
             uhfArrays.refundInputs,
             uhfArrays.notes
-        ) = _decomposeNotesMemo(self.notesMemo, self.commitments.length);
+        ) = _decomposeNotesMemo(self.notesMemo, nOuts);
 
-        // Performing sequential hashing (sha256) of encrypted data derived from notesMemo
-        (uint256 alpha, uint256 beta) = _UHF(uhfArrays);
-
-        bytes memory verifierParams = abi.encodePacked(
-            self.proof,
-            pubDataChunk1,
-            pubDataChunk2,
-            alpha,
-            beta
-        );
-
-        return verifierParams;
+        return _UHF(self.betaUHF, uhfArrays);
     }
-
-    /**
-        function genEncryptDataHashUsingPoseidon(
-            bytes calldata notesMemo,
-            uint256 nOuts,
-            address hasher
-        ) public view returns (uint256) {
-            uint256 encryptedDataHash;
-
-            // Call _decomposeNotesMemo() to get the uhfArrays
-            (
-                uint256[] memory encryptedDataEncryptionKeySeed,
-                uint256[] memory refundInputs,
-                uint256[][] memory notes
-            ) = _decomposeNotesMemo(notesMemo, nOuts);
-            // Hash encryptedDataEncryptionKeySeed (first 3 values)
-            uint256 keySeedHash = IHasher(hasher).hash(
-                encryptedDataEncryptionKeySeed
-            ); // 3
-            console.log("Encrypted DEK seed hash:");
-            console.logUint(keySeedHash);
-
-            // 3. Hash encryptedRefundData (next 4 values)
-            uint256 refundHash = IHasher(hasher).hash(refundInputs); // 4
-            console.log("Encrypted refund data hash:");
-            console.logUint(refundHash);
-
-            // 4. Hash each encryptedNote (4 values each)
-            uint256[] memory noteHashes = new uint256[](nOuts);
-            for (uint256 i = 0; i < nOuts; i++) {
-                uint256[] memory noteInputs = new uint256[](4);
-                for (uint256 j = 0; j < 4; j++) {
-                    noteInputs[j] = notes[i][j];
-                }
-                noteHashes[i] = IHasher(hasher).hash(noteInputs); // 4
-            }
-
-            for (uint256 i = 0; i < nOuts; i++) {
-                console.log("Encrypted note hash:");
-                console.logUint(noteHashes[i]);
-            }
-
-            // 5. Final hash combining all hashes
-            uint256[] memory finalInputs = new uint256[](2 + nOuts);
-            finalInputs[0] = keySeedHash;
-            finalInputs[1] = refundHash;
-            for (uint256 i = 0; i < nOuts; i++) {
-                finalInputs[2 + i] = noteHashes[i];
-            }
-
-            encryptedDataHash = IHasher(hasher).hash(finalInputs); // 4
-            console.log("FINAL HASH (encryptedDataHash public signal):");
-            console.logUint(encryptedDataHash);
-            return encryptedDataHash;
-        }
-     */
 
     ///////////////////////////////////
     ///////// Internal Functions //////
@@ -421,44 +379,41 @@ library ShieldedTransactionLogic {
             uint256[][] memory notes
         )
     {
-        require(notesMemo.length % 32 == 0, "Invalid notesMemo length");
+        require(notesMemo.length & 31 == 0, "Invalid notesMemo length");
 
         // 1. Split notesMemo into values array each 32 bytes
-        uint256[] memory values = new uint256[](notesMemo.length / 32);
-        for (uint256 i = 0; i < notesMemo.length / 32; i++) {
+        uint256 numWords = notesMemo.length / 32;
+        uint256[] memory values = new uint256[](numWords);
+        for (uint256 i = 0; i < numWords; i++) {
             values[i] = uint256(bytes32(notesMemo[i * 32:(i + 1) * 32]));
         }
 
         // 2. Hash encryptedDataEncryptionKeySeed (first 3 values)
         encryptedDataEncryptionKeySeed = new uint256[](3);
-        for (uint256 i = 0; i < 3; i++) {
-            encryptedDataEncryptionKeySeed[i] = values[i];
-        }
+        encryptedDataEncryptionKeySeed[0] = values[0];
+        encryptedDataEncryptionKeySeed[1] = values[1];
+        encryptedDataEncryptionKeySeed[2] = values[2];
 
         // 3. Hash encryptedRefundData (next 4 values)
         refundInputs = new uint256[](4);
-        for (uint256 i = 0; i < 4; i++) {
-            refundInputs[i] = values[i + 3];
-        }
+        refundInputs[0] = values[3];
+        refundInputs[1] = values[4];
+        refundInputs[2] = values[5];
+        refundInputs[3] = values[6];
 
         // 4. Hash each encryptedNote (4 values each)
         notes = new uint256[][](nOuts);
         for (uint256 i = 0; i < nOuts; i++) {
             notes[i] = new uint256[](4);
-            for (uint256 j = 0; j < 4; j++) {
-                notes[i][j] = values[7 + (i * 4) + j];
-            }
-        }
-
-        for (uint256 i = 0; i < nOuts; i++) {
-            for (uint256 j = 0; j < 4; j++) {
-                notes[i][j] = values[7 + (i * 4) + j];
-            }
+            notes[i][0] = values[7 + (i * 4)];
+            notes[i][1] = values[7 + (i * 4) + 1];
+            notes[i][2] = values[7 + (i * 4) + 2];
+            notes[i][3] = values[7 + (i * 4) + 3];
         }
     }
 
     /// @dev Performs sequential hashing (sha256) to generate `alpha` for _UHF
-    function _genEncryptedDataHashUsingSha256(
+    function _genUHFAlphaUsingSha256(
         UHFArrays memory uhfArrays
     ) internal pure returns (uint256) {
         // Call _decomposeNotesMemo() to get the uhfArrays
@@ -500,97 +455,99 @@ library ShieldedTransactionLogic {
         return currentHash;
     }
 
-    // Hashes a chunk of data with a previous hash value
+    // Hashes a chunk of data with a previous hash value; does NOT reduce modulo FIELD_SIZE
     function _hashChunkUsingSha256(
         uint256 prev,
         uint256[] memory nums
     ) internal pure returns (uint256) {
-        // Convert to bytes
-        bytes memory data = abi.encodePacked(prev);
-        for (uint i = 0; i < nums.length; i++) {
-            data = abi.encodePacked(data, nums[i]);
-        }
-
-        bytes32 chunkHash = sha256(data);
-        uint256 hashWithinField = uint256(chunkHash) % FIELD_SIZE;
-        return hashWithinField;
+        bytes memory data = abi.encodePacked(prev, nums);
+        return uint256(sha256(data)) % FIELD_SIZE;
     }
 
     function _addToUHFAccumulator(
         uint256[] memory elements,
         uint256 alpha,
-        uint256 alphaPow,
+        uint256 beta,
+        uint256 coefficientPow,
         uint256 accumulator
     ) internal pure returns (uint256, uint256) {
         for (uint i = 0; i < elements.length; i++) {
-            uint256 product = mulmod(elements[i], alphaPow, FIELD_SIZE);
+            uint256 product = mulmod(elements[i], coefficientPow, FIELD_SIZE);
             accumulator = addmod(accumulator, product, FIELD_SIZE);
-            alphaPow = mulmod(alphaPow, alpha, FIELD_SIZE);
+            coefficientPow = mulmod(coefficientPow, (alpha + beta), FIELD_SIZE);
         }
-        return (accumulator, alphaPow);
+        return (accumulator, coefficientPow);
     }
 
     /// @dev Universal Hash Function (UHF) for reducing the encryted data public inputs (nIns + nOuts + 3 + 4 + nOuts * 4) to only 2 public inputs. This is done to reduce the number of public inputs to the circuit and be compatible with Nebra's requirement of a max of 16 PIs.
     /// @dev The UHF is defined as follows:
     // β (accumulator) = UHF(D, a) = ∑i a^i⋅Di modp where D = [D1, D2, ..., Dn] is the list of encrypted data private inputs and a is the alpha value and p is the prime field modulus.
     /// @dev The onchain implementation of UHF processes each array of inputs being hashed seperately (unlike the TS implementation), due to the stack size limit of 16 in Solidity.
-
+    /// @param betaUHF This is the beta value for UHF which is generated from PoseidonEncryption of encryptedInputs offchain. This is passed in as a parameter to save gas instead of recomputing it onchain.
     function _UHF(
+        uint256 betaUHF,
         UHFArrays memory uhfArrays
     ) internal pure returns (uint256, uint256) {
-        uint256 alpha = _genEncryptedDataHashUsingSha256(uhfArrays);
+        uint256 alpha = _genUHFAlphaUsingSha256(uhfArrays);
 
-        uint256 alphaPow = 1;
+        uint256 coefficientPow = 1;
         uint256 accumulator = 0;
 
-        (accumulator, alphaPow) = _addToUHFAccumulator(
+        (accumulator, coefficientPow) = _addToUHFAccumulator(
             uhfArrays.pubAssetIds,
             alpha,
-            alphaPow,
+            betaUHF,
+            coefficientPow,
             accumulator
         );
 
-        (accumulator, alphaPow) = _addToUHFAccumulator(
+        (accumulator, coefficientPow) = _addToUHFAccumulator(
             uhfArrays.pubValues,
             alpha,
-            alphaPow,
+            betaUHF,
+            coefficientPow,
             accumulator
         );
 
-        (accumulator, alphaPow) = _addToUHFAccumulator(
+        (accumulator, coefficientPow) = _addToUHFAccumulator(
             uhfArrays.nullifiers,
             alpha,
-            alphaPow,
+            betaUHF,
+            coefficientPow,
             accumulator
         );
 
-        (accumulator, alphaPow) = _addToUHFAccumulator(
+        (accumulator, coefficientPow) = _addToUHFAccumulator(
             uhfArrays.commitments,
             alpha,
-            alphaPow,
+            betaUHF,
+            coefficientPow,
             accumulator
         );
 
-        (accumulator, alphaPow) = _addToUHFAccumulator(
+        (accumulator, coefficientPow) = _addToUHFAccumulator(
             uhfArrays.encryptedDataEncryptionKeySeed,
             alpha,
-            alphaPow,
+            betaUHF,
+            coefficientPow,
             accumulator
         );
 
-        (accumulator, alphaPow) = _addToUHFAccumulator(
+        (accumulator, coefficientPow) = _addToUHFAccumulator(
             uhfArrays.refundInputs,
             alpha,
-            alphaPow,
+            betaUHF,
+            coefficientPow,
             accumulator
         );
 
         // Process individual notes
         for (uint i = 0; i < uhfArrays.commitments.length; i++) {
-            (accumulator, alphaPow) = _addToUHFAccumulator(
+            (accumulator, coefficientPow) = _addToUHFAccumulator(
                 uhfArrays.notes[i],
                 alpha,
-                alphaPow,
+                betaUHF,
+                coefficientPow,
                 accumulator
             );
         }
@@ -600,19 +557,38 @@ library ShieldedTransactionLogic {
 
     function _handleAdaptorCall(
         mapping(uint24 => Asset) storage assets,
-        address hasher,
-        address adaptorHandler,
+        IHasher hasher,
+        IAdaptorHandler adaptorHandler,
         Params memory params,
         MemoParams memory memoParams
     ) internal {
-        PubAsset[] memory outPubAssets = IAdaptorHandler(adaptorHandler)
-            .handleAdaptor(
-                params.target,
-                params.pubAssets,
-                params.targetPayload
-            );
+        // Filter out pubAssets with value of 0 as they don't need to be sent to the adaptor handler and can cause issues with certain adaptors that expect only non-zero value assets.
+        // Value of pubAssets used as feeAsset for bundler paymaster fee, can become zero after fee is deducted. Ref: _copyParamsToMemory().
+        uint8 nonZeroValueAssetCount;
+        for (uint256 i = 0; i < params.pubAssets.length; ++i) {
+            if (params.pubAssets[i].value != 0) {
+                nonZeroValueAssetCount++;
+            }
+        }
+        PubAsset[] memory pubAssetsWithValue = new PubAsset[](
+            nonZeroValueAssetCount
+        );
 
-        _receivePubAssets(assets, outPubAssets, adaptorHandler);
+        uint8 index = 0;
+        for (uint256 i = 0; i < params.pubAssets.length; ++i) {
+            if (params.pubAssets[i].value != 0) {
+                pubAssetsWithValue[index] = params.pubAssets[i];
+                index++;
+            }
+        }
+
+        PubAsset[] memory outPubAssets = adaptorHandler.handleAdaptor(
+            params.target,
+            pubAssetsWithValue,
+            params.targetPayload
+        );
+
+        _receivePubAssets(assets, outPubAssets, address(adaptorHandler), 0);
 
         /// @dev Creating commitments and output noteMemos for received tokens. This is done on the protocol side for CALL_ADAPTOR txns because the exact value of converted tokens can only be determined after executing the tx.
         /// @dev `refundAddress` is used as the recipient's blinded address.
@@ -621,7 +597,7 @@ library ShieldedTransactionLogic {
         uint256[] memory pubCms = new uint256[](outLen);
 
         for (uint256 i = 0; i < outLen; ++i) {
-            pubCms[i] = IHasher(hasher).hash(
+            pubCms[i] = hasher.hash(
                 [
                     outPubAssets[i].id,
                     params.refundAddress,
@@ -635,45 +611,44 @@ library ShieldedTransactionLogic {
             );
         }
 
-        memoParams.commitments = _concat(memoParams.commitments, pubCms);
+        memoParams.commitments = ArrayUtils.concat(
+            memoParams.commitments,
+            pubCms
+        );
     }
 
     function _creditPaymasterFee(
         mapping(address => mapping(uint24 => uint256)) storage paymasterFees,
-        mapping(uint24 => uint256) storage proofSubAndExitMempoolFees,
-        Params memory params,
-        bool isPreVerified
+        Params memory params
     ) internal {
         uint256 feeValue = params.feeValue;
 
         if (feeValue != 0) {
-            if (isPreVerified) {
-                // Allot 65% percentage of fee to the verification tracker service for exiting tx out of mempool to the Veilnyx pool and the balance (35%) to the paymaster for adding tx to the Mempool.
-                uint256 gasFeeAddMempool = (feeValue * 35) / 100;
-                uint256 gasFeeExitMempool = feeValue - gasFeeAddMempool;
-
-                paymasterFees[params.paymaster][
-                    params.feeAssetId
-                ] += gasFeeAddMempool;
-
-                proofSubAndExitMempoolFees[
-                    params.feeAssetId
-                ] += gasFeeExitMempool;
-            } else {
-                // All fee goes to the paymaster only
-                paymasterFees[params.paymaster][params.feeAssetId] += feeValue;
-            }
+            // All fee goes to the paymaster only
+            paymasterFees[params.paymaster][params.feeAssetId] += feeValue;
         }
     }
 
     function _receivePubAssets(
         mapping(uint24 => Asset) storage assets,
         PubAsset[] memory pubAssets,
-        address from
+        address from,
+        uint24 prefundedAssetId
     ) internal {
         uint256 count = pubAssets.length;
 
         for (uint256 i = 0; i < count; ) {
+            // Skip pulling tokens for an asset that has already been credited
+            // to the Pool out-of-band (e.g. via wrapping native ETH into
+            // wToken in `Pool.transact`). Each asset id appears at most once
+            // in pubAssets so a single match per id is sufficient.
+            if (prefundedAssetId != 0 && pubAssets[i].id == prefundedAssetId) {
+                unchecked {
+                    ++i;
+                }
+                continue;
+            }
+
             AssetLogic.receiveAsset({
                 assets: assets,
                 from: from,
@@ -692,7 +667,9 @@ library ShieldedTransactionLogic {
         mapping(uint24 => uint256) storage withdrawFees,
         PubAsset[] memory pubAssets,
         address to,
-        uint256 feeBps
+        uint256 feeBps,
+        IWToken wToken_,
+        uint24 wTokenAssetId
     ) internal {
         uint256 count = pubAssets.length;
 
@@ -706,12 +683,20 @@ library ShieldedTransactionLogic {
             }
 
             fee = feeBps == 0 ? 0 : (pubAssets[i].value * feeBps) / 10000;
-            AssetLogic.transferAsset({
-                assets: assets,
-                to: to,
-                assetId: pubAssets[i].id,
-                value: pubAssets[i].value - fee
-            });
+            uint256 transferAmount = pubAssets[i].value - fee;
+
+            if (wTokenAssetId != 0 && pubAssets[i].id == wTokenAssetId) {
+                // Unwrap wToken → native ETH and forward to recipient
+                wToken_.withdraw(transferAmount);
+                Address.sendValue(payable(to), transferAmount);
+            } else {
+                AssetLogic.transferAsset({
+                    assets: assets,
+                    to: to,
+                    assetId: pubAssets[i].id,
+                    value: transferAmount
+                });
+            }
 
             if (fee != 0) {
                 withdrawFees[pubAssets[i].id] += fee;
@@ -854,25 +839,5 @@ library ShieldedTransactionLogic {
         }
 
         return memoParams;
-    }
-
-    function _concat(
-        uint256[] memory a,
-        uint256[] memory b
-    ) internal pure returns (uint256[] memory) {
-        uint256[] memory result = new uint256[](a.length + b.length);
-        for (uint256 i = 0; i < a.length; ) {
-            result[i] = a[i];
-            unchecked {
-                ++i;
-            }
-        }
-        for (uint256 i = 0; i < b.length; ) {
-            result[a.length + i] = b[i];
-            unchecked {
-                ++i;
-            }
-        }
-        return result;
     }
 }

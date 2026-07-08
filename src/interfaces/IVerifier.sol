@@ -1,18 +1,20 @@
-// SPDX-License-Identifier: MIT
-pragma solidity ^0.8.24;
+// SPDX-License-Identifier: LicenseRef-BUSL
+pragma solidity 0.8.24;
 
-import {ShieldedTransaction, RevokerData} from "../libraries/ShieldedTransaction.sol";
+import {ShieldedTransaction, RevokerData} from "../libraries/ShieldedTransactionLogic.sol";
 
 interface IVerifier {
-    error BadArguments();
-    error VerifierIdOverflow();
+    error BadArguments(uint256 nIns, uint256 nOuts);
+    error VerifierIdOverflow(uint256 computedVerifierId);
 
     function verifyTransactionProof(
-        uint16 vId,
-        bytes memory vInp
+        uint16 verifierId,
+        bytes calldata vInputs
     ) external view returns (bool);
 
-    function verifyAddressProof(bytes memory vInp) external view returns (bool);
+    function verifyAddressProof(
+        bytes calldata vInputs
+    ) external view returns (bool);
 
     function verifyTreeUpdateProof(
         bytes calldata vInputs

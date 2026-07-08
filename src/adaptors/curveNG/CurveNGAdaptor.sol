@@ -1,18 +1,14 @@
-// SPDX-License-Identifier: GPL-2.0-or-later
+// SPDX-License-Identifier: LicenseRef-BUSL
 pragma solidity 0.8.24;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {AdaptorBase} from "../../base/AdaptorBase.sol";
-import {Asset, AssetType} from "../../libraries/Asset.sol";
+import {Asset, AssetType} from "../../libraries/AssetLogic.sol";
 import {IWToken} from "../../interfaces/IWToken.sol";
 import {ICurvePool} from "./ICurvePool.sol";
-
-enum WithdrawType {
-    BALANCED,
-    SINGLE,
-    IMBALANCED
-}
+import {AssetAmount} from "../../interfaces/IAdaptor.sol";
+import {IPool} from "../../interfaces/IPool.sol";
 
 struct Payload {
     address curvePool;
@@ -23,36 +19,55 @@ struct Payload {
     uint256 slippageBps;
 }
 
-struct PoolUnderlyingTokensInfo {
-    address[] coins;
-    uint256[] balances;
-    uint24[] assetIds;
-    uint8[] indexes;
-}
-
 contract CurveNGAdaptor is AdaptorBase {
     using SafeERC20 for IERC20;
 
-    error InvalidInput();
-    error AssetNotSupportedByPool(address asset, address curvePool);
+    enum WithdrawType {
+        BALANCED,
+        SINGLE,
+        IMBALANCED
+    }
+
+    struct PoolUnderlyingTokensInfo {
+        address[] coins;
+        uint256[] balances;
+        uint24[] assetIds;
+        uint8[] indexes;
+    }
+
+    error InvalidCoinCount(uint256 nCoins);
+    error InvalidCoinIndex(uint8 coinIndex);
+    error InvalidSlippageBps(uint256 slippageBps, uint256 maxBps);
+    error InvalidUnderlyingTokenAmountLength(uint256 actual, uint256 expected);
+    error AssetNotSupportedByPool(address asset, ICurvePool curvePool);
 
     uint8 constant ACTION_SUPPLY = 0;
     uint8 constant ACTION_WITHDRAW = 1;
     uint256 constant BPS_PRECISION = 100_00;
 
-    constructor(address pool_) AdaptorBase(pool_) {}
+    // Intentionally empty: no adaptor-specific constructor logic beyond base initialization.
+    // solhint-disable-next-line no-empty-blocks
+    constructor(IPool pool_) AdaptorBase(pool_) {}
 
     function handleAssets(
-        uint24[] calldata inAssetIds,
-        uint256[] calldata inValues,
+        AssetAmount[] calldata inAssets,
         bytes calldata payload
     )
         external
         payable
         virtual
         override
-        returns (uint24[] memory outAssetIds, uint256[] memory outValues)
+        returns (AssetAmount[] memory outAssets)
     {
+        uint24[] memory inAssetIds = new uint24[](inAssets.length);
+        uint256[] memory inValues = new uint256[](inAssets.length);
+        for (uint256 i; i < inAssets.length; i++) {
+            inAssetIds[i] = inAssets[i].assetId;
+            inValues[i] = inAssets[i].value;
+        }
+        uint24[] memory outAssetIds;
+        uint256[] memory outValues;
+
         Payload memory decodedPayload = abi.decode(payload, (Payload));
         uint256 NCoins;
         // trying to access the third coin (index 2 of the coins array) to determine if it's a 2-coin or 3-coin pool
@@ -65,7 +80,7 @@ contract CurveNGAdaptor is AdaptorBase {
         }
 
         if (NCoins == 0) {
-            revert InvalidInput();
+            revert InvalidCoinCount(NCoins);
         }
 
         if (decodedPayload.action == ACTION_SUPPLY) {
@@ -86,12 +101,16 @@ contract CurveNGAdaptor is AdaptorBase {
                 inValues,
                 decodedPayload.slippageBps
             );
+            outAssets = new AssetAmount[](outAssetIds.length);
+            for (uint256 i; i < outAssetIds.length; i++) {
+                outAssets[i] = AssetAmount(outAssetIds[i], outValues[i]);
+            }
         } else if (decodedPayload.action == ACTION_WITHDRAW) {
             _withdrawChecksAndApprove(
                 ICurvePool(decodedPayload.curvePool),
                 NCoins,
-                inAssetIds[0],
-                inValues[0],
+                inAssetIds,
+                inValues,
                 decodedPayload
             );
 
@@ -102,7 +121,7 @@ contract CurveNGAdaptor is AdaptorBase {
                         decodedPayload.singleCoinIndex
                     ) == address(0)
                 ) {
-                    revert InvalidInput();
+                    revert InvalidCoinIndex(decodedPayload.singleCoinIndex);
                 }
 
                 outValues = new uint256[](1);
@@ -120,34 +139,39 @@ contract CurveNGAdaptor is AdaptorBase {
                     )
                 ).id;
 
-                return (outAssetIds, outValues);
+                outAssets = new AssetAmount[](outAssetIds.length);
+                for (uint256 i; i < outAssetIds.length; i++) {
+                    outAssets[i] = AssetAmount(outAssetIds[i], outValues[i]);
+                }
+                return outAssets;
             }
 
             if (NCoins == 2) {
                 if (
                     decodedPayload.withdrawType == uint8(WithdrawType.BALANCED)
                 ) {
+                    uint256 halfValue = inValues[0] / 2;
                     uint256 minAmtTokenA = _calcWithdrawOneCoin(
                         ICurvePool(decodedPayload.curvePool),
-                        inValues[0] / 2,
+                        halfValue,
                         0
                     );
 
                     uint256 minAmtTokenB = _calcWithdrawOneCoin(
                         ICurvePool(decodedPayload.curvePool),
-                        inValues[0] / 2,
+                        halfValue,
                         1
                     );
 
                     // deducting acceptable slippage
                     minAmtTokenA =
                         minAmtTokenA -
-                        ((minAmtTokenA * decodedPayload.slippageBps) /
-                            BPS_PRECISION);
+                        (minAmtTokenA * decodedPayload.slippageBps) /
+                        BPS_PRECISION;
                     minAmtTokenB =
                         minAmtTokenB -
-                        ((minAmtTokenB * decodedPayload.slippageBps) /
-                            BPS_PRECISION);
+                        (minAmtTokenB * decodedPayload.slippageBps) /
+                        BPS_PRECISION;
 
                     outValues = new uint256[](2);
                     outAssetIds = new uint24[](2);
@@ -184,37 +208,38 @@ contract CurveNGAdaptor is AdaptorBase {
                 if (
                     decodedPayload.withdrawType == uint8(WithdrawType.BALANCED)
                 ) {
+                    uint256 thirdValue = inValues[0] / 3;
                     uint256 minAmtTokenA = _calcWithdrawOneCoin(
                         ICurvePool(decodedPayload.curvePool),
-                        inValues[0] / 3,
+                        thirdValue,
                         0
                     );
 
                     uint256 minAmtTokenB = _calcWithdrawOneCoin(
                         ICurvePool(decodedPayload.curvePool),
-                        inValues[0] / 3,
+                        thirdValue,
                         1
                     );
 
                     uint256 minAmtTokenC = _calcWithdrawOneCoin(
                         ICurvePool(decodedPayload.curvePool),
-                        inValues[0] / 3,
+                        thirdValue,
                         2
                     );
 
                     // deducting acceptable slippage
                     minAmtTokenA =
                         minAmtTokenA -
-                        ((minAmtTokenA * decodedPayload.slippageBps) /
-                            BPS_PRECISION);
+                        (minAmtTokenA * decodedPayload.slippageBps) /
+                        BPS_PRECISION;
                     minAmtTokenB =
                         minAmtTokenB -
-                        ((minAmtTokenB * decodedPayload.slippageBps) /
-                            BPS_PRECISION);
+                        (minAmtTokenB * decodedPayload.slippageBps) /
+                        BPS_PRECISION;
                     minAmtTokenC =
                         minAmtTokenC -
-                        ((minAmtTokenC * decodedPayload.slippageBps) /
-                            BPS_PRECISION);
+                        (minAmtTokenC * decodedPayload.slippageBps) /
+                        BPS_PRECISION;
 
                     outValues = new uint256[](3);
                     outAssetIds = new uint24[](3);
@@ -256,7 +281,11 @@ contract CurveNGAdaptor is AdaptorBase {
                 ).id;
             }
 
-            return (outAssetIds, outValues);
+            outAssets = new AssetAmount[](outAssetIds.length);
+            for (uint256 i; i < outAssetIds.length; i++) {
+                outAssets[i] = AssetAmount(outAssetIds[i], outValues[i]);
+            }
+            return outAssets;
         } else {
             revert InvalidAction();
         }
@@ -289,9 +318,7 @@ contract CurveNGAdaptor is AdaptorBase {
 
             // LP tokens and Curve Pool share the same contract
             outAssetId = getAsset(address(curve)).id;
-        }
-
-        if (NCoins == 3) {
+        } else if (NCoins == 3) {
             uint256 expectedLPTokens = _calcLPTokens3CoinPool(
                 curve,
                 inValues,
@@ -311,6 +338,8 @@ contract CurveNGAdaptor is AdaptorBase {
 
             // LP tokens and Curve Pool share the same contract
             outAssetId = getAsset(address(curve)).id;
+        } else {
+            revert InvalidCoinCount(NCoins);
         }
     }
 
@@ -372,7 +401,10 @@ contract CurveNGAdaptor is AdaptorBase {
             NCoins = 2;
         }
         if (underlyingTokenAmts.length != NCoins) {
-            revert InvalidInput();
+            revert InvalidUnderlyingTokenAmountLength(
+                underlyingTokenAmts.length,
+                NCoins
+            );
         }
 
         if (NCoins == 2) {
@@ -393,7 +425,7 @@ contract CurveNGAdaptor is AdaptorBase {
                 );
         }
 
-        revert InvalidInput();
+        revert InvalidCoinCount(NCoins);
     }
 
     function totalLPTokenSupply(address pool) external view returns (uint256) {
@@ -411,6 +443,13 @@ contract CurveNGAdaptor is AdaptorBase {
         uint256[] memory inValues,
         uint256 slippageBps
     ) internal {
+        if (inAssetIds.length != NCoins || inValues.length != NCoins) {
+            revert InvalidInputAssetLength(
+                uint8(inAssetIds.length),
+                uint8(NCoins)
+            );
+        }
+
         for (uint256 i; i < inAssetIds.length; i++) {
             Asset memory inAsset = getAsset(inAssetIds[i]);
             bool supported = false;
@@ -418,22 +457,16 @@ contract CurveNGAdaptor is AdaptorBase {
             for (uint256 j; j < NCoins; j++) {
                 if (inAsset.assetAddress == curve.coins(j)) {
                     supported = true;
+                    break;
                 }
             }
 
-            if (!supported) revert InvalidInput();
-
-            if (slippageBps > BPS_PRECISION) revert InvalidInput();
-
-            if (
-                IERC20(inAsset.assetAddress).balanceOf(address(this)) <
-                inValues[i]
-            ) {
-                revert InsufficientBalance();
+            if (!supported) {
+                revert AssetNotSupportedByPool(inAsset.assetAddress, curve);
             }
 
-            if (NCoins != inAssetIds.length || NCoins != inValues.length) {
-                revert InvalidInput();
+            if (slippageBps > BPS_PRECISION) {
+                revert InvalidSlippageBps(slippageBps, BPS_PRECISION);
             }
 
             IERC20(inAsset.assetAddress).forceApprove(
@@ -460,11 +493,15 @@ contract CurveNGAdaptor is AdaptorBase {
     function _withdrawChecksAndApprove(
         ICurvePool curve,
         uint256 NCoins,
-        uint24 inAssetId,
-        uint256 inValue,
+        uint24[] memory inAssetIds,
+        uint256[] memory inValues,
         Payload memory decodedPayload
     ) internal {
-        Asset memory inAsset = getAsset(inAssetId);
+        if (inAssetIds.length != 1 || inValues.length != 1) {
+            revert InvalidInputAssetLength(uint8(inAssetIds.length), 1);
+        }
+
+        Asset memory inAsset = getAsset(inAssetIds[0]);
 
         if (
             inAsset.assetAddress == address(0) ||
@@ -473,19 +510,20 @@ contract CurveNGAdaptor is AdaptorBase {
             revert UnsupportedAsset(inAsset.id);
         }
 
-        if (inValue == 0) {
+        if (inValues[0] == 0) {
             revert ZeroValue();
         }
 
-        if (decodedPayload.slippageBps > BPS_PRECISION) revert InvalidInput();
-
-        if (IERC20(inAsset.assetAddress).balanceOf(address(this)) < inValue) {
-            revert InsufficientBalance();
+        if (decodedPayload.slippageBps > BPS_PRECISION) {
+            revert InvalidSlippageBps(
+                decodedPayload.slippageBps,
+                BPS_PRECISION
+            );
         }
 
         if (decodedPayload.withdrawType == uint8(WithdrawType.SINGLE)) {
             if (curve.coins(decodedPayload.singleCoinIndex) == address(0)) {
-                revert InvalidInput();
+                revert InvalidCoinIndex(decodedPayload.singleCoinIndex);
             }
         }
 
@@ -508,7 +546,7 @@ contract CurveNGAdaptor is AdaptorBase {
             }
         }
 
-        IERC20(address(curve)).forceApprove(address(curve), inValue);
+        IERC20(address(curve)).forceApprove(address(curve), inValues[0]);
     }
 
     // Two pool functions

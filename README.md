@@ -91,7 +91,7 @@ source .env && forge test --match-contract AaveAdaptorTest --fork-url "$RPC_ETHE
 source .env && forge coverage --no-match-coverage "(script|test)/.*" --fork-url $RPC_ETHEREUM_MAINNET --report lcov --report summary
 ```
 #### Pre-generated coverage report available at: 
-`v1-protocol/test/report/coverage.txt`
+`v1-protocol/test/report/coverage.txt`****
 
 ## Deployment
 
@@ -104,6 +104,15 @@ pnpm deployCoreWithAdp:sepolia
 # Deploy with proof aggregation infrastructure (Sepolia)
 pnpm deployCoreWithProofAggrInfra:sepolia
 ```
+
+### Roles & Actors
+| Role | Privileges | Restrictions |
+|------|-----------|--------------|
+| Admin | 1. Can upgrade the implementation logic <br> 2. Can pause protocol operations <br> 3. Add asset support <br> 4. Add external protocol adaptor support <br> 5. Register new revokers and modify existing revoker's status <br> 6. Withdraw protocol fees <br> 7. Set and update protocol fees <br> 8. Update verification tracker service <br> 9. Assign and transfer the Verifier Manager role | Cannot transact |
+| Verifier Manager | 1. Add new transaction verifiers <br> 2. Remove existing transaction verifiers <br> 3. Update the address verifier <br> 4. Update the tree update verifier | Cannot upgrade, pause, or perform any Pool-level admin ops. Role is assigned by the Admin |
+| User | Can transact: deposit, transfer, withdraw, call external protocols privately | Cannot control protocol level ops |
+| Revoker | Can revoke transaction | Cannot decrypt tx without the threshold no. of permissions received from the guardian network |
+| Guardian | Can contribute to a revoke request by providing cryptographic permission | Cannot decrypt tx alone 
 
 ## Documentation
 [Veilnyx Docs](http://veilnyx.gitbook.io/)

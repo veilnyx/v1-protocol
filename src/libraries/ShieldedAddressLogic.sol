@@ -1,18 +1,11 @@
-// SPDX-License-Identifier: GPL-3.0
-pragma solidity ^0.8.24;
+// SPDX-License-Identifier: LicenseRef-BUSL
+pragma solidity 0.8.24;
 
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
-import {FIELD_SIZE_DIV_2} from "../base/Constants.sol";
-import {MerkleTree, MerkleTreeLogic} from "./MerkleTree.sol";
+import {FIELD_SIZE, FIELD_SIZE_DIV_2, EIP712_TYPEHASH_REGISTER_ADDRESS, MESSAGE_REGISTER_ADDRESS} from "../base/Constants.sol";
+import {MerkleTree, MerkleTreeLogic} from "./MerkleTreeLogic.sol";
 import {IPool} from "../interfaces/IPool.sol";
 import {IVerifier} from "../interfaces/IVerifier.sol";
-import {INebraUpa} from "../interfaces/INebraUpa.sol";
-import {EIP712_TYPEHASH_REGISTER_ADDRESS, MESSAGE_REGISTER_ADDRESS} from "../base/Constants.sol";
-
-struct PreVerificationDetails {
-    bytes32 circuitId;
-    uint256[] publicInputs;
-}
 
 struct ShieldedAddressRegistrationData {
     bytes proof;
@@ -20,79 +13,30 @@ struct ShieldedAddressRegistrationData {
     bytes signature;
 }
 
-error NotPreVerified();
-error NebraVerifierNotSet();
-
 library ShieldedAddressLogic {
     using MerkleTreeLogic for MerkleTree;
 
-    bytes32 constant MASK_PACK =
+    error NotPreVerified();
+    error ShieldedAddrIncorrectLength(uint8 givenLength, uint8 expectedLength);
+    error ZeroRootAddress();
+    error ExceededFieldSize();
+
+    bytes32 internal constant MASK_PACK =
         hex"8000000000000000000000000000000000000000000000000000000000000000";
 
-    /// @notice Registers a shielded address using a Nebra UPA pre-verified proof.
-    /// @dev `nebraVerifier` is read from PoolStorage to prevent an attacker from
-    ///      supplying a mock verifier address that always returns true.
-    function registerWithNebraVerifier(
-        ShieldedAddressRegistrationData calldata self,
-        PreVerificationDetails calldata preVerifDetails,
-        MerkleTree storage addressTree,
-        mapping(address => uint256) storage publicAddresses,
-        mapping(uint256 => bool) storage rootAddresses,
-        address nebraVerifier,
-        bytes32 hashTypedData
-    ) external {
-        if (nebraVerifier == address(0)) {
-            revert NebraVerifierNotSet();
-        }
-        
-        uint256 rootAddress = uint256(bytes32(self.shieldedAddress[0:32]));
-        _validateShieldedAddressData(self, rootAddress, rootAddresses);
-
-        if (rootAddress != preVerifDetails.publicInputs[0]) {
-            revert IPool.RootAddrMismatch(
-                preVerifDetails.publicInputs[0],
-                rootAddress
-            );
-        }
-
-        bytes32 proofId = keccak256(
-            abi.encode(
-                preVerifDetails.circuitId,
-                preVerifDetails.publicInputs[0],
-                preVerifDetails.publicInputs[1],
-                preVerifDetails.publicInputs[2],
-                preVerifDetails.publicInputs[3],
-                preVerifDetails.publicInputs[4]
-            )
-        );
-
-        if (!INebraUpa(nebraVerifier).isProofVerified(proofId)) {
-            revert NotPreVerified();
-        }
-
-        _insertAddress(
-            self,
-            addressTree,
-            publicAddresses,
-            rootAddresses,
-            hashTypedData,
-            rootAddress
-        );
-    }
-
     /// @notice Registers a shielded address by verifying the proof on-chain via the Veilnyx verifier.
-    function registerWithVeilnyxVerifier(
+    function register(
         ShieldedAddressRegistrationData calldata self,
         MerkleTree storage addressTree,
         mapping(address => uint256) storage publicAddresses,
         mapping(uint256 => bool) storage rootAddresses,
-        address verifier,
+        IVerifier verifier,
         bytes32 hashTypedData
     ) external {
         uint256 rootAddress = uint256(bytes32(self.shieldedAddress[0:32]));
         _validateShieldedAddressData(self, rootAddress, rootAddresses);
 
-        if (!verifyProof(self, verifier)) {
+        if (!verifyProof(self, address(verifier))) {
             revert IPool.InvalidAddressProof();
         }
 
@@ -116,7 +60,14 @@ library ShieldedAddressLogic {
         }
         /// @dev 160 bytes is the size of a shielded address in unpacked form. Verifier expects input in unpacked form.
         if (self.shieldedAddress.length != 160) {
-            revert IPool.BadArguments();
+            revert ShieldedAddrIncorrectLength(
+                uint8(self.shieldedAddress.length),
+                160
+            );
+        }
+
+        if (rootAddress == 0) {
+            revert ZeroRootAddress();
         }
     }
 
@@ -171,6 +122,10 @@ library ShieldedAddressLogic {
     }
 
     function _packPoint(bytes32 x, bytes32 y) internal pure returns (bytes32) {
+        if (uint256(x) >= FIELD_SIZE || uint256(y) >= FIELD_SIZE) {
+            revert ExceededFieldSize();
+        }
+
         if (uint256(x) > FIELD_SIZE_DIV_2) {
             return MASK_PACK | y;
         }

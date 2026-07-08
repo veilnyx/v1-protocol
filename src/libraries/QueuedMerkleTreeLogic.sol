@@ -1,61 +1,61 @@
-// SPDX-License-Identifier: GPL-3.0
-pragma solidity ^0.8.24;
+// SPDX-License-Identifier: LicenseRef-BUSL
+pragma solidity 0.8.24;
 
-import {FIELD_SIZE, ZERO_LEAF} from "../base/Constants.sol";
+import {ZERO_LEAF, COMMITMENT_MERKLE_TREE_ROOT_HISTORY_SIZE, COMMITMENT_TREE_DEPTH} from "../base/Constants.sol";
 import {IHasher} from "../interfaces/IHasher.sol";
 import {IVerifier} from "../interfaces/IVerifier.sol";
-import {IPool} from "../interfaces/IPool.sol";
 
 struct QueuedMerkleTree {
-    uint8 depth;
     uint8 currentRootIndex;
     uint8 queueSize; // max number of leaves that can be queued before an update is required. This is defined by the circuit `treeUpdate::nLeaves` and is immutable after pool initialization.
-    uint40 capacity;
-    address hasher;
-    address verifier;
+    uint32 capacity;
+    IHasher hasher;
+    IVerifier verifier;
     uint32 nextLeafIndex;
     uint32 queueStartIndex;
     uint32 queueEndIndex;
     mapping(uint32 => uint256) queuedLeaves;
     mapping(uint8 => uint256) roots;
-    mapping(uint8 => uint256) zeroes;
-    mapping(uint8 => uint256) lastSubtrees;
+    uint256[COMMITMENT_TREE_DEPTH] levelZeros;
+    uint256[COMMITMENT_TREE_DEPTH] levelSubtrees;
 }
 
 struct TreeUpdateData {
     uint256 newRoot;
-    uint256[] newSubtrees;
+    uint32 batchSize;
+    uint256[COMMITMENT_TREE_DEPTH] newLevelSubtrees;
     bytes proof;
 }
 
 library QueuedMerkleTreeLogic {
     error MerkleTreeFull();
     error InvalidProof();
-
-    uint8 public constant ROOT_HISTORY_SIZE = 50;
+    error ZeroAddress();
 
     /// @custom:invariant QMT-1: queueStartIndex <= queueEndIndex always
     /// @custom:invariant QMT-2: queueEndIndex - queueStartIndex <= total leaves queued at all times
     function init(
         QueuedMerkleTree storage self,
-        uint8 depth,
         uint8 queueSize,
-        address hasher,
-        address verifier
+        IHasher hasher,
+        IVerifier verifier
     ) public {
-        self.depth = depth;
+        if (address(hasher) == address(0) || address(verifier) == address(0)) {
+            revert ZeroAddress();
+        }
+
         self.hasher = hasher;
         self.verifier = verifier;
-        self.capacity = uint32(2 ** depth);
+        self.capacity = uint32(1 << COMMITMENT_TREE_DEPTH);
         self.queueSize = queueSize;
         self.queueStartIndex = 0;
         self.queueEndIndex = 0;
 
         uint256 zero = ZERO_LEAF;
-        for (uint8 i = 0; i < depth; ) {
-            self.zeroes[i] = zero;
-            self.lastSubtrees[i] = zero;
-            zero = IHasher(hasher).hash([zero, zero]);
+        for (uint8 i = 0; i < COMMITMENT_TREE_DEPTH; ) {
+            self.levelZeros[i] = zero;
+            self.levelSubtrees[i] = zero;
+            zero = hasher.hash([zero, zero]);
 
             unchecked {
                 ++i;
@@ -72,7 +72,7 @@ library QueuedMerkleTreeLogic {
         uint32 nextIndex = self.queueEndIndex;
         uint32 nLeaves = uint32(leaves.length);
 
-        for (uint8 i = 0; i < nLeaves; ) {
+        for (uint32 i = 0; i < nLeaves; ) {
             self.queuedLeaves[nextIndex + i] = leaves[i];
             unchecked {
                 ++i;
@@ -89,8 +89,8 @@ library QueuedMerkleTreeLogic {
         uint32 startIdx = self.queueStartIndex;
         uint32 endIdx = self.queueEndIndex;
 
-        uint32 queueLen = endIdx - startIdx; //
-        uint32 nLeaves = queueLen > n ? n : queueLen;
+        uint32 batchSize = endIdx - startIdx;
+        uint32 nLeaves = batchSize > n ? n : batchSize;
 
         uint256[] memory leaves = new uint256[](n);
 
@@ -102,13 +102,11 @@ library QueuedMerkleTreeLogic {
             }
         }
 
-        if (nLeaves < n) {
-            for (uint32 i = nLeaves; i < n; ) {
-                leaves[i] = ZERO_LEAF;
+        for (uint32 i = nLeaves; i < n; ) {
+            leaves[i] = ZERO_LEAF;
 
-                unchecked {
-                    ++i;
-                }
+            unchecked {
+                ++i;
             }
         }
 
@@ -120,44 +118,40 @@ library QueuedMerkleTreeLogic {
         QueuedMerkleTree storage self,
         TreeUpdateData calldata data
     ) public {
-        uint32 batchSize = self.queueEndIndex - self.queueStartIndex;
-        bool isValid = _verifyUpdateProof(self, data, batchSize);
+        (bool isValid, uint32 insertedLeaves) = _verifyUpdateProof(self, data);
 
         if (!isValid) {
             revert InvalidProof();
         }
 
         // Updating tree states
-        uint8 newRootIndex = (self.currentRootIndex + 1) % ROOT_HISTORY_SIZE;
+        uint8 newRootIndex = (self.currentRootIndex + 1) %
+            COMMITMENT_MERKLE_TREE_ROOT_HISTORY_SIZE;
         self.currentRootIndex = newRootIndex;
         self.roots[newRootIndex] = data.newRoot;
+        self.levelSubtrees = data.newLevelSubtrees;
 
-        for (uint8 i = 0; i < self.depth; ) {
-            self.lastSubtrees[i] = data.newSubtrees[i];
-            unchecked {
-                ++i;
-            }
-        }
-
-        if (batchSize < self.queueSize) {
+        if (data.batchSize < self.queueSize) {
             self.queueStartIndex = self.queueEndIndex;
-            self.nextLeafIndex += batchSize;
         } else {
-            self.queueStartIndex += self.queueSize;
-            self.nextLeafIndex += self.queueSize;
+            self.queueStartIndex += insertedLeaves;
         }
+        self.nextLeafIndex += insertedLeaves;
     }
 
     function _verifyUpdateProof(
         QueuedMerkleTree storage self,
-        TreeUpdateData calldata data,
-        uint32 batchSize
-    ) internal view returns (bool) {
+        TreeUpdateData calldata data
+    ) internal view returns (bool valid, uint32 insertedLeaves) {
+        insertedLeaves = data.batchSize < self.queueSize
+            ? data.batchSize
+            : self.queueSize;
         uint256[] memory leaves = _getQueuedLeaves(self);
-        uint256[] memory lastSubtrees = _getSubtrees(self);
+        uint256[COMMITMENT_TREE_DEPTH] storage lastSubtrees = self
+            .levelSubtrees;
         uint256 lastRoot = self.roots[self.currentRootIndex];
-        uint256 nZeroLeaves = batchSize < self.queueSize
-            ? self.queueSize - batchSize
+        uint256 nZeroLeaves = data.batchSize < self.queueSize
+            ? self.queueSize - data.batchSize
             : 0;
 
         bytes memory vParams = abi.encodePacked(
@@ -167,11 +161,11 @@ library QueuedMerkleTreeLogic {
             lastRoot,
             lastSubtrees,
             data.newRoot,
-            data.newSubtrees,
+            data.newLevelSubtrees,
             nZeroLeaves
         );
 
-        return IVerifier(self.verifier).verifyTreeUpdateProof(vParams);
+        valid = self.verifier.verifyTreeUpdateProof(vParams);
     }
 
     function _getQueuedLeaves(
@@ -188,22 +182,6 @@ library QueuedMerkleTreeLogic {
         return _getQueuedLeaves(tree);
     }
 
-    function _getSubtrees(
-        QueuedMerkleTree storage tree
-    ) internal view returns (uint256[] memory) {
-        uint256[] memory subtree = new uint256[](tree.depth);
-
-        for (uint8 i; i < tree.depth; ) {
-            subtree[i] = tree.lastSubtrees[i];
-
-            unchecked {
-                ++i;
-            }
-        }
-
-        return subtree;
-    }
-
     function isKnownRoot(
         QueuedMerkleTree storage self,
         uint256 _root
@@ -218,40 +196,35 @@ library QueuedMerkleTreeLogic {
                 return true;
             }
             if (i == 0) {
-                // ROOT_HISTORY_SIZE -> currentRootIndex + 1
-                i = ROOT_HISTORY_SIZE;
+                // COMMITMENT_MERKLE_TREE_ROOT_HISTORY_SIZE -> currentRootIndex + 1
+                i = COMMITMENT_MERKLE_TREE_ROOT_HISTORY_SIZE;
             }
             i--;
         } while (i != _currentRootIndex);
         return false;
     }
 
-    /**
-    function getRoot(
-        QueuedMerkleTree storage self,
-        uint8 rootIndex
-    ) external view returns (uint256) {
-        return self.roots[rootIndex];
-    }
-     */
-
     function getState(
         QueuedMerkleTree storage self
     )
         public
         view
-        returns (uint256[] memory, uint256[] memory, uint256, uint8, uint32)
+        returns (
+            uint256[] memory queuedLeaves,
+            uint256[COMMITMENT_TREE_DEPTH] memory subtrees,
+            uint256 lastRoot,
+            uint8 currentRootIdx,
+            uint32 nextLeafIndex
+        )
     {
-        uint256[] memory leaves = _getQueuedLeaves(self);
-        uint256[] memory lastSubtrees = _getSubtrees(self);
-        uint32 nextLeafIndex = self.nextLeafIndex;
-        uint256 lastRoot = self.roots[self.currentRootIndex];
-        return (
-            leaves,
-            lastSubtrees,
-            lastRoot,
-            self.currentRootIndex,
-            nextLeafIndex
-        );
+        // queuedLeaves is always padded to queueSize with ZERO_LEAF. Real leaves occupy the
+        // front (indices 0 .. queueEndIndex-queueStartIndex-1); the remainder are ZERO_LEAF
+        // sentinels. This fixed-length array matches the ZK circuit's treeUpdate input width
+        // so the off-chain update service can pass it directly without reshaping.
+        queuedLeaves = _getQueuedLeaves(self);
+        subtrees = self.levelSubtrees;
+        nextLeafIndex = self.nextLeafIndex;
+        lastRoot = self.roots[self.currentRootIndex];
+        currentRootIdx = self.currentRootIndex;
     }
 }

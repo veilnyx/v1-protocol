@@ -31,6 +31,6 @@ contract VerifierDeploy is BaseScript {
             selector: vt22.verifyProof.selector
         });
 
-        new Verifier(vInfos, address(vr), address(vTree));
+        new Verifier(vInfos, address(vr), address(vTree), msg.sender);
     }
 }

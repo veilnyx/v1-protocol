@@ -4,14 +4,17 @@ pragma abicoder v2;
 
 import {PoolTest} from "test/fixtures/PoolTest.sol";
 import {Pool} from "src/core/Pool.sol";
-import {ShieldedTransaction} from "src/libraries/ShieldedTransaction.sol";
+import {ShieldedTransaction} from "src/libraries/ShieldedTransactionLogic.sol";
 import {LidoAdaptor} from "src/adaptors/lido/LidoAdaptor.sol";
 import {ILido} from "src/adaptors/lido/ILido.sol";
+import {IWithdrawQueueERC721} from "src/adaptors/lido/IWithdrawQueueERC721.sol";
+import {IAdaptorHandler} from "src/interfaces/IAdaptorHandler.sol";
 import {IAdaptor} from "src/interfaces/IAdaptor.sol";
+import {AssetAmount} from "src/interfaces/IAdaptor.sol";
 import {IWToken} from "src/interfaces/IWToken.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC721} from "@openzeppelin/contracts/token/ERC721/IERC721.sol";
-import {Asset, AssetType} from "src/libraries/Asset.sol";
+import {Asset, AssetType} from "src/libraries/AssetLogic.sol";
 import {console2} from "forge-std/console2.sol";
 
 enum Action {
@@ -47,12 +50,12 @@ contract LidoAdaptorTest is PoolTest {
         deployCodeTo(
             "LidoAdaptor.sol:LidoAdaptor",
             abi.encode(
-                lido,
-                WETH,
-                stETH,
-                wstETH,
-                withdrawalQueueERC721,
-                address(pool)
+                ILido(lido),
+                IWToken(WETH),
+                IERC20(stETH),
+                IERC20(wstETH),
+                IWithdrawQueueERC721(withdrawalQueueERC721),
+                pool
             ),
             fixtureAdaptorAddr
         );
@@ -62,15 +65,22 @@ contract LidoAdaptorTest is PoolTest {
         // Asset & Adaptor support on Veilnyx Protocol
         address poolOwner = pool.owner();
         vm.prank(poolOwner);
-        pool.addAdaptorSupport(fixtureAdaptorAddr, true);
+        pool.addAdaptorSupport(IAdaptorHandler(fixtureAdaptorAddr), true);
 
         AssetType assetType = AssetType.ERC20;
         address[] memory assetAddresses = new address[](1);
         assetAddresses[0] = wstETH;
+        uint8[] memory precisions = new uint8[](1);
+        precisions[0] = 18;
 
-        uint8[] memory assetsPrecision = new uint8[](1);
-        assetsPrecision[0] = 18;
-        pool.addAssets(assetType, assetAddresses, assetsPrecision);
+        pool.addAssets(
+            assetType,
+            _toAssetInitParams(
+                assetAddresses,
+                precisions,
+                _mockFeedsArray(assetAddresses.length)
+            )
+        );
 
         deal(WETH, user, INITIAL_SUPPLY);
 
@@ -79,7 +89,7 @@ contract LidoAdaptorTest is PoolTest {
         ShieldedTransaction memory stxWethDeposit = _loadShieldedTransaction(
             "deposit_2_testnet_weth"
         );
-        pool.transact(stxWethDeposit, false);
+        pool.transact(stxWethDeposit);
         vm.stopPrank();
 
         _processCommitmentTreeQueue();
@@ -99,7 +109,7 @@ contract LidoAdaptorTest is PoolTest {
         ShieldedTransaction memory stxStake = _loadShieldedTransaction(
             "stake_1_testnet_weth_lido"
         );
-        pool.transact(stxStake, false);
+        pool.transact(stxStake);
 
         // Asserts
         uint256 poolwstETHBalPostStake = IERC20(wstETH).balanceOf(
@@ -121,18 +131,12 @@ contract LidoAdaptorTest is PoolTest {
         vm.prank(address(lidoAdaptor));
         IWToken(WETH).deposit{value: INITIAL_SUPPLY}();
 
-        uint24[] memory inAssetIds = new uint24[](1);
-        uint256[] memory inValues = new uint256[](1);
+        AssetAmount[] memory inAssets = new AssetAmount[](1);
         bytes memory payload = abi.encode(Action.STAKE, address(0));
 
-        inAssetIds[0] = pool.getAsset(WETH).id;
-        inValues[0] = INITIAL_SUPPLY;
+        inAssets[0] = AssetAmount(pool.getAsset(WETH).id, INITIAL_SUPPLY);
 
-        IAdaptor(address(lidoAdaptor)).handleAssets(
-            inAssetIds,
-            inValues,
-            payload
-        ); // staking directly through LidoAdaptor
+        IAdaptor(address(lidoAdaptor)).handleAssets(inAssets, payload); // staking directly through LidoAdaptor
 
         uint256 adpWstETHBalBeforeUnStaking = IERC20(wstETH).balanceOf(
             address(lidoAdaptor)
@@ -142,15 +146,13 @@ contract LidoAdaptorTest is PoolTest {
 
         console2.log("Initiating Unstaking on Lido");
 
-        inAssetIds[0] = pool.getAsset(wstETH).id;
-        inValues[0] = adpWstETHBalBeforeUnStaking;
+        inAssets[0] = AssetAmount(
+            pool.getAsset(wstETH).id,
+            adpWstETHBalBeforeUnStaking
+        );
         payload = abi.encode(Action.UNSTAKE, user);
 
-        IAdaptor(address(lidoAdaptor)).handleAssets(
-            inAssetIds,
-            inValues,
-            payload
-        ); // unstaking directly through LidoAdp
+        IAdaptor(address(lidoAdaptor)).handleAssets(inAssets, payload); // unstaking directly through LidoAdp
 
         // Asserts
         uint256 adpWstETHBalPostUnStake = IERC20(wstETH).balanceOf(
@@ -170,11 +172,9 @@ contract LidoAdaptorTest is PoolTest {
     }
 
     function testRevertOnSepoliaWhenWithdrawing() external {
-        uint24[] memory inAssetIds = new uint24[](1);
-        uint256[] memory inValues = new uint256[](1);
+        AssetAmount[] memory inAssets = new AssetAmount[](1);
 
-        inAssetIds[0] = pool.getAsset(wstETH).id;
-        inValues[0] = INITIAL_SUPPLY;
+        inAssets[0] = AssetAmount(pool.getAsset(wstETH).id, INITIAL_SUPPLY);
         bytes memory payload = abi.encode(Action.UNSTAKE, user);
         deal(wstETH, address(lidoAdaptor), INITIAL_SUPPLY);
 
@@ -187,11 +187,7 @@ contract LidoAdaptorTest is PoolTest {
             );
         }
         // Unstaking call
-        IAdaptor(address(lidoAdaptor)).handleAssets(
-            inAssetIds,
-            inValues,
-            payload
-        );
+        IAdaptor(address(lidoAdaptor)).handleAssets(inAssets, payload);
     }
 
     /// @dev Only allowing Lido tests to run on Holesky testnet and ETH mainnet. More chains can be added.

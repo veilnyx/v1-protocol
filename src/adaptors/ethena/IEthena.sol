@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-2.0-or-later
+// SPDX-License-Identifier: LicenseRef-BUSL
 pragma solidity 0.8.24;
 
 interface IEthena {
@@ -14,5 +14,5 @@ interface IEthena {
 
     function unstake(address receiver) external;
 
-    function cooldownDuration() view external returns (uint24);
+    function cooldownDuration() external view returns (uint24);
 }
