@@ -1,6 +1,14 @@
 node_modules/
 cache/
+cache_hardhat/
 out/
 .env
+artifacts/
 broadcast/
+typechain/
+typechain-types/
 .DS_STORE
+# .openzeppelin/ intentionally tracked — the manifest is the storage layout
+# source of truth for upgrade validation. Never gitignore it.
+.claude/
+.vscode/

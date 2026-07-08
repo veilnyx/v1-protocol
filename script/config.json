@@ -1,37 +1,330 @@
 {
   "env": "testnet",
   "common": {
-    "revokerPublicKey": [
-      8116072818876777666029027213729376705234613448128995613697283149497235402123,
-      4598772416842731049226007701899382609184728232075557894618791492264594188716
+    "commitmentTreeDepth": 25,
+    "commitmentTreeQueueSize": 10,
+    "addressTreeDepth": 20,
+    "revokers": [
+      {
+        "name": "Veilnyx Internal Group 2",
+        "description": "A revoker group for decentralized applications, ensuring secure and reliable revocation processes.",
+        "revokerPublicKey": [
+          "20166730020419159052286555107141035920946760385383107576039955225567455300207",
+          "18439266136563662170719450990945300828423393702749802977743662490195521743390"
+        ],
+        "encryptionPublicKey": [
+          "1415297768191015876969734831367396850794970386289866514910293184189216114711",
+          "10435528812585515475307388160094137747296379532862976260464438917842987448252"
+        ]
+      }
     ],
-    "encryptionPublicKey": [
-      15187339732644800751812193648350861431733040013104897934882869545575329240973,
-      18224946718075372665314217959364704865149122115871220475141871484502637776562
-    ]
+    "withdrawFeeBps": 5,
+    "protocolVersion": 2,
+    "veilnyxMultiSigAddress": "0x9bAf694B165c42850BD3c9c944E16d48d566C617"
   },
   "31337": {
     "chain": "local",
-    "treeDepth": 32,
     "entryPoint": "0x0000000000000000000000000000000000000000",
     "wToken": "0x0000000000000000000000000000000000000000",
+    "gateway": "0x0000000000000000000000000000000000000000",
+    "paymaster": "0x0000000000000000000000000000000000000000",
+    "nebraVerifier": "0x0000000000000000000000000000000000000000",
+    "sanctionsList": "0x0000000000000000000000000000000000000000",
+    "poseidonT3": "0x5C7Ba1b0C0460c511203C9f2b3D37D1A5134d07d",
+    "poseidonT4": "0x64D0E3aBB8c45d55c992a9BfD90c1577dd3094db",
     "initAssetType": 1,
-    "initAssetAddresses": ["0x0000000000000000000000000000000000000000"]
+    "initAssetAddresses": [
+      "0x4200000000000000000000000000000000000006",
+      "0x5fd84259d66Cd46123540766Be93DFE6D43130D7"
+    ],
+    "initAssetsPrecision": [
+      18,
+      6
+    ],
+    "initNativeGasTokenToAssetChainlinkFeeds": [
+      "0x0000000000000000000000000000000000000000",
+      "0x0000000000000000000000000000000000000000"
+    ],
+    "initAssetToUSDChainlinkFeeds": [
+      "0x0000000000000000000000000000000000000000",
+      "0x0000000000000000000000000000000000000000"
+    ],
+    "initAssetIdsVeilnyx": [
+      65537,
+      65538
+    ]
   },
-  "80002": {
-    "chain": "polygon-amoy",
-    "treeDepth": 32,
+  "11155111": {
+    "chain": "eth-sepolia",
     "entryPoint": "0x0000000071727De22E5E9d8BAf0edAc6f37da032",
-    "wToken": "0xaFE07e24314864290f6E11D3CaA51290280fAEE1",
+    "gateway": "0x329FA1dd7f274C0C0B3F2B7539EF71f435a89F04",
+    "paymaster": "0xE45c40643af3aa4146E1B1C95051c23f7439ed75",
+    "nebraVerifier": "0x0000000000000000000000000000000000000000",
+    "wToken": "0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14",
+    "poseidonT3": "0xBA6c6494E1a30633936b7a6e1D1915E435aCc93c",
+    "poseidonT4": "0x9e915d462cf36436cA9376836128DC5daE549153",
+    "sanctionsList": "0x0000000000000000000000000000000000000000",
     "initAssetType": 1,
-    "initAssetAddresses": ["0xaFE07e24314864290f6E11D3CaA51290280fAEE1"]
+    "initAssetAddresses": [
+      "0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14",
+      "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238",
+      "0x3e3FE7dBc6B4C189E7128855dD526361c49b40Af",
+      "0xC558DBdd856501FCd9aaF1E62eae57A9F0629a3c",
+      "0x94a9D9AC8a22534E3FaCa9F4e7F2E2cf85d5E4C8"
+    ],
+    "initAssetsPrecision": [
+      18,
+      6,
+      18,
+      18,
+      6
+    ],
+    "initNativeGasTokenToAssetChainlinkFeeds": [
+      "0x0000000000000000000000000000000000000000",
+      "0x694AA1769357215DE4FAC081bf1f309aDC325306",
+      "0x0000000000000000000000000000000000000000",
+      "0x0000000000000000000000000000000000000000",
+      "0x0000000000000000000000000000000000000000"
+    ],
+    "initAssetToUSDChainlinkFeeds": [
+      "0x694AA1769357215DE4FAC081bf1f309aDC325306",
+      "0xA2F78ab2355fe2f984D808B5CeE7FD0A93D5270E",
+      "0x0000000000000000000000000000000000000000",
+      "0x0000000000000000000000000000000000000000",
+      "0x0000000000000000000000000000000000000000"
+    ],
+    "initAssetIdsVeilnyx": [
+      65537,
+      65538,
+      65539,
+      65540,
+      65541
+    ]
   },
   "11155420": {
     "chain": "optimism-sepolia",
-    "treeDepth": 32,
     "entryPoint": "0x0000000071727De22E5E9d8BAf0edAc6f37da032",
+    "gateway": "0x0000000000000000000000000000000000000000",
+    "paymaster": "0x0000000000000000000000000000000000000000",
+    "nebraVerifier": "0x0000000000000000000000000000000000000000",
     "wToken": "0x4200000000000000000000000000000000000006",
+    "sanctionsList": "0x8397daDcB6B284F4f5988128cAfc72Ee706d88f2",
+    "poseidonT3": "0x5C7Ba1b0C0460c511203C9f2b3D37D1A5134d07d",
+    "poseidonT4": "0x64D0E3aBB8c45d55c992a9BfD90c1577dd3094db",
     "initAssetType": 1,
-    "initAssetAddresses": ["0x4200000000000000000000000000000000000006"]
+    "initAssetAddresses": [
+      "0x4200000000000000000000000000000000000006",
+      "0x5fd84259d66Cd46123540766Be93DFE6D43130D7"
+    ],
+    "initAssetsPrecision": [
+      18,
+      6
+    ],
+    "initNativeGasTokenToAssetChainlinkFeeds": [
+      "0x0000000000000000000000000000000000000000",
+      "0x61Ec26aA57019C486B10502285c5A3D4A4750AD7"
+    ],
+    "initAssetToUSDChainlinkFeeds": [
+      "0x61Ec26aA57019C486B10502285c5A3D4A4750AD7",
+      "0x6e44e50E3cc14DD16e01C590DC1d7020cb36eD4C"
+    ],
+    "initAssetIdsVeilnyx": [
+      65537,
+      65538
+    ]
+  },
+  "80002": {
+    "chain": "polygon-amoy",
+    "entryPoint": "0x0000000071727De22E5E9d8BAf0edAc6f37da032",
+    "gateway": "0x0000000000000000000000000000000000000000",
+    "paymaster": "0x0000000000000000000000000000000000000000",
+    "nebraVerifier": "0x0000000000000000000000000000000000000000",
+    "wToken": "0xaFE07e24314864290f6E11D3CaA51290280fAEE1",
+    "sanctionsList": "0x2089c78f8247F42e7EbE328874963e856a77B22f",
+    "poseidonT3": "0x0000000000000000000000000000000000000000",
+    "poseidonT4": "0x0000000000000000000000000000000000000000",
+    "initAssetType": 1,
+    "initAssetAddresses": [
+      "0xaFE07e24314864290f6E11D3CaA51290280fAEE1",
+      "0x41E94Eb019C0762f9Bfcf9Fb1E58725BfB0e7582"
+    ],
+    "initAssetsPrecision": [
+      18,
+      6
+    ],
+    "initNativeGasTokenToAssetChainlinkFeeds": [
+      "0x0000000000000000000000000000000000000000",
+      "0xF0d50568e3A7e8259E16663972b11910F89BD8e7"
+    ],
+    "initAssetToUSDChainlinkFeeds": [
+      "0xF0d50568e3A7e8259E16663972b11910F89BD8e7",
+      "0x1b8739bB4CdF0089d07097A9Ae5Bd274b29C6F16"
+    ],
+    "initAssetIdsVeilnyx": [
+      65537,
+      65538
+    ]
+  },
+  "1": {
+    "chain": "eth-mainnet",
+    "entryPoint": "0x0000000071727De22E5E9d8BAf0edAc6f37da032",
+    "gateway": "0x0000000000000000000000000000000000000000",
+    "paymaster": "0x0000000000000000000000000000000000000000",
+    "nebraVerifier": "0x0000000000000000000000000000000000000000",
+    "wToken": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+    "poseidonT3": "0x0000000000000000000000000000000000000000",
+    "poseidonT4": "0x0000000000000000000000000000000000000000",
+    "sanctionsList": "0x40C57923924B5c5c5455c48D93317139ADDaC8fb",
+    "initAssetType": 1,
+    "initAssetAddresses": [
+      "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+      "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
+    ],
+    "initAssetsPrecision": [
+      18,
+      6
+    ],
+    "initNativeGasTokenToAssetChainlinkFeeds": [
+      "0x0000000000000000000000000000000000000000",
+      "0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419"
+    ],
+    "initAssetToUSDChainlinkFeeds": [
+      "0x5147eA642CAEF7BD9c1265AadcA78f997AbB9649",
+      "0x84E045745ED829c5b778aBB17104FC2600020850"
+    ],
+    "initAssetIdsVeilnyx": [
+      65537,
+      65538
+    ]
+  },
+  "7800": {
+    "chain": "veilnyx-mainnet-simulation",
+    "entryPoint": "0x0000000071727De22E5E9d8BAf0edAc6f37da032",
+    "gateway": "0x0000000000000000000000000000000000000000",
+    "paymaster": "0x0000000000000000000000000000000000000000",
+    "nebraVerifier": "0x0000000000000000000000000000000000000000",
+    "wToken": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+    "poseidonT3": "0x0000000000000000000000000000000000000000",
+    "poseidonT4": "0x0000000000000000000000000000000000000000",
+    "sanctionsList": "0x40C57923924B5c5c5455c48D93317139ADDaC8fb",
+    "initAssetType": 1,
+    "initAssetAddresses": [
+      "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+      "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48"
+    ],
+    "initAssetsPrecision": [
+      18,
+      6
+    ],
+    "initNativeGasTokenToAssetChainlinkFeeds": [
+      "0x0000000000000000000000000000000000000000",
+      "0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419"
+    ],
+    "initAssetToUSDChainlinkFeeds": [
+      "0x0000000000000000000000000000000000000000",
+      "0x0000000000000000000000000000000000000000"
+    ],
+    "initAssetIdsVeilnyx": [
+      65537,
+      65538
+    ]
+  },
+  "17000": {
+    "chain": "holesky",
+    "entryPoint": "0x0000000071727De22E5E9d8BAf0edAc6f37da032",
+    "gateway": "0x0000000000000000000000000000000000000000",
+    "paymaster": "0x0000000000000000000000000000000000000000",
+    "nebraVerifier": "0x0000000000000000000000000000000000000000",
+    "wToken": "0x94373a4919B3240D86eA41593D5eBa789FEF3848",
+    "poseidonT3": "0x0000000000000000000000000000000000000000",
+    "poseidonT4": "0x0000000000000000000000000000000000000000",
+    "lido": "0x3F1c547b21f65e10480dE3ad8E19fAAC46C95034",
+    "withdrawalQueueERC721": "0xc7cc160b58F8Bb0baC94b80847E2CF2800565C50",
+    "sanctionsList": "0x0000000000000000000000000000000000000000",
+    "initAssetType": 1,
+    "initAssetAddresses": [
+      "0x94373a4919B3240D86eA41593D5eBa789FEF3848",
+      "0x3F1c547b21f65e10480dE3ad8E19fAAC46C95034",
+      "0x8d09a4502Cc8Cf1547aD300E066060D043f6982D"
+    ],
+    "initAssetsPrecision": [
+      18,
+      6,
+      18
+    ],
+    "initNativeGasTokenToAssetChainlinkFeeds": [
+      "0x0000000000000000000000000000000000000000",
+      "0x0000000000000000000000000000000000000000",
+      "0x0000000000000000000000000000000000000000"
+    ],
+    "initAssetToUSDChainlinkFeeds": [
+      "0x0000000000000000000000000000000000000000",
+      "0x0000000000000000000000000000000000000000",
+      "0x0000000000000000000000000000000000000000"
+    ],
+    "initAssetIdsVeilnyx": [
+      65537,
+      65538,
+      65539
+    ]
+  },
+  "34244": {
+    "chain": "veilnyx-appchain-testnet",
+    "entryPoint": "0x0000000071727De22E5E9d8BAf0edAc6f37da032",
+    "gateway": "0xab595ec0694f7cead3bf338266ab7527a2b4e3f5",
+    "paymaster": "0x9365ed769466d04de2085b74a0fc8a116a37caca",
+    "nebraVerifier": "0x0000000000000000000000000000000000000000",
+    "wToken": "0xC047cfabBbDD41F382DE565A0F8239EC5B6E1893",
+    "poseidonT3": "0x67386d033b581aa97c8a3b11ed59e0c829c32e27",
+    "poseidonT4": "0xf297bd5314f5d21c872a52f190386bd15411b47e",
+    "sanctionsList": "0x0000000000000000000000000000000000000000",
+    "initAssetType": 1,
+    "initAssetAddresses": [
+      "0xC047cfabBbDD41F382DE565A0F8239EC5B6E1893",
+      "0x9aB19B1E375624b9A79aF4d2c728bf4d0feee30e"
+    ],
+    "initAssetsPrecision": [
+      18,
+      6
+    ],
+    "initNativeGasTokenToAssetChainlinkFeeds": [
+      "0x0000000000000000000000000000000000000000",
+      "0x0000000000000000000000000000000000000000"
+    ],
+    "initAssetToUSDChainlinkFeeds": [
+      "0x0000000000000000000000000000000000000000",
+      "0x0000000000000000000000000000000000000000"
+    ],
+    "initAssetIdsVeilnyx": [
+      65537,
+      65538
+    ]
+  },
+  "5042002": {
+    "chain": "arc-testnet",
+    "entryPoint": "0x0000000071727De22E5E9d8BAf0edAc6f37da032",
+    "gateway": "0x0000000000000000000000000000000000000000",
+    "paymaster": "0x0000000000000000000000000000000000000000",
+    "nebraVerifier": "0x0000000000000000000000000000000000000000",
+    "wToken": "0x911b4000D3422F482F4062a913885f7b035382Df",
+    "poseidonT3": "0x0000000000000000000000000000000000000000",
+    "poseidonT4": "0x0000000000000000000000000000000000000000",
+    "sanctionsList": "0x0000000000000000000000000000000000000000",
+    "initAssetType": 1,
+    "initAssetAddresses": [
+      "0x3600000000000000000000000000000000000000"
+    ],
+    "initAssetsPrecision": [
+      6
+    ],
+    "initNativeGasTokenToAssetChainlinkFeeds": [
+      "0x0000000000000000000000000000000000000000"
+    ],
+    "initAssetToUSDChainlinkFeeds": [
+      "0x0000000000000000000000000000000000000000"
+    ],
+    "initAssetIdsVeilnyx": [
+      65537
+    ]
   }
 }

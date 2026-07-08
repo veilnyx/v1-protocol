@@ -1,0 +1,10 @@
+{
+  "compilerOptions": {
+    "resolveJsonModule": true,
+    "esModuleInterop": true,
+    "types": ["node"],
+    "paths": {
+      "@nebrazkp/upa/sdk": ["./node_modules/@nebrazkp/upa/dist/src/sdk/index.d.ts"]
+    }
+  } 
+}

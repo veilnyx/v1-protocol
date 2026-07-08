@@ -1,31 +1,68 @@
-// SPDX-License-Identifier: MIT
-pragma solidity 0.8.23;
+// SPDX-License-Identifier: LicenseRef-BUSL
+pragma solidity 0.8.24;
 
-import {MerkleTree} from "../libraries/MerkleTree.sol";
-import {Asset, AssetType} from "../libraries/Asset.sol";
+import {MerkleTree} from "../libraries/MerkleTreeLogic.sol";
+import {QueuedMerkleTree} from "../libraries/QueuedMerkleTreeLogic.sol";
+import {Asset, AssetType} from "../libraries/AssetLogic.sol";
+import {RevokerData} from "../libraries/ShieldedTransactionLogic.sol";
+import {IVerifier} from "../interfaces/IVerifier.sol";
+import {IAdaptorHandler} from "../interfaces/IAdaptorHandler.sol";
+import {IHasher} from "../interfaces/IHasher.sol";
+import {IScreener} from "../interfaces/IScreener.sol";
+import {IWToken} from "../interfaces/IWToken.sol";
 
 abstract contract PoolStorage {
-    uint256 public constant FIELD_SIZE =
-        21888242871839275222246405745257275088548364400416034343698204186575808495617;
+    IVerifier public verifier;
+    IAdaptorHandler public adaptorHandler;
+    IHasher public hasher;
+    IScreener public screener;
 
-    uint256 public constant ZERO_LEAF = uint256(keccak256("zkFi")) % FIELD_SIZE;
+    MerkleTree internal _addressTree;
+    QueuedMerkleTree internal _commitmentTree;
 
-    uint8 public constant ROOT_HISTORY_SIZE = 100;
-
-    address public entryPoint;
-    address public verifier;
-    address public convertor;
+    mapping(uint256 => bool) internal _rootAddresses;
+    mapping(address => uint256) internal _publicAddresses;
 
     mapping(AssetType => uint16) internal _assetCounts;
-
-    /// Asset ids are are 3 bytes long - 1 byte for asset type and 2 bytes for asset uid
+    /// Asset ids are 3 bytes long: 1 byte for asset type and 2 bytes for asset unique index
+    mapping(address assetAddress => uint24 assetId) _assetIds;
     mapping(uint24 assetId => Asset asset) _assets;
 
-    MerkleTree internal _tree;
+    mapping(uint256 nullifier => uint32 markNullifierIndex)
+        internal _markedNullifiers;
 
-    mapping(address assetAddress => uint24 assetId) _assetIds;
+    mapping(IAdaptorHandler => bool) internal _adaptors;
 
-    mapping(uint256 => bool) internal _markedNullifiers;
+    uint16 internal _revokerCount;
+    mapping(uint256 => bool) internal _revokerPublicKeys;
+    mapping(uint256 => RevokerData) internal _revokers;
 
-    mapping(address => bool) internal _convertProxies;
+    uint256 public withdrawFeeBps; // 1 bip = 1% / 100
+    mapping(uint24 => uint256) internal _withdrawFees;
+    mapping(address paymaster => mapping(uint24 assetId => uint256 feeAmount))
+        internal _paymasterFees;
+
+    uint64 public version;
+
+    /// @dev TVL guard: maximum allowed TVL in USD, 6-decimal precision (USDC/USDT standard).
+    ///      type(uint256).max = no TVL cap (unlimited). Any other value is the hard cap.
+    uint256 public tvlLimitUsd;
+
+    /// @dev Deposit size limits in USD, 6-decimal precision.
+    uint256 public minDepositUsd;
+    uint256 public maxDepositUsd;
+
+    /// @dev Maximum age of a Chainlink price answer before it is considered stale, in seconds.
+    uint256 public priceFeedStalenessThreshold;
+
+    /// @dev Wrapped native token (e.g. WETH) used to convert any incoming msg.value
+    ///      into the corresponding ERC20 deposit during a DEPOSIT transaction.
+    ///      Must be set by the owner via `setNativeWToken` before native ETH deposits
+    ///      are accepted; while unset (address(0)) any `transact` call carrying
+    ///      msg.value > 0 reverts. ERC20-only deposits are unaffected.
+    IWToken public nativeWToken;
+
+    /// @dev Address authorised to call `pause()`. Set by the owner via `setPauser`.
+    ///      Defaults to address(0).
+    address public pauser;
 }

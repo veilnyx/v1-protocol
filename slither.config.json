@@ -1,0 +1,11 @@
+{
+    "filter_paths": "node_modules,lib",
+    "solc_solcs_select": "0.8.24",
+    "detectors_to_exclude": "naming-convention,solc-version",
+    "solc_remaps": [
+        "@openzeppelin/contracts/=node_modules/@openzeppelin/contracts/",
+        "@openzeppelin/contracts-upgradeable/=node_modules/@openzeppelin/contracts-upgradeable/",
+        "@account-abstraction/contracts/=node_modules/@account-abstraction/contracts/",
+        "forge-std/=node_modules/forge-std/src/"
+    ]
+}

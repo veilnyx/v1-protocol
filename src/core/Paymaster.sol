@@ -1,58 +1,132 @@
-// SPDX-License-Identifier: MIT
-pragma solidity 0.8.23;
+// SPDX-License-Identifier: LicenseRef-BUSL
+pragma solidity 0.8.24;
 
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IERC165} from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {BasePaymaster} from "@account-abstraction/contracts/core/BasePaymaster.sol";
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
+import {IPaymaster} from "@account-abstraction/contracts/interfaces/IPaymaster.sol";
 import {IEntryPoint} from "@account-abstraction/contracts/interfaces/IEntryPoint.sol";
 import {PackedUserOperation} from "@account-abstraction/contracts/interfaces/PackedUserOperation.sol";
-import {ZTransaction} from "../libraries/ZTransaction.sol";
+import {ShieldedTransaction} from "../libraries/ShieldedTransactionLogic.sol";
+import {Asset, AssetLogic} from "../libraries/AssetLogic.sol";
 import {IPool} from "../interfaces/IPool.sol";
+import {MIN_PRICE_STALENESS_THRESHOLD} from "../base/Constants.sol";
 
-contract Paymaster is BasePaymaster {
+contract Paymaster is IPaymaster, Ownable {
     uint256 public constant VALIDATION_SUCCESS = 0;
-
+    uint24 public constant GAS_ASSET_ID = 65537; // AssetId for the active chain's native gas token
+    uint8 public constant ETH_DECIMALS = 18;
+    IEntryPoint public immutable entryPoint;
     address public immutable sender;
+    IPool public immutable pool;
 
-    /**
-     * @dev Mapping from assetId to fee value.
-     */
-    mapping(uint24 => uint256) private _assetFees;
+    /// @notice Maximum age (seconds) of a Chainlink price answer used for fee conversion
+    ///         before it is considered stale. Configured independently from Pool's TVL
+    ///         staleness threshold because the fee-conversion feed (ETH/ERC20) and the
+    ///         TVL feeds (asset/USD) have different update cadences and risk profiles.
+    uint256 public priceStalenessThreshold;
+
+    mapping(uint24 => AggregatorV3Interface) public assetIdToChainlinkFeed;
 
     error InvalidPaymaster(address paymaster);
+    error InvalidEntryPoint();
     error InvalidSender(address sender);
+    error ZeroAddress();
     error InvalidCallData();
     error InsufficientFee(uint256 given, uint256 required);
-    error UnsupportedFeeAsset(uint24 asset);
+    error FeeAssetNotSupportedByVeilnyx(uint24 assetId);
+    error AssetNotSupportedAsFeeAsset(uint24 assetId);
+    error ChainlinkPriceFeedNotFound(uint24 assetId);
+    error ChainlinkPriceInvalid(
+        int256 price,
+        uint8 feedDecimals,
+        uint256 updatedAt
+    );
+    error MaxCostEthToAssetConversionFailed(uint24 assetId);
 
+    /**
+     * params entryPoint_:              Address of the entry point contract.
+     * params sender_:                  Address of the gateway contract.
+     * params priceStalenessThreshold_: Maximum age (seconds) for the fee-conversion
+     *                                  Chainlink feed before it is considered stale.
+     */
     constructor(
-        address entryPoint_,
-        address sender_
-    ) BasePaymaster(IEntryPoint(entryPoint_)) {
+        IEntryPoint entryPoint_,
+        address sender_,
+        IPool pool_,
+        uint256 priceStalenessThreshold_
+    ) Ownable(msg.sender) {
+        if (
+            address(entryPoint_) == address(0) ||
+            sender_ == address(0) ||
+            address(pool_) == address(0)
+        ) revert ZeroAddress();
+        if (priceStalenessThreshold_ < MIN_PRICE_STALENESS_THRESHOLD) {
+            revert IPool.PriceFeedStalenessThresholdTooLow(
+                priceStalenessThreshold_,
+                MIN_PRICE_STALENESS_THRESHOLD
+            );
+        }
+        entryPoint = entryPoint_;
         sender = sender_;
+        pool = pool_;
+        priceStalenessThreshold = priceStalenessThreshold_;
     }
 
-    function getAssetFee(uint24 assetId) external view returns (uint256) {
-        return _assetFees[assetId];
+    /// @notice Sets the maximum age of a Chainlink price answer used for fee conversion.
+    /// @param threshold Age in seconds. Set to type(uint256).max to effectively disable staleness checks.
+    function setPriceStalenessThreshold(uint256 threshold) external onlyOwner {
+        if (threshold < MIN_PRICE_STALENESS_THRESHOLD) {
+            revert IPool.PriceFeedStalenessThresholdTooLow(
+                threshold,
+                MIN_PRICE_STALENESS_THRESHOLD
+            );
+        }
+        if (priceStalenessThreshold != threshold) {
+            priceStalenessThreshold = threshold;
+            emit IPool.PriceStalenessThresholdUpdated(threshold);
+        }
     }
 
-    function updateAssetFee(
+    /**
+     * Sets Chainlink feed address for an asset.
+     * @param assetId - Asset id to update fee for.
+     * @param feed    - Chainlink feed address.
+     */
+    function setChainlinkFeed(
         uint24 assetId,
-        uint256 feeValue
+        AggregatorV3Interface feed
     ) external onlyOwner {
-        _assetFees[assetId] = feeValue;
+        assetIdToChainlinkFeed[assetId] = feed;
     }
 
-    function isFeeAssetSupported(uint24 assetId) external view returns (bool) {
-        return _assetFees[assetId] > 0;
+    /**
+     * Withdraw deposited value from entrypoint contract.
+     * @param withdrawAddress - Target to send to.
+     * @param amount          - Amount to withdraw.
+     */
+    function withdrawFromEntryPoint(
+        address payable withdrawAddress,
+        uint256 amount
+    ) public onlyOwner {
+        entryPoint.withdrawTo(withdrawAddress, amount);
     }
 
-    function withdrawTo(
+    /**
+     * Withdraw any asset/fee from the deposit.
+     * @param token  - Token to withdraw.
+     * @param to     - Target to send to.
+     * @param value  - Amount to withdraw.
+     */
+    function withdrawAsset(
         address token,
         address payable to,
         uint256 value
-    ) public onlyOwner {
+    ) external onlyOwner {
         if (token == address(0)) {
             Address.sendValue(to, value);
         } else {
@@ -60,11 +134,111 @@ contract Paymaster is BasePaymaster {
         }
     }
 
+    /**
+     * Add a deposit for this paymaster, used for paying for transaction fees.
+     */
+    function depositToEntryPoint() public payable {
+        entryPoint.depositTo{value: msg.value}(address(this));
+    }
+
+    /// @inheritdoc IPaymaster
+    function validatePaymasterUserOp(
+        PackedUserOperation calldata userOp,
+        bytes32 userOpHash,
+        uint256 maxCost
+    ) external override returns (bytes memory context, uint256 validationData) {
+        _requireFromEntryPoint();
+        return _validatePaymasterUserOp(userOp, userOpHash, maxCost);
+    }
+
+    /// @inheritdoc IPaymaster
+    function postOp(
+        PostOpMode /*mode*/,
+        bytes calldata /*context*/,
+        uint256 /*actualGasCost*/,
+        uint256 /*actualUserOpFeePerGas*/
+    ) external pure override {
+        revert("not supported");
+    }
+
+    /**
+     * Return current paymaster's deposit on the entryPoint.
+     */
+    function getEntryPointDeposit() public view returns (uint256) {
+        return entryPoint.balanceOf(address(this));
+    }
+
+    /// @notice Returns the `maxCostEth` (native gas token of the active chain) value in `feeAssetId` using Chainlink's price feeds.
+    function convertFeeFromGasTokenToFeeAsset(
+        uint256 maxCostEth,
+        uint24 feeAssetId
+    ) public view returns (uint256 feeInAsset) {
+        Asset memory feeAsset = pool.getAsset(feeAssetId);
+        Asset memory gasAsset = pool.getAsset(GAS_ASSET_ID);
+
+        if (!feeAsset.isActive) {
+            revert FeeAssetNotSupportedByVeilnyx(feeAssetId);
+        }
+
+        // if chainlink feed for assetId not found, return maxCostEth
+        if (
+            address(assetIdToChainlinkFeed[feeAssetId]) == address(0) &&
+            feeAssetId != GAS_ASSET_ID
+        ) {
+            revert AssetNotSupportedAsFeeAsset(feeAssetId);
+        }
+
+        if (
+            address(assetIdToChainlinkFeed[feeAssetId]) == address(0) &&
+            feeAssetId == GAS_ASSET_ID
+        ) {
+            // fee asset is GAS_TOKEN itself, returning default value
+            return maxCostEth;
+        }
+
+        AggregatorV3Interface feed = assetIdToChainlinkFeed[feeAssetId];
+        // for conversion we assume price fetching of assetId in ETH only since maxCostEth is in ETH
+        uint8 feedDecimals = feed.decimals();
+
+        (, int256 priceETHInAsset, , uint256 updatedAt, ) = feed
+            .latestRoundData();
+        if (
+            priceETHInAsset <= 0 ||
+            updatedAt > block.timestamp ||
+            block.timestamp - updatedAt > priceStalenessThreshold
+        ) {
+            revert ChainlinkPriceInvalid(
+                priceETHInAsset,
+                feedDecimals,
+                updatedAt
+            );
+        }
+
+        // returns fees in feeAsset's precision
+        uint256 feePrec = feeAsset.precision;
+        uint256 baseExp = gasAsset.precision + feedDecimals;
+        feeInAsset = feePrec >= baseExp
+            ? (maxCostEth *
+                uint256(priceETHInAsset) *
+                10 ** (feePrec - baseExp))
+            : Math.mulDiv(
+                maxCostEth,
+                uint256(priceETHInAsset),
+                10 ** (baseExp - feePrec)
+            );
+
+        if (feeInAsset == 0) {
+            revert MaxCostEthToAssetConversionFailed(feeAssetId);
+        }
+
+        return feeInAsset;
+    }
+
     /// @dev The only requirements for validation are
-    ///     - sender is pool contract
+    ///     - sender should be the Gateway contract
     ///     - specified paymaster is this contract only (guarantee to receive fee to this contract)
     ///     - specified fee is sufficient
-    /// Since thispaymaster is only used by and meant for zkFi pool and the pool's `validateUserOp` already checks
+    /// Since this paymaster is only used by and meant for Veilnyx pool and the pool's `validateUserOp` already checks
     /// for validity of tx (so that it does not revert when called), we don't need to check those here.
     /// This paymaster must always maintain sufficient deposit in the `EntryPoint` contract to pay for gas.
     /// Note that it always reverts for invalid operations rather than returning.
@@ -72,8 +246,8 @@ contract Paymaster is BasePaymaster {
         PackedUserOperation calldata userOp,
         bytes32 /*userOpHash*/,
         uint256 maxCostEth
-    ) internal view override returns (bytes memory, uint256) {
-        // Only support pool contract as sender
+    ) internal view returns (bytes memory, uint256) {
+        // Only support gateway contract as sender
         if (userOp.sender != sender) {
             revert InvalidSender(userOp.sender);
         }
@@ -101,30 +275,45 @@ contract Paymaster is BasePaymaster {
     function _parseFeeParams(
         PackedUserOperation calldata userOp
     ) internal pure returns (address, uint24, uint256) {
-        ZTransaction memory ztx = abi.decode(
+        ShieldedTransaction memory stx = abi.decode(
             userOp.callData[4:],
-            (ZTransaction)
+            (ShieldedTransaction)
         );
 
-        uint24 feeAssetId = ztx.pubAssetIds[0];
-        uint256 feeValue = uint256(uint96(ztx.feeData));
-        address paymaster = address(bytes20(bytes32(ztx.feeData)));
+        // FeeData is packed as follows (in order):
+        // 20 bytes - paymaster address
+        // 3 bytes - feeAssetId (24 bits)
+        // 9 bytes - feeValue (72 bits)
+        address paymaster = address(uint160(stx.feeData >> (24 + 72)));
+
+        // Extract the feeAssetId (3 bytes)
+        uint24 feeAssetId = uint24(stx.feeData >> 72);
+
+        // Extract the feeValue (9 bytes)
+        uint256 feeValue = uint256(uint72(stx.feeData));
 
         return (paymaster, feeAssetId, feeValue);
     }
 
+    /// @notice Returns `maxCostEth` amt of ETH in asset.
     function _getRequiredFee(
         uint24 feeAssetId,
-        uint256 /*maxCostEth*/
-    ) internal view returns (uint256) {
-        uint256 feeAssetValue = _assetFees[feeAssetId];
-
-        if (feeAssetValue == 0) {
-            revert UnsupportedFeeAsset(feeAssetId);
-        }
-
-        return feeAssetValue;
+        uint256 maxCostEth
+    ) internal view returns (uint256 feeInAsset) {
+        feeInAsset = convertFeeFromGasTokenToFeeAsset(maxCostEth, feeAssetId);
+        return feeInAsset;
     }
 
+    /**
+     * Validate the call is made from a valid entrypoint
+     */
+    function _requireFromEntryPoint() internal virtual {
+        if (msg.sender != address(entryPoint)) {
+            revert InvalidEntryPoint();
+        }
+    }
+
+    // Intentionally empty: allows this contract to receive native ETH for gas sponsorship flows.
+    // solhint-disable-next-line no-empty-blocks
     receive() external payable {}
 }
