@@ -801,7 +801,7 @@ library ShieldedTransactionLogic {
             // Extract last 28 bytes value
             params.pubAssets[i].value = uint224(stx.pubAssets[i]);
 
-            /// Since feeAsset pushed into pubAssets, for transfer tx, the pubAssets value will become 0, but thats fine as pubAssets is not used in transfer tx. Only used in other types tx to move assets.
+            /// Since feeAsset is pushed as a pubAssets (by the SDK layer), for transfer tx, the pubAssets.value will become 0. Thats okay as `pubAssets` is not used in transfer tx. It's only used in other tx type to move assets.
             if (params.pubAssets[i].id == params.feeAssetId) {
                 params.pubAssets[i].value =
                     params.pubAssets[i].value -
@@ -832,6 +832,9 @@ library ShieldedTransactionLogic {
         memoParams.keysMemo = stx.keysMemo;
         memoParams.notesMemo = stx.notesMemo;
 
+        // `assetsMemo` is used to record the input assets for tx.
+        // For transfer tx, the assetsMemo records the transferred notes. These transferred notes are encrypted against the sender's shielded address, hence able to capture sender's activity.
+        // For non-transfer tx, the assetsMemo will contain the pubAssets (31 bytes words): [assetId (3 bytes) + value (28 bytes)]. Since `pubAssets` contain the input assets and paymaster fee asset (created by the SDK layer), it being encoded to `assetsMemo` will be used to track the input asset activity of the sender for non-transfer tx.
         if (stx.txType == ShieldedTransactionType.TRANSFER) {
             memoParams.assetsMemo = stx.assetsMemo;
         } else {
