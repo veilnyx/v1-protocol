@@ -8,6 +8,8 @@ import {EIP712Upgradeable} from "@openzeppelin/contracts-upgradeable/utils/crypt
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {ShieldedAddressRegistrationData, ShieldedAddressLogic} from "src/libraries/ShieldedAddressLogic.sol";
 import {IPool} from "src/interfaces/IPool.sol";
+import {IScreener} from "src/interfaces/IScreener.sol";
+import {Screener} from "src/core/Screener.sol";
 import {PoolBaseTest} from "test/fixtures/PoolBaseTest.sol";
 
 contract PoolUserRegistration is PoolBaseTest {
@@ -131,6 +133,122 @@ contract PoolUserRegistration is PoolBaseTest {
             )
         );
 
+        pool.registerAddress(addressRegistrationData);
+    }
+
+    //////////////////////////////////////////////////////
+    /// Sanctioned Address Screening                //////
+    //////////////////////////////////////////////////////
+
+    uint256 internal constant ETH_MAINNET = 1;
+    /// @dev Chainalysis sanctions oracle on Ethereum mainnet.
+    address internal constant MAINNET_SANCTIONS_LIST =
+        0x40C57923924B5c5c5455c48D93317139ADDaC8fb;
+    /// @dev A sanctioned address taken from the mainnet `SanctionedAddressesAdded`
+    /// event logs of the Chainalysis oracle.
+    address internal constant SANCTIONED_ADDRESS =
+        0xFda1Ec4A6178d4916b001a065422D31EBE5F62FF;
+
+    /// @notice Registration must revert when the caller is sanctioned. Uses the
+    /// dynamic MockScreener so only this test flags the caller; all other tests
+    /// keep the default "not sanctioned" behaviour.
+    function test_revertWhenSenderSanctioned() external {
+        screener.setSanctioned(senderAddr, true);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IScreener.SanctionedAddress.selector,
+                senderAddr
+            )
+        );
+        vm.prank(senderAddr);
+        pool.registerAddress(addressRegistrationData);
+    }
+
+    /// @notice The zero-address screener kill-switch: once the owner disables
+    /// screening via `setScreener(0)`, a previously-blocked sanctioned caller can
+    /// register. The first (sanctioned) attempt reverts before any state change,
+    /// so the same registration data is reused for the successful attempt.
+    function test_registerSucceedsAfterScreenerDisabled() external {
+        screener.setSanctioned(senderAddr, true);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IScreener.SanctionedAddress.selector,
+                senderAddr
+            )
+        );
+        vm.prank(senderAddr);
+        pool.registerAddress(addressRegistrationData);
+
+        // Owner disables screening entirely.
+        pool.setScreener(IScreener(address(0)));
+
+        vm.expectEmit(true, true, false, false);
+        emit IPool.RegisterAddress(
+            senderAddr,
+            fixture.sender.rootAddress,
+            0,
+            shieldedAddress
+        );
+        vm.prank(senderAddr);
+        pool.registerAddress(addressRegistrationData);
+    }
+
+    /// @notice A non-sanctioned caller registers normally even after another
+    /// address has been flagged, proving the screening check is caller-scoped.
+    function test_registerSucceedsWhenSenderNotSanctioned() external {
+        screener.setSanctioned(SANCTIONED_ADDRESS, true);
+
+        vm.expectEmit(true, true, false, false);
+        emit IPool.RegisterAddress(
+            senderAddr,
+            fixture.sender.rootAddress,
+            0,
+            shieldedAddress
+        );
+        vm.prank(senderAddr);
+        pool.registerAddress(addressRegistrationData);
+    }
+
+    //////////////////////////////////////////////////////
+    /// Mainnet Fork Tests                          //////
+    //////////////////////////////////////////////////////
+
+    /// @notice Fork test against the live Chainalysis sanctions oracle on
+    /// Ethereum mainnet. Verifies that the real `Screener` flags a known
+    /// sanctioned address and that wiring it into the Pool blocks registration.
+    /// @dev Run with a mainnet fork, e.g.
+    ///      `forge test --fork-url $RPC_MAINNET --match-test test_fork_mainnetSanctionedAddressBlocksRegistration`
+    function test_fork_mainnetSanctionedAddressBlocksRegistration() external {
+        if (block.chainid != ETH_MAINNET) {
+            vm.skip(true);
+            return;
+        }
+
+        Screener realScreener = new Screener(MAINNET_SANCTIONS_LIST);
+
+        // The live oracle flags the sanctioned address...
+        assertTrue(
+            realScreener.isSanctioned(SANCTIONED_ADDRESS),
+            "expected address to be sanctioned on mainnet"
+        );
+        // ...but not an arbitrary fresh address.
+        assertFalse(
+            realScreener.isSanctioned(makeAddr("cleanAddress")),
+            "did not expect random address to be sanctioned"
+        );
+
+        // Swap the mock for the real screener and confirm registration is blocked.
+        pool.setScreener(IScreener(address(realScreener)));
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IScreener.SanctionedAddress.selector,
+                SANCTIONED_ADDRESS
+            )
+        );
+        vm.prank(SANCTIONED_ADDRESS);
         pool.registerAddress(addressRegistrationData);
     }
 }

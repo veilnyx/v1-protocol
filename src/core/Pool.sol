@@ -212,6 +212,13 @@ contract Pool is
         emit IPool.RevokerStatusUpdated(id, isActive);
     }
 
+    /// @notice Sets the sanctions screener contract.
+    /// @dev Setting `screener_` to the zero address disables screening entirely:
+    ///      registrations and deposits then proceed without a sanctions check.
+    ///      This is an intentional kill-switch — if the external screener becomes
+    ///      unavailable or starts reverting, the owner can disable screening to
+    ///      keep the protocol live rather than have core flows revert. Re-enable
+    ///      by setting a working screener again. Emits {ScreenerUpdated}.
     function setScreener(IScreener screener_) external onlyOwner {
         screener = screener_;
         emit ScreenerUpdated(address(screener_));
@@ -313,6 +320,8 @@ contract Pool is
     function registerAddress(
         ShieldedAddressRegistrationData calldata addressRegData
     ) external whenNotPaused {
+        _screenForSanctionedAddr(msg.sender);
+
         bytes32 hashTypedData = _hashTypedDataV4(
             ShieldedAddressLogic.hashRegsiterAddressStruct(
                 addressRegData.shieldedAddress
@@ -568,11 +577,24 @@ contract Pool is
         emit IPool.AssetUsdPriceFeedSet(assetId, feed);
     }
 
+    /// @dev Screens `account` against the configured sanctions screener.
+    /// @dev Reverts with {IScreener.SanctionedAddress} when `account` is flagged.
+    function _screenForSanctionedAddr(address account) internal view {
+        IScreener _screener = screener;
+        if (
+            address(_screener) != address(0) && _screener.isSanctioned(account)
+        ) {
+            revert IScreener.SanctionedAddress(account);
+        }
+    }
+
     /// @dev Runs all deposit guard-rail checks — deposit min/max limits and TVL cap
     function _runDepositGuardRails(
         ShieldedTransaction calldata stx
     ) private view {
         if (stx.txType != ShieldedTransactionType.DEPOSIT) return;
+        _screenForSanctionedAddr(msg.sender);
+
         uint256 _min = minDepositUsd;
         uint256 _max = maxDepositUsd;
         uint256 _tvl = tvlLimitUsd;

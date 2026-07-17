@@ -5,6 +5,8 @@ import {Test} from "forge-std/Test.sol";
 import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
 import {Asset, AssetType} from "src/libraries/AssetLogic.sol";
 import {IPool} from "src/interfaces/IPool.sol";
+import {IScreener} from "src/interfaces/IScreener.sol";
+import {Screener} from "src/core/Screener.sol";
 import {MockAggregatorV3} from "test/mocks/MockAggregatorV3.sol";
 import {ShieldedTransaction} from "src/libraries/ShieldedTransactionLogic.sol";
 import {MockERC20} from "test/mocks/MockERC20.sol";
@@ -21,6 +23,14 @@ contract PoolGuardrailsTest is PoolTest {
     MockAggregatorV3 internal mockFeed3; // tokenReent:          18-dec, $1
 
     Asset public asset3;
+    uint256 internal constant ETH_MAINNET = 1;
+    /// @dev Chainalysis sanctions oracle on Ethereum mainnet.
+    address internal constant MAINNET_SANCTIONS_LIST =
+        0x40C57923924B5c5c5455c48D93317139ADDaC8fb;
+    /// @dev A sanctioned address taken from the mainnet `SanctionedAddressesAdded`
+    /// event logs of the Chainalysis oracle.
+    address internal constant SANCTIONED_ADDRESS =
+        0xFda1Ec4A6178d4916b001a065422D31EBE5F62FF;
 
     function setUp() public {
         _setUp();
@@ -596,6 +606,152 @@ contract PoolGuardrailsTest is PoolTest {
                 asset1.id
             )
         );
+        pool.transact(stx);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // _runDepositGuardRails — sanctioned-address screening
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /// A DEPOSIT from a sanctioned caller reverts with SanctionedAddress. The
+    /// sanction check is the first thing the deposit guard rails do, so it
+    /// short-circuits before any token pull, limit, or feed logic.
+    function test_revert_runDepositGuardRails_depositorSanctioned() public {
+        address sanctionedDepositor = makeAddr("sanctionedDepositor");
+        screener.setSanctioned(sanctionedDepositor, true);
+
+        ShieldedTransaction memory stx = _loadShieldedTransaction(
+            "deposit_pre_tx"
+        );
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IScreener.SanctionedAddress.selector,
+                sanctionedDepositor
+            )
+        );
+        vm.prank(sanctionedDepositor);
+        pool.transact(stx);
+    }
+
+    /// A DEPOSIT from a clean caller still succeeds even when a *different*
+    /// address is flagged, proving the screening check is caller-scoped and the
+    /// dynamic mock does not leak into unrelated callers.
+    function test_runDepositGuardRails_depositorNotSanctioned_succeeds()
+        public
+    {
+        _registerAllFeeds();
+        // Flag an unrelated actor — must not affect address(this).
+        screener.setSanctioned(makeAddr("someOtherBadActor"), true);
+
+        _mintAsset(asset1, address(this), 10000 ether);
+        _mintAsset(asset2, address(this), 10000e6);
+        _approveAsset(asset1, address(pool), 10000 ether);
+        _approveAsset(asset2, address(pool), 10000e6);
+
+        ShieldedTransaction memory stx = _loadShieldedTransaction(
+            "deposit_pre_tx"
+        );
+        pool.transact(stx); // must not revert
+    }
+
+    /// The sanction screening lives in the DEPOSIT-only branch, so a TRANSFER
+    /// from a sanctioned caller must NOT be blocked by it.
+    function test_runDepositGuardRails_sanctionSkippedForTransfer() public {
+        _makePreDeposit();
+        // Flag the caller only after the pre-deposit is in place.
+        screener.setSanctioned(address(this), true);
+
+        ShieldedTransaction memory stx = _loadShieldedTransaction(
+            "transfer_20_weth_without_fee"
+        );
+        pool.transact(stx); // TRANSFER → deposit sanction check not triggered
+    }
+
+    /// The sanction screening lives in the DEPOSIT-only branch, so a WITHDRAW
+    /// from a sanctioned caller must NOT be blocked by it.
+    function test_runDepositGuardRails_sanctionSkippedForWithdraw() public {
+        _makePreDeposit();
+        screener.setSanctioned(address(this), true);
+
+        ShieldedTransaction memory stx = _loadShieldedTransaction(
+            "withdraw_100_weth_without_fee"
+        );
+        pool.transact(stx); // WITHDRAW → deposit sanction check not triggered
+    }
+
+    /// The zero-address screener kill-switch: once the owner disables screening
+    /// via `setScreener(0)`, a previously-blocked sanctioned depositor can
+    /// deposit. The first (sanctioned) attempt reverts before any state change,
+    /// so the same transaction is reused for the successful attempt.
+    /// Default test limits (min=0, max=∞, tvl=∞) mean no price feed is needed —
+    /// the guard returns before the oracle path.
+    function test_runDepositGuardRails_screenerDisabled_allowsDeposit() public {
+        _mintAsset(asset1, address(this), 10000 ether);
+        _mintAsset(asset2, address(this), 10000e6);
+        _approveAsset(asset1, address(pool), 10000 ether);
+        _approveAsset(asset2, address(pool), 10000e6);
+
+        screener.setSanctioned(address(this), true);
+
+        ShieldedTransaction memory stx = _loadShieldedTransaction(
+            "deposit_pre_tx"
+        );
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IScreener.SanctionedAddress.selector,
+                address(this)
+            )
+        );
+        pool.transact(stx);
+
+        // Owner disables screening entirely.
+        pool.setScreener(IScreener(address(0)));
+
+        pool.transact(stx); // must not revert
+    }
+
+    /// @notice Fork test against the live Chainalysis sanctions oracle on
+    /// Ethereum mainnet. Verifies that the real `Screener` flags a known
+    /// sanctioned address and that wiring it into the Pool blocks a deposit.
+    /// The sanction check is the first thing the deposit guard rails do, so it
+    /// reverts before any token pull.
+    /// @dev Run with a mainnet fork, e.g.
+    ///      `forge test --fork-url $RPC_MAINNET --match-test test_fork_mainnetSanctionedAddressBlocksDeposit`
+    function test_fork_mainnetSanctionedAddressBlocksDeposit() external {
+        if (block.chainid != ETH_MAINNET) {
+            vm.skip(true);
+            return;
+        }
+
+        Screener realScreener = new Screener(MAINNET_SANCTIONS_LIST);
+
+        // The live oracle flags the sanctioned address...
+        assertTrue(
+            realScreener.isSanctioned(SANCTIONED_ADDRESS),
+            "expected address to be sanctioned on mainnet"
+        );
+        // ...but not an arbitrary fresh address.
+        assertFalse(
+            realScreener.isSanctioned(makeAddr("cleanAddress")),
+            "did not expect random address to be sanctioned"
+        );
+
+        // Swap the mock for the real screener and confirm the deposit is blocked.
+        pool.setScreener(IScreener(address(realScreener)));
+
+        ShieldedTransaction memory stx = _loadShieldedTransaction(
+            "deposit_pre_tx"
+        );
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IScreener.SanctionedAddress.selector,
+                SANCTIONED_ADDRESS
+            )
+        );
+        vm.prank(SANCTIONED_ADDRESS);
         pool.transact(stx);
     }
 }
