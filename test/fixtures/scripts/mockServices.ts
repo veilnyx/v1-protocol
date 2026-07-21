@@ -1,14 +1,14 @@
 import { Hex, hexToBigInt, keccak256, stringToBytes } from "viem";
 import MerkleTree from "fixed-merkle-tree";
-import { fp } from "@labyrinthac/babyjubjub";
-import { ShieldedAddress } from "@labyrinthac/account";
+import { fp } from "@veilnyx-sdk/babyjubjub";
+import { ShieldedAddress } from "@veilnyx-sdk/account";
 import {
   IAddressResolver,
   INote,
   INoteSource,
   ITreeSource,
-} from "@labyrinthac/shared-types";
-import { hexFixed } from "@labyrinthac/utils";
+} from "@veilnyx-sdk/shared-types";
+import { hexFixed } from "@veilnyx-sdk/utils";
 
 export class MockAddressResolver implements IAddressResolver {
   private _mockedEnsNames: Record<string, Hex> = {};

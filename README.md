@@ -44,7 +44,7 @@ The majority of pool and adaptor tests rely on pre-generated ZK proof fixtures. 
 pnpm test:prepare
 ```
 
-This runs `test/fixtures/scripts/index.ts` which generates encoded `ShieldedTransaction` fixtures under `test/fixtures/data/`. The script uses the `@labyrinthac/core` SDK to produce real ZK proofs — expect it to take a few minutes.
+This runs `test/fixtures/scripts/index.ts` which generates encoded `ShieldedTransaction` fixtures under `test/fixtures/data/`. The script uses the `@veilnyx-sdk/core` SDK to produce real ZK proofs — expect it to take a few minutes.
 
 > **Note:** The fixture generation script is selective. Open `test/fixtures/scripts/index.ts` to see which fixture groups are active and uncomment those you need. We have updated all tx fixtures, so running this should not be required.
 

@@ -1,4 +1,4 @@
-import { Core } from "@labyrinthac/core";
+import { Core } from "@veilnyx-sdk/core";
 import { generateTestAddressRegistrations, generateTestAddrRegWithOutsourceProofVerifications } from "./fixture";
 
 const reqs = {

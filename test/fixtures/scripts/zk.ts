@@ -6,7 +6,7 @@ import {
   CircuitPath,
   TreeUpdateData,
   ZTransaction,
-} from "@labyrinthac/zk-prover";
+} from "@veilnyx-sdk/zk-prover";
 
 const circuitPathBase = path.resolve(
   __dirname,
