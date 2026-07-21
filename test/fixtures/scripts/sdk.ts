@@ -16,11 +16,11 @@ import {
   PublicClient
 } from "viem";
 import { foundry } from "viem/chains";
-import { Core, CoreOptions } from "@labyrinthac/core";
+import { Core, CoreOptions } from "@veilnyx-sdk/core";
 import MerkleTree from "fixed-merkle-tree";
-import { fp, poseidonHash } from "@labyrinthac/babyjubjub";
+import { fp, poseidonHash } from "@veilnyx-sdk/babyjubjub";
 import { UpaClient, UpaInstanceDescriptor } from "@nebrazkp/upa/sdk";
-import { toBigInt } from "@labyrinthac/utils";
+import { toBigInt } from "@veilnyx-sdk/utils";
 import {
   MockAddressResolver,
   MockNotesSource,
@@ -28,7 +28,7 @@ import {
 } from "./mockServices";
 import { circuits } from "./zk";
 import { fixture } from "./fixture";
-import { TransactionOptions } from "@labyrinthac/shared-types";
+import { TransactionOptions } from "@veilnyx-sdk/shared-types";
 
 const {
   sender: { account: senderAccount },

@@ -23,16 +23,16 @@ import {
   getRequiredPrefund,
   ENTRYPOINT_ADDRESS_V07,
 } from "permissionless";
-import { ShieldedAccount } from "@labyrinthac/account";
-import { Point, poseidonDecrypt, PointType } from "@labyrinthac/babyjubjub";
-import { randomBigInt, randomBytes, randomHex } from "@labyrinthac/utils";
+import { ShieldedAccount } from "@veilnyx-sdk/account";
+import { Point, poseidonDecrypt, PointType } from "@veilnyx-sdk/babyjubjub";
+import { randomBigInt, randomBytes, randomHex } from "@veilnyx-sdk/utils";
 import {
   TransactionOptions,
   TransactionRequest,
-} from "@labyrinthac/shared-types";
-import { Core } from "@labyrinthac/core";
-import { ZTransaction } from "@labyrinthac/zk-prover";
-import { Note, SIZE_ENCRYPTED_DECRYPTION_KEY, SIZE_FULLY_ENCRYPTED_NOTE_DATA } from "@labyrinthac/transaction";
+} from "@veilnyx-sdk/shared-types";
+import { Core } from "@veilnyx-sdk/core";
+import { ZTransaction } from "@veilnyx-sdk/zk-prover";
+import { Note, SIZE_ENCRYPTED_DECRYPTION_KEY, SIZE_FULLY_ENCRYPTED_NOTE_DATA } from "@veilnyx-sdk/transaction";
 import config from "../config.json";
 
 const senderSeed = BigInt(config.sender.seed);

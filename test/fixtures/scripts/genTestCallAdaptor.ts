@@ -1,6 +1,6 @@
 import { parseEther, parseUnits, zeroAddress, encodeAbiParameters } from "viem";
-import { Core } from "@labyrinthac/core";
-import { TransactionType } from "@labyrinthac/shared-types";
+import { Core } from "@veilnyx-sdk/core";
+import { TransactionType } from "@veilnyx-sdk/shared-types";
 import { fixture, generateTestTransactions, mockNotes, PAYMASTER_ADDR_FIXTURE } from "./fixture";
 
 const {

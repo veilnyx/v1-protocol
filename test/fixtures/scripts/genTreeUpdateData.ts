@@ -1,9 +1,9 @@
 const path = require("path");
 import { writeFileSync } from "fs";
 import { keccak256, stringToBytes } from "viem";
-import { fp, poseidonHash } from "@labyrinthac/babyjubjub";
-import { MerkleTreeState } from "@labyrinthac/zk-prover";
-import { Core } from "@labyrinthac/core";
+import { fp, poseidonHash } from "@veilnyx-sdk/babyjubjub";
+import { MerkleTreeState } from "@veilnyx-sdk/zk-prover";
+import { Core } from "@veilnyx-sdk/core";
 import { fixture } from "./fixture";
 
 const dirFixtureData = path.resolve(__dirname, "../data");

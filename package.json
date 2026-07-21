@@ -1,7 +1,7 @@
 {
-  "name": "@labyrinthac/v1-protocol",
+  "name": "v1-protocol",
   "version": "1.0.0",
-  "description": "Smart contracts for zkfi v1 protocol",
+  "description": "Smart contracts for the Veilnyx protocol",
   "scripts": {
     "clean": "rm -rf cache out",
     "build": "forge build",
@@ -29,7 +29,7 @@
     "registerCircuitNebra:ethSepolia": "hardhat run script/registerCircuitsOnNebra.ts --network sepolia"
   },
   "keywords": [],
-  "author": "zkFi Team",
+  "author": "Gelbfeld AG",
   "dependencies": {
     "@account-abstraction/contracts": "^0.7.0",
     "@chainlink/contracts": "^1.3.0",
@@ -38,13 +38,13 @@
     "poseidon-solidity": "^0.0.5"
   },
   "devDependencies": {
-    "@labyrinthac/account": "link:../v1-sdk/packages/account",
-    "@labyrinthac/babyjubjub": "link:../v1-sdk/packages/babyjubjub",
-    "@labyrinthac/core": "link:../v1-sdk/packages/core",
-    "@labyrinthac/shared-types": "link:../v1-sdk/packages/shared-types",
-    "@labyrinthac/transaction": "link:../v1-sdk/packages/transaction",
-    "@labyrinthac/utils": "link:../v1-sdk/packages/utils",
-    "@labyrinthac/zk-prover": "link:../v1-sdk/packages/zk-prover",
+    "@veilnyx-sdk/account": "^1.3.3",
+    "@veilnyx-sdk/babyjubjub": "^1.3.3",
+    "@veilnyx-sdk/core": "^1.3.4",
+    "@veilnyx-sdk/shared-types": "^1.3.3",
+    "@veilnyx-sdk/transaction": "^1.3.3",
+    "@veilnyx-sdk/utils": "^1.3.3",
+    "@veilnyx-sdk/zk-prover": "^1.3.4",
     "@nebrazkp/upa": "^2.0.3",
     "@nomicfoundation/hardhat-ethers": "^3.0.8",
     "@nomicfoundation/hardhat-foundry": "^1.1.2",
