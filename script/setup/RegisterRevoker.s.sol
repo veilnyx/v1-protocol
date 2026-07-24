@@ -5,19 +5,20 @@ import {BaseScript} from "../BaseScript.sol";
 import {IPool} from "src/interfaces/IPool.sol";
 
 contract RegisterRevoker is BaseScript {
-    // DECOM_GRP revoker keys
+    // Veilnyx Internal Group 3 revoker keys
+    // Revoker EVM address (off-chain reference): 0x4E6de297299Da45E45Fb35E081dBE5A58006C8Fe
     uint256 constant REVOKER_X =
-        20166730020419159052286555107141035920946760385383107576039955225567455300207;
+        2749704438653731913188138418018248383640313533126118762606204960313160705060;
     uint256 constant REVOKER_Y =
-        18439266136563662170719450990945300828423393702749802977743662490195521743390;
+        14954171922332770306296821288711456505467306686450412062256847568323648387209;
 
     uint256 constant ENC_X =
-        1415297768191015876969734831367396850794970386289866514910293184189216114711;
+        8585211455054262025734530102131927858150037756720423682188447718953446140897;
     uint256 constant ENC_Y =
-        10435528812585515475307388160094137747296379532862976260464438917842987448252;
+        6678436805882868525395395045499965952852531887623729224842556806569195954800;
 
     function run() external broadcast {
-        string memory name = "Veilnyx Internal Group 2";
+        string memory name = "Veilnyx Internal Group 3";
         string
             memory description = "A revoker group for decentralized applications, ensuring secure and reliable revocation processes.";
         bytes memory metadata = abi.encode(name, description);

@@ -61,7 +61,7 @@ const assets = {
   reentrantToken: config.assets.reentrantToken,
   testnetWeth: config.assets.testnetWeth,
   testnetUsdc: config.assets.testnetUsdc,
-  usde: config.assets.usde
+  morphoVaultToken: config.assets.morphoVaultToken
 };
 
 const revokerPublicKey = Point.fromAffine({

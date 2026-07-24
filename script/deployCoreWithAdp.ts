@@ -312,7 +312,7 @@ const deployAdaptors = async (pool: any, adpParams: any, deployConfig: any) => {
   // await deployCurve(curveParams, pool, deployConfig);
   // await deployEthena(ethenaParams, pool, deployConfig);
   // await deployBeefy(beefyParams, pool, deployConfig);
-  // await deployMorpho(morphoParams, pool, deployConfig);
+  await deployMorpho(morphoParams, pool, deployConfig);
   // await deployOneInch(oneInchParams, pool, deployConfig);
   // await deployRocketPool(rocketPoolParams, pool, deployConfig);
 }
@@ -559,7 +559,7 @@ const main = async () => {
     address: poolProxy.address,
     abi: poolAbi,
     functionName: "transferOwnership",
-    args: [commonParams.veilnyxMultiSigAddress], // set to zeroAddress to keep ownership to deployer wallet for testing. Update with multisig or Gnosis Safe address for production deployment.
+    args: [commonParams.hardwareWalletOwner], // set to zeroAddress to keep ownership to deployer wallet for testing. Update with multisig or Gnosis Safe address for production deployment.
   });
   await client.waitForTransactionReceipt({ hash: transferOwnershipHash });
   console.log("Pool: ownership transferred");

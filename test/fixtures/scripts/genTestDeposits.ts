@@ -4,7 +4,7 @@ import { TransactionType } from "@veilnyx-sdk/shared-types";
 import { fixture, generateTestTransactions, generateTestTxsWithOutsourcedProofVerification } from "./fixture";
 
 const {
-  assets: { weth, usdc, testnetWeth, testnetUsdc, reentrantToken },
+  assets: { weth, usdc, testnetWeth, testnetUsdc, reentrantToken, morphoVaultToken },
   sender: { account: senderAccount },
 } = fixture;
 
@@ -29,7 +29,7 @@ export const reqs = {
     viaBundler: false,
     paymaster: zeroAddress,
     revokerId: 0,
-  }
+  },
   /**
   deposit_weth_tx: {
     type: TransactionType.DEPOSIT,
@@ -41,6 +41,7 @@ export const reqs = {
     paymaster: zeroAddress,
     revokerId: 0,
   },
+ */
  deposit_2_morphoVaultToken: {
    type: TransactionType.DEPOSIT,
    assetIds: [morphoVaultToken],
@@ -51,6 +52,7 @@ export const reqs = {
    paymaster: zeroAddress,
    revokerId: 0,
  },
+ /**
  deposit_2_morphoLoanToken: {
    type: TransactionType.DEPOSIT,
    assetIds: [testnetWeth],
@@ -61,6 +63,7 @@ export const reqs = {
    paymaster: zeroAddress,
    revokerId: 0,
  },
+ /**
  deposit_2_usde: {
    type: TransactionType.DEPOSIT,
    assetIds: [usde],
@@ -124,6 +127,7 @@ export const reqs = {
    paymaster: zeroAddress,
    revokerId: 0,
  }
+ /**
  ,
 deposit_1000_weth_without_fee: {
  type: TransactionType.DEPOSIT,
@@ -151,6 +155,7 @@ deposit_1000_weth_usdc_without_fee: {
 // Two identical deposits that together supply 4 input notes (2 WETH + 2 USDC each)
 // for the transact42 (4-input 2-output) circuit test.
 export const reqs4x2: Record<string, any> = {
+  /**
   deposit_pre_tx_4x2_a: {
     type: TransactionType.DEPOSIT,
     assetIds: [weth, usdc],
@@ -161,6 +166,7 @@ export const reqs4x2: Record<string, any> = {
     paymaster: zeroAddress,
     revokerId: 0,
   },
+  */
   deposit_pre_tx_4x2_b: {
     type: TransactionType.DEPOSIT,
     assetIds: [weth, usdc],

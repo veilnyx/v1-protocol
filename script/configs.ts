@@ -38,6 +38,7 @@ export type CommonParams = {
   withdrawFeeBps: bigint;
   protocolVersion: bigint;
   veilnyxMultiSigAddress: Hex;
+  hardwareWalletOwner: Hex;
   revokers: {
     name: string;
     description: string;
@@ -64,6 +65,7 @@ export function loadConfigs() {
     withdrawFeeBps: BigInt(common.withdrawFeeBps),
     protocolVersion: BigInt(common.protocolVersion),
     veilnyxMultiSigAddress: getHex(common.veilnyxMultiSigAddress),
+    hardwareWalletOwner: getHex(common.hardwareWalletOwner),
     revokers: common.revokers.map((r) => {
       const x = {
         name: r.name,
