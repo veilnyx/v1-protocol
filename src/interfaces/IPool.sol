@@ -130,6 +130,10 @@ interface IPool {
     error DepositRestrictedAsAssetFeedNotSet(uint24 assetId);
     error DepositBelowMinimum(uint256 depositUsd, uint256 minDepositUsd);
     error DepositAboveMaximum(uint256 depositUsd, uint256 maxDepositUsd);
+    /// @dev setScreener() was called with a non-zero address that holds no code.
+    ///      An EOA screener would make every isSanctioned() call revert. The zero
+    ///      address is still accepted — it is the kill-switch that disables screening.
+    error InvalidScreenerAddress(address screener);
 
     /// @dev msg.value was sent for a non-DEPOSIT transaction. Native ETH is only
     ///      accepted on DEPOSIT to be wrapped into the configured nativeWToken.
@@ -156,6 +160,10 @@ interface IPool {
     ///      remainder if msg.value < wTokenValue.
     error NativeEthExceedsDeposit(uint256 sent, uint256 expected);
     error NotPauser();
+
+    /// @dev renounceOwnership() was called. Ownership cannot be renounced
+    ///      because the Pool would become permanently unadministrable.
+    error RenounceDisabled();
 
     /////////////////////////////////////////
     //         ADMIN WRITE METHODS         //
