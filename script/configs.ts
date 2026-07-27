@@ -6,7 +6,7 @@ const { env, common, ...chains } = configJson;
 
 export type ChainParams = {
   entryPoint: Hex;
-  wToken: Hex;
+  nativeWToken: Hex;
   sanctionsList: Hex;
   poseidonT3: Hex;
   poseidonT4: Hex;
@@ -39,6 +39,7 @@ export type CommonParams = {
   protocolVersion: bigint;
   veilnyxMultiSigAddress: Hex;
   hardwareWalletOwner: Hex;
+  pauserAddress: Hex;
   revokers: {
     name: string;
     description: string;
@@ -226,7 +227,7 @@ export function loadConfigs() {
 
     const {
       entryPoint,
-      wToken,
+      nativeWToken,
       sanctionsList,
       initAssetType,
       initAssetAddresses,
@@ -239,7 +240,7 @@ export function loadConfigs() {
 
     chainParams[Number(chainId)] = {
       entryPoint: getHex(entryPoint),
-      wToken: getHex(wToken),
+      nativeWToken: getHex(nativeWToken),
       sanctionsList: getHex(sanctionsList),
       poseidonT3: getHex(params.poseidonT3),
       poseidonT4: getHex(params.poseidonT4),

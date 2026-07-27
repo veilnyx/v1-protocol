@@ -203,9 +203,9 @@ library ShieldedTransactionLogic {
     /// @param adaptorHandler Address of the adaptor handler contract responsible for handling DeFi adaptor ops
     /// @param paymasterFees Mapping of paymaster address to assetId to fee value
     /// @param wToken_ Wrapped native token (e.g. WETH). On DEPOSIT with
-    ///        `msg.value > 0` the wToken was pre-funded by the caller via
+    ///        `msg.value > 0` the nativeWToken was pre-funded by the caller via
     ///        wrapping, so `transferFrom` is skipped for that asset id. On
-    ///        WITHDRAW, the wToken is unwrapped to native ETH before forwarding
+    ///        WITHDRAW, the nativeWToken is unwrapped to native ETH before forwarding
     ///        to the recipient. Pass address(0) to disable both behaviours.
     /// @param wTokenAssetId Asset id of `wToken_`. Pass 0 to disable.
     function execute(
@@ -226,7 +226,7 @@ library ShieldedTransactionLogic {
         // Credit paymaster fees
         _creditPaymasterFee(paymasterFees, params);
 
-        // Receive any deposits; skip transferFrom for the wToken asset when
+        // Receive any deposits; skip transferFrom for the nativeWToken asset when
         // msg.value > 0 because the caller already pre-funded it via wrapping.
         if (stx.txType == ShieldedTransactionType.DEPOSIT) {
             uint24 prefundedAssetId = msg.value > 0 ? wTokenAssetId : 0;
@@ -238,7 +238,7 @@ library ShieldedTransactionLogic {
             );
         }
 
-        // Transfer any withdrawals — unwrap wToken to native ETH when applicable
+        // Transfer any withdrawals — unwrap nativeWToken to native ETH when applicable
         if (stx.txType == ShieldedTransactionType.WITHDRAW) {
             _transferPubAssets(
                 assets,
@@ -640,7 +640,7 @@ library ShieldedTransactionLogic {
         for (uint256 i = 0; i < count; ) {
             // Skip pulling tokens for an asset that has already been credited
             // to the Pool out-of-band (e.g. via wrapping native ETH into
-            // wToken in `Pool.transact`). Each asset id appears at most once
+            // nativeWToken in `Pool.transact`). Each asset id appears at most once
             // in pubAssets so a single match per id is sufficient.
             if (prefundedAssetId != 0 && pubAssets[i].id == prefundedAssetId) {
                 unchecked {
@@ -686,7 +686,7 @@ library ShieldedTransactionLogic {
             uint256 transferAmount = pubAssets[i].value - fee;
 
             if (wTokenAssetId != 0 && pubAssets[i].id == wTokenAssetId) {
-                // Unwrap wToken → native ETH and forward to recipient
+                // Unwrap nativeWToken → native ETH and forward to recipient
                 wToken_.withdraw(transferAmount);
                 Address.sendValue(payable(to), transferAmount);
             } else {

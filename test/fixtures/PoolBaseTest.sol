@@ -90,7 +90,8 @@ contract PoolBaseTest is BaseTest {
             verifier: IVerifier(address(verifier)),
             adaptorHandler: IAdaptorHandler(address(adaptorHandler)),
             screener: IScreener(address(screener)),
-            hasher: IHasher(address(hasher))
+            hasher: IHasher(address(hasher)),
+            pauser: address(0)
         });
 
         PoolConfigParams memory configParams = PoolConfigParams({
@@ -99,16 +100,12 @@ contract PoolBaseTest is BaseTest {
             minDepositUsd: 0,
             maxDepositUsd: type(uint256).max,
             priceFeedStalenessThreshold: 1 days,
-            nativeWToken: IWToken(config.wToken())
+            nativeWToken: IWToken(config.nativeWToken())
         });
 
         bytes memory initData = abi.encodeCall(
             Pool.initialize,
-            (
-                fixture.commitmentTreeQueueSize,
-                initAddressParams,
-                configParams
-            )
+            (fixture.commitmentTreeQueueSize, initAddressParams, configParams)
         );
 
         ERC1967Proxy poolProxy = new ERC1967Proxy(address(pool), initData);

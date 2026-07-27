@@ -18,7 +18,7 @@
             },
             "assetsUsdPriceFeeds": {
                 "staticAWeth": "0x5424384B256154046E9667dDFaaa5e550145215e",
-                "staticAUsdc": "0xB00341502DfEA6Ced8A5786b4059d29dA5E4D1FD"
+                "staticAUsdc": "0x84E045745ED829c5b778aBB17104FC2600020850"
             }
         },
         "lido": {
@@ -129,10 +129,10 @@
                 "staticAWeth": 18,
                 "staticAUsdc": 6
             },
-                "assetsUsdPriceFeeds": {
-                    "staticAWeth": "0x5424384B256154046E9667dDFaaa5e550145215e",
-                    "staticAUsdc": "0xB00341502DfEA6Ced8A5786b4059d29dA5E4D1FD"
-                }
+            "assetsUsdPriceFeeds": {
+                "staticAWeth": "0x5424384B256154046E9667dDFaaa5e550145215e",
+                "staticAUsdc": "0xB00341502DfEA6Ced8A5786b4059d29dA5E4D1FD"
+            }
         },
         "lido": {
             "lido": "0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84",
@@ -203,7 +203,7 @@
             },
             "assetsPrecision": {
                 "gauntletWETHPrimeVault": 18
-            }, 
+            },
             "assetsUsdPriceFeeds": {
                 "gauntletWETHPrimeVault": "0x0000000000000000000000000000000000000000"
             }

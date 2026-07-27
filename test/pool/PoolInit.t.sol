@@ -3,7 +3,15 @@ pragma solidity ^0.8.24;
 
 import {Test} from "forge-std/Test.sol";
 import {PoolTest} from "test/fixtures/PoolTest.sol";
-import {IPool} from "src/interfaces/IPool.sol";
+import {IPool, InitAddressParams, PoolConfigParams} from "src/interfaces/IPool.sol";
+import {IVerifier} from "src/interfaces/IVerifier.sol";
+import {IAdaptorHandler} from "src/interfaces/IAdaptorHandler.sol";
+import {IScreener} from "src/interfaces/IScreener.sol";
+import {IHasher} from "src/interfaces/IHasher.sol";
+import {IWToken} from "src/interfaces/IWToken.sol";
+import {Pool} from "src/core/Pool.sol";
+import {MockPool} from "test/mocks/MockPool.sol";
+import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {MockERC20} from "test/mocks/MockERC20.sol";
 import {AssetType, Asset} from "src/libraries/AssetLogic.sol";
 import {MerkleTree} from "src/libraries/MerkleTreeLogic.sol";
@@ -132,6 +140,88 @@ contract PoolInitTest is PoolTest {
 
         RevokerData memory revoker = pool.getRevokerData(1);
         assertEq(revoker.isActive, false);
+    }
+
+    ///////////////////////////
+    ////// Initialize     /////
+    ///////////////////////////
+
+    function test_initializeSetsScreenerAndPauser() external {
+        address newPauser = makeAddr("initPauser");
+
+        MockPool newPool = _deployPool(address(screener), newPauser);
+
+        assertEq(address(newPool.screener()), address(screener));
+        assertEq(newPool.pauser(), newPauser);
+    }
+
+    function test_initializeAllowsZeroScreenerAndPauser() external {
+        MockPool newPool = _deployPool(address(0), address(0));
+
+        assertEq(address(newPool.screener()), address(0));
+        assertEq(newPool.pauser(), address(0));
+    }
+
+    function test_revertWhenInitializedWithEoaScreener() external {
+        address eoa = makeAddr("eoaScreener");
+        address impl = address(new MockPool());
+        bytes memory initData = _initData(eoa, address(0));
+
+        vm.expectRevert(
+            abi.encodeWithSelector(IPool.InvalidScreenerAddress.selector, eoa)
+        );
+        new ERC1967Proxy(impl, initData);
+    }
+
+    /// @dev Deploys a fresh Pool behind a proxy with the given screener and pauser.
+    function _deployPool(
+        address screener_,
+        address pauser_
+    ) internal returns (MockPool) {
+        return
+            MockPool(
+                payable(
+                    address(
+                        new ERC1967Proxy(
+                            address(new MockPool()),
+                            _initData(screener_, pauser_)
+                        )
+                    )
+                )
+            );
+    }
+
+    /// @dev Builds the `Pool.initialize` calldata used by the proxy deployments above.
+    function _initData(
+        address screener_,
+        address pauser_
+    ) internal view returns (bytes memory) {
+        InitAddressParams memory initAddressParams = InitAddressParams({
+            verifier: IVerifier(address(verifier)),
+            adaptorHandler: IAdaptorHandler(address(adaptorHandler)),
+            screener: IScreener(screener_),
+            hasher: IHasher(address(hasher)),
+            pauser: pauser_
+        });
+
+        PoolConfigParams memory configParams = PoolConfigParams({
+            withdrawFeeBps: fixture.withdrawFeeBps,
+            tvlLimitUsd: type(uint256).max,
+            minDepositUsd: 0,
+            maxDepositUsd: type(uint256).max,
+            priceFeedStalenessThreshold: 1 days,
+            nativeWToken: IWToken(config.nativeWToken())
+        });
+
+        return
+            abi.encodeCall(
+                Pool.initialize,
+                (
+                    fixture.commitmentTreeQueueSize,
+                    initAddressParams,
+                    configParams
+                )
+            );
     }
 
     function _getRevokerKeys()

@@ -8,7 +8,7 @@ export const deployErc4337Infra = async (chainParams, poolAddress, deployConfig)
     // ERC4337 infra setup
     const gateway = await hre.viem.deployContract("Gateway", [
         chainParams.entryPoint,
-        chainParams.wToken,
+        chainParams.nativeWToken,
         poolAddress,
     ], deployConfig);
     console.log("Gateway deployed:", gateway.address);

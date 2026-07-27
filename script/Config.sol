@@ -21,7 +21,7 @@ contract Config is Script {
     address public immutable entryPoint;
     address public immutable gateway;
     address public immutable paymaster;
-    address public immutable wToken;
+    address public immutable nativeWToken;
     address public immutable sanctionsList;
     address public immutable nebraVerifier;
 
@@ -86,9 +86,9 @@ contract Config is Script {
             string.concat(chainPrefix, ".nebraVerifier")
         );
 
-        wToken = vm.parseJsonAddress(
+        nativeWToken = vm.parseJsonAddress(
             configJson,
-            string.concat(chainPrefix, ".wToken")
+            string.concat(chainPrefix, ".nativeWToken")
         );
 
         sanctionsList = vm.parseJsonAddress(

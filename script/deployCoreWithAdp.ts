@@ -473,23 +473,24 @@ const main = async () => {
   const { hasher } = await deployHasher(deployConfig.client.wallet, client, deployConfig);
   console.log("Hasher deployed:", hasher);
 
-  const verifier = await deployVerifier(deployConfig, wallets[0].account.address);
+  const verifier = await deployVerifier(deployConfig, commonParams.hardwareWalletOwner);
 
   const initAddressParams = {
     verifier: verifier,
     adaptorHandler: adaptorHandler.address,
     screener: chainParams.sanctionsList,
-    hasher: hasher
+    hasher: hasher,
+    pauser: commonParams.pauserAddress, // zeroAddress leaves pausing exclusive to the owner
   }
 
-  const ONE_DAY = 86400n;
+  const ONE_HOUR = 3600n;
   const configParams = {
     withdrawFeeBps: BigInt(commonParams.withdrawFeeBps),
     tvlLimitUsd: BigInt(5_000e6),    // $5,000 (6-decimal precision)
     minDepositUsd: BigInt(2e6),      // $2 (6-decimal precision)
     maxDepositUsd: BigInt(200e6),    // $200 (6-decimal precision)
-    priceFeedStalenessThreshold: ONE_DAY * 5n, // 5 days in seconds
-    wToken: chainParams.wToken,      // wrapped native token (e.g. WETH) for native ETH deposits
+    priceFeedStalenessThreshold: ONE_HOUR * 2n, // 2 hours in seconds
+    nativeWToken: chainParams.nativeWToken,      // wrapped native token (e.g. WETH) for native ETH deposits
   };
 
   const args = [
@@ -521,7 +522,7 @@ const main = async () => {
   await client.waitForTransactionReceipt({ hash: setVersionHash });
   console.log("Pool: version set to", commonParams.protocolVersion);
 
-  // wToken is set via PoolConfigParams during initialize() above; no separate
+  // nativeWToken is set via PoolConfigParams during initialize() above; no separate
   // setWToken call is needed for fresh deployments.
 
   // @ts-ignore
