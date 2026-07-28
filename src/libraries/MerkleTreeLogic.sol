@@ -109,6 +109,12 @@ library MerkleTreeLogic {
         MerkleTree storage self,
         uint256 _root
     ) public view returns (bool) {
+        // Unwritten slots in the circular buffer are zero, so without this guard a
+        // zero root matches on a tree that has not yet filled its history.
+        // QueuedMerkleTreeLogic.isKnownRoot already carries the same guard.
+        if (_root == 0) {
+            return false;
+        }
         uint8 _currentRootIndex = self.currentRootIndex;
         uint8 i = _currentRootIndex; // currentRootIndex -> 0
         do {
