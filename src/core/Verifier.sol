@@ -21,7 +21,7 @@ uint256 constant GROTH16_PROOF_LENGTH = 256;
 ///      These MUST match the deployed verifiers, whose IC point counts are
 ///      nPublicInputs + 1 (13 / 6 / 65 respectively).
 uint256 constant TRANSACTION_PUBLIC_INPUTS = 12;
-uint256 constant ADDRESS_PUBLIC_INPUTS = 5;
+uint256 constant ADDRESS_PUBLIC_INPUTS = 6;
 uint256 constant TREE_UPDATE_PUBLIC_INPUTS = 64;
 
 contract Verifier is IVerifier, Ownable {
