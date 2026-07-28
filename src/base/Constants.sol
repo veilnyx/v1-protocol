@@ -23,6 +23,10 @@ uint8 constant USER_REGISTER_MERKLE_TREE_ROOT_HISTORY_SIZE = 50;
 
 uint8 constant MERKLE_TREE_DEPTH = 20;
 uint8 constant COMMITMENT_TREE_DEPTH = 25;
+/// @dev Must equal the treeUpdate circuit's `nLeaves` parameter, i.e. the 10 in
+///      `TreeUpdate(25, 10)`. It fixes the circuit's public-input count, so the
+///      verifier calldata layout depends on it.
+uint8 constant TREE_UPDATE_QUEUE_SIZE = 10;
 /// @dev TVL values use 6-decimal precision (USDC/USDT DeFi standard).
 uint8 constant TVL_USD_DECIMALS = 6;
 /// @dev Minimum allowed price staleness threshold (seconds). Prevents operator from

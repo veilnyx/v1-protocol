@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-BUSL
 pragma solidity 0.8.24;
 
-import {ZERO_LEAF, COMMITMENT_MERKLE_TREE_ROOT_HISTORY_SIZE, COMMITMENT_TREE_DEPTH} from "../base/Constants.sol";
+import {ZERO_LEAF, COMMITMENT_MERKLE_TREE_ROOT_HISTORY_SIZE, COMMITMENT_TREE_DEPTH, TREE_UPDATE_QUEUE_SIZE} from "../base/Constants.sol";
 import {IHasher} from "../interfaces/IHasher.sol";
 import {IVerifier} from "../interfaces/IVerifier.sol";
 
@@ -31,6 +31,7 @@ library QueuedMerkleTreeLogic {
     error MerkleTreeFull();
     error InvalidProof();
     error InvalidBatchSize();
+    error InvalidQueueSize(uint8 given, uint8 expected);
     error ZeroAddress();
 
     /// @custom:invariant QMT-1: queueStartIndex <= queueEndIndex always
@@ -43,6 +44,15 @@ library QueuedMerkleTreeLogic {
     ) public {
         if (address(hasher) == address(0) || address(verifier) == address(0)) {
             revert ZeroAddress();
+        }
+
+        // The treeUpdate circuit is compiled as TreeUpdate(COMMITMENT_TREE_DEPTH, 10),
+        // so its public-input count -- and therefore the verifier calldata layout --
+        // is fixed at this queue size. Any other value would silently produce
+        // vParams of the wrong length and make every tree update revert, halting
+        // commitment insertion permanently.
+        if (queueSize != TREE_UPDATE_QUEUE_SIZE) {
+            revert InvalidQueueSize(queueSize, TREE_UPDATE_QUEUE_SIZE);
         }
 
         self.hasher = hasher;
