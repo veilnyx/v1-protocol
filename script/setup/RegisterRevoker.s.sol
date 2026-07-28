@@ -17,7 +17,7 @@ contract RegisterRevoker is BaseScript {
     uint256 constant ENC_Y =
         4303763666990812745724909494561603880133773663501392405214554054831058921986;
 
-    address constant poolAddress = ;
+    address constant poolAddress = 0xef7585dFCdB91b0dc9fC9f920c4fb72bfb7B3E1f;
 
     function run() external broadcast {
         string memory name = "Veilnyx Security";
@@ -28,7 +28,10 @@ contract RegisterRevoker is BaseScript {
         uint256[2] memory revokerPublicKey = [REVOKER_X, REVOKER_Y];
         uint256[2] memory encryptionPublicKey = [ENC_X, ENC_Y];
 
-        IPool(poolAddress)
-            .registerRevoker(revokerPublicKey, encryptionPublicKey, metadata);
+        IPool(poolAddress).registerRevoker(
+            revokerPublicKey,
+            encryptionPublicKey,
+            metadata
+        );
     }
 }
