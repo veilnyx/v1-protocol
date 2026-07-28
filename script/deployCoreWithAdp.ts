@@ -9,7 +9,8 @@ import {
   http,
   createWalletClient,
   Chain,
-  zeroAddress
+  zeroAddress,
+  isAddressEqual
 } from "viem";
 
 import { DeployContractConfig, KeyedClient } from '@nomicfoundation/hardhat-viem/types';
@@ -589,6 +590,31 @@ const main = async () => {
   });
   await client.waitForTransactionReceipt({ hash: transferOwnershipHash });
   console.log("Pool: ownership transferred");
+
+  // AdaptorHandler is Ownable(msg.sender), so the deploy key owns it after deployment,
+  // and setVeilnyxPool is onlyOwner. Left on that key it could repoint the handler at
+  // another pool; the onlyPool check would then reject the real Pool and every
+  // CALL_ADAPTOR route (Aave, Morpho, Lido, Uniswap) would stop working.
+  // Sequenced after setVeilnyxPool above, which requires the deployer to still own it.
+  const adaptorHandlerOwner = commonParams.hardwareWalletOwner as `0x${string}`;
+  const deployerAddress = wallets[0].account.address as `0x${string}`;
+
+  if (
+    adaptorHandlerOwner !== zeroAddress &&
+    !isAddressEqual(adaptorHandlerOwner, deployerAddress)
+  ) {
+    // @ts-ignore
+    const adaptorHandlerOwnershipHash = await wallets[0].writeContract({
+      address: adaptorHandler.address,
+      abi: adaptorHandlerAbi,
+      functionName: "transferOwnership",
+      args: [adaptorHandlerOwner],
+    });
+    await client.waitForTransactionReceipt({ hash: adaptorHandlerOwnershipHash });
+    console.log("AdaptorHandler: ownership transferred to", adaptorHandlerOwner);
+  } else {
+    console.log("AdaptorHandler: ownership retained by deployer", deployerAddress);
+  }
 
   // Verify all core contracts on Etherscan
   await verifyAll({ asset, merkleTree, queuedMerkleTree, shieldedAddress, shieldedTransaction, adaptorHandler, poolImpl, poolProxy, initData });
