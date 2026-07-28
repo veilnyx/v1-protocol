@@ -152,6 +152,26 @@ const deployRocketPool = async (rocketPoolParams: any, pool: any, deployConfig: 
   await addAssets(assets, assetsPrecision, assetsUsdPriceFeeds, 1, pool, deployConfig.client.wallet, deployConfig.client.public);
 }
 
+// Resolves the Etherscan API endpoint for the network the script is running against,
+// reusing the `etherscan.customChains` entry from hardhat.config.ts so the URL lives in
+// one place. Falls back to the Etherscan V2 unified endpoint for the current chain id.
+const getEtherscanApiUrl = (): string => {
+  const networkName = hre.network.name;
+  const chainId = hre.network.config.chainId;
+  const customChains = (hre.config as any).etherscan?.customChains ?? [];
+
+  const match = customChains.find(
+    (c: any) => c.network === networkName || c.chainId === chainId
+  );
+
+  if (match?.urls?.apiURL) return match.urls.apiURL;
+
+  console.warn(
+    `getEtherscanApiUrl: no customChains entry for ${networkName} (chainId: ${chainId}), falling back to the Etherscan V2 endpoint`
+  );
+  return `https://api.etherscan.io/v2/api?chainid=${chainId}`;
+};
+
 const verifyProxy = async (proxyAddress: string, implAddress: string) => {
   const apiKey = process.env.ETHERSCAN_API_KEY;
   if (!apiKey) {
@@ -159,7 +179,8 @@ const verifyProxy = async (proxyAddress: string, implAddress: string) => {
     return;
   }
 
-  const baseUrl = "https://api.etherscan.io/v2/api?chainid=11155111";
+  const baseUrl = getEtherscanApiUrl();
+  console.log("verifyProxy: using Etherscan API:", baseUrl);
 
   // Step 1: submit proxy verification
   const submitBody = new URLSearchParams({
@@ -473,7 +494,11 @@ const main = async () => {
   const { hasher } = await deployHasher(deployConfig.client.wallet, client, deployConfig);
   console.log("Hasher deployed:", hasher);
 
-  const verifier = await deployVerifier(deployConfig, commonParams.hardwareWalletOwner);
+  const verifier = await deployVerifier(
+    deployConfig,
+    commonParams.hardwareWalletOwner,
+    commonParams.hardwareWalletOwner
+  );
 
   const initAddressParams = {
     verifier: verifier,

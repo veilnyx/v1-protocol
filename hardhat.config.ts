@@ -12,6 +12,7 @@ import "@nomicfoundation/hardhat-verify";
 // tdly.setup({ automaticVerifications: true });
 dotenv.config();
 
+const rpcEthereumMainnet = process.env.RPC_ETHEREUM_MAINNET as string;
 const rpcEthereumSepolia = process.env.RPC_ETHEREUM_SEPOLIA as string;
 const etherscanApiKey = process.env.ETHERSCAN_API_KEY as string;
 const rpcOptimismSepolia = process.env.RPC_OPTIMISM_SEPOLIA as string;
@@ -61,6 +62,11 @@ const config: HardhatUserConfig = {
         blockNumber: 16229898,
       },
     },
+    mainnet: {
+      url: rpcEthereumMainnet,
+      accounts: privateKeys,
+      chainId: 1
+    },
     sepolia: {
       url: rpcEthereumSepolia,
       accounts: privateKeys,
@@ -97,11 +103,25 @@ const config: HardhatUserConfig = {
     strict: true,
     unit: "kB"
   },
+  // Consumed by @nomicfoundation/hardhat-verify (`hre.run("verify:verify")`).
+  // `apiKey` and `customChains` are both keyed by the *network name* as declared
+  // in `networks` above, so every network we verify on needs an entry in each.
+  // The scripts also read `customChains[].urls.apiURL` directly for raw Etherscan
+  // V2 API calls (see verifyProxy in script/deployCoreWithAdp.ts).
   etherscan: {
     apiKey: {
+      mainnet: etherscanApiKey,
       sepolia: etherscanApiKey,
     },
     customChains: [
+      {
+        network: "mainnet",
+        chainId: 1,
+        urls: {
+          apiURL: "https://api.etherscan.io/v2/api?chainid=1",
+          browserURL: "https://etherscan.io",
+        },
+      },
       {
         network: "sepolia",
         chainId: 11155111,

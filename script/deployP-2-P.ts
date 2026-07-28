@@ -100,7 +100,7 @@ const main = async () => {
         const { hasher } = await deployHasher(wallet, client, deployConfig);
         console.log("Hasher deployed:", hasher);
 
-        const verifier = await deployVerifier(deployConfig, wallet.account.address);
+        const verifier = await deployVerifier(deployConfig, wallet.account.address, wallet.account.address);
 
         const initAddressParams = {
             verifier: verifier,

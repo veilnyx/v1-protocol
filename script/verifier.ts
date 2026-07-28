@@ -1,9 +1,13 @@
 import path from "path";
 import { readFileSync } from "fs";
 import hre from "hardhat";
-import { toFunctionSelector } from "viem";
+import { isAddressEqual, toFunctionSelector, zeroAddress } from "viem";
 
-export const deployVerifier = async (deployConfig, verifierManager: `0x${string}`) => {
+export const deployVerifier = async (
+    deployConfig,
+    verifierManager: `0x${string}`,
+    owner: `0x${string}`
+) => {
     const verifier21Abi = hre.artifacts.readArtifactSync("VerifierTransact21").abi;
     const verifier22Abi = hre.artifacts.readArtifactSync("VerifierTransact22").abi;
     const verifier23Abi = hre.artifacts.readArtifactSync("VerifierTransact23").abi;
@@ -70,6 +74,22 @@ export const deployVerifier = async (deployConfig, verifierManager: `0x${string}
         deployConfig
     );
     console.log("Verifier deployed:", verifier.address);
+
+    // Verifier's constructor sets the deployer as owner, transfer it to the intended owner
+    // (e.g. hardware wallet / multisig). Skipped when the deployer is already the owner.
+    const deployer = deployConfig.client.wallet.account.address as `0x${string}`;
+    if (owner !== zeroAddress && !isAddressEqual(owner, deployer)) {
+        const hash = await deployConfig.client.wallet.writeContract({
+            address: verifier.address,
+            abi: hre.artifacts.readArtifactSync("Verifier").abi,
+            functionName: "transferOwnership",
+            args: [owner],
+        });
+        await deployConfig.client.public.waitForTransactionReceipt({ hash });
+        console.log("Verifier: ownership transferred to", owner);
+    } else {
+        console.log("Verifier: ownership retained by deployer", deployer);
+    }
 
     return verifier.address;
 }
