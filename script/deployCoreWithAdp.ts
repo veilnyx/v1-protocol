@@ -17,6 +17,7 @@ import { loadConfigs, ChainParams, AdaptorParams, CommonParams, getHex } from ".
 import { deployHasher } from "./hasher";
 import { deployVerifier } from "./verifier";
 import { getChainForCurrentNetwork } from "./utils/chainUtils";
+import { assertOwnershipTransferred, transferOwnershipToOwner } from "./utils/ownership";
 import { deployErc4337Infra } from "./erc4337Infra";
 
 const config = loadConfigs();
@@ -561,7 +562,7 @@ const main = async () => {
   console.log("AdaptorHandler: veilnyxPool set to", poolProxy.address);
 
   // ERC4337 infra setup
-  await deployErc4337Infra(chainParams, poolProxy.address, deployConfig);
+  const { gateway, paymaster } = await deployErc4337Infra(chainParams, poolProxy.address, deployConfig);
 
   // Asset & Revoker Setup
   await addAssetsAndRevokers(poolProxy.address, chainParams, commonParams, client, deployConfig.client.wallet);
@@ -579,19 +580,29 @@ const main = async () => {
   await client.waitForTransactionReceipt({ hash: pauseHash });
   console.log("Pool: paused");
 
-  // transfer ownership to a multisig or a Gnosis Safe after deployment. For testing purposes, we can keep the ownership to the deployer wallet
-  // @ts-ignore
-  const transferOwnershipHash = await wallets[0].writeContract({
-    address: poolProxy.address,
-    abi: poolAbi,
-    functionName: "transferOwnership",
-    args: [commonParams.hardwareWalletOwner], // set to zeroAddress to keep ownership to deployer wallet for testing. Update with multisig or Gnosis Safe address for production deployment.
-  });
-  await client.waitForTransactionReceipt({ hash: transferOwnershipHash });
-  console.log("Pool: ownership transferred");
+  // Hand every Ownable contract over to the hardware wallet / multisig. Must stay after all
+  // owner-gated setup above (setVersion, setVeilnyxPool, addAssets, registerRevoker,
+  // addAdaptorSupport, setChainlinkFeed, pause) — those revert once the deployer is no longer
+  // the owner. Set common.hardwareWalletOwner to zeroAddress to retain deployer ownership for
+  // testing. Verifier is listed for completeness; deployVerifier already transfers it, so it is
+  // reported as `already-owned`.
+  const ownershipResults = await transferOwnershipToOwner(
+    [
+      { contract: "Pool", address: poolProxy.address, label: "PoolProxy" },
+      { contract: "Verifier", address: verifier },
+      { contract: "AdaptorHandler", address: adaptorHandler.address },
+      { contract: "Gateway", address: gateway },
+      { contract: "Paymaster", address: paymaster },
+    ],
+    commonParams.hardwareWalletOwner,
+    deployConfig
+  );
 
   // Verify all core contracts on Etherscan
   await verifyAll({ asset, merkleTree, queuedMerkleTree, shieldedAddress, shieldedTransaction, adaptorHandler, poolImpl, poolProxy, initData });
+
+  // Fail the run (after verification, so it still happens) if anything is still deployer-owned
+  assertOwnershipTransferred(ownershipResults);
 };
 
 main().catch(console.error);

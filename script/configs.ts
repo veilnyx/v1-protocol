@@ -67,6 +67,7 @@ export function loadConfigs() {
     protocolVersion: BigInt(common.protocolVersion),
     veilnyxMultiSigAddress: getHex(common.veilnyxMultiSigAddress),
     hardwareWalletOwner: getHex(common.hardwareWalletOwner),
+    pauserAddress: getHex(common.pauserAddress),
     revokers: common.revokers.map((r) => {
       const x = {
         name: r.name,
