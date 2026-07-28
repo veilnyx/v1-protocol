@@ -142,8 +142,8 @@ library QueuedMerkleTreeLogic {
         self.roots[newRootIndex] = data.newRoot;
         self.levelSubtrees = data.newLevelSubtrees;
 
-        // `insertedLeaves` is min(pending, queueSize) by construction, so this can never
-        // advance past `queueEndIndex`.
+        // `insertedLeaves` is bounded by `pending` in _verifyUpdateProof, so this can
+        // never advance past `queueEndIndex`.
         self.queueStartIndex += insertedLeaves;
         self.nextLeafIndex += insertedLeaves;
     }
@@ -152,21 +152,21 @@ library QueuedMerkleTreeLogic {
         QueuedMerkleTree storage self,
         TreeUpdateData calldata data
     ) internal view returns (bool valid, uint32 insertedLeaves) {
-        // Derive the batch size from queue state rather than trusting the caller.
-        // `batchSize` only reaches the circuit as `nZeroLeaves`, and padding an empty
-        // slot with ZERO_LEAF is a root no-op, so an OVERSTATED batchSize is honestly
-        // provable while advancing `queueStartIndex` past `queueEndIndex`. Every later
-        // `queueEndIndex - queueStartIndex` would then underflow and revert, including
-        // the one on the transact path, permanently bricking the pool.
+        // `batchSize` stays caller-supplied on purpose: deriving it from queue state
+        // would let anyone invalidate an in-flight update proof by enqueueing one more
+        // leaf, which is the DDoS vector that made it a parameter in the first place.
+        //
+        // It must still be bounded. It only reaches the circuit as `nZeroLeaves`, and
+        // padding an empty slot with ZERO_LEAF is a root no-op, so an OVERSTATED
+        // batchSize is honestly provable while advancing `queueStartIndex` past
+        // `queueEndIndex`. Every later `queueEndIndex - queueStartIndex` would then
+        // underflow and revert, including the one on the transact path, permanently
+        // bricking the pool.
         uint32 pending = self.queueEndIndex - self.queueStartIndex;
-        insertedLeaves = pending < self.queueSize ? pending : self.queueSize;
-
-        // Kept as a caller-supplied field for ABI compatibility, but it must agree with
-        // the state-derived value; otherwise the proof was generated for a different
-        // nZeroLeaves and would fail verification with a far less obvious error.
-        if (data.batchSize != insertedLeaves) {
+        if (data.batchSize > pending || data.batchSize > self.queueSize) {
             revert InvalidBatchSize();
         }
+        insertedLeaves = data.batchSize;
 
         uint256[] memory leaves = _getQueuedLeaves(self);
         uint256[COMMITMENT_TREE_DEPTH] storage lastSubtrees = self

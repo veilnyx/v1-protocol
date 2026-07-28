@@ -70,6 +70,32 @@ contract AuditQueueAccounting is BaseTest {
         this.simulatePrintNotes();
     }
 
+    /// ABDK CVF13: batchSize is caller-supplied precisely so that enqueueing more
+    /// leaves cannot invalidate an already-generated update proof. Bounding it must
+    /// not reintroduce that DDoS: a batch smaller than `pending` stays acceptable.
+    function test_smallerBatchStillAcceptedAfterMoreLeavesQueued() public {
+        uint256[] memory few = new uint256[](3);
+        for (uint256 i; i < 3; ++i) few[i] = i + 1;
+        qmt.queueLeaves(few);
+
+        // Prover commits to batchSize = 3, then someone enqueues another leaf.
+        uint256[] memory one = new uint256[](1);
+        one[0] = 99;
+        qmt.queueLeaves(one);
+        assertEq(qmt.queueEndIndex - qmt.queueStartIndex, 4, "pending should be 4");
+
+        TreeUpdateData memory d = TreeUpdateData({
+            newRoot: uint256(keccak256("r")),
+            batchSize: 3,
+            newLevelSubtrees: qmt.levelSubtrees,
+            proof: bytes("")
+        });
+
+        qmt.update(d);
+        assertEq(qmt.queueStartIndex, 3, "batch of 3 should have been consumed");
+        assertEq(qmt.queueEndIndex, 4, "remaining leaf should stay queued");
+    }
+
     /// I-2: queueSize is fixed by the treeUpdate circuit's nLeaves parameter.
     /// Any other value silently changes the verifier calldata layout.
     function test_initRejectsQueueSizeMismatch() public {
