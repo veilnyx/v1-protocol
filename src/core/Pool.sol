@@ -17,7 +17,7 @@ import {IHasher} from "../interfaces/IHasher.sol";
 import {IWToken} from "../interfaces/IWToken.sol";
 import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {EIP712_DOMAIN_NAME, EIP712_DOMAIN_VERSION, MAX_WITHDRAW_FEE_BPS, MERKLE_TREE_DEPTH, COMMITMENT_TREE_DEPTH, TVL_USD_DECIMALS, MIN_PRICE_STALENESS_THRESHOLD} from "../base/Constants.sol";
+import {EIP712_DOMAIN_NAME, EIP712_DOMAIN_VERSION, MAX_WITHDRAW_FEE_BPS, MERKLE_TREE_DEPTH, COMMITMENT_TREE_DEPTH, TVL_USD_DECIMALS, MIN_PRICE_STALENESS_THRESHOLD, FIELD_SIZE, BABYJUBJUB_A, BABYJUBJUB_D} from "../base/Constants.sol";
 import {PoolStorage} from "../base/PoolStorage.sol";
 import {Asset, AssetType, AssetLogic, AssetInitParams} from "../libraries/AssetLogic.sol";
 import {MerkleTree, MerkleTreeLogic} from "../libraries/MerkleTreeLogic.sol";
@@ -160,6 +160,15 @@ contract Pool is
         uint256[2] calldata encryptionPublicKey,
         bytes calldata revokerMetadata
     ) external onlyOwner {
+        // The circuit uses these keys as scalar-multiplication bases. A point off
+        // the curve, or of low order, makes the multiplication degenerate: with
+        // revokerPublicKey = (0, y) every nullifier collapses to
+        // Poseidon(leafIndex, commitment, 0), which is computable from public
+        // chain data alone, silently destroying nullifier privacy for every note
+        // registered under this revoker. Validate before it can ever be selected.
+        _assertValidCurvePoint(revokerPublicKey);
+        _assertValidCurvePoint(encryptionPublicKey);
+
         uint16 id = _revokerCount;
         uint256 revokerPublicKeyHash = uint256(
             keccak256((abi.encode(revokerPublicKey)))
@@ -846,6 +855,33 @@ contract Pool is
                 assetId: wTokenAssetId,
                 value: remainder
             });
+        }
+    }
+
+    /// @dev Rejects points that are not on BabyJubJub, and the low-order points
+    ///      x == 0 (the identity and the order-2 point), which are the ones that
+    ///      collapse a scalar multiplication to a constant.
+    function _assertValidCurvePoint(
+        uint256[2] calldata point
+    ) private pure {
+        uint256 x = point[0];
+        uint256 y = point[1];
+
+        if (x == 0 || x >= FIELD_SIZE || y >= FIELD_SIZE) {
+            revert InvalidCurvePoint(x, y);
+        }
+
+        uint256 x2 = mulmod(x, x, FIELD_SIZE);
+        uint256 y2 = mulmod(y, y, FIELD_SIZE);
+        uint256 lhs = addmod(mulmod(BABYJUBJUB_A, x2, FIELD_SIZE), y2, FIELD_SIZE);
+        uint256 rhs = addmod(
+            1,
+            mulmod(BABYJUBJUB_D, mulmod(x2, y2, FIELD_SIZE), FIELD_SIZE),
+            FIELD_SIZE
+        );
+
+        if (lhs != rhs) {
+            revert InvalidCurvePoint(x, y);
         }
     }
 }

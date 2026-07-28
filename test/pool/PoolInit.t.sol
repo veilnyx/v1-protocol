@@ -232,11 +232,16 @@ contract PoolInitTest is PoolTest {
             uint256[2] memory encryptionKeys
         )
     {
-        uint256 revokerKeyX = uint256(keccak256(bytes("revokerKeyX")));
-        uint256 revokerKeyY = uint256(keccak256(bytes("revokerKeyX")));
+        // Must be genuine BabyJubJub points: registerRevoker validates them, and the
+        // circuit uses both as scalar-multiplication bases. Previously these were
+        // keccak hashes reused for x and y, which are not on the curve (and were not
+        // even field elements).
+        // 2G and 3G on BabyJubJub, G being the standard base point.
+        uint256 revokerKeyX = 10031262171927540148667355526369034398030886437092045105752248699557385197826;
+        uint256 revokerKeyY = 633281375905621697187330766174974863687049529291089048651929454608812697683;
 
-        uint256 encryptionKeyX = uint256(keccak256(bytes("encryptionKeyX")));
-        uint256 encryptionKeyY = uint256(keccak256(bytes("encryptionKeyX")));
+        uint256 encryptionKeyX = 2763488322167937039616325905516046217694264098671987087929565332380420898366;
+        uint256 encryptionKeyY = 15305195750036305661220525648961313310481046260814497672243197092298550508693;
 
         revokerKeys = [revokerKeyX, revokerKeyY];
         encryptionKeys = [encryptionKeyX, encryptionKeyY];

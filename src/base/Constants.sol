@@ -6,6 +6,10 @@ uint256 constant FIELD_SIZE = 21888242871839275222246405745257275088548364400416
 // (FIELD_SIZE - 1) / 2 gives exact integer division since FIELD_SIZE is odd
 uint256 constant FIELD_SIZE_DIV_2 = (FIELD_SIZE - 1) / 2;
 
+/// @dev BabyJubJub twisted Edwards parameters: a*x^2 + y^2 = 1 + d*x^2*y^2 over FIELD_SIZE.
+uint256 constant BABYJUBJUB_A = 168700;
+uint256 constant BABYJUBJUB_D = 168696;
+
 type FieldElement is uint256;
 
 uint256 constant ZERO_LEAF = uint256(keccak256("zero")) % FIELD_SIZE;
