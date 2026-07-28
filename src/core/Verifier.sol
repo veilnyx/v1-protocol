@@ -263,15 +263,15 @@ contract Verifier is IVerifier, Ownable {
             revert BadArguments(nIns, nOuts);
         }
 
-        uint256 nOutsCopy = nOuts;
-        uint8 noOfDigits = 0;
-
-        while (nOutsCopy > 0) {
-            noOfDigits++;
-            nOutsCopy /= 10;
+        // The id is the decimal concatenation of nIns and nOuts, which is only
+        // injective while nOuts occupies a fixed single digit: with a multi-digit
+        // nOuts, (2,10) and (21,0) both yield 210, so two distinct circuit shapes
+        // would share one verifier slot. No deployed verifier exceeds nOuts = 4.
+        if (nOuts > 9) {
+            revert BadArguments(nIns, nOuts);
         }
-        noOfDigits = noOfDigits == 0 ? 1 : noOfDigits;
-        uint256 verifierID = nIns * 10 ** noOfDigits + nOuts;
+
+        uint256 verifierID = nIns * 10 + nOuts;
 
         if (verifierID > type(uint16).max) {
             revert VerifierIdOverflow(verifierID);
