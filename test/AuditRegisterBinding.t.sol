@@ -25,10 +25,12 @@ contract RegisterInputHarness {
 /// address of the attacker's choosing -- which is exactly what a decrypted note is
 /// ultimately resolved to -- and nothing on chain can repair it.
 ///
-/// NOTE: the committed VerifierRegister still declares uint256[5]. Until it is
-/// regenerated from the 6-input register circuit, the appended word is trailing
-/// calldata and the binding is INERT. These tests are what proves the contract side
-/// is wired correctly in the meantime; a green full suite does not.
+/// VerifierRegister is now regenerated from the 6-input register circuit and
+/// register_sender is proven against it with `publicAddress` bound to
+/// `config.registrant`, so the binding is live and enforced on chain --
+/// test_e2e_hijackedRegistrationFailsVerification proves it end to end. The arity guard
+/// in that test is retained so a regression to a 5-input verifier skips loudly rather
+/// than passing vacuously.
 contract AuditRegisterBinding is PoolTest {
     RegisterInputHarness internal harness;
 
@@ -107,17 +109,17 @@ contract AuditRegisterBinding is PoolTest {
     /// This only demonstrates anything once VerifierRegister declares uint256[6]. With
     /// the 5-input verifier the appended word is trailing calldata and both cases pass.
     function test_e2e_hijackedRegistrationFailsVerification() public {
-        (address alice, ) = makeAddrAndKey("sender"); // the fixture's own signer
+        address alice = fixture.registrant.addr; // the fixture's own signer
         (address bob, ) = makeAddrAndKey("bob-frontrunner");
         ShieldedAddressRegistrationData memory reg = _reg();
 
         bool honestOk = harness.verify(reg, address(verifier), alice);
         bool hijackOk = harness.verify(reg, address(verifier), bob);
 
-        // Self-detecting: while VerifierRegister still declares uint256[5] the appended
-        // word is trailing calldata, so BOTH verify and this test cannot mean anything.
-        // Skip loudly rather than pass vacuously. Verified green against a locally
-        // generated 6-input verifier: honest true, hijack false.
+        // Self-detecting regression guard: if VerifierRegister ever reverts to uint256[5]
+        // the appended word becomes trailing calldata, so BOTH verify and this test
+        // cannot mean anything. Skip loudly rather than pass vacuously. Against the
+        // current 6-input verifier this branch is not taken: honest true, hijack false.
         if (honestOk && hijackOk) {
             emit log(
                 "SKIP: VerifierRegister is still 5-input; regenerate it from the 6-input register circuit to arm this test"

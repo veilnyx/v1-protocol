@@ -55,6 +55,20 @@ export const USER_OP_PAYMASTER_VERIFICATION_GAS = BigInt(50_000);
 export const PAYMASTER_ADDR_FIXTURE = config.paymaster;
 export const GATEWAY_ADDR_FIXTURE = config.gateway;
 
+// Dedicated deterministic account used ONLY for shielded address registration.
+//
+// The register proof binds the registrant's public address as a public input, so it must
+// equal the address the Pool recovers from the EIP-712 registration signature
+// (see ShieldedAddressLogic.register). That means it has to be a real EOA with a known
+// private key -- `config.sender.pubAddress` cannot serve here, as it is derived from the
+// shielded rootAddress (a Poseidon output) and has no secp256k1 key. It is also already
+// load-bearing as the withdrawal recipient, so it is left untouched.
+//
+// `config.registrant` is the single source of truth: Solidity reads the same entry via
+// FixtureLib so the signer and the proof's public input can never drift apart.
+// Key is keccak256("veilnyx.fixture.registrant"); test-only, never used outside fixtures.
+export const REGISTER_SIGNER_ADDRESS = getAddress(config.registrant.address);
+
 const assets = {
   weth: config.assets.weth,
   usdc: config.assets.usdc,
@@ -182,30 +196,35 @@ export const generateTestTransactionWithOutsourcedProofVerification = async (
 
 export const generateTestAddressRegistrations = async (
   reqs: Record<string, {}>,
-  sdk: Core
+  sdk: Core,
+  publicAddress: Hex = REGISTER_SIGNER_ADDRESS
 ) => {
   const reqArr = Object.entries(reqs);
   for (const [name, req] of reqArr) {
-    await generateTestAddressRegistration(name, sdk);
+    await generateTestAddressRegistration(name, sdk, publicAddress);
   }
 };
 
 export const generateTestAddrRegWithOutsourceProofVerifications = async (
   reqs: Record<string, {}>,
   sdk: Core,
-  nebraClient: any
+  nebraClient: any,
+  publicAddress: Hex = REGISTER_SIGNER_ADDRESS
 ) => {
   const reqArr = Object.entries(reqs);
   for (const [name, req] of reqArr) {
-    await generateTestAddrRegWithOutsourcedProofVerification(name, sdk, nebraClient);
+    await generateTestAddrRegWithOutsourcedProofVerification(name, sdk, nebraClient, publicAddress);
   }
 };
 
 const generateTestAddressRegistration = async (
   name: string,
-  sdk: Core
+  sdk: Core,
+  publicAddress: Hex
 ) => {
-  const zaddrReg = await sdk.proveAddress("0x"); // signature will be generated inside the protocol test setup `_getRegisterAddressSignature` function, so passing dummy data here
+  // signature will be generated inside the protocol test setup `_getRegisterAddressSignature` function, so passing dummy data here.
+  // `publicAddress` however is a public input of the proof and must match the signer the Pool recovers.
+  const zaddrReg = await sdk.proveAddress("0x", publicAddress);
   const encoded = zaddrReg.encode();
   writeFileSync(`${dirFixtureData}/${name}.txt`, encoded);
 };
@@ -213,9 +232,10 @@ const generateTestAddressRegistration = async (
 const generateTestAddrRegWithOutsourcedProofVerification = async (
   name: string,
   sdk: Core,
-  nebraClient: any
+  nebraClient: any,
+  publicAddress: Hex
 ) => {
-  const zaddrReg = await sdk.proveAddressAndOutsourceVerification("0x", nebraClient);
+  const zaddrReg = await sdk.proveAddressAndOutsourceVerification("0x", nebraClient, publicAddress);
   console.log("zaddrReg obj returned after proof gen & submission to Nebra:", zaddrReg);
   console.log("Encoding to gen fixture");
   const encoded = zaddrReg.shieldedAddressRegistrationData.encode();

@@ -203,10 +203,9 @@ contract PoolTest is PoolBaseTest, BaseScript {
             revokerMetaData
         );
 
-        // Register a user - "sender"
-        (, uint256 senderPk) = makeAddrAndKey("sender");
+        // Register a user - the sender's shielded address, signed by the fixture registrant
         bytes memory signature = _getRegisterAddressSignature(
-            senderPk,
+            fixture.registrant.privateKey,
             bytes.concat(
                 bytes32(fixture.sender.rootAddress),
                 bytes32(fixture.sender.signPublicKey[0]),

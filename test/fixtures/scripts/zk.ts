@@ -10,7 +10,7 @@ import {
 
 const circuitPathBase = path.resolve(
   __dirname,
-  "../../../../v1-circuits/artifacts/testCeremony"
+  "../../../../v1-circuits/artifacts"
 );
 
 export const getCircuitPath = (name: string) => {
