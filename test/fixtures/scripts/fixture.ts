@@ -40,6 +40,18 @@ const receiverSeed = BigInt(config.receiver.seed);
 const senderAccount = ShieldedAccount.generate(senderSeed);
 const receiverAccount = ShieldedAccount.generate(receiverSeed);
 const senderPubAddress = config.sender.pubAddress;
+
+/**
+ * The address bound into the register proof.
+ *
+ * NOTE: this is deliberately NOT `config.sender.pubAddress`. The Solidity harness
+ * re-signs the registration at runtime with `makeAddrAndKey("sender")`
+ * (PoolTest.sol:207), so that is the address the Pool recovers from the EIP-712
+ * signature and therefore the one the proof must commit to. Binding
+ * `config.sender.pubAddress` here would make every regenerated register fixture
+ * fail verification once the 6-input register circuit is deployed.
+ */
+const REGISTER_PROOF_ADDRESS = "0xCD1722F3947DEf4Cf144679Da39c4c32BDC35681";
 const receiverPubAddress = config.receiver.pubAddress;
 const addressTreeDepth = Number(config.addressTreeDepth);
 const commitmentTreeDepth = Number(config.commitmentTreeDepth);
@@ -205,7 +217,10 @@ const generateTestAddressRegistration = async (
   name: string,
   sdk: Core
 ) => {
-  const zaddrReg = await sdk.proveAddress("0x"); // signature will be generated inside the protocol test setup `_getRegisterAddressSignature` function, so passing dummy data here
+  // Signature is regenerated inside the protocol test setup by
+  // `_getRegisterAddressSignature`, so dummy data is fine here. The address is not
+  // dummy: it is bound into the proof and must match what the Pool recovers.
+  const zaddrReg = await sdk.proveAddress("0x", REGISTER_PROOF_ADDRESS);
   const encoded = zaddrReg.encode();
   writeFileSync(`${dirFixtureData}/${name}.txt`, encoded);
 };
@@ -215,7 +230,11 @@ const generateTestAddrRegWithOutsourcedProofVerification = async (
   sdk: Core,
   nebraClient: any
 ) => {
-  const zaddrReg = await sdk.proveAddressAndOutsourceVerification("0x", nebraClient);
+  const zaddrReg = await sdk.proveAddressAndOutsourceVerification(
+    "0x",
+    nebraClient,
+    REGISTER_PROOF_ADDRESS
+  );
   console.log("zaddrReg obj returned after proof gen & submission to Nebra:", zaddrReg);
   console.log("Encoding to gen fixture");
   const encoded = zaddrReg.shieldedAddressRegistrationData.encode();
