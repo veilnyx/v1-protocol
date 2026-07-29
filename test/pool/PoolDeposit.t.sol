@@ -34,7 +34,7 @@ contract PoolDepositTest is PoolTest {
         if (block.chainid != ETH_SEPOLIA && block.chainid != 1) {
             vm.skip(true);
         }
-        address testnet_weth = config.wToken();
+        address testnet_weth = config.nativeWToken();
         uint256 deposit1 = 2 ether;
         uint256 balance1 = IWToken(testnet_weth).balanceOf(address(pool));
 
@@ -107,7 +107,7 @@ contract PoolDepositTest is PoolTest {
         if (block.chainid != ETH_SEPOLIA && block.chainid != 1) {
             vm.skip(true);
         }
-        address testnet_weth = config.wToken();
+        address testnet_weth = config.nativeWToken();
         uint256 deposit1 = 2 ether;
         uint256 balance1 = IWToken(testnet_weth).balanceOf(address(pool));
         uint256 ethBalanceBefore = address(this).balance;
@@ -134,7 +134,7 @@ contract PoolDepositTest is PoolTest {
         if (block.chainid != ETH_SEPOLIA && block.chainid != 1) {
             vm.skip(true);
         }
-        address testnet_weth = config.wToken();
+        address testnet_weth = config.nativeWToken();
         uint256 depositAmt = 2 ether;
         uint256 ethPortion = 1 ether;
         uint256 wethPortion = depositAmt - ethPortion;
@@ -172,7 +172,7 @@ contract PoolDepositTest is PoolTest {
         assertEq(address(this).balance, ethBalanceBefore - ethPortion);
     }
 
-    /// @dev msg.value strictly exceeds the wToken pubAsset value: Pool refuses
+    /// @dev msg.value strictly exceeds the nativeWToken pubAsset value: Pool refuses
     ///      to wrap to avoid locking surplus ETH and reverts with
     ///      `NativeEthExceedsDeposit`.
     function test_revertOnNativeEthExceedsDeposit() public {
@@ -197,7 +197,7 @@ contract PoolDepositTest is PoolTest {
         pool.transact{value: oversend}(stx);
     }
 
-    /// @dev Sending msg.value before `wToken` has been configured by the
+    /// @dev Sending msg.value before `nativeWToken` has been configured by the
     ///      owner must revert with `WTokenNotConfigured`. ERC20-only deposits
     ///      (msg.value == 0) are unaffected by this.
     function test_revertOnNativeEthWhenWTokenNotConfigured() public {

@@ -17,12 +17,16 @@ import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interf
 /// @param verifier The address of the verifier contract. Verifier contract verifies the stx's zk proof, address proof and merkle tree queue proof.
 /// @param adaptorHandler The address of the adaptor handler contract, responsible for delegate calling adaptors of external DeFi protocols.
 /// @param screener The address of the screener contract, responsible for screening sanctioned addresseses.
+///        Must either be a contract or address(0) (screening disabled); an EOA is rejected.
 /// @param hasher The address of the hasher contract. It provides a single interface to Poseidon hashing functions
+/// @param pauser The address allowed to pause the pool alongside the owner. Pass address(0)
+///        to leave pausing exclusive to the owner; can later be set via `setPauser`.
 struct InitAddressParams {
     IVerifier verifier;
     IAdaptorHandler adaptorHandler;
     IScreener screener;
     IHasher hasher;
+    address pauser;
 }
 
 /// @param withdrawFeeBps Withdrawal fee in basis points (1 bps = 0.01%).
@@ -154,9 +158,9 @@ interface IPool {
     ///      once.
     error DuplicatePubAssetId(uint24 assetId);
 
-    /// @dev msg.value exceeds the (pre-fee) wToken pubAsset value of the
+    /// @dev msg.value exceeds the (pre-fee) nativeWToken pubAsset value of the
     ///      deposit. Refusing to wrap to avoid locking the surplus ETH in the
-    ///      Pool. Send `msg.value <= wTokenValue` and approve the wToken
+    ///      Pool. Send `msg.value <= wTokenValue` and approve the nativeWToken
     ///      remainder if msg.value < wTokenValue.
     error NativeEthExceedsDeposit(uint256 sent, uint256 expected);
     error NotPauser();
@@ -286,13 +290,13 @@ interface IPool {
 
     /// @notice Validates and executes a stx.
     /// @notice Can only be called when the contract is not paused.
-    /// @notice Payable: when the transaction is a DEPOSIT and `wToken` is set,
-    ///         the caller may attach native ETH equal to the (pre-fee) wToken
-    ///         pubAsset value. The Pool then wraps the ETH into wToken on
-    ///         behalf of the caller in lieu of pulling wToken from the caller's
+    /// @notice Payable: when the transaction is a DEPOSIT and `nativeWToken` is set,
+    ///         the caller may attach native ETH equal to the (pre-fee) nativeWToken
+    ///         pubAsset value. The Pool then wraps the ETH into nativeWToken on
+    ///         behalf of the caller in lieu of pulling nativeWToken from the caller's
     ///         wallet via `transferFrom`. msg.value of 0 preserves the
     ///         pre-existing ERC20 transferFrom flow for any asset (including
-    ///         wToken).
+    ///         nativeWToken).
     /// @param stx The stx to be executed.
     function transact(ShieldedTransaction calldata stx) external payable;
 

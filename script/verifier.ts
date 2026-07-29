@@ -3,7 +3,15 @@ import { readFileSync } from "fs";
 import hre from "hardhat";
 import { toFunctionSelector } from "viem";
 
-export const deployVerifier = async (deployConfig, verifierManager: `0x${string}`) => {
+/**
+ * Deploys the Verifier and its sub-verifiers. The Verifier's constructor makes the deployer
+ * its owner — hand it over with `transferOwnershipToOwner` from `./utils/ownership` together
+ * with the rest of the Ownable contracts once post-deployment setup is done.
+ */
+export const deployVerifier = async (
+    deployConfig,
+    verifierManager: `0x${string}`
+) => {
     const verifier21Abi = hre.artifacts.readArtifactSync("VerifierTransact21").abi;
     const verifier22Abi = hre.artifacts.readArtifactSync("VerifierTransact22").abi;
     const verifier23Abi = hre.artifacts.readArtifactSync("VerifierTransact23").abi;

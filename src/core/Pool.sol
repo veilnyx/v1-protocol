@@ -85,7 +85,8 @@ contract Pool is
         verifier = initAddressParams.verifier;
         adaptorHandler = initAddressParams.adaptorHandler;
         hasher = initAddressParams.hasher;
-        screener = initAddressParams.screener;
+        _setScreener(initAddressParams.screener);
+        _setPauser(initAddressParams.pauser);
 
         withdrawFeeBps = configParams.withdrawFeeBps;
         tvlLimitUsd = configParams.tvlLimitUsd;
@@ -123,8 +124,7 @@ contract Pool is
 
     /// @custom:invariant ACCESS-1 Owner can delegate pausing to a separate address
     function setPauser(address newPauser) external onlyOwner {
-        emit IPool.PauserUpdated(pauser, newPauser);
-        pauser = newPauser;
+        _setPauser(newPauser);
     }
 
     function addAssets(
@@ -222,15 +222,7 @@ contract Pool is
     ///      Any non-zero `screener_` must be a contract: setting an EOA would
     ///      make `isSanctioned` revert and brick registrations and deposits.
     function setScreener(IScreener screener_) external onlyOwner {
-        if (
-            address(screener_) != address(0) &&
-            address(screener_).code.length == 0
-        ) {
-            revert IPool.InvalidScreenerAddress(address(screener_));
-        }
-
-        screener = screener_;
-        emit ScreenerUpdated(address(screener_));
+        _setScreener(screener_);
     }
 
     /// @custom:invariant FEE-1: withdrawFeeBps cannot be set above MAX_WITHDRAW_FEE_BPS
@@ -379,10 +371,10 @@ contract Pool is
         IWToken _wToken = nativeWToken;
         uint24 _wTokenAssetId = _resolveWTokenAssetId(_wToken);
 
-        // If the caller attached native ETH, wrap it into wToken up-front so
-        // the ensuing deposit logic can treat the wToken portion as already
+        // If the caller attached native ETH, wrap it into nativeWToken up-front so
+        // the ensuing deposit logic can treat the nativeWToken portion as already
         // credited to the Pool. msg.value == 0 preserves the ERC20
-        // transferFrom flow for every pubAsset (including wToken).
+        // transferFrom flow for every pubAsset (including nativeWToken).
         if (msg.value > 0) {
             _wrapNativeEthForDeposit(stx, _wToken, _wTokenAssetId);
         }
@@ -586,6 +578,28 @@ contract Pool is
             revert IPool.BadArguments();
     }
 
+    /// @dev Shared by `initialize` and `setScreener`. Rejects an EOA screener: a
+    ///      non-contract address would make `isSanctioned` revert and brick
+    ///      registrations and deposits. address(0) is allowed and disables screening.
+    function _setScreener(IScreener screener_) private {
+        if (
+            address(screener_) != address(0) &&
+            address(screener_).code.length == 0
+        ) {
+            revert IPool.InvalidScreenerAddress(address(screener_));
+        }
+
+        screener = screener_;
+        emit IPool.ScreenerUpdated(address(screener_));
+    }
+
+    /// @dev Shared by `initialize` and `setPauser`. address(0) leaves pausing
+    ///      exclusive to the owner.
+    function _setPauser(address newPauser) private {
+        emit IPool.PauserUpdated(pauser, newPauser);
+        pauser = newPauser;
+    }
+
     function _setAssetPriceFeed(
         uint24 assetId,
         AggregatorV3Interface feed
@@ -744,7 +758,7 @@ contract Pool is
     /// @notice Returns the asset id of `_wToken_` in this pool, or 0 if it is
     ///         not configured or not registered as an asset. Does not revert.
     ///         Used by `transact` to drive both the DEPOSIT wrap path and the
-    ///         WITHDRAW unwrap path without reading wToken storage twice.
+    ///         WITHDRAW unwrap path without reading nativeWToken storage twice.
     function _resolveWTokenAssetId(
         IWToken _wToken_
     ) internal view returns (uint24) {
@@ -752,25 +766,25 @@ contract Pool is
         return _assetIds[address(_wToken_)];
     }
 
-    /// @notice Wraps the attached `msg.value` into the configured wToken so it
-    ///         can be used as the wToken portion of a DEPOSIT.
+    /// @notice Wraps the attached `msg.value` into the configured nativeWToken so it
+    ///         can be used as the nativeWToken portion of a DEPOSIT.
     /// @dev    Called from `transact` only when `msg.value > 0`. Validates that
     ///         the call shape is consistent with wrapping native ETH:
     ///         - `txType` must be DEPOSIT (otherwise the ETH would be locked).
-    ///         - `wToken` must be configured and registered as an active
+    ///         - `nativeWToken` must be configured and registered as an active
     ///           ERC20 asset (otherwise wrapping has no destination).
-    ///         - exactly one pubAsset must reference the wToken's asset id, otherwise can lead to deduction of `msg.value` from multiple pubAssets with the same assetId.
+    ///         - exactly one pubAsset must reference the nativeWToken's asset id, otherwise can lead to deduction of `msg.value` from multiple pubAssets with the same assetId.
     ///         - `msg.value` must be `<=` that pubAsset's full value
     ///           so no surplus ETH is locked in the Pool. Strict-less means
     ///           the caller has chosen to top up the deposit by approving the
-    ///           remainder in wToken (ERC20) form; we pull that delta with
+    ///           remainder in nativeWToken (ERC20) form; we pull that delta with
     ///           `transferFrom(msg.sender, address(this), delta)` so the Pool
-    ///           ends up holding the full `wTokenValue` of wToken before the
+    ///           ends up holding the full `wTokenValue` of nativeWToken before the
     ///           library proceeds. The library skips its own per-asset
-    ///           `transferFrom` for the wToken id via `prefundedAssetId`.
+    ///           `transferFrom` for the nativeWToken id via `prefundedAssetId`.
     /// @param  stx The shielded transaction being executed.
-    /// @param  _wToken_ The resolved wToken contract (from `_resolveWTokenAssetId`).
-    /// @param  wTokenAssetId The resolved wToken asset id (from `_resolveWTokenAssetId`).
+    /// @param  _wToken_ The resolved nativeWToken contract (from `_resolveWTokenAssetId`).
+    /// @param  wTokenAssetId The resolved nativeWToken asset id (from `_resolveWTokenAssetId`).
     function _wrapNativeEthForDeposit(
         ShieldedTransaction calldata stx,
         IWToken _wToken_,
@@ -814,16 +828,16 @@ contract Pool is
             revert IPool.NativeEthExceedsDeposit(msg.value, wTokenValue);
         }
 
-        // Wrap the attached native ETH into wToken; the resulting wToken
+        // Wrap the attached native ETH into nativeWToken; the resulting nativeWToken
         // balance is held directly by this Pool.
         _wToken_.deposit{value: msg.value}();
 
         // If the caller chose to fund only part of the deposit with native
-        // ETH, pull the remainder in wToken (ERC20) form. This requires the
+        // ETH, pull the remainder in nativeWToken (ERC20) form. This requires the
         // caller to have approved at least (wTokenValue - msg.value) of
-        // wToken to this Pool. Combined with the wrap above, the Pool now
-        // holds exactly `wTokenValue` of wToken for this deposit, allowing
-        // the library to skip its own transferFrom for the wToken id.
+        // nativeWToken to this Pool. Combined with the wrap above, the Pool now
+        // holds exactly `wTokenValue` of nativeWToken for this deposit, allowing
+        // the library to skip its own transferFrom for the nativeWToken id.
         uint256 remainder = wTokenValue - msg.value;
         if (remainder != 0) {
             AssetLogic.receiveAsset({

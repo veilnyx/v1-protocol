@@ -17,6 +17,7 @@ import { loadConfigs, ChainParams, AdaptorParams, CommonParams, getHex } from ".
 import { deployHasher } from "./hasher";
 import { deployVerifier } from "./verifier";
 import { getChainForCurrentNetwork } from "./utils/chainUtils";
+import { assertOwnershipTransferred, transferOwnershipToOwner } from "./utils/ownership";
 import { deployErc4337Infra } from "./erc4337Infra";
 
 const config = loadConfigs();
@@ -24,6 +25,10 @@ const config = loadConfigs();
 // ABIs
 const poolAbi = hre.artifacts.readArtifactSync("Pool").abi;
 const adaptorHandlerAbi = hre.artifacts.readArtifactSync("AdaptorHandler").abi;
+
+// Failures are non-fatal here (the deploy keeps going), so print them in bold red
+// to keep them from getting lost in the surrounding deploy output.
+const logError = (...args: any[]) => console.error("\x1b[1;31m✖", ...args, "\x1b[0m");
 
 const deployUniswap = async (uniswapParams, pool, deployConfig) => {
   const uniswap = await hre.viem.deployContract("UniswapV3Adapter", [
@@ -152,14 +157,35 @@ const deployRocketPool = async (rocketPoolParams: any, pool: any, deployConfig: 
   await addAssets(assets, assetsPrecision, assetsUsdPriceFeeds, 1, pool, deployConfig.client.wallet, deployConfig.client.public);
 }
 
+// Resolves the Etherscan API endpoint for the network the script is running against,
+// reusing the `etherscan.customChains` entry from hardhat.config.ts so the URL lives in
+// one place. Falls back to the Etherscan V2 unified endpoint for the current chain id.
+const getEtherscanApiUrl = (): string => {
+  const networkName = hre.network.name;
+  const chainId = hre.network.config.chainId;
+  const customChains = (hre.config as any).etherscan?.customChains ?? [];
+
+  const match = customChains.find(
+    (c: any) => c.network === networkName || c.chainId === chainId
+  );
+
+  if (match?.urls?.apiURL) return match.urls.apiURL;
+
+  console.warn(
+    `getEtherscanApiUrl: no customChains entry for ${networkName} (chainId: ${chainId}), falling back to the Etherscan V2 endpoint`
+  );
+  return `https://api.etherscan.io/v2/api?chainid=${chainId}`;
+};
+
 const verifyProxy = async (proxyAddress: string, implAddress: string) => {
   const apiKey = process.env.ETHERSCAN_API_KEY;
   if (!apiKey) {
-    console.error("verifyProxy: ETHERSCAN_API_KEY not set, skipping proxy link");
+    logError("verifyProxy: ETHERSCAN_API_KEY not set, skipping proxy link");
     return;
   }
 
-  const baseUrl = "https://api.etherscan.io/v2/api?chainid=11155111";
+  const baseUrl = getEtherscanApiUrl();
+  console.log("verifyProxy: using Etherscan API:", baseUrl);
 
   // Step 1: submit proxy verification
   const submitBody = new URLSearchParams({
@@ -176,7 +202,7 @@ const verifyProxy = async (proxyAddress: string, implAddress: string) => {
   const submitJson = await submitRes.json() as any;
 
   if (submitJson.status !== "1") {
-    console.error("verifyProxy: proxy verification submission failed:", submitJson.result);
+    logError("verifyProxy: proxy verification submission failed:", submitJson.result);
     return;
   }
 
@@ -203,11 +229,11 @@ const verifyProxy = async (proxyAddress: string, implAddress: string) => {
       console.log("verifyProxy: proxy linked to implementation:", implAddress);
       return;
     }
-    console.error("verifyProxy: failed:", checkJson.result);
+    logError("verifyProxy: failed:", checkJson.result);
     return;
   }
 
-  console.error("verifyProxy: timed out waiting for result");
+  logError("verifyProxy: timed out waiting for result");
 };
 
 const verifyAll = async (contracts: {
@@ -263,7 +289,7 @@ const verifyAll = async (contracts: {
       if (e.message?.includes("Already Verified") || e.message?.includes("already verified")) {
         console.log("Already verified:", v.address);
       } else {
-        console.error("Verification failed for", v.address, e.message);
+        logError("Verification failed for", v.address, e.message);
       }
     }
   }
@@ -295,7 +321,7 @@ const verifyAll = async (contracts: {
     } else if (e.message?.includes("Query params cannot be passed")) {
       console.log("verifyAll: proxy source submit hit URL bug — source may still have been submitted. Proceeding to proxy link step.");
     } else {
-      console.error("Verification failed for", poolProxy.address, e.message);
+      logError("Verification failed for", poolProxy.address, e.message);
     }
   }
 
@@ -312,7 +338,7 @@ const deployAdaptors = async (pool: any, adpParams: any, deployConfig: any) => {
   // await deployCurve(curveParams, pool, deployConfig);
   // await deployEthena(ethenaParams, pool, deployConfig);
   // await deployBeefy(beefyParams, pool, deployConfig);
-  // await deployMorpho(morphoParams, pool, deployConfig);
+  await deployMorpho(morphoParams, pool, deployConfig);
   // await deployOneInch(oneInchParams, pool, deployConfig);
   // await deployRocketPool(rocketPoolParams, pool, deployConfig);
 }
@@ -329,11 +355,18 @@ const addAdpatorSupport = async (pool: any, adpAddress: any, enable: boolean, wa
 
     const rct = await client.waitForTransactionReceipt({ hash });
     console.log("rct:addAdpSupport", rct.status);
-  } catch (error) {
-    console.log("Error supporting adp");
-    console.log(error.message);
+  } catch (error: any) {
+    logError("Error supporting adp:", error.message);
   }
 }
+
+// Pool.addAssets takes (AssetType, AssetInitParams[]) — zip the parallel config arrays into structs.
+const toAssetInitParams = (assets: any, assetsPrecision: any, usdPriceFeeds: any) =>
+  assets.map((assetAddress: any, i: number) => ({
+    assetAddress,
+    precision: assetsPrecision[i],
+    usdPriceFeed: usdPriceFeeds[i],
+  }));
 
 const addAssets = async (assets: any, assetsPrecision: any, usdPriceFeeds: any, assetType: number, poolAddr: any, wallet: any, client: any) => {
   console.log("Adding assets:", assets);
@@ -343,13 +376,13 @@ const addAssets = async (assets: any, assetsPrecision: any, usdPriceFeeds: any, 
       address: poolAddr,
       abi: poolAbi,
       functionName: "addAssets",
-      args: [assetType, assets, assetsPrecision, usdPriceFeeds],
+      args: [assetType, toAssetInitParams(assets, assetsPrecision, usdPriceFeeds)],
     });
 
     const rct = await client.waitForTransactionReceipt({ hash });
     console.log("rct:addAsset", rct.status);
   } catch (e) {
-    console.log("Error adding assets:", e);
+    logError("Error adding assets:", e);
   }
 }
 
@@ -360,7 +393,14 @@ const addAssetsAndRevokers = async (poolProxy: any, chainParams: any, commonPara
       address: poolProxy,
       abi: poolAbi,
       functionName: "addAssets",
-      args: [chainParams.initAssetType, chainParams.initAssetAddresses, chainParams.initAssetsPrecision, chainParams.initAssetToUSDChainlinkFeeds],
+      args: [
+        chainParams.initAssetType,
+        toAssetInitParams(
+          chainParams.initAssetAddresses,
+          chainParams.initAssetsPrecision,
+          chainParams.initAssetToUSDChainlinkFeeds
+        ),
+      ],
     });
 
     const rct = await client.waitForTransactionReceipt({ hash });
@@ -387,8 +427,8 @@ const addAssetsAndRevokers = async (poolProxy: any, chainParams: any, commonPara
       const rct = await client.waitForTransactionReceipt({ hash });
       console.log("rct:revokerAdd", rct.status);
     }
-  } catch (error) {
-    console.log(error.message);
+  } catch (error: any) {
+    logError("Error adding assets and revokers:", error.message);
   }
 }
 
@@ -473,13 +513,16 @@ const main = async () => {
   const { hasher } = await deployHasher(deployConfig.client.wallet, client, deployConfig);
   console.log("Hasher deployed:", hasher);
 
-  const verifier = await deployVerifier(deployConfig, wallets[0].account.address);
+  // Ownership is handed over below with the rest of the Ownable contracts; this only sets
+  // the verifier manager.
+  const verifier = await deployVerifier(deployConfig, commonParams.hardwareWalletOwner);
 
   const initAddressParams = {
     verifier: verifier,
     adaptorHandler: adaptorHandler.address,
     screener: chainParams.sanctionsList,
-    hasher: hasher
+    hasher: hasher,
+    pauser: commonParams.pauserAddress, // zeroAddress leaves pausing exclusive to the owner
   }
 
   const ONE_DAY = 86400n;
@@ -488,8 +531,8 @@ const main = async () => {
     tvlLimitUsd: BigInt(5_000e6),    // $5,000 (6-decimal precision)
     minDepositUsd: BigInt(2e6),      // $2 (6-decimal precision)
     maxDepositUsd: BigInt(200e6),    // $200 (6-decimal precision)
-    priceFeedStalenessThreshold: ONE_DAY * 5n, // 5 days in seconds
-    wToken: chainParams.wToken,      // wrapped native token (e.g. WETH) for native ETH deposits
+    priceFeedStalenessThreshold: ONE_DAY * 2n, // 2 days in seconds
+    nativeWToken: chainParams.nativeWToken,      // wrapped native token (e.g. WETH) for native ETH deposits
   };
 
   const args = [
@@ -521,7 +564,7 @@ const main = async () => {
   await client.waitForTransactionReceipt({ hash: setVersionHash });
   console.log("Pool: version set to", commonParams.protocolVersion);
 
-  // wToken is set via PoolConfigParams during initialize() above; no separate
+  // nativeWToken is set via PoolConfigParams during initialize() above; no separate
   // setWToken call is needed for fresh deployments.
 
   // @ts-ignore
@@ -535,7 +578,7 @@ const main = async () => {
   console.log("AdaptorHandler: veilnyxPool set to", poolProxy.address);
 
   // ERC4337 infra setup
-  await deployErc4337Infra(chainParams, poolProxy.address, deployConfig);
+  const { gateway, paymaster } = await deployErc4337Infra(chainParams, poolProxy.address, deployConfig);
 
   // Asset & Revoker Setup
   await addAssetsAndRevokers(poolProxy.address, chainParams, commonParams, client, deployConfig.client.wallet);
@@ -553,19 +596,28 @@ const main = async () => {
   await client.waitForTransactionReceipt({ hash: pauseHash });
   console.log("Pool: paused");
 
-  // transfer ownership to a multisig or a Gnosis Safe after deployment. For testing purposes, we can keep the ownership to the deployer wallet
-  // @ts-ignore
-  const transferOwnershipHash = await wallets[0].writeContract({
-    address: poolProxy.address,
-    abi: poolAbi,
-    functionName: "transferOwnership",
-    args: [commonParams.veilnyxMultiSigAddress], // set to zeroAddress to keep ownership to deployer wallet for testing. Update with multisig or Gnosis Safe address for production deployment.
-  });
-  await client.waitForTransactionReceipt({ hash: transferOwnershipHash });
-  console.log("Pool: ownership transferred");
+  // Hand every Ownable contract over to the hardware wallet / multisig. Must stay after all
+  // owner-gated setup above (setVersion, setVeilnyxPool, addAssets, registerRevoker,
+  // addAdaptorSupport, setChainlinkFeed, pause) — those revert once the deployer is no longer
+  // the owner. Set common.hardwareWalletOwner to zeroAddress to retain deployer ownership for
+  // testing.
+  const ownershipResults = await transferOwnershipToOwner(
+    [
+      { contract: "Pool", address: poolProxy.address, label: "PoolProxy" },
+      { contract: "Verifier", address: verifier },
+      { contract: "AdaptorHandler", address: adaptorHandler.address },
+      { contract: "Gateway", address: gateway },
+      { contract: "Paymaster", address: paymaster },
+    ],
+    commonParams.hardwareWalletOwner,
+    deployConfig
+  );
 
   // Verify all core contracts on Etherscan
   await verifyAll({ asset, merkleTree, queuedMerkleTree, shieldedAddress, shieldedTransaction, adaptorHandler, poolImpl, poolProxy, initData });
+
+  // Fail the run (after verification, so it still happens) if anything is still deployer-owned
+  assertOwnershipTransferred(ownershipResults);
 };
 
-main().catch(console.error);
+main().catch(logError);

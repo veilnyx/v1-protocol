@@ -31,7 +31,6 @@ export const reqs = {
 		paymaster: zeroAddress,
 		revokerId: 0,
 	}
-	/**,
 	transfer_1000_weth_with_usdc_fee: {
 		type: TransactionType.TRANSFER,
 		assetIds: [weth],
@@ -41,8 +40,7 @@ export const reqs = {
 		paymaster: PAYMASTER_ADDR_FIXTURE as `0x${string}`,
 		feeAssetId: usdc,
 		revokerId: 0,
-	}
-	/**,,
+	},
 	transfer_500_weth_without_fee: {
 		type: TransactionType.TRANSFER,
 		assetIds: [weth],
@@ -63,6 +61,7 @@ export const reqs = {
 		feeAssetId: weth,
 		revokerId: 0,
 	},
+	/**
 	transfer_500_weth_with_usdc_fee: {
 		type: TransactionType.TRANSFER,
 		assetIds: [weth],
@@ -73,6 +72,7 @@ export const reqs = {
 		feeAssetId: usdc,
 		revokerId: 0,
 	},
+	/**
 	transfer_500_weth_without_fee: {
 		type: TransactionType.TRANSFER,
 		assetIds: [weth],

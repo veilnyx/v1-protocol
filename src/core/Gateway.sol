@@ -17,7 +17,7 @@ contract Gateway is IGateway, Ownable {
 
     IEntryPoint public immutable entryPoint;
     IPool public immutable pool;
-    IWToken public immutable wToken;
+    IWToken public immutable nativeWToken;
 
     error InvalidEntryPoint(address entryPoint);
     error ZeroAddress();
@@ -42,7 +42,7 @@ contract Gateway is IGateway, Ownable {
         ) revert ZeroAddress();
         entryPoint = entryPoint_;
         pool = pool_;
-        wToken = wToken_;
+        nativeWToken = wToken_;
     }
 
     /// @dev `missingAccountFunds` is always expected to be 0 since paymaster
@@ -64,8 +64,8 @@ contract Gateway is IGateway, Ownable {
     function handleWrapAndDeposit(
         ShieldedTransaction calldata stx
     ) external payable {
-        wToken.deposit{value: msg.value}();
-        wToken.forceApprove(address(pool), msg.value);
+        nativeWToken.deposit{value: msg.value}();
+        nativeWToken.forceApprove(address(pool), msg.value);
         pool.transact(stx);
     }
 

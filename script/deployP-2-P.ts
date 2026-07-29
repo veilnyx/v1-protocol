@@ -100,23 +100,26 @@ const main = async () => {
         const { hasher } = await deployHasher(wallet, client, deployConfig);
         console.log("Hasher deployed:", hasher);
 
+        // Verifier ownership stays with the deployer here, as it did when deployVerifier
+        // handled the transfer and was passed the deployer as owner.
         const verifier = await deployVerifier(deployConfig, wallet.account.address);
 
         const initAddressParams = {
             verifier: verifier,
             adaptorHandler: zeroAddress,
             screener: chainParams.sanctionsList,
-            hasher: hasher
+            hasher: hasher,
+            pauser: commonParams.pauserAddress, // zeroAddress leaves pausing exclusive to the owner
         }
 
-        const ONE_DAY = 86400n;
+        const ONE_HOUR = 3600n;
         const configParams = {
             withdrawFeeBps: BigInt(commonParams.withdrawFeeBps),
             tvlLimitUsd: BigInt(5_000e6),    // $5,000 (6-decimal precision)
             minDepositUsd: BigInt(2e6),      // $2 (6-decimal precision)
             maxDepositUsd: BigInt(200e6),    // $200 (6-decimal precision)
-            priceFeedStalenessThreshold: ONE_DAY * 5n, // 5 days in seconds
-            wToken: chainParams.wToken,      // wrapped native token (e.g. WETH) for native ETH deposits
+            priceFeedStalenessThreshold: ONE_HOUR * 2n, // 2 hours in seconds
+            nativeWToken: chainParams.nativeWToken,      // wrapped native token (e.g. WETH) for native ETH deposits
         };
 
         const args = [
