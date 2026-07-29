@@ -54,14 +54,31 @@ contract VerifierTest is BaseTest {
         uint256 id = _verifier.getTransactionVerifierId(2, 2);
         assertEq(id, 22);
 
-        uint256 id2 = _verifier.getTransactionVerifierId(10, 10);
-        assertEq(id2, 1010);
-
-        uint256 id3 = _verifier.getTransactionVerifierId(123, 45);
-        assertEq(id3, 12345);
-
         uint16 id4 = _verifier.getTransactionVerifierId(1, 0);
         assertEq(id4, 10);
+
+        // Every deployed shape stays on its existing id.
+        assertEq(_verifier.getTransactionVerifierId(2, 1), 21);
+        assertEq(_verifier.getTransactionVerifierId(2, 3), 23);
+        assertEq(_verifier.getTransactionVerifierId(4, 2), 42);
+        assertEq(_verifier.getTransactionVerifierId(4, 4), 44);
+        assertEq(_verifier.getTransactionVerifierId(8, 2), 82);
+        assertEq(_verifier.getTransactionVerifierId(8, 4), 84);
+    }
+
+    /// A multi-digit nOuts made the id ambiguous: (2,10) and (21,0) both gave 210.
+    function test_getVerifierIdRevertsOnMultiDigitNOuts() public {
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IVerifier.BadArguments.selector,
+                uint256(2),
+                uint256(10)
+            )
+        );
+        _verifier.getTransactionVerifierId(2, 10);
+
+        // The value it used to collide with is still reachable and unambiguous.
+        assertEq(_verifier.getTransactionVerifierId(21, 0), 210);
     }
 
     function test_getVerifierIdRevertsOnUint16Overflow() public {

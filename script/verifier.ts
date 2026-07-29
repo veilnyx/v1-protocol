@@ -2,12 +2,15 @@ import path from "path";
 import { readFileSync } from "fs";
 import hre from "hardhat";
 import { toFunctionSelector } from "viem";
-import { transferOwnershipToOwner } from "./utils/ownership";
 
+/**
+ * Deploys the Verifier and its sub-verifiers. The Verifier's constructor makes the deployer
+ * its owner — hand it over with `transferOwnershipToOwner` from `./utils/ownership` together
+ * with the rest of the Ownable contracts once post-deployment setup is done.
+ */
 export const deployVerifier = async (
     deployConfig,
-    verifierManager: `0x${string}`,
-    owner: `0x${string}`
+    verifierManager: `0x${string}`
 ) => {
     const verifier21Abi = hre.artifacts.readArtifactSync("VerifierTransact21").abi;
     const verifier22Abi = hre.artifacts.readArtifactSync("VerifierTransact22").abi;
@@ -75,14 +78,6 @@ export const deployVerifier = async (
         deployConfig
     );
     console.log("Verifier deployed:", verifier.address);
-
-    // Verifier's constructor sets the deployer as owner, transfer it to the intended owner
-    // (e.g. hardware wallet / multisig). No-op when the deployer is already the owner.
-    await transferOwnershipToOwner(
-        [{ contract: "Verifier", address: verifier.address }],
-        owner,
-        deployConfig
-    );
 
     return verifier.address;
 }

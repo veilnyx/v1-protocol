@@ -26,6 +26,10 @@ const config = loadConfigs();
 const poolAbi = hre.artifacts.readArtifactSync("Pool").abi;
 const adaptorHandlerAbi = hre.artifacts.readArtifactSync("AdaptorHandler").abi;
 
+// Failures are non-fatal here (the deploy keeps going), so print them in bold red
+// to keep them from getting lost in the surrounding deploy output.
+const logError = (...args: any[]) => console.error("\x1b[1;31m✖", ...args, "\x1b[0m");
+
 const deployUniswap = async (uniswapParams, pool, deployConfig) => {
   const uniswap = await hre.viem.deployContract("UniswapV3Adapter", [
     uniswapParams.uniswapSwapRouter02,
@@ -176,7 +180,7 @@ const getEtherscanApiUrl = (): string => {
 const verifyProxy = async (proxyAddress: string, implAddress: string) => {
   const apiKey = process.env.ETHERSCAN_API_KEY;
   if (!apiKey) {
-    console.error("verifyProxy: ETHERSCAN_API_KEY not set, skipping proxy link");
+    logError("verifyProxy: ETHERSCAN_API_KEY not set, skipping proxy link");
     return;
   }
 
@@ -198,7 +202,7 @@ const verifyProxy = async (proxyAddress: string, implAddress: string) => {
   const submitJson = await submitRes.json() as any;
 
   if (submitJson.status !== "1") {
-    console.error("verifyProxy: proxy verification submission failed:", submitJson.result);
+    logError("verifyProxy: proxy verification submission failed:", submitJson.result);
     return;
   }
 
@@ -225,11 +229,11 @@ const verifyProxy = async (proxyAddress: string, implAddress: string) => {
       console.log("verifyProxy: proxy linked to implementation:", implAddress);
       return;
     }
-    console.error("verifyProxy: failed:", checkJson.result);
+    logError("verifyProxy: failed:", checkJson.result);
     return;
   }
 
-  console.error("verifyProxy: timed out waiting for result");
+  logError("verifyProxy: timed out waiting for result");
 };
 
 const verifyAll = async (contracts: {
@@ -285,7 +289,7 @@ const verifyAll = async (contracts: {
       if (e.message?.includes("Already Verified") || e.message?.includes("already verified")) {
         console.log("Already verified:", v.address);
       } else {
-        console.error("Verification failed for", v.address, e.message);
+        logError("Verification failed for", v.address, e.message);
       }
     }
   }
@@ -317,7 +321,7 @@ const verifyAll = async (contracts: {
     } else if (e.message?.includes("Query params cannot be passed")) {
       console.log("verifyAll: proxy source submit hit URL bug — source may still have been submitted. Proceeding to proxy link step.");
     } else {
-      console.error("Verification failed for", poolProxy.address, e.message);
+      logError("Verification failed for", poolProxy.address, e.message);
     }
   }
 
@@ -351,11 +355,18 @@ const addAdpatorSupport = async (pool: any, adpAddress: any, enable: boolean, wa
 
     const rct = await client.waitForTransactionReceipt({ hash });
     console.log("rct:addAdpSupport", rct.status);
-  } catch (error) {
-    console.log("Error supporting adp");
-    console.log(error.message);
+  } catch (error: any) {
+    logError("Error supporting adp:", error.message);
   }
 }
+
+// Pool.addAssets takes (AssetType, AssetInitParams[]) — zip the parallel config arrays into structs.
+const toAssetInitParams = (assets: any, assetsPrecision: any, usdPriceFeeds: any) =>
+  assets.map((assetAddress: any, i: number) => ({
+    assetAddress,
+    precision: assetsPrecision[i],
+    usdPriceFeed: usdPriceFeeds[i],
+  }));
 
 const addAssets = async (assets: any, assetsPrecision: any, usdPriceFeeds: any, assetType: number, poolAddr: any, wallet: any, client: any) => {
   console.log("Adding assets:", assets);
@@ -365,13 +376,13 @@ const addAssets = async (assets: any, assetsPrecision: any, usdPriceFeeds: any, 
       address: poolAddr,
       abi: poolAbi,
       functionName: "addAssets",
-      args: [assetType, assets, assetsPrecision, usdPriceFeeds],
+      args: [assetType, toAssetInitParams(assets, assetsPrecision, usdPriceFeeds)],
     });
 
     const rct = await client.waitForTransactionReceipt({ hash });
     console.log("rct:addAsset", rct.status);
   } catch (e) {
-    console.log("Error adding assets:", e);
+    logError("Error adding assets:", e);
   }
 }
 
@@ -382,7 +393,14 @@ const addAssetsAndRevokers = async (poolProxy: any, chainParams: any, commonPara
       address: poolProxy,
       abi: poolAbi,
       functionName: "addAssets",
-      args: [chainParams.initAssetType, chainParams.initAssetAddresses, chainParams.initAssetsPrecision, chainParams.initAssetToUSDChainlinkFeeds],
+      args: [
+        chainParams.initAssetType,
+        toAssetInitParams(
+          chainParams.initAssetAddresses,
+          chainParams.initAssetsPrecision,
+          chainParams.initAssetToUSDChainlinkFeeds
+        ),
+      ],
     });
 
     const rct = await client.waitForTransactionReceipt({ hash });
@@ -409,8 +427,8 @@ const addAssetsAndRevokers = async (poolProxy: any, chainParams: any, commonPara
       const rct = await client.waitForTransactionReceipt({ hash });
       console.log("rct:revokerAdd", rct.status);
     }
-  } catch (error) {
-    console.log(error.message);
+  } catch (error: any) {
+    logError("Error adding assets and revokers:", error.message);
   }
 }
 
@@ -495,11 +513,9 @@ const main = async () => {
   const { hasher } = await deployHasher(deployConfig.client.wallet, client, deployConfig);
   console.log("Hasher deployed:", hasher);
 
-  const verifier = await deployVerifier(
-    deployConfig,
-    commonParams.hardwareWalletOwner,
-    commonParams.hardwareWalletOwner
-  );
+  // Ownership is handed over below with the rest of the Ownable contracts; this only sets
+  // the verifier manager.
+  const verifier = await deployVerifier(deployConfig, commonParams.hardwareWalletOwner);
 
   const initAddressParams = {
     verifier: verifier,
@@ -509,13 +525,13 @@ const main = async () => {
     pauser: commonParams.pauserAddress, // zeroAddress leaves pausing exclusive to the owner
   }
 
-  const ONE_HOUR = 3600n;
+  const ONE_DAY = 86400n;
   const configParams = {
     withdrawFeeBps: BigInt(commonParams.withdrawFeeBps),
     tvlLimitUsd: BigInt(5_000e6),    // $5,000 (6-decimal precision)
     minDepositUsd: BigInt(2e6),      // $2 (6-decimal precision)
     maxDepositUsd: BigInt(200e6),    // $200 (6-decimal precision)
-    priceFeedStalenessThreshold: ONE_HOUR * 2n, // 2 hours in seconds
+    priceFeedStalenessThreshold: ONE_DAY * 2n, // 2 days in seconds
     nativeWToken: chainParams.nativeWToken,      // wrapped native token (e.g. WETH) for native ETH deposits
   };
 
@@ -584,8 +600,7 @@ const main = async () => {
   // owner-gated setup above (setVersion, setVeilnyxPool, addAssets, registerRevoker,
   // addAdaptorSupport, setChainlinkFeed, pause) — those revert once the deployer is no longer
   // the owner. Set common.hardwareWalletOwner to zeroAddress to retain deployer ownership for
-  // testing. Verifier is listed for completeness; deployVerifier already transfers it, so it is
-  // reported as `already-owned`.
+  // testing.
   const ownershipResults = await transferOwnershipToOwner(
     [
       { contract: "Pool", address: poolProxy.address, label: "PoolProxy" },
@@ -605,4 +620,4 @@ const main = async () => {
   assertOwnershipTransferred(ownershipResults);
 };
 
-main().catch(console.error);
+main().catch(logError);

@@ -123,6 +123,7 @@ interface IPool {
     error DuplicateAsset(address assetAddress);
     error InactiveAsset(uint24 assetId);
     error InvalidRevoker(uint256 id);
+    error InvalidCurvePoint(uint256 x, uint256 y);
     error DuplicateRevoker(uint256[2] publicKey);
     error NoFeeToClaim(address paymaster, uint24 assetId);
     error WithdrawalFeeTooHigh(uint256 feeBps, uint256 maxFeeBps);

@@ -18,8 +18,8 @@
         ]
       }
     ],
-    "withdrawFeeBps": 5,
-    "protocolVersion": 2,
+    "withdrawFeeBps": 0,
+    "protocolVersion": 1,
     "veilnyxMultiSigAddress": "0x9bAf694B165c42850BD3c9c944E16d48d566C617",
     "hardwareWalletOwner": "0xa285717BfD608468566bfBda742b56b1177494f7",
     "pauserAddress": "0x50887b9a36E734cF861FE236fA6b4bE68D205113"

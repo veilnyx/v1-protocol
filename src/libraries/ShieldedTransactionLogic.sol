@@ -379,7 +379,15 @@ library ShieldedTransactionLogic {
             uint256[][] memory notes
         )
     {
-        require(notesMemo.length & 31 == 0, "Invalid notesMemo length");
+        // Only words 0..6 and 7..7+4*nOuts-1 are consumed below and folded into
+        // alpha/gamma. Any trailing words would be unauthenticated by the proof yet
+        // still emitted verbatim in the Receipt event, letting a relayer append
+        // arbitrary bytes to a user's memo without invalidating their proof. Require
+        // the exact length so the whole memo is covered by the binding.
+        require(
+            notesMemo.length == 32 * (7 + 4 * nOuts),
+            "Invalid notesMemo length"
+        );
 
         // 1. Split notesMemo into values array each 32 bytes
         uint256 numWords = notesMemo.length / 32;

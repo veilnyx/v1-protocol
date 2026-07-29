@@ -13,6 +13,17 @@ struct TransactionVerifierInfo {
     address addr;
 }
 
+/// @dev Byte length of a Groth16 proof as consumed by the snarkjs-generated
+///      verifiers: uint256[2] _pA + uint256[2][2] _pB + uint256[2] _pC.
+uint256 constant GROTH16_PROOF_LENGTH = 256;
+
+/// @dev Public-input counts declared by each circuit's `component main { public [...] }`.
+///      These MUST match the deployed verifiers, whose IC point counts are
+///      nPublicInputs + 1 (13 / 6 / 65 respectively).
+uint256 constant TRANSACTION_PUBLIC_INPUTS = 12;
+uint256 constant ADDRESS_PUBLIC_INPUTS = 6;
+uint256 constant TREE_UPDATE_PUBLIC_INPUTS = 64;
+
 contract Verifier is IVerifier, Ownable {
     /**
      * @notice Verifier id to Verifier info mapping for transaction verifiers only
@@ -166,9 +177,28 @@ contract Verifier is IVerifier, Ownable {
         emit TransactionVerifierRemoved(vId);
     }
 
+    /// @dev The snarkjs verifiers take only statically-sized parameters, so the ABI
+    ///      decoder reads `_pubSignals` at a fixed calldata offset and silently ignores
+    ///      any trailing bytes. Callers build verifier calldata as `proof ‖ publicInputs`
+    ///      with `proof` an unbounded `bytes`, so without an exact length check a caller
+    ///      can embed its own public signals inside the proof blob and push the honestly
+    ///      computed ones into the ignored tail, defeating verification entirely.
+    ///      Requiring the exact length is what forces the public inputs to land where the
+    ///      verifier actually reads them.
+    function _assertVParamsLength(
+        uint256 actual,
+        uint256 nPublicInputs
+    ) private pure {
+        if (actual != GROTH16_PROOF_LENGTH + 32 * nPublicInputs) {
+            revert("Verifier: invalid proof length");
+        }
+    }
+
     function verifyAddressProof(
         bytes calldata vParams
     ) public view returns (bool) {
+        _assertVParamsLength(vParams.length, ADDRESS_PUBLIC_INPUTS);
+
         (bool success, bytes memory result) = _addressVerifier.staticcall(
             bytes.concat(VerifierRegister.verifyProof.selector, vParams)
         );
@@ -183,6 +213,8 @@ contract Verifier is IVerifier, Ownable {
     function verifyTreeUpdateProof(
         bytes calldata vParams
     ) public view returns (bool) {
+        _assertVParamsLength(vParams.length, TREE_UPDATE_PUBLIC_INPUTS);
+
         (bool success, bytes memory result) = _treeUpdateVerifier.staticcall(
             bytes.concat(VerifierTreeUpdate.verifyProof.selector, vParams)
         );
@@ -203,6 +235,8 @@ contract Verifier is IVerifier, Ownable {
         if (vInfo.addr == address(0)) {
             revert("Verifier: verifier not found");
         }
+
+        _assertVParamsLength(vParams.length, TRANSACTION_PUBLIC_INPUTS);
 
         (bool success, bytes memory result) = vInfo.addr.staticcall(
             bytes.concat(vInfo.selector, vParams)
@@ -229,15 +263,15 @@ contract Verifier is IVerifier, Ownable {
             revert BadArguments(nIns, nOuts);
         }
 
-        uint256 nOutsCopy = nOuts;
-        uint8 noOfDigits = 0;
-
-        while (nOutsCopy > 0) {
-            noOfDigits++;
-            nOutsCopy /= 10;
+        // The id is the decimal concatenation of nIns and nOuts, which is only
+        // injective while nOuts occupies a fixed single digit: with a multi-digit
+        // nOuts, (2,10) and (21,0) both yield 210, so two distinct circuit shapes
+        // would share one verifier slot. No deployed verifier exceeds nOuts = 4.
+        if (nOuts > 9) {
+            revert BadArguments(nIns, nOuts);
         }
-        noOfDigits = noOfDigits == 0 ? 1 : noOfDigits;
-        uint256 verifierID = nIns * 10 ** noOfDigits + nOuts;
+
+        uint256 verifierID = nIns * 10 + nOuts;
 
         if (verifierID > type(uint16).max) {
             revert VerifierIdOverflow(verifierID);
