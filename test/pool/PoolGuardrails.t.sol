@@ -7,7 +7,9 @@ import {Asset, AssetType} from "src/libraries/AssetLogic.sol";
 import {IPool} from "src/interfaces/IPool.sol";
 import {IScreener} from "src/interfaces/IScreener.sol";
 import {Screener} from "src/core/Screener.sol";
+import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {MockAggregatorV3} from "test/mocks/MockAggregatorV3.sol";
+import {MockScreener} from "test/mocks/MockScreener.sol";
 import {ShieldedTransaction} from "src/libraries/ShieldedTransactionLogic.sol";
 import {MockERC20} from "test/mocks/MockERC20.sol";
 import {TVL_USD_DECIMALS, MIN_PRICE_STALENESS_THRESHOLD} from "src/base/Constants.sol";
@@ -710,6 +712,108 @@ contract PoolGuardrailsTest is PoolTest {
         pool.setScreener(IScreener(address(0)));
 
         pool.transact(stx); // must not revert
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // setScreener
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /// A non-zero screener must hold code. An EOA would make every
+    /// `isSanctioned` call revert and brick registrations and deposits.
+    function test_revert_setScreener_eoa() public {
+        address eoa = makeAddr("eoaScreener");
+
+        vm.expectRevert(
+            abi.encodeWithSelector(IPool.InvalidScreenerAddress.selector, eoa)
+        );
+        pool.setScreener(IScreener(eoa));
+
+        assertEq(
+            address(pool.screener()),
+            address(screener),
+            "screener must be unchanged after a rejected update"
+        );
+    }
+
+    /// The zero address is exempt from the code check — it is the kill-switch
+    /// that disables screening (see test_runDepositGuardRails_screenerDisabled_allowsDeposit).
+    function test_setScreener_zeroAddressAllowedAsKillSwitch() public {
+        vm.expectEmit(false, false, false, true);
+        emit IPool.ScreenerUpdated(address(0));
+
+        pool.setScreener(IScreener(address(0)));
+
+        assertEq(address(pool.screener()), address(0));
+    }
+
+    function test_setScreener_acceptsContract() public {
+        MockScreener newScreener = new MockScreener();
+
+        vm.expectEmit(false, false, false, true);
+        emit IPool.ScreenerUpdated(address(newScreener));
+
+        pool.setScreener(IScreener(address(newScreener)));
+
+        assertEq(address(pool.screener()), address(newScreener));
+    }
+
+    function test_revert_setScreener_notOwner() public {
+        MockScreener newScreener = new MockScreener();
+        address notOwner = makeAddr("notOwner");
+
+        vm.prank(notOwner);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                OwnableUpgradeable.OwnableUnauthorizedAccount.selector,
+                notOwner
+            )
+        );
+        pool.setScreener(IScreener(address(newScreener)));
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // renounceOwnership
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /// Ownership can never be renounced: owner() configures assets, revokers,
+    /// fees, limits and upgrades, so the Pool must always have one.
+    function test_revert_renounceOwnership_owner() public {
+        address ownerBefore = pool.owner();
+
+        vm.prank(ownerBefore);
+        vm.expectRevert(IPool.RenounceDisabled.selector);
+        pool.renounceOwnership();
+
+        assertEq(pool.owner(), ownerBefore, "owner must be unchanged");
+    }
+
+    /// The override keeps `onlyOwner`, which runs before the body, so a
+    /// non-owner is rejected by the access check rather than RenounceDisabled.
+    /// Either way ownership survives.
+    function test_revert_renounceOwnership_notOwner() public {
+        address ownerBefore = pool.owner();
+        address notOwner = makeAddr("notOwner");
+
+        vm.prank(notOwner);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                OwnableUpgradeable.OwnableUnauthorizedAccount.selector,
+                notOwner
+            )
+        );
+        pool.renounceOwnership();
+
+        assertEq(pool.owner(), ownerBefore, "owner must be unchanged");
+    }
+
+    /// transferOwnership remains the supported way to move ownership.
+    function test_transferOwnership_stillWorks() public {
+        address newOwner = makeAddr("newOwner");
+
+        vm.prank(pool.owner());
+        pool.transferOwnership(newOwner);
+
+        assertEq(pool.owner(), newOwner);
     }
 
     /// @notice Fork test against the live Chainalysis sanctions oracle on
