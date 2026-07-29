@@ -1,7 +1,7 @@
 import hre from "hardhat";
 import { parseEther, parseUnits } from "viem";
 
-const PAYMASTER_FUNDING_AMT = parseEther("0.5");
+const PAYMASTER_FUNDING_AMT = parseEther("0.03");
 const PRICEFEED_STALENESS_THRESHOLD = 24 * 60 * 60; // 1 DAY
 
 export const deployErc4337Infra = async (chainParams, poolAddress, deployConfig) => {

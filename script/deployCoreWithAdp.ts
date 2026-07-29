@@ -368,15 +368,38 @@ const toAssetInitParams = (assets: any, assetsPrecision: any, usdPriceFeeds: any
     usdPriceFeed: usdPriceFeeds[i],
   }));
 
+const isUnconfigured = (assetAddress: any) =>
+  !assetAddress || assetAddress.toLowerCase() === zeroAddress;
+
 const addAssets = async (assets: any, assetsPrecision: any, usdPriceFeeds: any, assetType: number, poolAddr: any, wallet: any, client: any) => {
-  console.log("Adding assets:", assets);
+  // Adaptor assets that don't exist on the target chain are configured as the zero address
+  // (e.g. Morpho's Gauntlet WETH Prime vault is mainnet-only). Pool.addAssets reverts with
+  // ZeroAddress() on those, and the call is all-or-nothing — sending them anyway would drop
+  // the assets that *are* configured in the same batch.
+  const keep = assets.map((a: any) => !isUnconfigured(a));
+  const toAdd = assets.filter((_: any, i: number) => keep[i]);
+  const skippedCount = assets.length - toAdd.length;
+
+  if (skippedCount > 0) {
+    console.warn(`⚠️  Skipping ${skippedCount} asset(s) not configured on this chain (zero address)`);
+  }
+  if (toAdd.length === 0) {
+    console.log("No configured assets to add, skipping addAssets");
+    return;
+  }
+
+  console.log("Adding assets:", toAdd);
   try {
     //@ts-ignore
     const hash = await wallet.writeContract({
       address: poolAddr,
       abi: poolAbi,
       functionName: "addAssets",
-      args: [assetType, toAssetInitParams(assets, assetsPrecision, usdPriceFeeds)],
+      args: [assetType, toAssetInitParams(
+        toAdd,
+        assetsPrecision.filter((_: any, i: number) => keep[i]),
+        usdPriceFeeds.filter((_: any, i: number) => keep[i])
+      )],
     });
 
     const rct = await client.waitForTransactionReceipt({ hash });
@@ -525,13 +548,13 @@ const main = async () => {
     pauser: commonParams.pauserAddress, // zeroAddress leaves pausing exclusive to the owner
   }
 
-  const ONE_DAY = 86400n;
+  const ONE_HOUR = 3600n;
   const configParams = {
     withdrawFeeBps: BigInt(commonParams.withdrawFeeBps),
     tvlLimitUsd: BigInt(5_000e6),    // $5,000 (6-decimal precision)
     minDepositUsd: BigInt(2e6),      // $2 (6-decimal precision)
     maxDepositUsd: BigInt(200e6),    // $200 (6-decimal precision)
-    priceFeedStalenessThreshold: ONE_DAY * 2n, // 2 days in seconds
+    priceFeedStalenessThreshold: ONE_HOUR * 30n, // 30 hours in seconds
     nativeWToken: chainParams.nativeWToken,      // wrapped native token (e.g. WETH) for native ETH deposits
   };
 
