@@ -15,6 +15,8 @@
     "upgrade:test": "cross-env HARDHAT_FORK=true HARDHAT_SHOW_STACK_TRACES=true HARDHAT_VERBOSE=true DEBUG=hardhat:* hardhat --verbose run script/upgrade.ts --network hardhat",
     "deployCoreWithAdp:tenderly": "hardhat run script/deployCoreWithAdp.ts --network tenderlyMainnetCustomId",
     "deployCoreWithAdp:sepolia": "hardhat run script/deployCoreWithAdp.ts --network sepolia",
+    "fork:mainnet": "source .env && anvil --fork-url $RPC_ETHEREUM_MAINNET --chain-id 1 --port 8546",
+    "deployCoreWithAdp:mainnet:fork": "hardhat run script/deployCoreWithAdp.ts --network mainnetFork",
     "deployCoreWithAdp:mainnet": "hardhat run script/deployCoreWithAdp.ts --network mainnet",
     "deployCoreWithProofAggrInfra:sepolia": "hardhat run script/deployCoreWithProofAggrInfra.ts --network sepolia",
     "deployP-2-P:veilnyx": "hardhat run script/deployP-2-P.ts --network veilnyxTestnet",

@@ -1,4 +1,4 @@
-import { Hex, isHex, hexToNumber } from "viem";
+import { Hex, isHex, hexToNumber, isAddress, isAddressEqual, zeroAddress } from "viem";
 import configJson from "./config.json";
 import adaptorConfig from "./adaptorConfig.json";
 
@@ -258,4 +258,118 @@ export function loadConfigs() {
   const configParams = { common: commonParams, adpConfig: adpParams, ...chainParams };
 
   return configParams;
+}
+
+// Asset ids are `1 byte AssetType | 2 bytes counter` (AssetLogic.addAsset), so the first
+// ERC20 asset registered on a fresh pool is always (1 << 16) | 1. Paymaster.GAS_ASSET_ID
+// hardcodes this id as the chain's gas token.
+export const GAS_ASSET_ID = 65537;
+
+/** Assets absent on the target chain are configured as the zero address rather than omitted. */
+export const isUnconfigured = (assetAddress: any) =>
+  !assetAddress || assetAddress.toLowerCase() === zeroAddress;
+
+/**
+ * Validates one chain's base-asset config against the rules `Pool` and `Paymaster` enforce.
+ * Pure — reads config only, touches no chain state. Call it before a deployment spends any gas:
+ * every problem it reports would otherwise surface after the libraries, implementation and proxy
+ * are already on-chain, and none of it is repairable in place — the pool is behind a proxy, but
+ * the asset counter only moves forward, so a shifted id means a full redeploy.
+ *
+ * Deliberately not called from {@link loadConfigs}: that walks every chain in config.json, and
+ * these rules only hold for chains deployed by `deployCoreWithAdp.ts` (arc-testnet, for one,
+ * registers a gas token that is not its `nativeWToken`). Each deploy script opts in for the one
+ * chain it is targeting.
+ */
+export const assertChainAssetConfig = (chainId: number, chainParams: ChainParams) => {
+  const errors: string[] = [];
+  const {
+    initAssetType: assetType,
+    initAssetIdsVeilnyx: ids,
+    initAssetAddresses: addresses,
+    initAssetsPrecision: precisions,
+    initAssetToUSDChainlinkFeeds: usdFeeds,
+    initNativeGasTokenToAssetChainlinkFeeds: gasFeeds,
+    nativeWToken: wNativeToken,
+  } = chainParams;
+
+  if (addresses.length === 0) {
+    // Nothing below can say anything useful without the addresses to line up against.
+    throw new Error(`config for chain ${chainId}: initAssetAddresses is empty — the pool would have no assets`);
+  }
+
+  // These are consumed strictly by index — addAssetsAndRevokers zips addresses/precisions/usdFeeds
+  // into AssetInitParams, and deployPaymaster walks ids alongside gasFeeds. A short array silently
+  // becomes `undefined` at the tail rather than an error.
+  for (const [name, arr] of Object.entries({
+    initAssetIdsVeilnyx: ids,
+    initAssetsPrecision: precisions,
+    initAssetToUSDChainlinkFeeds: usdFeeds,
+    initNativeGasTokenToAssetChainlinkFeeds: gasFeeds,
+  })) {
+    if (arr.length !== addresses.length) {
+      errors.push(
+        `${name} has ${arr.length} entries, initAssetAddresses has ${addresses.length} — these are zipped by index`
+      );
+    }
+  }
+
+  addresses.forEach((assetAddress, i) => {
+    // Checksum-insensitive: config mixes casings, and Pool only cares about the 20 bytes.
+    if (!isAddress(assetAddress, { strict: false })) {
+      errors.push(`initAssetAddresses[${i}] (${assetAddress}) is not a 20-byte address`);
+      return;
+    }
+    if (isUnconfigured(assetAddress)) {
+      errors.push(`initAssetAddresses[${i}] is the zero address — Pool.addAssets reverts with ZeroAddress()`);
+      return;
+    }
+    const duplicateOf = addresses.findIndex((other, j) => j < i && isAddressEqual(other, assetAddress));
+    if (duplicateOf !== -1) {
+      errors.push(
+        `initAssetAddresses[${i}] (${assetAddress}) duplicates [${duplicateOf}] — Pool.addAssets reverts with DuplicateAsset()`
+      );
+    }
+  });
+
+  // Asset ids are not free-form config: AssetLogic.addAsset derives them as
+  // `(assetType << 16) | counter`, with the counter starting at 1 on a fresh pool. So the ids the
+  // SDK, Paymaster and adaptorConfig are written against are fully determined by the order of
+  // initAssetAddresses — this catches a hand-edited id list drifting from that order.
+  ids.forEach((id, i) => {
+    const derived = (assetType << 16) | (i + 1);
+    if (id !== derived) {
+      errors.push(
+        `initAssetIdsVeilnyx[${i}] is ${id}, but addAssets assigns ${derived} to initAssetAddresses[${i}] (${addresses[i]})`
+      );
+    }
+  });
+
+  // Paymaster reads GAS_ASSET_ID's `precision` as an exponent in convertFeeFromGasTokenToFeeAsset,
+  // and returns `maxCostEth` verbatim when the fee asset *is* GAS_ASSET_ID. An unset nativeWToken
+  // is a supported configuration (Pool.setNativeWToken documents it as disabling native deposits),
+  // so that one is a warning.
+  if (isUnconfigured(wNativeToken)) {
+    console.warn(`⚠️  chain ${chainId}: nativeWToken is unset — native ETH deposits will be disabled on this pool`);
+  } else {
+    if (!isAddressEqual(addresses[0], wNativeToken)) {
+      errors.push(
+        `nativeWToken ${wNativeToken} must be initAssetAddresses[0] (currently ${addresses[0]}) — Paymaster.GAS_ASSET_ID hardcodes ${GAS_ASSET_ID} as the gas token`
+      );
+    }
+    if (((assetType << 16) | 1) !== GAS_ASSET_ID) {
+      errors.push(
+        `initAssetType ${assetType} makes the first asset id ${(assetType << 16) | 1}, but Paymaster.GAS_ASSET_ID hardcodes ${GAS_ASSET_ID} — the gas token must be the first asset of type ${GAS_ASSET_ID >> 16}`
+      );
+    }
+  }
+
+  if (errors.length > 0) {
+    throw new Error(
+      `Base-asset config for chain ${chainId} is invalid:\n` +
+      errors.map((e) => `  - ${e}`).join("\n")
+    );
+  }
+
+  console.log(`Config validated for chain ${chainId}: ${addresses.length} base asset(s), ids ${ids.join(", ")}`);
 }

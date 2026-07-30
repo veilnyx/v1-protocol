@@ -56,6 +56,8 @@ const config: HardhatUserConfig = {
   networks: {
     hardhat: {
       allowUnlimitedContractSize: false,
+      // Serves `deploy:test` / `upgrade:test` only. Mainnet dry-runs use the `mainnetFork` network
+      // below instead — Hardhat's in-process forking cannot fork current mainnet at all.
       forking: {
         url: rpcOptimismSepolia,
         enabled: forkEnabled,
@@ -65,6 +67,24 @@ const config: HardhatUserConfig = {
     mainnet: {
       url: rpcEthereumMainnet,
       accounts: privateKeys,
+      chainId: 1
+    },
+    // Deployment dry-runs against a local anvil mainnet fork:
+    //   npm run fork:mainnet                    (terminal 1, keep running)
+    //   npm run deployCoreWithAdp:mainnet:fork  (terminal 2)
+    //
+    // chainId 1 is the point: the deploy scripts resolve their config by `client.getChainId()`,
+    // so this is what makes them load the real mainnet entry from config.json instead of a copy.
+    // Hardhat's own in-process forking cannot be used for this — its bundled EDR predates recent
+    // mainnet hardforks and panics on current block headers ("Must be present as this is not a
+    // pending block") — and it would report chainId 31337 regardless.
+    //
+    // `url` is hardcoded to localhost and `accounts` is left as "remote" (anvil's pre-funded,
+    // unlocked accounts) on purpose: this network carries mainnet's chain id, so it must never be
+    // one env var away from broadcasting real transactions with a real key. deployCoreWithAdp.ts
+    // additionally refuses to run against any node that is not anvil/hardhat.
+    mainnetFork: {
+      url: "http://127.0.0.1:8546",
       chainId: 1
     },
     sepolia: {

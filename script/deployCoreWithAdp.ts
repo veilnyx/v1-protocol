@@ -3,22 +3,27 @@ import {
   encodeAbiParameters,
   encodeFunctionData,
   parseAbiParameters,
-  defineChain,
-  parseEther,
-  toFunctionSelector,
-  http,
-  createWalletClient,
-  Chain,
-  zeroAddress
+  isAddressEqual,
+  Hex,
 } from "viem";
 
 import { DeployContractConfig, KeyedClient } from '@nomicfoundation/hardhat-viem/types';
-import { loadConfigs, ChainParams, AdaptorParams, CommonParams, getHex } from "./configs";
+import {
+  loadConfigs,
+  ChainParams,
+  AdaptorParams,
+  CommonParams,
+  assertChainAssetConfig,
+  isUnconfigured,
+  GAS_ASSET_ID,
+} from "./configs";
 import { deployHasher } from "./hasher";
 import { deployVerifier } from "./verifier";
-import { getChainForCurrentNetwork } from "./utils/chainUtils";
+import { getChainForCurrentNetwork, isDevelopmentNode } from "./utils/chainUtils";
 import { assertOwnershipTransferred, transferOwnershipToOwner } from "./utils/ownership";
 import { deployErc4337Infra } from "./erc4337Infra";
+import { mkdirSync, writeFileSync } from "fs";
+import { join } from "path";
 
 const config = loadConfigs();
 
@@ -26,8 +31,9 @@ const config = loadConfigs();
 const poolAbi = hre.artifacts.readArtifactSync("Pool").abi;
 const adaptorHandlerAbi = hre.artifacts.readArtifactSync("AdaptorHandler").abi;
 
-// Failures are non-fatal here (the deploy keeps going), so print them in bold red
-// to keep them from getting lost in the surrounding deploy output.
+// Prints in bold red so a failure does not get lost in the surrounding deploy output.
+// Only the reporting-style steps (Etherscan verification, ownership summary) keep going
+// after logging; every state-changing setup call below aborts the run instead.
 const logError = (...args: any[]) => console.error("\x1b[1;31m✖", ...args, "\x1b[0m");
 
 const deployUniswap = async (uniswapParams, pool, deployConfig) => {
@@ -37,6 +43,7 @@ const deployUniswap = async (uniswapParams, pool, deployConfig) => {
   ], deployConfig)
   console.log("UniswapV3Adapter deployed:", uniswap.address);
   await addAdpatorSupport(pool, uniswap.address, true, deployConfig.client.wallet, deployConfig.client.public);
+  return uniswap.address;
 }
 
 const deployAave = async (aaveParams, pool, deployConfig) => {
@@ -53,6 +60,7 @@ const deployAave = async (aaveParams, pool, deployConfig) => {
   const assetsUsdPriceFeeds = [aaveParams.assetsUsdPriceFeeds.staticAWeth, aaveParams.assetsUsdPriceFeeds.staticAUsdc];
 
   await addAssets(assets, assetsPrecision, assetsUsdPriceFeeds, 1, pool, deployConfig.client.wallet, deployConfig.client.public);
+  return aave.address;
 }
 
 const deployLido = async (lidoParams, pool, deployConfig) => {
@@ -72,6 +80,7 @@ const deployLido = async (lidoParams, pool, deployConfig) => {
   const assetsUsdPriceFeeds = [lidoParams.assetsUsdPriceFeeds.wstEth];
 
   await addAssets(assets, assetsPrecision, assetsUsdPriceFeeds, 1, pool, deployConfig.client.wallet, deployConfig.client.public);
+  return lido.address;
 }
 
 const deployCurve = async (curveParams, pool, deployConfig) => {
@@ -129,6 +138,7 @@ const deployMorpho = async (morphoParams, pool, deployConfig) => {
   const assetsUsdPriceFeeds = [morphoParams.assetsUsdPriceFeeds.gauntletWETHPrimeVault];
 
   await addAssets(assets, assetsPrecision, assetsUsdPriceFeeds, 1, pool, deployConfig.client.wallet, deployConfig.client.public);
+  return morpho.address;
 }
 
 const deployOneInch = async (oneInchParams: any, pool: any, deployConfig: any) => {
@@ -329,18 +339,23 @@ const verifyAll = async (contracts: {
   await verifyProxy(poolProxy.address, poolImpl.address);
 };
 
-const deployAdaptors = async (pool: any, adpParams: any, deployConfig: any) => {
+// Sequential on purpose: every adaptor registers assets, and the ids they receive come from a
+// monotonic counter, so the enabled set and its order here decide the id of every adaptor asset.
+// Returns the addresses so the caller can record them without module-level state.
+const deployAdaptors = async (pool: any, adpParams: any, deployConfig: any): Promise<Record<string, Hex>> => {
   const { uniswap: uniswapParams, aave: aaveParams, lido: lidoParams, curve: curveParams, ethena: ethenaParams, beefy: beefyParams, morpho: morphoParams, rocketPool: rocketPoolParams, oneInch: oneInchParams } = adpParams;
 
-  await deployUniswap(uniswapParams, pool, deployConfig);
-  await deployAave(aaveParams, pool, deployConfig);
-  await deployLido(lidoParams, pool, deployConfig);
-  // await deployCurve(curveParams, pool, deployConfig);
-  // await deployEthena(ethenaParams, pool, deployConfig);
-  // await deployBeefy(beefyParams, pool, deployConfig);
-  await deployMorpho(morphoParams, pool, deployConfig);
-  // await deployOneInch(oneInchParams, pool, deployConfig);
-  // await deployRocketPool(rocketPoolParams, pool, deployConfig);
+  return {
+    uniswap: await deployUniswap(uniswapParams, pool, deployConfig),
+    aave: await deployAave(aaveParams, pool, deployConfig),
+    lido: await deployLido(lidoParams, pool, deployConfig),
+    // curve: await deployCurve(curveParams, pool, deployConfig),
+    // ethena: await deployEthena(ethenaParams, pool, deployConfig),
+    // beefy: await deployBeefy(beefyParams, pool, deployConfig),
+    morpho: await deployMorpho(morphoParams, pool, deployConfig),
+    // oneInch: await deployOneInch(oneInchParams, pool, deployConfig),
+    // rocketPool: await deployRocketPool(rocketPoolParams, pool, deployConfig),
+  };
 }
 
 const addAdpatorSupport = async (pool: any, adpAddress: any, enable: boolean, wallet: any, client: any) => {
@@ -355,8 +370,14 @@ const addAdpatorSupport = async (pool: any, adpAddress: any, enable: boolean, wa
 
     const rct = await client.waitForTransactionReceipt({ hash });
     console.log("rct:addAdpSupport", rct.status);
+    if (rct.status !== "success") {
+      throw new Error(`addAdaptorSupport(${adpAddress}, ${enable}) reverted (tx ${hash})`);
+    }
   } catch (error: any) {
+    // Fatal: an adaptor the pool does not recognise is dead weight, and continuing would
+    // register its assets anyway — shifting the ids of every asset added after it.
     logError("Error supporting adp:", error.message);
+    throw error;
   }
 }
 
@@ -367,9 +388,6 @@ const toAssetInitParams = (assets: any, assetsPrecision: any, usdPriceFeeds: any
     precision: assetsPrecision[i],
     usdPriceFeed: usdPriceFeeds[i],
   }));
-
-const isUnconfigured = (assetAddress: any) =>
-  !assetAddress || assetAddress.toLowerCase() === zeroAddress;
 
 const addAssets = async (assets: any, assetsPrecision: any, usdPriceFeeds: any, assetType: number, poolAddr: any, wallet: any, client: any) => {
   // Adaptor assets that don't exist on the target chain are configured as the zero address
@@ -404,8 +422,14 @@ const addAssets = async (assets: any, assetsPrecision: any, usdPriceFeeds: any, 
 
     const rct = await client.waitForTransactionReceipt({ hash });
     console.log("rct:addAsset", rct.status);
+    if (rct.status !== "success") {
+      throw new Error(`addAssets reverted for ${toAdd.join(", ")} (tx ${hash})`);
+    }
   } catch (e) {
+    // Fatal: addAssets is the only thing that advances the pool's asset counter, so a
+    // silently dropped batch shifts the id of every asset registered afterwards.
     logError("Error adding assets:", e);
+    throw e;
   }
 }
 
@@ -428,6 +452,9 @@ const addAssetsAndRevokers = async (poolProxy: any, chainParams: any, commonPara
 
     const rct = await client.waitForTransactionReceipt({ hash });
     console.log("rct:addAsset", rct.status);
+    if (rct.status !== "success") {
+      throw new Error(`addAssets reverted for the base assets (tx ${hash})`);
+    }
 
     for (let i = 0; i < commonParams.revokers.length; i++) {
       const revokerPublicKey = commonParams.revokers[i].revokerPublicKey;
@@ -449,15 +476,104 @@ const addAssetsAndRevokers = async (poolProxy: any, chainParams: any, commonPara
 
       const rct = await client.waitForTransactionReceipt({ hash });
       console.log("rct:revokerAdd", rct.status);
+      if (rct.status !== "success") {
+        throw new Error(`registerRevoker reverted for "${revokerName}" (tx ${hash})`);
+      }
     }
   } catch (error: any) {
+    // Fatal: the base assets fix the id of every adaptor asset registered afterwards, and
+    // the revokers are registered in the same block of work. A pool that comes out of this
+    // half-configured cannot be repaired in place — it needs a proxy redeploy.
     logError("Error adding assets and revokers:", error.message);
+    throw error;
   }
 }
+
+// Pool.getAsset is overloaded (uint24 / address); pin the uint24 overload so viem does not
+// have to infer which one to encode.
+const getAssetByIdAbi = poolAbi.filter(
+  (item: any) => item.name === "getAsset" && item.inputs?.[0]?.type === "uint24"
+);
+
+type OnChainAsset = { id: number; assetAddress: Hex; isActive: boolean };
+
+// Unknown ids read back as the empty Asset struct (isActive: false, assetAddress: 0x0)
+// rather than reverting, so this is safe to call for an id that was never assigned.
+const getAssetById = async (poolAddr: Hex, assetId: number, client: any): Promise<OnChainAsset> =>
+  (await client.readContract({
+    address: poolAddr,
+    abi: getAssetByIdAbi,
+    functionName: "getAsset",
+    args: [assetId],
+  })) as OnChainAsset;
+
+/**
+ * Confirms on-chain that `GAS_ASSET_ID` resolves to the wrapped native token. Must run after the
+ * base assets are registered and before `deployAdaptors`.
+ *
+ * Not a re-run of `assertChainAssetConfig`: that checks the config's id arithmetic in TypeScript,
+ * against a copy of `AssetLogic.addAsset`'s formula. This reads the deployed pool, so it is the
+ * only check that catches the Solidity side drifting from what this script and `Paymaster` assume —
+ * a changed id derivation, or a counter that no longer starts at 1 because `initialize` registered
+ * something. One read, on the one id everything else is anchored to.
+ */
+const assertGasAssetRegistered = async (poolAddr: Hex, chainParams: any, client: any) => {
+  // Unset nativeWToken disables native ETH deposits (Pool.setNativeWToken) — supported, so warn.
+  const wNativeToken: Hex = chainParams.nativeWToken;
+  if (isUnconfigured(wNativeToken)) {
+    console.warn("⚠️  nativeWToken is unset — native ETH deposits are disabled on this pool");
+    return;
+  }
+
+  // Paymaster reads GAS_ASSET_ID's `precision` as the exponent in convertFeeFromGasTokenToFeeAsset
+  // and returns `maxCostEth` verbatim when the fee asset *is* GAS_ASSET_ID, so pointing that id at
+  // a 6-decimal token puts every gas fee off by 10**12. Passing also proves Pool can resolve
+  // `_assetIds[nativeWToken]` for the native-ETH wrap path.
+  const gasAsset = await getAssetById(poolAddr, GAS_ASSET_ID, client);
+  if (!gasAsset.isActive || !isAddressEqual(gasAsset.assetAddress, wNativeToken)) {
+    throw new Error(
+      `Asset ${GAS_ASSET_ID} is ${gasAsset.assetAddress} (active: ${gasAsset.isActive}), not the configured ` +
+      `nativeWToken ${wNativeToken}. Paymaster.GAS_ASSET_ID hardcodes ${GAS_ASSET_ID} as this chain's gas ` +
+      `token, so gas fees would be converted against the wrong token's precision.`
+    );
+  }
+  console.log(`✅ asset ${GAS_ASSET_ID} = ${gasAsset.assetAddress} (nativeWToken)`);
+}
+
+/**
+ * Writes every deployed address to `deployments/`, keyed by network name rather than chain id: a
+ * dry run against the mainnet fork shares mainnet's chain id, and a file that reads as the
+ * canonical mainnet registry must not contain anvil addresses. `dryRun` is recorded in the payload
+ * for the same reason.
+ */
+const writeDeploymentRecord = (chainId: number, dryRun: boolean, addresses: Record<string, Hex>) => {
+  const dir = join(__dirname, "..", "deployments");
+  mkdirSync(dir, { recursive: true });
+  const path = join(dir, `${hre.network.name}-${chainId}.json`);
+  const record = { network: hre.network.name, chainId, dryRun, deployedAt: new Date().toISOString(), addresses };
+  writeFileSync(path, JSON.stringify(record, null, 2));
+  console.log("Deployment record written to:", path);
+};
 
 const main = async () => {
   const chain = await getChainForCurrentNetwork(hre);
   console.log("Deploying to chain:", chain);
+
+  // A network whose name says "fork" carries a real chain id (and, on mainnet, will carry the real
+  // deployer key) while being meant for dry-runs only. Fail closed if the node on the other end is
+  // not a local development chain — this is the check standing between a typo'd RPC URL and a live
+  // mainnet deployment.
+  const dryRun = await isDevelopmentNode(hre);
+  if (/fork/i.test(hre.network.name) && !dryRun) {
+    throw new Error(
+      `Network "${hre.network.name}" is a dry-run network, but the node behind it is not anvil or ` +
+      `Hardhat. Refusing to deploy — nothing has been deployed. Start the fork first ` +
+      `(npm run fork:mainnet) or deploy against a real network explicitly.`
+    );
+  }
+  if (dryRun) {
+    console.log(`Dry run: ${hre.network.name} is a local development node`);
+  }
 
   const client = await hre.viem.getPublicClient({ chain });
 
@@ -474,6 +590,17 @@ const main = async () => {
   const commonParams = config.common as CommonParams;
   const adpParams = config.adpConfig[chainId] as AdaptorParams;
   const chainParams = config[chainId] as ChainParams;
+
+  // Everything below this line costs gas, so validate the config first. Both lookups above are
+  // plain index reads that yield undefined for an unconfigured chain — deployAdaptors would only
+  // notice once the core contracts were already on-chain.
+  if (!chainParams) {
+    throw new Error(`config.json has no entry for chain ${chainId} — nothing has been deployed`);
+  }
+  assertChainAssetConfig(chainId, chainParams);
+  if (!adpParams) {
+    throw new Error(`adaptorConfig.json has no entry for chain ${chainId} — nothing has been deployed`);
+  }
 
   // Add assets
   // addAssets([`0x94a9D9AC8a22534E3FaCa9F4e7F2E2cf85d5E4C8` as `0x${string}`], [18], 1, `0x62e7485535ea31382dcc3bbfc399ddd6b9c9b27f` as `0x${string}`, wallets[0], client);
@@ -552,8 +679,8 @@ const main = async () => {
   const configParams = {
     withdrawFeeBps: BigInt(commonParams.withdrawFeeBps),
     tvlLimitUsd: BigInt(5_000e6),    // $5,000 (6-decimal precision)
-    minDepositUsd: BigInt(2e6),      // $2 (6-decimal precision)
-    maxDepositUsd: BigInt(200e6),    // $200 (6-decimal precision)
+    minDepositUsd: BigInt(10e6),      // $10 (6-decimal precision)
+    maxDepositUsd: BigInt(250e6),    // $250 (6-decimal precision)
     priceFeedStalenessThreshold: ONE_HOUR * 30n, // 30 hours in seconds
     nativeWToken: chainParams.nativeWToken,      // wrapped native token (e.g. WETH) for native ETH deposits
   };
@@ -590,6 +717,19 @@ const main = async () => {
   // nativeWToken is set via PoolConfigParams during initialize() above; no separate
   // setWToken call is needed for fresh deployments.
 
+  // Pause before any of the setup below runs: only the user-facing entry points are
+  // whenNotPaused (transact, register), so every owner-gated setup call still works while
+  // paused — and a setup step that aborts the run leaves the pool closed rather than live
+  // and half-configured.
+  // @ts-ignore
+  const pauseHash = await wallets[0].writeContract({
+    address: poolProxy.address,
+    abi: poolAbi,
+    functionName: "pause",
+  });
+  await client.waitForTransactionReceipt({ hash: pauseHash });
+  console.log("Pool: paused");
+
   // @ts-ignore
   const setPoolTxHash = await wallets[0].writeContract({
     address: adaptorHandler.address,
@@ -606,18 +746,12 @@ const main = async () => {
   // Asset & Revoker Setup
   await addAssetsAndRevokers(poolProxy.address, chainParams, commonParams, client, deployConfig.client.wallet);
 
-  // Deploy Adaptors (should be after base assets are added to maintain the expected ID order)
-  await deployAdaptors(poolProxy.address, adpParams, deployConfig);
+  // Adaptor asset ids continue the same counter as the base assets, so confirm the anchor id the
+  // Paymaster and SDK are written against before anything is deployed on top of it.
+  await assertGasAssetRegistered(poolProxy.address, chainParams, client);
 
-  // pause the protocol immediately after deployment to prevent any interactions before the setup is complete
-  // @ts-ignore
-  const pauseHash = await wallets[0].writeContract({
-    address: poolProxy.address,
-    abi: poolAbi,
-    functionName: "pause",
-  });
-  await client.waitForTransactionReceipt({ hash: pauseHash });
-  console.log("Pool: paused");
+  // Deploy Adaptors (should be after base assets are added to maintain the expected ID order)
+  const adaptors = await deployAdaptors(poolProxy.address, adpParams, deployConfig);
 
   // Hand every Ownable contract over to the hardware wallet / multisig. Must stay after all
   // owner-gated setup above (setVersion, setVeilnyxPool, addAssets, registerRevoker,
@@ -636,11 +770,37 @@ const main = async () => {
     deployConfig
   );
 
-  // Verify all core contracts on Etherscan
-  await verifyAll({ asset, merkleTree, queuedMerkleTree, shieldedAddress, shieldedTransaction, adaptorHandler, poolImpl, poolProxy, initData });
+  // Record every deployed address before verification, so an aborted verify still leaves the
+  // addresses on disk — on a real deploy they are not recoverable from anywhere else.
+  writeDeploymentRecord(chainId, dryRun, {
+    poolProxy: poolProxy.address,
+    poolImpl: poolImpl.address,
+    verifier,
+    hasher,
+    adaptorHandler: adaptorHandler.address,
+    gateway,
+    paymaster,
+    assetLogic: asset.address,
+    merkleTreeLogic: merkleTree.address,
+    queuedMerkleTreeLogic: queuedMerkleTree.address,
+    shieldedAddressLogic: shieldedAddress.address,
+    shieldedTransactionLogic: shieldedTransaction.address,
+    ...adaptors,
+  });
+
+  if (dryRun) {
+    console.log("Dry run: skipping Etherscan verification");
+  } else {
+    await verifyAll({ asset, merkleTree, queuedMerkleTree, shieldedAddress, shieldedTransaction, adaptorHandler, poolImpl, poolProxy, initData });
+  }
 
   // Fail the run (after verification, so it still happens) if anything is still deployer-owned
   assertOwnershipTransferred(ownershipResults);
 };
 
-main().catch(logError);
+// `hardhat run` does not fail on an unhandled rejection alone — set the exit code explicitly
+// so an aborted deploy is visible to CI and to `pnpm deployCoreWithAdp:*`.
+main().catch((error) => {
+  logError(error);
+  process.exitCode = 1;
+});
