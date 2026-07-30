@@ -578,6 +578,20 @@ const main = async () => {
   const client = await hre.viem.getPublicClient({ chain });
 
   const chainId = await client.getChainId();
+
+  // hardhat.config.ts declares a chain id and the node reports one. getChainForCurrentNetwork
+  // builds the viem Chain from the declared value, while every config lookup below keys off the
+  // reported one, so an RPC URL pointing somewhere other than the network it is configured as
+  // makes those diverge silently: transactions would be signed for one chain while the pool is
+  // configured from another chain's entry in config.json.
+  const declaredChainId = hre.network.config.chainId;
+  if (declaredChainId !== undefined && declaredChainId !== chainId) {
+    throw new Error(
+      `Network "${hre.network.name}" declares chainId ${declaredChainId} in hardhat.config.ts, but the ` +
+      `node reports ${chainId}. The RPC URL is pointing at a different chain — nothing has been deployed.`
+    );
+  }
+
   const wallets = await hre.viem.getWalletClients({ chain });
 
   const deployConfig: DeployContractConfig = {
