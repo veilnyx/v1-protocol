@@ -43,6 +43,7 @@ export type CommonParams = {
   revokers: {
     name: string;
     description: string;
+    pinataCID: string;
     revokerPublicKey: [bigint, bigint];
     encryptionPublicKey: [bigint, bigint];
   }[];
@@ -72,6 +73,7 @@ export function loadConfigs() {
       const x = {
         name: r.name,
         description: r.description,
+        pinataCID: r.pinataCID,
         revokerPublicKey: [
           BigInt(r.revokerPublicKey[0]),
           BigInt(r.revokerPublicKey[1]),

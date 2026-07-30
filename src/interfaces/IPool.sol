@@ -58,6 +58,9 @@ interface IPool {
         uint32 indexed leafIndex,
         bytes shieldedAddress
     );
+    /// @dev `metadata` decodes as `(string pinataCID)` — see {registerRevoker}. Consumers should
+    /// not fall back to the earlier `(string name, string description)` layout: decoding that one
+    /// as a single string succeeds and returns the name, so the two cannot be told apart by trying.
     event RevokerRegistered(
         uint256 indexed id,
         uint256[2] revokerPublicKey,
@@ -216,7 +219,9 @@ interface IPool {
     /// @notice Can only be called by the owner.
     /// @param revokerPublicKey The public key of the revoker. Public key represents a point of the elliptic curve, hence it is a pair of two 256-bit integers.
     /// @param encryptionPublicKey The guardian network's public key used for encrypting the transactions.
-    /// @param revokerMetadata Metadata for the revoker (e.g. name, description).
+    /// @param revokerMetadata `abi.encode(string pinataCID)` — an IPFS CIDv1 (raw codec, sha2-256,
+    /// base32) resolving to a JSON document `{"name": ..., "description": ...}`. Stored nowhere;
+    /// the pool only re-emits it in {RevokerRegistered}, and there is no way to change it later.
     function registerRevoker(
         uint256[2] calldata revokerPublicKey,
         uint256[2] calldata encryptionPublicKey,

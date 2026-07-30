@@ -15,7 +15,8 @@
         "encryptionPublicKey": [
           "8415733266590874906051569398859887253801673499116319370506942542327247131378",
           "4303763666990812745724909494561603880133773663501392405214554054831058921986"
-        ]
+        ],
+        "pinataCID": "bafkreiazfa7ncz3236ixetvumpczv2cdktx7gyx2mifltjjgelpofy4kcq"
       }
     ],
     "withdrawFeeBps": 0,

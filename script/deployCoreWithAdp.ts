@@ -1,8 +1,6 @@
 import hre from "hardhat";
 import {
-  encodeAbiParameters,
   encodeFunctionData,
-  parseAbiParameters,
   isAddressEqual,
   formatEther,
   parseEther,
@@ -23,6 +21,11 @@ import { deployHasher } from "./hasher";
 import { deployVerifier } from "./verifier";
 import { getChainForCurrentNetwork, isDevelopmentNode } from "./utils/chainUtils";
 import { assertVerifiersMatchCeremony } from "./utils/verifierProvenance";
+import {
+  assertRevokerMetadata,
+  checkRevokerMetadataIsPinned,
+  encodeRevokerMetadata,
+} from "./utils/revokerMetadata";
 import { assertOwnershipTransferred, transferOwnershipToOwner } from "./utils/ownership";
 import { deployErc4337Infra } from "./erc4337Infra";
 import { mkdirSync, writeFileSync } from "fs";
@@ -463,11 +466,9 @@ const addAssetsAndRevokers = async (poolProxy: any, chainParams: any, commonPara
       const revokerPublicKey = commonParams.revokers[i].revokerPublicKey;
       const encryptionPublicKey = commonParams.revokers[i].encryptionPublicKey;
       const revokerName = commonParams.revokers[i].name;
-      const revokerDescription = commonParams.revokers[i].description;
-      const metadata = encodeAbiParameters(
-        parseAbiParameters("string name, string description"),
-        [revokerName, revokerDescription]
-      );
+      // Validated by assertRevokerMetadata before any of this ran — see that function for why a
+      // wrong CID here would be permanent.
+      const metadata = encodeRevokerMetadata(commonParams.revokers[i].pinataCID);
 
       //@ts-ignore
       const hash = await wallet.writeContract({
@@ -624,6 +625,11 @@ const main = async () => {
   // so a stale verifier is invisible to arity checks and surfaces after deployment as
   // InvalidTransactionProof.
   assertVerifiersMatchCeremony();
+  // Pins each revoker's pinataCID to a document committed in docs/. Registration happens in the
+  // same try block as the base assets, so a CID problem discovered there leaves a pool that has
+  // assets but no revoker — unusable and unrepairable. The gateway check that follows is advisory.
+  assertRevokerMetadata(commonParams.revokers);
+  await checkRevokerMetadataIsPinned(commonParams.revokers);
   if (!adpParams) {
     throw new Error(`adaptorConfig.json has no entry for chain ${chainId} — nothing has been deployed`);
   }

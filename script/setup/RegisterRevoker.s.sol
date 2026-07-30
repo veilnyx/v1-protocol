@@ -19,11 +19,15 @@ contract RegisterRevoker is BaseScript {
 
     address constant poolAddress = 0xef7585dFCdB91b0dc9fC9f920c4fb72bfb7B3E1f;
 
+    /// CIDv1 (raw, sha2-256) of `docs/revoker.json`, which holds the revoker's name and
+    /// description. Keep in sync with `common.revokers[].pinataCID` in `script/config.json` —
+    /// `script/utils/revokerMetadata.ts` checks that one against the committed document, and
+    /// `Pool` has no metadata setter, so a wrong CID here cannot be corrected afterwards.
+    string constant PINATA_CID =
+        "bafkreiazfa7ncz3236ixetvumpczv2cdktx7gyx2mifltjjgelpofy4kcq";
+
     function run() external broadcast {
-        string memory name = "Veilnyx Security";
-        string
-            memory description = "A compliance group for dApps, ensuring private yet compliant revocation processes.";
-        bytes memory metadata = abi.encode(name, description);
+        bytes memory metadata = abi.encode(PINATA_CID);
 
         uint256[2] memory revokerPublicKey = [REVOKER_X, REVOKER_Y];
         uint256[2] memory encryptionPublicKey = [ENC_X, ENC_Y];

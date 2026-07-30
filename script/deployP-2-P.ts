@@ -6,9 +6,7 @@
 
 import hre from "hardhat";
 import {
-    encodeAbiParameters,
     encodeFunctionData,
-    parseAbiParameters,
     zeroAddress
 } from "viem";
 import { DeployContractConfig, KeyedClient } from '@nomicfoundation/hardhat-viem/types';
@@ -17,6 +15,7 @@ import { deployHasher } from "./hasher";
 import { deployVerifier } from "./verifier";
 import { deployErc4337Infra } from "./erc4337Infra";
 import { getChainForCurrentNetwork } from "./utils/chainUtils";
+import { assertRevokerMetadata, encodeRevokerMetadata } from "./utils/revokerMetadata";
 
 const config = loadConfigs();
 const poolAbi = hre.artifacts.readArtifactSync("Pool").abi;
@@ -35,6 +34,10 @@ const main = async () => {
 
     const commonParams = config.common as CommonParams;
     const chainParams = config[chain.id] as ChainParams;
+
+    // Before anything costs gas: revoker metadata is write-once per keypair, and registration
+    // below shares a try block with addAssets, so a CID problem found there is unrepairable.
+    assertRevokerMetadata(commonParams.revokers);
 
     const deployConfig: DeployContractConfig = {
         client: {
@@ -189,12 +192,7 @@ const main = async () => {
         for (let i = 0; i < commonParams.revokers.length; i++) {
             const revokerPublicKey = commonParams.revokers[i].revokerPublicKey;
             const encryptionPublicKey = commonParams.revokers[i].encryptionPublicKey;
-            const revokerName = commonParams.revokers[i].name;
-            const revokerDescription = commonParams.revokers[i].description;
-            const metadata = encodeAbiParameters(
-                parseAbiParameters("string name, string description"),
-                [revokerName, revokerDescription]
-            );
+            const metadata = encodeRevokerMetadata(commonParams.revokers[i].pinataCID);
 
             //@ts-ignore
             const hash = await wallet.writeContract({

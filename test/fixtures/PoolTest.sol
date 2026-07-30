@@ -46,7 +46,11 @@ contract PoolTest is PoolBaseTest, BaseScript {
     ///      the on-chain QueuedMerkleTree (the fixed-depth MerkleTree only supports depth 20).
     BinaryIMTData internal _helperTree;
 
-    bytes revokerMetaData = abi.encode("Revoker 1", "Organization 1");
+    /// Matches the production encoding: a single ABI-encoded IPFS CID, not a name/description
+    /// pair. The pool only re-emits these bytes, but the two layouts are silently confusable —
+    /// decoding a `(string,string)` payload as one `string` returns the name rather than failing.
+    bytes revokerMetaData =
+        abi.encode("bafkreiazfa7ncz3236ixetvumpczv2cdktx7gyx2mifltjjgelpofy4kcq");
 
     modifier expectNullifiersMarked(ShieldedTransaction memory stx_) {
         (, , , , uint32 nextLeafIndex) = pool.getCommitmentTreeState();
