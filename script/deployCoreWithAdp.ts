@@ -4,6 +4,8 @@ import {
   encodeFunctionData,
   parseAbiParameters,
   isAddressEqual,
+  formatEther,
+  parseEther,
   Hex,
 } from "viem";
 
@@ -491,6 +493,11 @@ const addAssetsAndRevokers = async (poolProxy: any, chainParams: any, commonPara
 
 // Pool.getAsset is overloaded (uint24 / address); pin the uint24 overload so viem does not
 // have to infer which one to encode.
+// A floor for the deployer balance, not an estimate of the deploy cost: this run deploys five
+// libraries, an implementation, a proxy, nine verifiers and four adaptors, then makes a dozen
+// owner-gated calls. Gas prices vary too much to predict, so this only catches the unfunded case.
+const MIN_DEPLOYER_BALANCE_WEI = parseEther("0.15");
+
 const getAssetByIdAbi = poolAbi.filter(
   (item: any) => item.name === "getAsset" && item.inputs?.[0]?.type === "uint24"
 );
@@ -639,6 +646,24 @@ const main = async () => {
       );
     }
     console.log(`Ownership will transfer to ${owner} (deployer ${deployer})`);
+
+    // Running dry midway is not a retryable failure here: addAssets is the only thing that
+    // advances the pool's asset counter, so a partial run shifts the id of every asset added
+    // afterwards and the pool has to be redeployed. This is a floor, not an estimate — it only
+    // catches an unfunded or nearly-empty deployer, which is the common case.
+    const balance = await client.getBalance({ address: deployer });
+    console.log(`Deployer balance: ${formatEther(balance)} ETH`);
+    if (balance === BigInt(0)) {
+      throw new Error(
+        `Deployer ${deployer} has no balance on chain ${chainId} — nothing has been deployed.`
+      );
+    }
+    if (balance < MIN_DEPLOYER_BALANCE_WEI) {
+      console.warn(
+        `⚠️  Deployer balance is ${formatEther(balance)} ETH, below the ${formatEther(MIN_DEPLOYER_BALANCE_WEI)} ETH ` +
+        `floor. A run that stops midway leaves a pool that cannot be repaired in place.`
+      );
+    }
   }
 
   // Add assets
