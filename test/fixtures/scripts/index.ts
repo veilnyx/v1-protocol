@@ -1,6 +1,6 @@
 import { genAddressRegistrations, genAddrRegWithOutsourceProofVerification } from "./genTestAddressRegistration";
 import { genTestDeposits, genTestDeposits4x2 } from "./genTestDeposits";
-import { genTestWithdrawals, genTestWithdrawalsFromPreTxDeposit, genTestWithdrawalsFromReentrantTokenDeposit } from "./genTestWithdrawals";
+import { genTestWithdrawals, genTestWithdrawalsFromReentrantTokenDeposit } from "./genTestWithdrawals";
 import { genTestTransfers, genTestTransfersWith4Input2OutputNotes, genTestTransfersWith4Input4OutputNotes, genTestTransfersWithOutsourceProofVerification, genTransferPackedUserOp, genTransferPackedUserOpPreVerified } from "./genTestTransfers";
 import { genTestCallAdaptors, genMorphoSupplyAdaptorTx, genMorphoWithdrawAdaptorTx } from './genTestCallAdaptor';
 
@@ -15,7 +15,7 @@ const main = async () => {
 	// @dev Deposit notes are reused across tests (transfer, withdrawal, adaptor). Only regenerate when new assets are needed, as overriding existing notes will break dependent tests fixtures. Commit hash containing the deposit tx fixtures on which followup tx fixtures depend: fe9cfaa37bb522f0221f6e86f043ec6b6cf6ea8f
 	// await genTestDeposits(sdk); // already generated; transact21 wasm not compiled - only regenerate if assets change
 	// await genMorphoSupplyAdaptorTx(sdk);
-	await genMorphoWithdrawAdaptorTx(sdk);
+	// await genMorphoWithdrawAdaptorTx(sdk);
 	// await genTestDepositsWithOutsourceProofVerification(sdk, nebraClient);
 	// await genTestTransfers(sdk);
 	// await genTestDeposits4x2(sdk);
@@ -26,7 +26,7 @@ const main = async () => {
 	// await genAddressRegistrations(sdk);
 	// await genTestDepositsWithOutsourceProofVerification(sdk, nebraClient);
 	// await genTestTransfersWithOutsourceProofVerification(sdk, nebraClient);
-	// await genTestWithdrawals(sdk);
+	await genTestWithdrawals(sdk);
 	// await genTestWithdrawalsFromPreTxDeposit(sdk);
 	// await genTestWithdrawalsFromReentrantTokenDeposit(sdk);
 	// await genTestCallAdaptors(sdk);

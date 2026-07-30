@@ -9,10 +9,21 @@ const {
 } = fixture;
 
 export const reqs = {
-  deposit_2_morphoVaultToken: {
+  deposit_pre_tx: {
     type: TransactionType.DEPOSIT,
-    assetIds: [morphoVaultToken],
-    values: [parseEther("2")],
+    assetIds: [weth, usdc],
+    values: [parseEther("10000"), parseUnits("10000", 6)],
+    feeAssetId: 0,
+    to: senderAccount.shieldedAddress.pack(),
+    viaBundler: false,
+    paymaster: zeroAddress,
+    revokerId: 0,
+  }
+  /**
+  deposit_weth_tx: {
+    type: TransactionType.DEPOSIT,
+    assetIds: [weth],
+    values: [parseEther("100")],
     feeAssetId: 0,
     to: senderAccount.shieldedAddress.pack(),
     viaBundler: false,
@@ -30,7 +41,17 @@ deposit_2_morphoLoanToken: {
   paymaster: zeroAddress,
   revokerId: 0,
 }
-
+,
+  deposit_2_morphoVaultToken: {
+    type: TransactionType.DEPOSIT,
+    assetIds: [morphoVaultToken],
+    values: [parseEther("2")],
+    feeAssetId: 0,
+    to: senderAccount.shieldedAddress.pack(),
+    viaBundler: false,
+    paymaster: zeroAddress,
+    revokerId: 0,
+  },
 
 deposit_1000_reentrantToken_without_fee: {
 type: TransactionType.DEPOSIT,
@@ -53,16 +74,7 @@ paymaster: zeroAddress,
 revokerId: 0,
 },
 /**
-deposit_weth_tx: {
-type: TransactionType.DEPOSIT,
-assetIds: [weth],
-values: [parseEther("100")],
-feeAssetId: 0,
-to: senderAccount.shieldedAddress.pack(),
-viaBundler: false,
-paymaster: zeroAddress,
-revokerId: 0,
-},
+
 */
   /**
   ,
@@ -114,16 +126,6 @@ revokerId: 0,
     type: TransactionType.DEPOSIT,
     assetIds: [testnetWeth, testnetUsdc],
     values: [parseEther("10"), parseUnits("10", 6)],
-    feeAssetId: 0,
-    to: senderAccount.shieldedAddress.pack(),
-    viaBundler: false,
-    paymaster: zeroAddress,
-    revokerId: 0,
-  },
-  deposit_pre_tx: {
-    type: TransactionType.DEPOSIT,
-    assetIds: [weth, usdc],
-    values: [parseEther("10000"), parseUnits("10000", 6)],
     feeAssetId: 0,
     to: senderAccount.shieldedAddress.pack(),
     viaBundler: false,

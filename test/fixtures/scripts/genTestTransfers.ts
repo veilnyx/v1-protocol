@@ -10,6 +10,17 @@ const {
 } = fixture;
 
 export const reqs = {
+	transfer_1000_weth_with_usdc_fee: {
+		type: TransactionType.TRANSFER,
+		assetIds: [weth],
+		values: [parseEther("1000")],
+		to: receiverAccount.shieldedAddress.pack(),
+		viaBundler: true,
+		paymaster: PAYMASTER_ADDR_FIXTURE as `0x${string}`,
+		feeAssetId: usdc,
+		revokerId: 0,
+	}
+	/**
 	transfer_20_weth_with_weth_fee: {
 		type: TransactionType.TRANSFER,
 		assetIds: [weth],
@@ -18,9 +29,9 @@ export const reqs = {
 		viaBundler: true,
 		paymaster: PAYMASTER_ADDR_FIXTURE as `0x${string}`,
 		feeAssetId: weth,
-		revokerId: 0
-	}
-	/**
+		revokerId: 0,
+	},	
+	
 	transfer_20_weth_without_fee: {
 		type: TransactionType.TRANSFER,
 		assetIds: [weth],
@@ -31,16 +42,6 @@ export const reqs = {
 		paymaster: zeroAddress,
 		revokerId: 0,
 	}
-	transfer_1000_weth_with_usdc_fee: {
-		type: TransactionType.TRANSFER,
-		assetIds: [weth],
-		values: [parseEther("1000")],
-		to: receiverAccount.shieldedAddress.pack(),
-		viaBundler: true,
-		paymaster: PAYMASTER_ADDR_FIXTURE as `0x${string}`,
-		feeAssetId: usdc,
-		revokerId: 0,
-	},
 	transfer_500_weth_without_fee: {
 		type: TransactionType.TRANSFER,
 		assetIds: [weth],
