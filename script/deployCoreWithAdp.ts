@@ -616,6 +616,31 @@ const main = async () => {
     throw new Error(`adaptorConfig.json has no entry for chain ${chainId} — nothing has been deployed`);
   }
 
+  // A zero or unset hardwareWalletOwner is the documented way to retain deployer ownership for
+  // local testing: transferOwnershipToOwner skips every handover and reports "skipped", and
+  // assertOwnershipTransferred only fails on "failed". So on a real network that combination
+  // completes as a successful deployment while leaving the deployer EOA owning Pool, Verifier,
+  // AdaptorHandler, Gateway and Paymaster — including upgradeToAndCall on the UUPS proxy, which
+  // is unrestricted control of user funds by whatever key happened to run this script.
+  if (!dryRun) {
+    const deployer = wallets[0].account.address as Hex;
+    const owner = commonParams.hardwareWalletOwner;
+    if (isUnconfigured(owner)) {
+      throw new Error(
+        `common.hardwareWalletOwner is unset for a deployment to chain ${chainId}. Ownership would ` +
+        `stay with the deployer ${deployer} and the run would still report success — nothing has ` +
+        `been deployed. Set it to the hardware wallet or multisig, or use a dry-run network.`
+      );
+    }
+    if (isAddressEqual(owner, deployer)) {
+      throw new Error(
+        `common.hardwareWalletOwner (${owner}) is the deployer for chain ${chainId}, so the ` +
+        `protocol would be owned by the deploying key — nothing has been deployed.`
+      );
+    }
+    console.log(`Ownership will transfer to ${owner} (deployer ${deployer})`);
+  }
+
   // Add assets
   // addAssets([`0x94a9D9AC8a22534E3FaCa9F4e7F2E2cf85d5E4C8` as `0x${string}`], [18], 1, `0x62e7485535ea31382dcc3bbfc399ddd6b9c9b27f` as `0x${string}`, wallets[0], client);
 
