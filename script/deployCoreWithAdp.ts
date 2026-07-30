@@ -4,6 +4,8 @@ import {
   encodeFunctionData,
   parseAbiParameters,
   isAddressEqual,
+  formatEther,
+  parseEther,
   Hex,
 } from "viem";
 
@@ -20,6 +22,7 @@ import {
 import { deployHasher } from "./hasher";
 import { deployVerifier } from "./verifier";
 import { getChainForCurrentNetwork, isDevelopmentNode } from "./utils/chainUtils";
+import { assertVerifiersMatchCeremony } from "./utils/verifierProvenance";
 import { assertOwnershipTransferred, transferOwnershipToOwner } from "./utils/ownership";
 import { deployErc4337Infra } from "./erc4337Infra";
 import { mkdirSync, writeFileSync } from "fs";
@@ -491,6 +494,11 @@ const addAssetsAndRevokers = async (poolProxy: any, chainParams: any, commonPara
 
 // Pool.getAsset is overloaded (uint24 / address); pin the uint24 overload so viem does not
 // have to infer which one to encode.
+// A floor for the deployer balance, not an estimate of the deploy cost: this run deploys five
+// libraries, an implementation, a proxy, nine verifiers and four adaptors, then makes a dozen
+// owner-gated calls. Gas prices vary too much to predict, so this only catches the unfunded case.
+const MIN_DEPLOYER_BALANCE_WEI = parseEther("0.15");
+
 const getAssetByIdAbi = poolAbi.filter(
   (item: any) => item.name === "getAsset" && item.inputs?.[0]?.type === "uint24"
 );
@@ -578,6 +586,20 @@ const main = async () => {
   const client = await hre.viem.getPublicClient({ chain });
 
   const chainId = await client.getChainId();
+
+  // hardhat.config.ts declares a chain id and the node reports one. getChainForCurrentNetwork
+  // builds the viem Chain from the declared value, while every config lookup below keys off the
+  // reported one, so an RPC URL pointing somewhere other than the network it is configured as
+  // makes those diverge silently: transactions would be signed for one chain while the pool is
+  // configured from another chain's entry in config.json.
+  const declaredChainId = hre.network.config.chainId;
+  if (declaredChainId !== undefined && declaredChainId !== chainId) {
+    throw new Error(
+      `Network "${hre.network.name}" declares chainId ${declaredChainId} in hardhat.config.ts, but the ` +
+      `node reports ${chainId}. The RPC URL is pointing at a different chain — nothing has been deployed.`
+    );
+  }
+
   const wallets = await hre.viem.getWalletClients({ chain });
 
   const deployConfig: DeployContractConfig = {
@@ -598,8 +620,55 @@ const main = async () => {
     throw new Error(`config.json has no entry for chain ${chainId} — nothing has been deployed`);
   }
   assertChainAssetConfig(chainId, chainParams);
+  // Pins the verifier sources to a ceremony. Only delta distinguishes one phase-2 from another,
+  // so a stale verifier is invisible to arity checks and surfaces after deployment as
+  // InvalidTransactionProof.
+  assertVerifiersMatchCeremony();
   if (!adpParams) {
     throw new Error(`adaptorConfig.json has no entry for chain ${chainId} — nothing has been deployed`);
+  }
+
+  // A zero or unset hardwareWalletOwner is the documented way to retain deployer ownership for
+  // local testing: transferOwnershipToOwner skips every handover and reports "skipped", and
+  // assertOwnershipTransferred only fails on "failed". So on a real network that combination
+  // completes as a successful deployment while leaving the deployer EOA owning Pool, Verifier,
+  // AdaptorHandler, Gateway and Paymaster — including upgradeToAndCall on the UUPS proxy, which
+  // is unrestricted control of user funds by whatever key happened to run this script.
+  if (!dryRun) {
+    const deployer = wallets[0].account.address as Hex;
+    const owner = commonParams.hardwareWalletOwner;
+    if (isUnconfigured(owner)) {
+      throw new Error(
+        `common.hardwareWalletOwner is unset for a deployment to chain ${chainId}. Ownership would ` +
+        `stay with the deployer ${deployer} and the run would still report success — nothing has ` +
+        `been deployed. Set it to the hardware wallet or multisig, or use a dry-run network.`
+      );
+    }
+    if (isAddressEqual(owner, deployer)) {
+      throw new Error(
+        `common.hardwareWalletOwner (${owner}) is the deployer for chain ${chainId}, so the ` +
+        `protocol would be owned by the deploying key — nothing has been deployed.`
+      );
+    }
+    console.log(`Ownership will transfer to ${owner} (deployer ${deployer})`);
+
+    // Running dry midway is not a retryable failure here: addAssets is the only thing that
+    // advances the pool's asset counter, so a partial run shifts the id of every asset added
+    // afterwards and the pool has to be redeployed. This is a floor, not an estimate — it only
+    // catches an unfunded or nearly-empty deployer, which is the common case.
+    const balance = await client.getBalance({ address: deployer });
+    console.log(`Deployer balance: ${formatEther(balance)} ETH`);
+    if (balance === BigInt(0)) {
+      throw new Error(
+        `Deployer ${deployer} has no balance on chain ${chainId} — nothing has been deployed.`
+      );
+    }
+    if (balance < MIN_DEPLOYER_BALANCE_WEI) {
+      console.warn(
+        `⚠️  Deployer balance is ${formatEther(balance)} ETH, below the ${formatEther(MIN_DEPLOYER_BALANCE_WEI)} ETH ` +
+        `floor. A run that stops midway leaves a pool that cannot be repaired in place.`
+      );
+    }
   }
 
   // Add assets
@@ -660,12 +729,19 @@ const main = async () => {
   });
   console.log("Pool deployed:", poolImpl.address);
 
-  const { hasher } = await deployHasher(deployConfig.client.wallet, client, deployConfig);
+  const { hasher, poseidonT3, poseidonT4, poseidonT5 } = await deployHasher(
+    deployConfig.client.wallet,
+    client,
+    deployConfig
+  );
   console.log("Hasher deployed:", hasher);
 
   // Ownership is handed over below with the rest of the Ownable contracts; this only sets
   // the verifier manager.
-  const verifier = await deployVerifier(deployConfig, commonParams.hardwareWalletOwner);
+  const { verifier, ...verifiers } = await deployVerifier(
+    deployConfig,
+    commonParams.hardwareWalletOwner
+  );
 
   const initAddressParams = {
     verifier: verifier,
@@ -785,6 +861,12 @@ const main = async () => {
     queuedMerkleTreeLogic: queuedMerkleTree.address,
     shieldedAddressLogic: shieldedAddress.address,
     shieldedTransactionLogic: shieldedTransaction.address,
+    poseidonT3,
+    poseidonT4,
+    poseidonT5,
+    // The sub-verifiers and Poseidon libraries above are deployed standalone rather than through
+    // hre.viem's artifact registry, so nothing else on disk holds their addresses.
+    ...verifiers,
     ...adaptors,
   });
 

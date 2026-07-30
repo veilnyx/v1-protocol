@@ -7,6 +7,11 @@ import { toFunctionSelector } from "viem";
  * Deploys the Verifier and its sub-verifiers. The Verifier's constructor makes the deployer
  * its owner — hand it over with `transferOwnershipToOwner` from `./utils/ownership` together
  * with the rest of the Ownable contracts once post-deployment setup is done.
+ *
+ * Returns every address rather than just the Verifier's. The sub-verifiers are only reachable
+ * on chain through `getTransactionVerifier`, and on a real deployment the console log is the
+ * sole record of them, so they need to reach the deployment record to be verifiable on
+ * Etherscan or auditable afterwards.
  */
 export const deployVerifier = async (
     deployConfig,
@@ -17,6 +22,8 @@ export const deployVerifier = async (
     const verifier23Abi = hre.artifacts.readArtifactSync("VerifierTransact23").abi;
     const verifier42Abi = hre.artifacts.readArtifactSync("VerifierTransact42").abi;
     const verifier44Abi = hre.artifacts.readArtifactSync("VerifierTransact44").abi;
+    const verifier82Abi = hre.artifacts.readArtifactSync("VerifierTransact82").abi;
+    const verifier84Abi = hre.artifacts.readArtifactSync("VerifierTransact84").abi;
 
     const verifierRegister = await hre.viem.deployContract("VerifierRegister", [], deployConfig);
     console.log("VerifierRegister deployed:", verifierRegister.address);
@@ -39,6 +46,18 @@ export const deployVerifier = async (
 
     const verifierTransact44 = await hre.viem.deployContract("VerifierTransact44", [], deployConfig);
     console.log("VerifierTransact44 deployed:", verifierTransact44.address);
+
+    // The 8-input shapes. The SDK selects a circuit from the number of input notes a spend needs,
+    // so an account whose balance is spread across five or more notes routes here with no way to
+    // opt out. Registering them on chain is safe even if the frontend does not ship the matching
+    // keys yet: the reverse, a frontend that can build 8-input proofs against a pool with no
+    // verifier at id 82/84, reverts with "Verifier: verifier not found" after the user has already
+    // waited through proof generation.
+    const verifierTransact82 = await hre.viem.deployContract("VerifierTransact82", [], deployConfig);
+    console.log("VerifierTransact82 deployed:", verifierTransact82.address);
+
+    const verifierTransact84 = await hre.viem.deployContract("VerifierTransact84", [], deployConfig);
+    console.log("VerifierTransact84 deployed:", verifierTransact84.address);
 
     // Prepare the TransactionVerifierInfo array
     const txVerifierInfos = [
@@ -66,6 +85,16 @@ export const deployVerifier = async (
             id: 44,
             selector: toFunctionSelector(verifier44Abi[0]),
             addr: verifierTransact44.address
+        },
+        {
+            id: 82,
+            selector: toFunctionSelector(verifier82Abi[0]),
+            addr: verifierTransact82.address
+        },
+        {
+            id: 84,
+            selector: toFunctionSelector(verifier84Abi[0]),
+            addr: verifierTransact84.address
         }
     ];
 
@@ -79,5 +108,16 @@ export const deployVerifier = async (
     );
     console.log("Verifier deployed:", verifier.address);
 
-    return verifier.address;
+    return {
+        verifier: verifier.address,
+        verifierRegister: verifierRegister.address,
+        verifierTreeUpdate: verifierTreeUpdate.address,
+        verifierTransact21: verifierTransact21.address,
+        verifierTransact22: verifierTransact22.address,
+        verifierTransact23: verifierTransact23.address,
+        verifierTransact42: verifierTransact42.address,
+        verifierTransact44: verifierTransact44.address,
+        verifierTransact82: verifierTransact82.address,
+        verifierTransact84: verifierTransact84.address
+    };
 }
