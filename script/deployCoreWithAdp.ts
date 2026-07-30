@@ -22,6 +22,7 @@ import {
 import { deployHasher } from "./hasher";
 import { deployVerifier } from "./verifier";
 import { getChainForCurrentNetwork, isDevelopmentNode } from "./utils/chainUtils";
+import { assertVerifiersMatchCeremony } from "./utils/verifierProvenance";
 import { assertOwnershipTransferred, transferOwnershipToOwner } from "./utils/ownership";
 import { deployErc4337Infra } from "./erc4337Infra";
 import { mkdirSync, writeFileSync } from "fs";
@@ -619,6 +620,10 @@ const main = async () => {
     throw new Error(`config.json has no entry for chain ${chainId} — nothing has been deployed`);
   }
   assertChainAssetConfig(chainId, chainParams);
+  // Pins the verifier sources to a ceremony. Only delta distinguishes one phase-2 from another,
+  // so a stale verifier is invisible to arity checks and surfaces after deployment as
+  // InvalidTransactionProof.
+  assertVerifiersMatchCeremony();
   if (!adpParams) {
     throw new Error(`adaptorConfig.json has no entry for chain ${chainId} — nothing has been deployed`);
   }
