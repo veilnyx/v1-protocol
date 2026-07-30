@@ -7,6 +7,11 @@ import { toFunctionSelector } from "viem";
  * Deploys the Verifier and its sub-verifiers. The Verifier's constructor makes the deployer
  * its owner — hand it over with `transferOwnershipToOwner` from `./utils/ownership` together
  * with the rest of the Ownable contracts once post-deployment setup is done.
+ *
+ * Returns every address rather than just the Verifier's. The sub-verifiers are only reachable
+ * on chain through `getTransactionVerifier`, and on a real deployment the console log is the
+ * sole record of them, so they need to reach the deployment record to be verifiable on
+ * Etherscan or auditable afterwards.
  */
 export const deployVerifier = async (
     deployConfig,
@@ -103,5 +108,16 @@ export const deployVerifier = async (
     );
     console.log("Verifier deployed:", verifier.address);
 
-    return verifier.address;
+    return {
+        verifier: verifier.address,
+        verifierRegister: verifierRegister.address,
+        verifierTreeUpdate: verifierTreeUpdate.address,
+        verifierTransact21: verifierTransact21.address,
+        verifierTransact22: verifierTransact22.address,
+        verifierTransact23: verifierTransact23.address,
+        verifierTransact42: verifierTransact42.address,
+        verifierTransact44: verifierTransact44.address,
+        verifierTransact82: verifierTransact82.address,
+        verifierTransact84: verifierTransact84.address
+    };
 }

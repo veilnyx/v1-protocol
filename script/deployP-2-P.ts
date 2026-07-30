@@ -102,7 +102,7 @@ const main = async () => {
 
         // Verifier ownership stays with the deployer here, as it did when deployVerifier
         // handled the transfer and was passed the deployer as owner.
-        const verifier = await deployVerifier(deployConfig, wallet.account.address);
+        const { verifier } = await deployVerifier(deployConfig, wallet.account.address);
 
         const initAddressParams = {
             verifier: verifier,

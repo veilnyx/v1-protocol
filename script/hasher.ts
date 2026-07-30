@@ -73,5 +73,5 @@ export const deployHasher = async (wallet, client, tenderlyDeployConfig) => {
     poseidonT5
   ], tenderlyDeployConfig);
 
-  return { hasher: hasher.address, poseidonT3, poseidonT4 };
+  return { hasher: hasher.address, poseidonT3, poseidonT4, poseidonT5 };
 };

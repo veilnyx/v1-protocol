@@ -729,12 +729,19 @@ const main = async () => {
   });
   console.log("Pool deployed:", poolImpl.address);
 
-  const { hasher } = await deployHasher(deployConfig.client.wallet, client, deployConfig);
+  const { hasher, poseidonT3, poseidonT4, poseidonT5 } = await deployHasher(
+    deployConfig.client.wallet,
+    client,
+    deployConfig
+  );
   console.log("Hasher deployed:", hasher);
 
   // Ownership is handed over below with the rest of the Ownable contracts; this only sets
   // the verifier manager.
-  const verifier = await deployVerifier(deployConfig, commonParams.hardwareWalletOwner);
+  const { verifier, ...verifiers } = await deployVerifier(
+    deployConfig,
+    commonParams.hardwareWalletOwner
+  );
 
   const initAddressParams = {
     verifier: verifier,
@@ -854,6 +861,12 @@ const main = async () => {
     queuedMerkleTreeLogic: queuedMerkleTree.address,
     shieldedAddressLogic: shieldedAddress.address,
     shieldedTransactionLogic: shieldedTransaction.address,
+    poseidonT3,
+    poseidonT4,
+    poseidonT5,
+    // The sub-verifiers and Poseidon libraries above are deployed standalone rather than through
+    // hre.viem's artifact registry, so nothing else on disk holds their addresses.
+    ...verifiers,
     ...adaptors,
   });
 
