@@ -5,7 +5,7 @@ import {Test, console2} from "forge-std/Test.sol";
 import {IHasher} from "src/interfaces/IHasher.sol";
 import {IVerifier} from "src/interfaces/IVerifier.sol";
 import {QueuedMerkleTree, QueuedMerkleTreeLogic, TreeUpdateData} from "src/libraries/QueuedMerkleTreeLogic.sol";
-import {COMMITMENT_TREE_DEPTH, TREE_UPDATE_QUEUE_SIZE} from "src/base/Constants.sol";
+import {COMMITMENT_TREE_DEPTH} from "src/base/Constants.sol";
 import {BaseTest} from "test/fixtures/BaseTest.sol";
 import {MockVerifier} from "test/mocks/MockVerifier.sol";
 
@@ -16,7 +16,6 @@ contract AuditQueueAccounting is BaseTest {
     using QueuedMerkleTreeLogic for QueuedMerkleTree;
 
     QueuedMerkleTree internal qmt;
-    QueuedMerkleTree internal qmtBadSize;
     MockVerifier internal mv;
     IHasher internal deployedHasher;
 
@@ -25,7 +24,7 @@ contract AuditQueueAccounting is BaseTest {
         mv = new MockVerifier();
         mv.setResult(true);
         deployedHasher = _deployHasher();
-        qmt.init(fixture.commitmentTreeQueueSize, deployedHasher, IVerifier(address(mv)));
+        qmt.init(deployedHasher, IVerifier(address(mv)));
     }
 
     function test_queueStartIndexOverrunBricksPool() public {
@@ -94,19 +93,6 @@ contract AuditQueueAccounting is BaseTest {
         qmt.update(d);
         assertEq(qmt.queueStartIndex, 3, "batch of 3 should have been consumed");
         assertEq(qmt.queueEndIndex, 4, "remaining leaf should stay queued");
-    }
-
-    /// I-2: queueSize is fixed by the treeUpdate circuit's nLeaves parameter.
-    /// Any other value silently changes the verifier calldata layout.
-    function test_initRejectsQueueSizeMismatch() public {
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                QueuedMerkleTreeLogic.InvalidQueueSize.selector,
-                uint8(9),
-                TREE_UPDATE_QUEUE_SIZE
-            )
-        );
-        qmtBadSize.init(9, deployedHasher, IVerifier(address(mv)));
     }
 
     function simulatePrintNotes() external view returns (uint32) {

@@ -105,7 +105,7 @@ contract PoolBaseTest is BaseTest {
 
         bytes memory initData = abi.encodeCall(
             Pool.initialize,
-            (fixture.commitmentTreeQueueSize, initAddressParams, configParams)
+            (initAddressParams, configParams)
         );
 
         ERC1967Proxy poolProxy = new ERC1967Proxy(address(pool), initData);

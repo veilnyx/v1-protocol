@@ -47,9 +47,7 @@ contract Pool is
 
     /// @notice Initializes the Pool contract with the given parameters.
     /// @dev Pool is an UUPSUpgradeable contract, so it needs to be initialized.
-    /// @param commitmentTreeQueueSize The size of the queue for the commitment tree. This determines how many leaves can be queued at MAX before a tree update is required. Defined by the circuit `treeUpdate::nLeaves`
     function initialize(
-        uint8 commitmentTreeQueueSize,
         InitAddressParams calldata initAddressParams,
         PoolConfigParams calldata configParams
     ) external initializer {
@@ -96,7 +94,7 @@ contract Pool is
         nativeWToken = configParams.nativeWToken;
 
         _addressTree.init(hasher);
-        _commitmentTree.init(commitmentTreeQueueSize, hasher, verifier);
+        _commitmentTree.init(hasher, verifier);
     }
 
     /////////////////////////////////////////

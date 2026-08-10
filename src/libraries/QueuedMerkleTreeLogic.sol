@@ -31,14 +31,12 @@ library QueuedMerkleTreeLogic {
     error MerkleTreeFull();
     error InvalidProof();
     error InvalidBatchSize();
-    error InvalidQueueSize(uint8 given, uint8 expected);
     error ZeroAddress();
 
     /// @custom:invariant QMT-1: queueStartIndex <= queueEndIndex always
     /// @custom:invariant QMT-2: queueEndIndex - queueStartIndex <= total leaves queued at all times
     function init(
         QueuedMerkleTree storage self,
-        uint8 queueSize,
         IHasher hasher,
         IVerifier verifier
     ) public {
@@ -46,19 +44,12 @@ library QueuedMerkleTreeLogic {
             revert ZeroAddress();
         }
 
-        // The treeUpdate circuit is compiled as TreeUpdate(COMMITMENT_TREE_DEPTH, 10),
-        // so its public-input count -- and therefore the verifier calldata layout --
-        // is fixed at this queue size. Any other value would silently produce
-        // vParams of the wrong length and make every tree update revert, halting
-        // commitment insertion permanently.
-        if (queueSize != TREE_UPDATE_QUEUE_SIZE) {
-            revert InvalidQueueSize(queueSize, TREE_UPDATE_QUEUE_SIZE);
-        }
-
         self.hasher = hasher;
         self.verifier = verifier;
         self.capacity = uint32(1 << COMMITMENT_TREE_DEPTH);
-        self.queueSize = queueSize;
+        // Fixed by the treeUpdate circuit's nLeaves parameter and retained in
+        // storage for proxy layout compatibility and efficient runtime access.
+        self.queueSize = TREE_UPDATE_QUEUE_SIZE;
         self.queueStartIndex = 0;
         self.queueEndIndex = 0;
 

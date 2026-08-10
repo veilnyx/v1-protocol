@@ -28,7 +28,7 @@ contract AuditTreeUpdateForgery is BaseTest {
             address(treeUpdateVerifier),
             address(this)
         );
-        qmt.init(fixture.commitmentTreeQueueSize, hasher, verifier_);
+        qmt.init(hasher, verifier_);
     }
 
     /// Anyone can set the commitment tree root to an ARBITRARY value by padding
