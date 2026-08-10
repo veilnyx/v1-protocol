@@ -54,6 +54,12 @@ contract VerifierTest is BaseTest {
         uint256 id = _verifier.getTransactionVerifierId(2, 2);
         assertEq(id, 22);
 
+        uint256 id2 = _verifier.getTransactionVerifierId(10, 10);
+        assertEq(id2, 1010);
+
+        uint256 id3 = _verifier.getTransactionVerifierId(123, 45);
+        assertEq(id3, 12345);
+
         uint16 id4 = _verifier.getTransactionVerifierId(1, 0);
         assertEq(id4, 10);
 
@@ -66,23 +72,40 @@ contract VerifierTest is BaseTest {
         assertEq(_verifier.getTransactionVerifierId(8, 4), 84);
     }
 
-    /// A multi-digit nOuts made the id ambiguous: (2,10) and (21,0) both gave 210.
-    function test_getVerifierIdRevertsOnMultiDigitNOuts() public {
+    /// Colliding circuit shapes intentionally share a registry slot. Adding a
+    /// second verifier for that slot is rejected by addTransactionVerifier.
+    function test_getVerifierIdAllowsMultiDigitCollision() public {
+        uint16 multiDigitOutputsId = _verifier.getTransactionVerifierId(2, 10);
+        uint16 multiDigitInputsId = _verifier.getTransactionVerifierId(21, 0);
+
+        assertEq(multiDigitOutputsId, 210);
+        assertEq(multiDigitInputsId, 210);
+
+        _verifier.addTransactionVerifier(
+            TransactionVerifierInfo({
+                id: multiDigitOutputsId,
+                addr: address(vt23),
+                selector: vt23.verifyProof.selector
+            })
+        );
+
         vm.expectRevert(
             abi.encodeWithSelector(
-                IVerifier.BadArguments.selector,
-                uint256(2),
-                uint256(10)
+                Verifier.VerifierAlreadyExists.selector,
+                multiDigitInputsId
             )
         );
-        _verifier.getTransactionVerifierId(2, 10);
-
-        // The value it used to collide with is still reachable and unambiguous.
-        assertEq(_verifier.getTransactionVerifierId(21, 0), 210);
+        _verifier.addTransactionVerifier(
+            TransactionVerifierInfo({
+                id: multiDigitInputsId,
+                addr: address(vt22),
+                selector: vt22.verifyProof.selector
+            })
+        );
     }
 
     function test_getVerifierIdRevertsOnUint16Overflow() public {
-        // nOuts=0 → noOfDigits=0 → verifierID = nIns * 10^0 + 0 = nIns
+        // nOuts=0 is treated as one digit, so verifierID = nIns * 10.
         // 65536 > type(uint16).max (65535)
         vm.expectRevert(
             abi.encodeWithSelector(
