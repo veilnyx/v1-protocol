@@ -189,6 +189,69 @@ contract VerifierTest is BaseTest {
         assertEq(added24.addr, address(vt23_2));
     }
 
+    function test_updateTransactionVerifier() public {
+        TransactionVerifierInfo memory replacement = TransactionVerifierInfo({
+            id: 21,
+            addr: address(vt23),
+            selector: vt23.verifyProof.selector
+        });
+
+        vm.expectEmit(true, false, false, true);
+        emit Verifier.TransactionVerifierUpdated(
+            21,
+            vt21.verifyProof.selector,
+            address(vt21),
+            vt23.verifyProof.selector,
+            address(vt23)
+        );
+
+        _verifier.updateTransactionVerifier(replacement);
+
+        TransactionVerifierInfo memory updated = _verifier
+            .getTransactionVerifier(21);
+        assertEq(updated.id, 21);
+        assertEq(updated.addr, address(vt23));
+        assertEq(updated.selector, vt23.verifyProof.selector);
+    }
+
+    function test_revert_updateTransactionVerifier_notFound() public {
+        TransactionVerifierInfo memory replacement = TransactionVerifierInfo({
+            id: 24,
+            addr: address(vt23),
+            selector: vt23.verifyProof.selector
+        });
+
+        vm.expectRevert(
+            abi.encodeWithSelector(Verifier.VerifierNotFound.selector, 24)
+        );
+        _verifier.updateTransactionVerifier(replacement);
+
+        assertEq(_verifier.getTransactionVerifier(24).addr, address(0));
+    }
+
+    function test_revert_updateTransactionVerifier_zeroAddress() public {
+        TransactionVerifierInfo memory replacement = TransactionVerifierInfo({
+            id: 21,
+            addr: address(0),
+            selector: vt23.verifyProof.selector
+        });
+
+        vm.expectRevert(Verifier.ZeroAddress.selector);
+        _verifier.updateTransactionVerifier(replacement);
+    }
+
+    function test_revert_updateTransactionVerifier_notVerifierManager() public {
+        TransactionVerifierInfo memory replacement = TransactionVerifierInfo({
+            id: 21,
+            addr: address(vt23),
+            selector: vt23.verifyProof.selector
+        });
+
+        vm.prank(address(0x123));
+        vm.expectRevert(Verifier.NotVerifierManager.selector);
+        _verifier.updateTransactionVerifier(replacement);
+    }
+
     function test_removeTransactionVerifier() public {
         vm.expectEmit(true, false, false, false);
         emit Verifier.TransactionVerifierRemoved(21);
@@ -211,6 +274,19 @@ contract VerifierTest is BaseTest {
         _verifier.addTransactionVerifier(badVerifier);
     }
 
+    function test_revert_addVerifier_zeroId() public {
+        TransactionVerifierInfo memory badVerifier = TransactionVerifierInfo({
+            id: 0,
+            addr: address(vt23),
+            selector: vt23.verifyProof.selector
+        });
+
+        vm.expectRevert(
+            abi.encodeWithSelector(Verifier.InvalidVerifierId.selector, 0)
+        );
+        _verifier.addTransactionVerifier(badVerifier);
+    }
+
     function test_revert_addVerifier_alreadyExists() public {
         TransactionVerifierInfo memory duplicateVerifier = TransactionVerifierInfo({
             id: 21, // Already exists
@@ -225,7 +301,9 @@ contract VerifierTest is BaseTest {
     }
 
     function test_revert_removeVerifier_notFound() public {
-        vm.expectRevert("Verifier: verifier not found");
+        vm.expectRevert(
+            abi.encodeWithSelector(Verifier.VerifierNotFound.selector, 99)
+        );
         _verifier.removeTransactionVerifier(99); // Doesn't exist
     }
 

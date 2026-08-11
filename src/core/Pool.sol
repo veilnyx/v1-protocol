@@ -125,6 +125,25 @@ contract Pool is
         _setPauser(newPauser);
     }
 
+    /// @notice Atomically updates the verifier used by all Pool proof paths.
+    /// @dev Updates both the primary verifier reference and the verifier cached
+    ///      by the commitment tree. Only callable by the owner.
+    function setVerifier(IVerifier newVerifier) external onlyOwner {
+        address newVerifierAddress = address(newVerifier);
+        if (
+            newVerifierAddress == address(0) ||
+            newVerifierAddress.code.length == 0
+        ) {
+            revert IPool.InvalidVerifierAddress(newVerifierAddress);
+        }
+
+        address previousVerifier = address(verifier);
+        verifier = newVerifier;
+        _commitmentTree.setVerifier(newVerifier);
+
+        emit IPool.VerifierUpdated(previousVerifier, newVerifierAddress);
+    }
+
     function addAssets(
         AssetType assetType,
         AssetInitParams[] calldata initParams
@@ -859,9 +878,7 @@ contract Pool is
     /// @dev Rejects points that are not on BabyJubJub, and the low-order points
     ///      x == 0 (the identity and the order-2 point), which are the ones that
     ///      collapse a scalar multiplication to a constant.
-    function _assertValidCurvePoint(
-        uint256[2] calldata point
-    ) private pure {
+    function _assertValidCurvePoint(uint256[2] calldata point) private pure {
         uint256 x = point[0];
         uint256 y = point[1];
 
@@ -871,7 +888,11 @@ contract Pool is
 
         uint256 x2 = mulmod(x, x, FIELD_SIZE);
         uint256 y2 = mulmod(y, y, FIELD_SIZE);
-        uint256 lhs = addmod(mulmod(BABYJUBJUB_A, x2, FIELD_SIZE), y2, FIELD_SIZE);
+        uint256 lhs = addmod(
+            mulmod(BABYJUBJUB_A, x2, FIELD_SIZE),
+            y2,
+            FIELD_SIZE
+        );
         uint256 rhs = addmod(
             1,
             mulmod(BABYJUBJUB_D, mulmod(x2, y2, FIELD_SIZE), FIELD_SIZE),

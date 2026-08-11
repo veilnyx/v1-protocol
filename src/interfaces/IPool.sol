@@ -103,6 +103,10 @@ interface IPool {
     event PriceFeedStalenessThresholdUpdated(uint256 threshold);
     event NativeWTokenUpdated(IWToken indexed nativeWToken);
     event PauserUpdated(address indexed oldPauser, address indexed newPauser);
+    event VerifierUpdated(
+        address indexed previousVerifier,
+        address indexed newVerifier
+    );
     event PriceStalenessThresholdUpdated(uint256 threshold);
 
     /////////////////////////////////////////
@@ -142,6 +146,9 @@ interface IPool {
     ///      An EOA screener would make every isSanctioned() call revert. The zero
     ///      address is still accepted — it is the kill-switch that disables screening.
     error InvalidScreenerAddress(address screener);
+    /// @dev A verifier must be a deployed contract. An EOA or the zero address
+    ///      would make proof verification calls fail and brick Pool operations.
+    error InvalidVerifierAddress(address verifier);
 
     /// @dev msg.value was sent for a non-DEPOSIT transaction. Native ETH is only
     ///      accepted on DEPOSIT to be wrapped into the configured nativeWToken.
@@ -243,6 +250,11 @@ interface IPool {
     function setScreener(IScreener screener) external;
 
     event ScreenerUpdated(address indexed screener);
+
+    /// @notice Atomically updates the verifier used for address, transaction,
+    ///         and commitment-tree update proofs.
+    /// @notice Can only be called by the owner.
+    function setVerifier(IVerifier newVerifier) external;
 
     /// @notice Sets the no. of bips (basis points: 1/10000) fee that is charged for withdrawing assets from the pool.
     /// @notice Can only be called by the owner.

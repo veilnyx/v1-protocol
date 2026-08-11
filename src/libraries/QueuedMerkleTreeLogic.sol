@@ -67,6 +67,16 @@ library QueuedMerkleTreeLogic {
         self.roots[0] = zero;
     }
 
+    /// @dev Updates the verifier used for commitment-tree update proofs.
+    ///      Access control is enforced by the calling Pool contract.
+    function setVerifier(
+        QueuedMerkleTree storage self,
+        IVerifier newVerifier
+    ) internal {
+        if (address(newVerifier) == address(0)) revert ZeroAddress();
+        self.verifier = newVerifier;
+    }
+
     function queueLeaves(
         QueuedMerkleTree storage self,
         uint256[] calldata leaves

@@ -41,6 +41,13 @@ contract Verifier is IVerifier, Ownable {
         address addr
     );
     event TransactionVerifierRemoved(uint16 indexed id);
+    event TransactionVerifierUpdated(
+        uint16 indexed id,
+        bytes4 previousSelector,
+        address previousAddr,
+        bytes4 newSelector,
+        address newAddr
+    );
     event TreeUpdateVerifierUpdated(address indexed newTreeUpdateVerifier);
     event AddressVerifierUpdated(address indexed newAddressVerifier);
     event VerifierManagerUpdated(
@@ -50,7 +57,9 @@ contract Verifier is IVerifier, Ownable {
 
     error ZeroAddress();
     error VerifierAlreadyExists(uint16 id);
+    error VerifierNotFound(uint16 id);
     error NotVerifierManager();
+    error InvalidVerifierId(uint16 id);
 
     modifier onlyVerifierManager() {
         if (msg.sender != verifierManager) revert NotVerifierManager();
@@ -72,7 +81,7 @@ contract Verifier is IVerifier, Ownable {
         uint256 len = txvInfos.length;
 
         for (uint256 i = 0; i < len; ) {
-            if (txvInfos[i].addr == address(0)) revert ZeroAddress();
+            _validateNewTransactionVerifier(txvInfos[i]);
             _transactionVerifiers[txvInfos[i].id] = txvInfos[i];
             unchecked {
                 ++i;
@@ -123,10 +132,7 @@ contract Verifier is IVerifier, Ownable {
     function addTransactionVerifier(
         TransactionVerifierInfo calldata txvInfo
     ) external onlyVerifierManager {
-        if (txvInfo.addr == address(0)) revert ZeroAddress();
-        if (_transactionVerifiers[txvInfo.id].addr != address(0)) {
-            revert VerifierAlreadyExists(txvInfo.id);
-        }
+        _validateNewTransactionVerifier(txvInfo);
 
         _transactionVerifiers[txvInfo.id] = txvInfo;
         emit TransactionVerifierAdded(
@@ -145,10 +151,7 @@ contract Verifier is IVerifier, Ownable {
         uint256 len = txvInfos.length;
 
         for (uint256 i = 0; i < len; ) {
-            if (txvInfos[i].addr == address(0)) revert ZeroAddress();
-            if (_transactionVerifiers[txvInfos[i].id].addr != address(0)) {
-                revert VerifierAlreadyExists(txvInfos[i].id);
-            }
+            _validateNewTransactionVerifier(txvInfos[i]);
 
             _transactionVerifiers[txvInfos[i].id] = txvInfos[i];
             emit TransactionVerifierAdded(
@@ -163,6 +166,44 @@ contract Verifier is IVerifier, Ownable {
         }
     }
 
+    /// @dev Validates a transaction verifier before registering it.
+    function _validateNewTransactionVerifier(
+        TransactionVerifierInfo memory txvInfo
+    ) internal view {
+        if (txvInfo.addr == address(0)) revert ZeroAddress();
+        if (txvInfo.id == 0) revert InvalidVerifierId(txvInfo.id);
+        if (_transactionVerifiers[txvInfo.id].addr != address(0)) {
+            revert VerifierAlreadyExists(txvInfo.id);
+        }
+    }
+
+    /// @notice Atomically replaces the verifier contract for an existing ID.
+    /// @dev Cannot register a new ID; use addTransactionVerifier for that.
+    ///      Only callable by the verifier manager.
+    /// @param txvInfo Existing verifier ID and its replacement configuration.
+    function updateTransactionVerifier(
+        TransactionVerifierInfo calldata txvInfo
+    ) external onlyVerifierManager {
+        if (txvInfo.addr == address(0)) revert ZeroAddress();
+        if (txvInfo.id == 0) revert InvalidVerifierId(txvInfo.id);
+
+        TransactionVerifierInfo memory previous = _transactionVerifiers[
+            txvInfo.id
+        ];
+        if (previous.addr == address(0)) {
+            revert VerifierNotFound(txvInfo.id);
+        }
+
+        _transactionVerifiers[txvInfo.id] = txvInfo;
+        emit TransactionVerifierUpdated(
+            txvInfo.id,
+            previous.selector,
+            previous.addr,
+            txvInfo.selector,
+            txvInfo.addr
+        );
+    }
+
     /// @notice Removes a transaction verifier
     /// @dev Only callable by verifier manager
     /// @param vId The verifier ID to remove
@@ -170,7 +211,7 @@ contract Verifier is IVerifier, Ownable {
         uint16 vId
     ) external onlyVerifierManager {
         if (_transactionVerifiers[vId].addr == address(0)) {
-            revert("Verifier: verifier not found");
+            revert VerifierNotFound(vId);
         }
 
         delete _transactionVerifiers[vId];
