@@ -9,7 +9,6 @@ import {MerkleTree} from "../libraries/MerkleTreeLogic.sol";
 
 struct TransactionVerifierInfo {
     uint16 id;
-    bytes4 selector;
     address addr;
 }
 
@@ -23,6 +22,11 @@ uint256 constant GROTH16_PROOF_LENGTH = 256;
 uint256 constant TRANSACTION_PUBLIC_INPUTS = 12;
 uint256 constant ADDRESS_PUBLIC_INPUTS = 6;
 uint256 constant TREE_UPDATE_PUBLIC_INPUTS = 64;
+/// @dev Every transaction verifier must expose this exact snarkJS-generated
+///      signature. Circuit shapes differ only by verification key, not ABI.
+bytes4 constant TRANSACTION_VERIFY_PROOF_SELECTOR = bytes4(
+    keccak256("verifyProof(uint256[2],uint256[2][2],uint256[2],uint256[12])")
+);
 
 contract Verifier is IVerifier, Ownable {
     /**
@@ -35,17 +39,10 @@ contract Verifier is IVerifier, Ownable {
     /// @notice Address authorised to add, update and remove verifiers.
     address public verifierManager;
 
-    event TransactionVerifierAdded(
-        uint16 indexed id,
-        bytes4 selector,
-        address addr
-    );
-    event TransactionVerifierRemoved(uint16 indexed id);
+    event TransactionVerifierAdded(uint16 indexed id, address addr);
     event TransactionVerifierUpdated(
         uint16 indexed id,
-        bytes4 previousSelector,
         address previousAddr,
-        bytes4 newSelector,
         address newAddr
     );
     event TreeUpdateVerifierUpdated(address indexed newTreeUpdateVerifier);
@@ -135,11 +132,7 @@ contract Verifier is IVerifier, Ownable {
         _validateNewTransactionVerifier(txvInfo);
 
         _transactionVerifiers[txvInfo.id] = txvInfo;
-        emit TransactionVerifierAdded(
-            txvInfo.id,
-            txvInfo.selector,
-            txvInfo.addr
-        );
+        emit TransactionVerifierAdded(txvInfo.id, txvInfo.addr);
     }
 
     /// @notice Adds multiple transaction verifiers in batch
@@ -154,11 +147,7 @@ contract Verifier is IVerifier, Ownable {
             _validateNewTransactionVerifier(txvInfos[i]);
 
             _transactionVerifiers[txvInfos[i].id] = txvInfos[i];
-            emit TransactionVerifierAdded(
-                txvInfos[i].id,
-                txvInfos[i].selector,
-                txvInfos[i].addr
-            );
+            emit TransactionVerifierAdded(txvInfos[i].id, txvInfos[i].addr);
 
             unchecked {
                 ++i;
@@ -197,25 +186,9 @@ contract Verifier is IVerifier, Ownable {
         _transactionVerifiers[txvInfo.id] = txvInfo;
         emit TransactionVerifierUpdated(
             txvInfo.id,
-            previous.selector,
             previous.addr,
-            txvInfo.selector,
             txvInfo.addr
         );
-    }
-
-    /// @notice Removes a transaction verifier
-    /// @dev Only callable by verifier manager
-    /// @param vId The verifier ID to remove
-    function removeTransactionVerifier(
-        uint16 vId
-    ) external onlyVerifierManager {
-        if (_transactionVerifiers[vId].addr == address(0)) {
-            revert VerifierNotFound(vId);
-        }
-
-        delete _transactionVerifiers[vId];
-        emit TransactionVerifierRemoved(vId);
     }
 
     /// @dev The snarkjs verifiers take only statically-sized parameters, so the ABI
@@ -280,7 +253,7 @@ contract Verifier is IVerifier, Ownable {
         _assertVParamsLength(vParams.length, TRANSACTION_PUBLIC_INPUTS);
 
         (bool success, bytes memory result) = vInfo.addr.staticcall(
-            bytes.concat(vInfo.selector, vParams)
+            bytes.concat(TRANSACTION_VERIFY_PROOF_SELECTOR, vParams)
         );
 
         if (!success) {

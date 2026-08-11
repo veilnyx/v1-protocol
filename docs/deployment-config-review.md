@@ -43,7 +43,6 @@ fee-conversion feed (ETH/asset) have different update cadences.
 |---|---|---|
 | `withdrawFeeBps` | **0** | `PoolConfigParams.withdrawFeeBps`. Cap `MAX_WITHDRAW_FEE_BPS = 2500` (25%) |
 | `protocolVersion` | **1** | `setVersion()` post-init |
-| `commitmentTreeQueueSize` | **10** | `initialize()`; must equal `TREE_UPDATE_QUEUE_SIZE = 10` or init reverts |
 | `commitmentTreeDepth` | 25 | **unused by this script** — mirrors `COMMITMENT_TREE_DEPTH` |
 | `addressTreeDepth` | 20 | **unused by this script** — mirrors `MERKLE_TREE_DEPTH` |
 | `hardwareWalletOwner` | `0xa285717BfD608468566bfBda742b56b1177494f7` | Final owner of PoolProxy, Verifier, AdaptorHandler, Gateway, Paymaster — **and** the Verifier's `verifierManager` |

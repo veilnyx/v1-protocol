@@ -1,7 +1,5 @@
-import path from "path";
-import { readFileSync } from "fs";
 import hre from "hardhat";
-import { toFunctionSelector } from "viem";
+import { DeployContractConfig } from "@nomicfoundation/hardhat-viem/types";
 
 /**
  * Deploys the Verifier and its sub-verifiers. The Verifier's constructor makes the deployer
@@ -14,17 +12,9 @@ import { toFunctionSelector } from "viem";
  * Etherscan or auditable afterwards.
  */
 export const deployVerifier = async (
-    deployConfig,
+    deployConfig: DeployContractConfig,
     verifierManager: `0x${string}`
 ) => {
-    const verifier21Abi = hre.artifacts.readArtifactSync("VerifierTransact21").abi;
-    const verifier22Abi = hre.artifacts.readArtifactSync("VerifierTransact22").abi;
-    const verifier23Abi = hre.artifacts.readArtifactSync("VerifierTransact23").abi;
-    const verifier42Abi = hre.artifacts.readArtifactSync("VerifierTransact42").abi;
-    const verifier44Abi = hre.artifacts.readArtifactSync("VerifierTransact44").abi;
-    const verifier82Abi = hre.artifacts.readArtifactSync("VerifierTransact82").abi;
-    const verifier84Abi = hre.artifacts.readArtifactSync("VerifierTransact84").abi;
-
     const verifierRegister = await hre.viem.deployContract("VerifierRegister", [], deployConfig);
     console.log("VerifierRegister deployed:", verifierRegister.address);
 
@@ -63,37 +53,30 @@ export const deployVerifier = async (
     const txVerifierInfos = [
         {
             id: 21,
-            selector: toFunctionSelector(verifier21Abi[0]),
             addr: verifierTransact21.address
         },
         {
             id: 22,
-            selector: toFunctionSelector(verifier22Abi[0]),
             addr: verifierTransact22.address
         },
         {
             id: 23,
-            selector: toFunctionSelector(verifier23Abi[0]),
             addr: verifierTransact23.address
         },
         {
             id: 42,
-            selector: toFunctionSelector(verifier42Abi[0]),
             addr: verifierTransact42.address
         },
         {
             id: 44,
-            selector: toFunctionSelector(verifier44Abi[0]),
             addr: verifierTransact44.address
         },
         {
             id: 82,
-            selector: toFunctionSelector(verifier82Abi[0]),
             addr: verifierTransact82.address
         },
         {
             id: 84,
-            selector: toFunctionSelector(verifier84Abi[0]),
             addr: verifierTransact84.address
         }
     ];
