@@ -186,3 +186,80 @@ Two environment issues found alongside it, neither fixed:
   Every other SDK package has the marker.
 - `RPC_ETHEREUM_SEPOLIA` in `.env` is origin whitelisted and returns 403 from a CLI, which blocks
   fixture generation.
+
+---
+
+## 9. HyperCore integration: feasibility notes
+
+Forward looking. Nothing in this section is built. It records what was verified on chain and what
+the open questions are, so the next person does not have to rediscover it.
+
+The goal being explored is private perp positions: the position itself is public and openly the
+pool's, while the link between a user and their position stays private, carried by an encrypted
+note. Isolated margin is wanted so one user's liquidation cannot affect another's.
+
+### Verified present on chain 998
+
+- **CoreWriter** at `0x3333333333333333333333333333333333333333`, 544 bytes of code.
+- **Read precompiles** in the `0x800` range respond. `0x806` and `0x807` (oracle prices) return
+  values for a single word input. `0x800`, `0x801` and `0x802` reject that input, which is expected:
+  position and balance reads take structured arguments such as `(user, perp)`, not a bare index.
+
+That contracts can read HyperCore positions on chain matters for settlement. A close can be verified
+against real Core state rather than trusting off chain data.
+
+### What fits the existing design
+
+- **`cloid` is a 128 bit field the caller controls.** Action ID 1 (limit order) takes
+  `cloid` as `uint128`, where 0 means none. That is a natural place for a commitment, so an order
+  can be bound to a note without revealing its owner.
+- **Note metadata needs no circuit change**, provided it is only client side bookkeeping. The
+  existing `encryptedNoteData[n][4]` payload has room, and the commitment stays
+  `Poseidon(assetId, owner, value)`. A circuit change is only required if the metadata must be
+  constrained, for example proving in circuit that the closer owns the position.
+- **Positions belong to the calling contract's Core account.** CoreWriter sends actions on behalf of
+  the caller, which under `delegatecall` is the AdaptorHandler. So a position is publicly the pool's,
+  which is the intended privacy model.
+
+### Three obstacles, in order of difficulty
+
+1. **Orders are asynchronous; the adaptor interface is not.**
+   `handleAssets(AssetAmount[], bytes) returns (AssetAmount[])` is synchronous and returns token
+   amounts, and `_receivePubAssets` then pulls those tokens and mints commitments. A CoreWriter order
+   emits a log, is deliberately delayed a few seconds to remove any latency advantage over the L1
+   mempool, and fills later at a price not known when the call returns. Nothing comes back in the
+   same transaction. This needs a two phase adaptor, open then settle on close, which touches
+   `ShieldedTransactionLogic` rather than only adding a file under `src/adaptors/`.
+
+2. **One Core account holds one position per asset.** Isolated versus cross margin controls margin
+   allocation, not multiplicity. Two users going long the same asset through one account net into a
+   single position. Sub accounts appear in action 13 (`Send asset`, which takes a `subAccount`) and
+   action 16 (`Set abstraction`), but the documentation consulted does not say whether a contract can
+   create and control them.
+
+3. **Value must cross from HyperEVM to HyperCore.** The pool holds ERC20s on the EVM while margin
+   lives on Core. This bridge is untouched, and is the piece behind the original "HyperEVM to
+   HyperCore" difficulty.
+
+### The question that decides the architecture
+
+**Can a contract create and control HyperCore sub accounts?**
+
+- **If yes:** one sub account per position gives genuine isolation, one user's liquidation cannot
+  touch another's, and the pool remains the visible funder so user identity stays hidden.
+- **If no:** positions must be pooled, and notes represent pro rata shares of a single aggregate
+  position per asset and direction. This is the same shape as the Morpho vault share note that
+  already works. It gives a stronger anonymity set because users genuinely share a position, but
+  users cannot choose independent size or entry. It is a shielded perp vault rather than private
+  individual positions.
+
+Resolve that before designing anything else. A related question worth settling at the same time is
+liquidation: if a pooled position is liquidated, the behaviour of the notes claiming it is a design
+decision, not an implementation detail.
+
+### One thing not to assume
+
+Encrypting order metadata hides the link between user and position. It does not hide the position.
+HyperCore positions are public, including size, direction, entry and liquidation price. At low
+volume a position is a near unique fingerprint, so correlation between pool activity and position
+opens is the residual leak, and it is not addressed by anything in the note.
