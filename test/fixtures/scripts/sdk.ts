@@ -80,6 +80,10 @@ export const getSDKInstance = async () => {
       addressTreeSource,
       notesSource,
       contractSource: {} as any,
+      // Required since the SDK began rejecting partial service sets in
+      // getConfigWithDefaults. Fixture generation never resolves an address, so a
+      // stub is sufficient, matching contractSource above.
+      addressResolver: {} as any,
     }
   }
 
