@@ -166,7 +166,13 @@ contract HyperEvmE2E is PoolTest {
         _processCommitmentTreeQueue();
         console2.log("commitment tree flushed");
 
-        pool.transact(_loadShieldedTransaction("withdraw_100_weth_without_fee"));
+        // Pair the withdraw with a fixture from the same post-ceremony regeneration as
+        // deposit_pre_tx (commit 8a65d25). Fixtures are generated against the tree state
+        // a specific deposit produces, so mixing generations yields a commitment tree
+        // root the Pool has never seen and reverts with UnknownCommitmentTreeRoot.
+        // withdraw_100_weth_without_fee predates the ceremony and fails for that reason,
+        // as do 17 other fixtures still referenced by the suite.
+        pool.transact(_loadShieldedTransaction("withdraw_10_weth_with_weth_fee"));
         uint256 aft = MockERC20(asset1.assetAddress).balanceOf(address(pool));
         console2.log("WITHDRAW ok, pool asset1:", aft);
         console2.log("net pool delta:", aft - before);
