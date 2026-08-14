@@ -111,8 +111,11 @@ export const getSDKInstance = async () => {
   // zkfi.getPaymasterFee = async () => BigInt(parseEther("0.002"));
 
   // bypassing fee calculation (in selected asset) call to Paymaster for testing purpose
-  zkfi.getUserOpFee = async (options: TransactionOptions, feeAssetId: number, client: any): Promise<bigint> => {
-    const requiredPrefundInETH = options.requiredPrefundEth;
+  zkfi.getUserOpFeeInFeeAsset = async (options: TransactionOptions, feeAssetId: number, client: any): Promise<bigint> => {
+    const userOpFeeQuoteEth = options.userOpFeeQuoteEth ?? options.requiredPrefundEth;
+    if (userOpFeeQuoteEth === undefined) {
+      throw new Error("fixture::sdk.ts::Missing UserOp fee quote");
+    }
     const ethInUSD: bigint = parseUnits("4000", 6);
 
     // assuming the fee asset is USDC, if not ETH (token1, testnetETH)
@@ -124,9 +127,9 @@ export const getSDKInstance = async () => {
     // testnetUSDC = 65541
     // any other tokens required for testing adaptors from 65542 and onwards..
     if (feeAssetId == 65538 || feeAssetId == 65541) {
-      return ((requiredPrefundInETH * ethInUSD) / parseEther("1"));
+      return (userOpFeeQuoteEth * ethInUSD) / parseEther("1");
     } else if (feeAssetId == 65537 || feeAssetId == 65540) {
-      return requiredPrefundInETH;
+      return userOpFeeQuoteEth;
     } else {
       throw new Error(`fixture::sdk.ts::Unsupported fee asset id: ${feeAssetId} by the test setup. Please use USDC (65538 or 65541) or ETH (65537 or 65540) as fee asset in the test cases.`);
     }

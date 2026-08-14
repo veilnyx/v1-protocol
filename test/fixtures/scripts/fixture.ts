@@ -20,8 +20,6 @@ import {
 import {
   UserOperation,
   getPackedUserOperation,
-  getRequiredPrefund,
-  ENTRYPOINT_ADDRESS_V07,
 } from "permissionless";
 import { ShieldedAccount } from "@veilnyx-sdk/account";
 import { Point, poseidonDecrypt, PointType } from "@veilnyx-sdk/babyjubjub";
@@ -30,7 +28,7 @@ import {
   TransactionOptions,
   TransactionRequest,
 } from "@veilnyx-sdk/shared-types";
-import { Core } from "@veilnyx-sdk/core";
+import { Core, quoteUserOpGasCost } from "@veilnyx-sdk/core";
 import { ZTransaction } from "@veilnyx-sdk/zk-prover";
 import { Note, SIZE_ENCRYPTED_DECRYPTION_KEY, SIZE_FULLY_ENCRYPTED_NOTE_DATA } from "@veilnyx-sdk/transaction";
 import config from "../config.json";
@@ -143,7 +141,7 @@ export const generateTestTransaction = async (
     viaBundler: req.viaBundler,
     paymaster: req.paymaster,
     revokerId: req.revokerId,
-    requiredPrefundEth: parseEther("0.00025")
+    userOpFeeQuoteEth: parseEther("0.00025")
   };
   const tx = await sdk.createTransaction(req, opts);
   // console.log("TX: ", tx);
@@ -178,7 +176,7 @@ export const generateTestTransactionWithOutsourcedProofVerification = async (
     viaBundler: req.viaBundler,
     paymaster: req.paymaster,
     revokerId: req.revokerId,
-    requiredPrefundEth: parseEther("0.00025")
+    userOpFeeQuoteEth: parseEther("0.00025")
   };
   const tx = await sdk.createTransaction(req, opts);
   // console.log("TX: ", tx);
@@ -380,7 +378,27 @@ export async function mockNotesWithOffset(depositName: string, sdk: Core, leafIn
   console.log("commit tree root after mockNotesWithOffset", sdk.commitmentTreeSource.root);
 }
 
-export const generatePackedUserOps = async (name: string, req: TransactionRequest & TransactionOptions, sdk: Core, isPreVerified: boolean, nebraClient) => {
+export const generatePackedUserOps = async (name: string, req: TransactionRequest & TransactionOptions, sdk: Core, isPreVerified: boolean, nebraClient: any) => {
+  return generatePackedUserOpsWithFeeQuote(name, req, sdk, isPreVerified, nebraClient, {
+    baseFeePerGas: BigInt(0),
+  });
+}
+
+type UserOpFeeQuoteOverrides = {
+  maxFeePerGas?: bigint;
+  maxPriorityFeePerGas?: bigint;
+  baseFeePerGas: bigint;
+  headroomBps?: number;
+};
+
+export const generatePackedUserOpsWithFeeQuote = async (
+  name: string,
+  req: TransactionRequest & TransactionOptions,
+  sdk: Core,
+  isPreVerified: boolean,
+  nebraClient: any,
+  feeQuote: UserOpFeeQuoteOverrides,
+) => {
 
   const nonce = concatHex([
     padHex(randomHex(24), { size: 24 }),
@@ -397,8 +415,8 @@ export const generatePackedUserOps = async (name: string, req: TransactionReques
     callGasLimit: USER_OP_CALL_GAS_LIMIT, // 30 M gas is block gas limit = 30_000_000 gas
     verificationGasLimit: USER_OP_VERIFICATION_GAS_LIMIT,
     preVerificationGas: USER_OP_PRE_VERIFICATION_GAS,
-    maxFeePerGas: USER_OP_MAX_FEE_PER_GAS,
-    maxPriorityFeePerGas: USER_OP_MAX_FEE_PER_GAS,
+    maxFeePerGas: feeQuote.maxFeePerGas ?? USER_OP_MAX_FEE_PER_GAS,
+    maxPriorityFeePerGas: feeQuote.maxPriorityFeePerGas ?? USER_OP_MAX_PRIORITY_FEE_PER_GAS,
     paymaster: PAYMASTER_ADDR_FIXTURE as `0x${string}`, // make sure this matches the Paymaster address from solidity test setup
     paymasterVerificationGasLimit: USER_OP_PAYMASTER_VERIFICATION_GAS,
     paymasterPostOpGasLimit: BigInt(5),
@@ -406,9 +424,19 @@ export const generatePackedUserOps = async (name: string, req: TransactionReques
     signature: "0x",
   };
 
-  const requiredPrefundEth = getRequiredPrefund({
-    userOperation: userOp,
-    entryPoint: ENTRYPOINT_ADDRESS_V07
+  const requiredGas =
+    userOp.callGasLimit +
+    userOp.verificationGasLimit +
+    userOp.preVerificationGas +
+    (userOp.paymasterVerificationGasLimit ?? BigInt(0)) +
+    (userOp.paymasterPostOpGasLimit ?? BigInt(0));
+  const maxCost = requiredGas * userOp.maxFeePerGas;
+  const userOpFeeQuoteEth = quoteUserOpGasCost({
+    maxCost,
+    maxFeePerGas: userOp.maxFeePerGas,
+    maxPriorityFeePerGas: userOp.maxPriorityFeePerGas,
+    baseFeePerGas: feeQuote.baseFeePerGas,
+    headroomBps: feeQuote.headroomBps,
   });
 
   // Generating ztx (preparing userop calldata)
@@ -416,7 +444,7 @@ export const generatePackedUserOps = async (name: string, req: TransactionReques
     viaBundler: req.viaBundler,
     paymaster: req.paymaster,
     revokerId: req.revokerId,
-    requiredPrefundEth: requiredPrefundEth
+    userOpFeeQuoteEth
   };
 
   const tx = await sdk.createTransaction(req, opts);
@@ -434,7 +462,7 @@ export const generatePackedUserOps = async (name: string, req: TransactionReques
   // writeFileSync(`${dirFixtureData}/${name}_preVerificationEncodedStruct.txt`, encodedPreVerification);
 
   // Generating & Updating calldata in UserOp
-  const gatewayAbi = JSON.parse(readFileSync("artifacts/Gateway.sol/Gateway.json", "utf-8")).abi;
+  const gatewayAbi = JSON.parse(readFileSync("artifacts/src/core/Gateway.sol/Gateway.json", "utf-8")).abi;
   userOp.callData = encodeFunctionData({
     abi: gatewayAbi,
     functionName: "handleUserOp",

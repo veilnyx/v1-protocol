@@ -15,17 +15,27 @@ const {
 
 // Spends notes from `deposit_2_testnet_weth`. Consumed by PoolDepositWithdraw.
 export const reqs = {
-  withdraw_10_weth_with_weth_fee: {
+  withdraw_100_weth_without_fee: {
+    type: TransactionType.WITHDRAW,
+    assetIds: [weth],
+    values: [parseEther("100")],
+    feeAssetId: 0,
+    to: senderPubAddress,
+    viaBundler: false,
+    paymaster: zeroAddress,
+    revokerId: 0,
+  }
+  /**
+  withdraw_10_weth_with_usdc_fee: {
     type: TransactionType.WITHDRAW,
     assetIds: [weth],
     values: [parseEther("10")],
-    feeAssetId: weth,
+    feeAssetId: usdc,
     to: senderPubAddress,
     viaBundler: true,
     paymaster: PAYMASTER_ADDR_FIXTURE as `0x${string}`,
-    revokerId: 0
-  }
-  /**
+    revokerId: 0,
+  },
   withdraw_1_testnet_weth_without_fee: {
     type: TransactionType.WITHDRAW,
     assetIds: [testnetWeth],
@@ -38,33 +48,21 @@ export const reqs = {
   }
 };
 
-// Spends notes from `deposit_pre_tx` (10000 WETH + 10000 USDC), which is what
-// `_makePreDeposit()` puts on-chain. Consumed by PoolWithdraw, PoolGuardrails,
-// TvlGuard and Paymaster.
-export const reqsFromPreTxDeposit = {
-  /**
-  withdraw_100_weth_without_fee: {
-    type: TransactionType.WITHDRAW,
-    assetIds: [weth],
-    values: [parseEther("100")],
-    feeAssetId: 0,
-    to: senderPubAddress,
-    viaBundler: false,
-    paymaster: zeroAddress,
-    revokerId: 0,
-  },
-  */
-  /**,
-  withdraw_10_weth_with_usdc_fee: {
+  withdraw_10_weth_with_weth_fee: {
     type: TransactionType.WITHDRAW,
     assetIds: [weth],
     values: [parseEther("10")],
-    feeAssetId: usdc,
+    feeAssetId: weth,
     to: senderPubAddress,
     viaBundler: true,
     paymaster: PAYMASTER_ADDR_FIXTURE as `0x${string}`,
-    revokerId: 0,
-  },
+    revokerId: 0
+  }
+// Spends notes from `deposit_pre_tx` (10000 WETH + 10000 USDC), which is what
+// `_makePreDeposit()` puts on-chain. Consumed by PoolWithdraw, PoolGuardrails,
+// TvlGuard and Paymaster.
+export const reqsFromPreTxDeposit = {,
+  */
   /**
   withdraw_500_weth_without_fee: {
     type: TransactionType.WITHDRAW,
