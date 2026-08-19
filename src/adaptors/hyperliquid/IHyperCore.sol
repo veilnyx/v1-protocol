@@ -14,6 +14,7 @@ library HyperCore {
     address internal constant SPOT_BALANCE = 0x0000000000000000000000000000000000000801;
     address internal constant WITHDRAWABLE = 0x0000000000000000000000000000000000000803;
     address internal constant MARK_PX = 0x0000000000000000000000000000000000000806;
+    address internal constant ORACLE_PX = 0x0000000000000000000000000000000000000807;
     address internal constant SPOT_PX = 0x0000000000000000000000000000000000000808;
     address internal constant L1_BLOCK = 0x0000000000000000000000000000000000000809;
     address internal constant PERP_ASSET_INFO = 0x000000000000000000000000000000000000080a;
@@ -122,6 +123,17 @@ library HyperCore {
         (bool ok, bytes memory out) = BBO.staticcall(abi.encode(perp));
         if (!ok) revert PrecompileFailed(BBO);
         b = abi.decode(out, (Bbo));
+    }
+
+    /// @notice Externally sourced index price, independent of this venue's book.
+    /// @dev The counterpart to markPx: the mark is derived from the order book and
+    ///      can be pushed, the oracle cannot be pushed by trading here. Live
+    ///      divergence on chain 998 sits around 6-24 bps, so a wider bound
+    ///      separates ordinary basis from manipulation.
+    function oraclePx(uint32 perp) internal view returns (uint64 px) {
+        (bool ok, bytes memory out) = ORACLE_PX.staticcall(abi.encode(perp));
+        if (!ok) revert PrecompileFailed(ORACLE_PX);
+        px = abi.decode(out, (uint64));
     }
 
     function coreUserExists(address user) internal view returns (bool exists) {

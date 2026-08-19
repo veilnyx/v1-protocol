@@ -69,6 +69,9 @@ contract PerpVaultMultiUserTest is Test {
             abi.encode(HyperCore.Position(szi, 0, 0, 10, false))
         );
         vm.mockCall(HyperCore.MARK_PX, abi.encode(PERP), abi.encode(px));
+        // Index oracle, mocked in line with the mark so pricing is allowed.
+        // Tests that need a dislocation override this one call.
+        vm.mockCall(HyperCore.ORACLE_PX, abi.encode(PERP), abi.encode(px));
         // totalAssets() also reads the Core spot balance; this harness keeps all
         // equity in perp, so spot stays flat at zero.
         vm.mockCall(
@@ -355,6 +358,89 @@ contract PerpVaultMultiUserTest is Test {
         assertGt(equity, mm * 3, "band should fire with real headroom over maintenance");
         console2.log("equity at fire :", equity);
         console2.log("maintenance    :", mm);
+    }
+
+    /// @dev The attack the oracle bound exists to stop, priced end to end.
+    ///      NAV derives from accountValue, which HyperCore marks with its OWN mark
+    ///      price, so pushing the mark does not merely mislead a read — it inflates
+    ///      or deflates equity itself. Deposit into a suppressed mark, let it
+    ///      revert, redeem rich.
+    function test_markManipulationCannotMintCheapShares() public {
+        _resetVault(20_000);
+        address honest = _mkUser(700, 1_000_000e6);
+        _deposit(honest, 50_000e6);
+        _rebalance();
+
+        uint256 fairShares = vault.convertToShares(10_000e6);
+
+        // Push the mark 10% below the index while leaving the oracle alone, and
+        // mark the position down with it, exactly as HyperCore would.
+        uint64 pushed = uint64((uint256(px) * 90) / 100);
+        int256 d = int256(uint256(pushed)) - int256(uint256(px));
+        coreEquity8 += int64(int256(szi) * d);
+        px = pushed;
+        _sync();
+        vm.mockCall(HyperCore.ORACLE_PX, abi.encode(PERP), abi.encode(uint64(1_000_000)));
+
+        // Suppressed NAV would hand the attacker materially more shares.
+        assertGt(
+            vault.convertToShares(10_000e6), (fairShares * 110) / 100,
+            "a pushed mark really does cheapen shares"
+        );
+
+        address attacker = _mkUser(701, 1_000_000e6);
+        vm.prank(attacker);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                PerpVault.PriceDislocated.selector, pushed, uint64(1_000_000),
+                vault.markOracleDeviationBps()
+            )
+        );
+        vault.deposit(10_000e6, attacker);
+    }
+
+    /// @dev Exiting at an inflated mark takes value from whoever stays, so the
+    ///      same guard has to apply on the way out.
+    function test_markManipulationCannotRedeemRich() public {
+        _resetVault(20_000);
+        address honest = _mkUser(710, 1_000_000e6);
+        uint256 shares = _deposit(honest, 50_000e6);
+        _rebalance();
+
+        uint64 pushed = uint64((uint256(px) * 110) / 100);
+        int256 d = int256(uint256(pushed)) - int256(uint256(px));
+        coreEquity8 += int64(int256(szi) * d);
+        px = pushed;
+        _sync();
+        vm.mockCall(HyperCore.ORACLE_PX, abi.encode(PERP), abi.encode(uint64(1_000_000)));
+
+        vm.prank(honest);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                PerpVault.PriceDislocated.selector, pushed, uint64(1_000_000),
+                vault.markOracleDeviationBps()
+            )
+        );
+        vault.redeem(shares / 2, honest);
+    }
+
+    /// @dev Ordinary basis must not brick the vault. Real divergence on chain 998
+    ///      runs 6-24 bps against a 200 bps bound.
+    function test_ordinaryBasisStillAllowsDeposits() public {
+        _resetVault(20_000);
+        address a = _mkUser(720, 1_000_000e6);
+        _deposit(a, 50_000e6);
+        _rebalance();
+
+        // 25 bps apart: wider than anything observed live, still well inside.
+        vm.mockCall(
+            HyperCore.ORACLE_PX, abi.encode(PERP), abi.encode(uint64((uint256(px) * 10_025) / 10_000))
+        );
+        assertLt(vault.markOracleDeviationBps(), 200, "normal basis is inside the bound");
+
+        address b = _mkUser(721, 1_000_000e6);
+        vm.prank(b);
+        vault.deposit(1_000e6, b); // must not revert
     }
 
     /// @dev A deposit valued immediately afterwards must never be worth more than

@@ -8,6 +8,7 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {HyperCore} from "./IHyperCore.sol";
+import {ClaimToken} from "./ClaimToken.sol";
 
 /// @title PerpVault - a single fixed-strategy leveraged perp vault on HyperCore
 /// @notice One contract per strategy (e.g. BTC-LONG-2x). Each instance is its own
@@ -103,6 +104,16 @@ contract PerpVault is ERC20, Ownable, ReentrancyGuard {
     ///         holders. Excess accrues to the vault, i.e. to those holders.
     uint256 public entryFeeBps = 10;
 
+    /// @notice Largest tolerated gap between the venue mark and the index oracle,
+    ///         in bps, before the vault refuses to price.
+    /// @dev NAV derives from accountValue, which HyperCore marks using its OWN
+    ///      mark price. So a pushed mark does not merely mislead a price read, it
+    ///      corrupts equity itself — deposit cheap, let the mark revert, redeem
+    ///      rich. Validating the mark against the independent index price is what
+    ///      makes that unprofitable, and it needs no on-chain TWAP because
+    ///      HyperCore already publishes both. Observed divergence is 6-24 bps.
+    uint256 public maxOracleDeviationBps = 200;
+
     /// @notice How far past the touch a rebalance order may be priced, in bps.
     ///         Bounds what a thin or fast-moving book can cost the vault.
     uint256 public maxSlippageBps = 50;
@@ -118,6 +129,18 @@ contract PerpVault is ERC20, Ownable, ReentrancyGuard {
     ///      ends up at twice the intended exposure.
     uint256 public rebalanceCooldown = 30;
     uint256 public lastRebalanceAt;
+
+    /// @notice Receipt handed out when a redemption cannot be paid immediately.
+    ClaimToken public immutable claimToken;
+
+    /// @notice Asset owed to queued redeemers, in asset units.
+    uint256 public claimsOutstanding;
+
+    /// @notice Asset set aside to pay them, in asset units.
+    /// @dev Held apart from the buffer so that unwind proceeds earmarked for
+    ///      exiting holders are not silently recycled into the position, and so
+    ///      NAV does not count money that is no longer the remaining holders'.
+    uint256 public claimPot;
 
     /// @notice Asset already sent to the Core system address but not yet credited.
     /// @dev The bridge is not atomic: the ERC20 leaves on this block, Core credits
@@ -139,6 +162,10 @@ contract PerpVault is ERC20, Ownable, ReentrancyGuard {
     event OrderPlaced(bool isBuy, uint64 size, uint64 limitPx, uint128 cloid);
     event DeRisked(uint256 effectiveLeverageBps, uint256 triggerBps, uint256 newLeverageBps);
     event DistressDetected(uint256 equity, uint256 maintenanceMargin);
+    event RebalanceSkipped(uint256 deviationBps);
+    event RedemptionQueued(address indexed receiver, uint256 amount);
+    event ClaimsFunded(uint256 funded, uint256 stillOwed);
+    event Claimed(address indexed receiver, uint256 claimAmount, uint256 paid);
     event BridgeStarted(uint256 amount, uint256 spotBefore);
     event BridgeSettled(uint256 credited, uint256 stillInFlight);
 
@@ -149,6 +176,7 @@ contract PerpVault is ERC20, Ownable, ReentrancyGuard {
     error BadParameter();
     error RebalanceTooSoon(uint256 nextAllowedAt);
     error VaultDistressed();
+    error PriceDislocated(uint64 markPx, uint64 oraclePx, uint256 deviationBps);
 
     modifier onlyKeeper() {
         if (msg.sender != keeper && msg.sender != owner()) revert NotKeeper();
@@ -175,6 +203,9 @@ contract PerpVault is ERC20, Ownable, ReentrancyGuard {
         isLong = isLong_;
         targetLeverageBps = targetLeverageBps_;
         keeper = owner_;
+        claimToken = new ClaimToken(
+            string.concat(name_, " Claim"), string.concat(symbol_, "-CLAIM"), _assetDecimals
+        );
     }
 
     // ---------------------------------------------------------------- views
@@ -220,7 +251,12 @@ contract PerpVault is ERC20, Ownable, ReentrancyGuard {
     ///      perp and EVM — as this did — makes NAV collapse and recover on every
     ///      bridge and every spot-to-perp move, which is a free round trip.
     function totalAssets() public view returns (uint256) {
-        return coreEquity() + idleAssets() + coreSpot() + pendingBridge();
+        uint256 gross = coreEquity() + idleAssets() + coreSpot() + pendingBridge();
+        // Subtract everything OWED to exiters, not merely what has been set aside
+        // for them. A redemption stops being the remaining holders' equity the
+        // moment it is queued, which is before any pot exists — netting only the
+        // funded part would let the first exit inflate NAV for whoever stays.
+        return gross > claimsOutstanding ? gross - claimsOutstanding : 0;
     }
 
     /// @notice Core spot balance of the vault's asset, in asset decimals.
@@ -248,6 +284,26 @@ contract PerpVault is ERC20, Ownable, ReentrancyGuard {
     ///      `balanceOf`, so anyone can donate USDC to the vault, and without the
     ///      offset a 1-wei first deposit followed by a large donation would round
     ///      every subsequent depositor's shares to zero.
+    /// @notice Deviation between the venue mark and the index oracle, in bps.
+    function markOracleDeviationBps() public view returns (uint256) {
+        uint64 mark = HyperCore.markPx(perpIndex);
+        uint64 oracle = HyperCore.oraclePx(perpIndex);
+        if (oracle == 0 || mark == 0) return type(uint256).max;
+        uint256 diff = mark > oracle ? mark - oracle : oracle - mark;
+        return (diff * BPS) / oracle;
+    }
+
+    /// @dev Fails closed. A market with no oracle, or one dislocated beyond the
+    ///      bound, must not be priced at all rather than priced optimistically.
+    function _assertPriceSane() internal view {
+        uint256 dev = markOracleDeviationBps();
+        if (dev > maxOracleDeviationBps) {
+            revert PriceDislocated(
+                HyperCore.markPx(perpIndex), HyperCore.oraclePx(perpIndex), dev
+            );
+        }
+    }
+
     /// @notice True when the open position is at or past its maintenance
     ///         requirement, i.e. liquidatable or already being liquidated.
     function isDistressed() public view returns (bool) {
@@ -308,6 +364,9 @@ contract PerpVault is ERC20, Ownable, ReentrancyGuard {
         // whether or not anyone has flagged it yet.
         if (depositsFrozen) revert DepositsAreFrozen();
         if (isDistressed()) revert VaultDistressed();
+        // Only meaningful while a position exists; with none, equity is cash and
+        // no mark is involved in valuing it.
+        if (notional() > 0) _assertPriceSane();
 
         uint256 navUsed = pricePerShare();
 
@@ -327,17 +386,35 @@ contract PerpVault is ERC20, Ownable, ReentrancyGuard {
     /// @dev Stage 1 is buffer-only: if the buffer cannot cover the payout this
     ///      reverts rather than silently queueing. The CLAIM-token queue that
     ///      handles the overflow case is deliberately not implemented yet.
-    function redeem(uint256 shares, address receiver) external nonReentrant returns (uint256 assets) {
+    function redeem(uint256 shares, address receiver)
+        external
+        nonReentrant
+        returns (uint256 assets)
+    {
         if (shares == 0) revert ZeroAmount();
+
+        // Redemption is equally price-sensitive: exiting at an inflated NAV takes
+        // value from whoever stays.
+        if (notional() > 0) _assertPriceSane();
 
         uint256 navUsed = pricePerShare();
         assets = convertToAssets(shares);
 
-        uint256 available = idleAssets();
-        if (assets > available) revert InsufficientIdleLiquidity(assets, available);
-
         _burn(msg.sender, shares);
-        asset.safeTransfer(receiver, assets);
+
+        // Anything the buffer covers settles immediately; the rest is queued.
+        // Splitting rather than all-or-nothing means a large exit does not block
+        // on the whole amount being liquid.
+        uint256 free = idleAssets() > claimPot ? idleAssets() - claimPot : 0;
+        uint256 paidNow = assets > free ? free : assets;
+        uint256 queued = assets - paidNow;
+
+        if (paidNow > 0) asset.safeTransfer(receiver, paidNow);
+        if (queued > 0) {
+            claimsOutstanding += queued;
+            claimToken.mint(receiver, queued);
+            emit RedemptionQueued(receiver, queued);
+        }
 
         emit Redeemed(msg.sender, shares, assets, navUsed);
     }
@@ -362,6 +439,36 @@ contract PerpVault is ERC20, Ownable, ReentrancyGuard {
         uint256 down = (p / factor) * factor;
         if (!roundUp || down == p) return uint64(down);
         return uint64(down + factor);
+    }
+
+    /// @notice Move idle asset into the pot that pays queued redeemers.
+    /// @dev Permissionless: leaving exiters unpaid while the asset sits idle is
+    ///      worse than letting anyone advance it.
+    function fundClaims() public returns (uint256 funded) {
+        uint256 shortfall = claimsOutstanding > claimPot ? claimsOutstanding - claimPot : 0;
+        if (shortfall == 0) return 0;
+        uint256 free = idleAssets() > claimPot ? idleAssets() - claimPot : 0;
+        funded = shortfall > free ? free : shortfall;
+        if (funded == 0) return 0;
+        claimPot += funded;
+        emit ClaimsFunded(funded, claimsOutstanding - claimPot);
+    }
+
+    /// @notice Redeem a claim receipt for asset, pro rata against the pot.
+    /// @dev Pro rata rather than first-come-first-served, so a partially funded
+    ///      pot does not pay early claimants in full and leave later ones with
+    ///      nothing. Claims are fungible for exactly this reason.
+    function claim(uint256 amount, address receiver) external nonReentrant returns (uint256 paid) {
+        if (amount == 0) revert ZeroAmount();
+        fundClaims();
+        if (claimsOutstanding == 0) revert ZeroAmount();
+
+        paid = (amount * claimPot) / claimsOutstanding;
+        claimToken.burn(msg.sender, amount);
+        claimsOutstanding -= amount;
+        claimPot -= paid;
+        if (paid > 0) asset.safeTransfer(receiver, paid);
+        emit Claimed(receiver, amount, paid);
     }
 
     // --------------------------------------------------------------- keeper
@@ -418,6 +525,14 @@ contract PerpVault is ERC20, Ownable, ReentrancyGuard {
             // frequently does not fill because the mark can sit inside or outside
             // the spread — a buy has to cross the ask. A non-filling order is
             // silent: it reverts nothing and simply leaves the vault off target.
+            // Do not trade into a dislocated book. Unlike deposit/redeem this
+            // returns rather than reverting, so the state updates above (cooldown,
+            // distress latch) still stand and the keeper can retry.
+            if (markOracleDeviationBps() > maxOracleDeviationBps) {
+                emit RebalanceSkipped(markOracleDeviationBps());
+                return sizeDelta;
+            }
+
             HyperCore.Bbo memory book = HyperCore.bbo(perpIndex);
             uint64 ref = buy ? book.ask : book.bid;
             if (ref == 0) ref = px; // empty book: fall back rather than send a zero price
@@ -534,6 +649,11 @@ contract PerpVault is ERC20, Ownable, ReentrancyGuard {
     function setEntryFeeBps(uint256 bps) external onlyOwner {
         if (bps > 500) revert BadParameter();
         entryFeeBps = bps;
+    }
+
+    function setMaxOracleDeviationBps(uint256 bps) external onlyOwner {
+        if (bps == 0 || bps > 2_000) revert BadParameter();
+        maxOracleDeviationBps = bps;
     }
 
     function setMaxSlippageBps(uint256 bps) external onlyOwner {

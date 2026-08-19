@@ -66,6 +66,9 @@ contract PerpVaultTest is Test {
             HyperCore.POSITION, abi.encode(address(vault), PERP), abi.encode(HyperCore.Position(szi, 0, 0, 10, false))
         );
         vm.mockCall(HyperCore.MARK_PX, abi.encode(PERP), abi.encode(markPx));
+        // Index oracle, mocked in line with the mark so pricing is allowed.
+        // Tests that need a dislocation override this one call.
+        vm.mockCall(HyperCore.ORACLE_PX, abi.encode(PERP), abi.encode(markPx));
         vm.mockCall(
             HyperCore.SPOT_BALANCE,
             abi.encode(address(vault), TOKEN_INDEX),
@@ -197,19 +200,86 @@ contract PerpVaultTest is Test {
         assertEq(vault.balanceOf(alice), shares / 2);
     }
 
-    /// @dev Stage 1 is buffer-only. The CLAIM queue for the overflow case is not
-    ///      built yet, so this must fail loudly rather than appear to succeed.
-    function test_redeemRevertsWhenBufferInsufficient() public {
+    /// @dev A redemption larger than the buffer no longer reverts. It pays what is
+    ///      liquid and queues the rest as a transferable claim, so a large exit does
+    ///      not block on the whole amount being available at once.
+    function test_redeemPaysWhatIsLiquidAndQueuesTheRest() public {
         vm.prank(alice);
         uint256 shares = vault.deposit(10_000e6, alice);
 
-        // Move most of it to Core, leaving a thin buffer.
-        _moveToCore(9_000e6);
+        _moveToCore(9_000e6); // 1,000 left liquid
         _setCore({equityCoreUnits: 9_000e6, szi: 0, markPx: 1_000_000});
 
+        uint256 before = usdc.balanceOf(alice);
         vm.prank(alice);
-        vm.expectRevert(abi.encodeWithSelector(PerpVault.InsufficientIdleLiquidity.selector, 10_000e6, 1_000e6));
-        vault.redeem(shares, alice);
+        uint256 assets = vault.redeem(shares, alice);
+
+        assertApproxEqAbs(assets, 10_000e6, 1, "full value is owed");
+        assertEq(usdc.balanceOf(alice) - before, 1_000e6, "paid what was liquid");
+        assertApproxEqAbs(
+            vault.claimToken().balanceOf(alice), 9_000e6, 1, "remainder queued as a claim"
+        );
+        assertEq(vault.balanceOf(alice), 0, "shares are gone either way");
+    }
+
+    /// @dev Claims settle pro rata, so a partly funded pot does not pay whoever
+    ///      arrives first in full and leave everyone after them with nothing.
+    function test_claimsSettleProRataFromAPartialPot() public {
+        vm.prank(alice);
+        uint256 aShares = vault.deposit(10_000e6, alice);
+        vm.prank(bob);
+        uint256 bShares = vault.deposit(10_000e6, bob);
+
+        _moveToCore(20_000e6);
+        _setCore({equityCoreUnits: 20_000e6, szi: 0, markPx: 1_000_000});
+
+        vm.prank(alice);
+        vault.redeem(aShares, alice);
+        vm.prank(bob);
+        vault.redeem(bShares, bob);
+        assertApproxEqAbs(vault.claimsOutstanding(), 20_000e6, 2);
+
+        // Unwind half of what is owed back to the EVM side: Core equity falls by
+        // the same amount it gains on this side.
+        usdc.mint(address(vault), 10_000e6);
+        _setCore({equityCoreUnits: 10_000e6, szi: 0, markPx: 1_000_000});
+        vault.fundClaims();
+        assertEq(vault.claimPot(), 10_000e6);
+
+        uint256 aBefore = usdc.balanceOf(alice);
+        // Resolve the balance BEFORE pranking: an argument-position call would
+        // consume the prank and run claim() as this test contract.
+        uint256 aClaim = vault.claimToken().balanceOf(alice);
+        vm.prank(alice);
+        uint256 paid = vault.claim(aClaim, alice);
+
+        assertApproxEqRel(paid, 5_000e6, 1e12, "half funded means half paid");
+        assertEq(usdc.balanceOf(alice) - aBefore, paid);
+        assertApproxEqRel(vault.claimsOutstanding(), 10_000e6, 1e12, "Bob still owed in full");
+        assertApproxEqRel(vault.claimPot(), 5_000e6, 1e12);
+    }
+
+    /// @dev The pot belongs to holders who have already left, so counting it in NAV
+    ///      would credit remaining holders with money that is not theirs.
+    function test_claimPotIsExcludedFromNav() public {
+        vm.prank(alice);
+        uint256 aShares = vault.deposit(10_000e6, alice);
+        vm.prank(bob);
+        vault.deposit(10_000e6, bob);
+
+        _moveToCore(20_000e6);
+        _setCore({equityCoreUnits: 20_000e6, szi: 0, markPx: 1_000_000});
+
+        vm.prank(alice);
+        vault.redeem(aShares, alice); // fully queued
+
+        uint256 navBefore = vault.pricePerShare();
+        usdc.mint(address(vault), 10_000e6); // unwound back for Alice
+        _setCore({equityCoreUnits: 10_000e6, szi: 0, markPx: 1_000_000});
+        vault.fundClaims();
+
+        assertApproxEqAbs(vault.pricePerShare(), navBefore, 1, "funding a claim must not move NAV");
+        assertApproxEqAbs(vault.totalAssets(), 10_000e6, 2, "only Bob's half remains");
     }
 
     /// @dev Redemptions must stay open when deposits are frozen, per the
