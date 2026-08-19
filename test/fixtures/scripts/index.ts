@@ -2,7 +2,7 @@ import { genAddressRegistrations, genAddrRegWithOutsourceProofVerification } fro
 import { genTestDeposits, genTestDeposits4x2 } from "./genTestDeposits";
 import { genTestWithdrawals, genTestWithdrawalsFromReentrantTokenDeposit } from "./genTestWithdrawals";
 import { genTestTransfers, genTestTransfersWith4Input2OutputNotes, genTestTransfersWith4Input4OutputNotes, genTestTransfersWithOutsourceProofVerification, genTransferPackedUserOp, genTransferPackedUserOpPreVerified } from "./genTestTransfers";
-import { genTestCallAdaptors, genMorphoSupplyAdaptorTx, genMorphoWithdrawAdaptorTx } from './genTestCallAdaptor';
+import { genTestCallAdaptors, genMorphoSupplyAdaptorTx, genMorphoWithdrawAdaptorTx, genPerpVaultDepositTx } from './genTestCallAdaptor';
 
 import { getSDKInstance } from "./sdk";
 import { genHyperEvmTreeUpdate } from "./genHyperEvmTreeUpdate";
@@ -42,6 +42,12 @@ const main = async () => {
 	// await genTestCallAdaptors(sdk);
 	await genTreeUpdateData(sdk);
 	await genHyperEvmTreeUpdate(sdk);
+	// LAST, deliberately. Generators share one commitment tree, so inserting here
+	// shifts leaf indices for everything that follows and their nullifiers stop
+	// matching — the withdrawal fixture failed on exactly that assert when this ran
+	// earlier in the sequence. Running last means it consumes state without
+	// disturbing anyone.
+	await genPerpVaultDepositTx(sdk);
 	// await genTreeUpdateDataWithPartialQueue(sdk);
 };
 

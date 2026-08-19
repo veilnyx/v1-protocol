@@ -4,7 +4,7 @@ import { TransactionType } from "@veilnyx-sdk/shared-types";
 import { fixture, generateTestTransactions, mockNotes, PAYMASTER_ADDR_FIXTURE } from "./fixture";
 
 const {
-    assets: { testnetWeth, testnetUsdc, morphoVaultToken },
+    assets: { weth, usdc, testnetWeth, testnetUsdc, morphoVaultToken },
     sender: { account: senderAccount, pubAddress: senderPubAddress },
     receiver: { account: receiverAccount },
 } = fixture;
@@ -256,6 +256,41 @@ export const genTestCallAdaptors = async (sdk: Core) => {
 // consumes the loan token (testnetWeth); withdrawing consumes the vault token.
 const MORPHO_VAULT = '0x2371e134e3455e0593363cBF89d3b6cf53740618';
 
+// Fixed addresses the proof commits to. The Solidity test etches the real
+// runtime code at these, exactly as the Morpho fixture does for its adaptor:
+// the proof binds `to` and the payload, so both must be known at generation.
+const PERP_VAULT_ADAPTOR = '0x9A9f2CCfdE556A7E9Ff0848998Aa4a0CFD8863AE';
+const PERP_VAULT = '0x7E5F4552091A69125d5DfCb7b8C2659029395Bdf';
+
+enum PerpVaultAction {
+    DEPOSIT = 0,
+    REDEEM = 1
+}
+
+export const reqsPerpVaultDeposit = {
+    // Spends the usdc note from deposit_pre_tx — the only deposit this run
+    // regenerates, so it is the only note whose leaf index matches the current
+    // tree. The weth half of that deposit is spent by the withdrawal fixture;
+    // the usdc half is free.
+    // The vault's share count is not knowable at proof time, which is exactly why
+    // CALL_ADAPTOR commits the output on chain against refundAddress rather than
+    // in the circuit.
+    perp_vault_deposit_10_usdc: {
+        type: TransactionType.CALL_ADAPTER,
+        assetIds: [usdc],
+        values: [parseUnits("10", 6)],
+        feeAssetId: 0,
+        to: PERP_VAULT_ADAPTOR,
+        payload: encodeAbiParameters(
+            [{ type: "uint8", name: "action" }, { type: "address", name: "vault" }],
+            [PerpVaultAction.DEPOSIT, PERP_VAULT]
+        ),
+        revokerId: 0,
+        viaBundler: false,
+        paymaster: zeroAddress
+    },
+};
+
 export const reqsMorphoSupply = {
     supply_2_morphoLoanToken: {
         type: TransactionType.CALL_ADAPTER,
@@ -307,6 +342,12 @@ export const reqsMorphoWithdraw = {
 export const genMorphoSupplyAdaptorTx = async (sdk: Core) => {
     await mockNotes("deposit_2_morphoLoanToken", sdk);
     await generateTestTransactions(reqsMorphoSupply, sdk);
+};
+
+export const genPerpVaultDepositTx = async (sdk: Core) => {
+    // Notes come from the deposit fixture that funded testnetUsdc.
+    await mockNotes("deposit_pre_tx", sdk);
+    await generateTestTransactions(reqsPerpVaultDeposit, sdk);
 };
 
 export const genMorphoWithdrawAdaptorTx = async (sdk: Core) => {
