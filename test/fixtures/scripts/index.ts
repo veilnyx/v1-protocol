@@ -12,7 +12,10 @@ import {
 } from "./genTreeUpdateData";
 
 const main = async () => {
-	const { sdk, nebraClient } = await getSDKInstance();
+	// getNebraClient is a function, not a value: only the *WithOutsourceProofVerification
+	// generators need it, and resolving it reaches Sepolia. Destructuring a resolved
+	// client here would make every generator depend on that RPC.
+	const { sdk, getNebraClient } = await getSDKInstance();
 	// @dev Deposit notes are reused across tests (transfer, withdrawal, adaptor). Only regenerate when new assets are needed, as overriding existing notes will break dependent tests fixtures. Commit hash containing the deposit tx fixtures on which followup tx fixtures depend: fe9cfaa37bb522f0221f6e86f043ec6b6cf6ea8f
 	// HyperEVM testnet branch: the four generators the end-to-end script needs,
 	// enabled in dependency order. Deposits must precede withdrawals because the
@@ -23,16 +26,16 @@ const main = async () => {
 	await genTestDeposits(sdk);
 	// await genMorphoSupplyAdaptorTx(sdk);
 	// await genMorphoWithdrawAdaptorTx(sdk);
-	// await genTestDepositsWithOutsourceProofVerification(sdk, nebraClient);
+	// await genTestDepositsWithOutsourceProofVerification(sdk, await getNebraClient());
 	// await genTestTransfers(sdk);
 	// await genTestDeposits4x2(sdk);
 	// await genTestTransfersWith4Input2OutputNotes(sdk);
 	// await genTestTransfersWith4Input4OutputNotes(sdk);
-	// await genTestTransfersWithOutsourceProofVerification(sdk, nebraClient);
-	// await genTransferPackedUserOp(sdk, nebraClient);
+	// await genTestTransfersWithOutsourceProofVerification(sdk, await getNebraClient());
+	// await genTransferPackedUserOp(sdk, await getNebraClient());
 	// await genAddressRegistrations(sdk);
-	// await genTestDepositsWithOutsourceProofVerification(sdk, nebraClient);
-	// await genTestTransfersWithOutsourceProofVerification(sdk, nebraClient);
+	// await genTestDepositsWithOutsourceProofVerification(sdk, await getNebraClient());
+	// await genTestTransfersWithOutsourceProofVerification(sdk, await getNebraClient());
 	await genTestWithdrawals(sdk);
 	// await genTestWithdrawalsFromPreTxDeposit(sdk);
 	// await genTestWithdrawalsFromReentrantTokenDeposit(sdk);

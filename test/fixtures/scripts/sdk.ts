@@ -89,21 +89,35 @@ export const getSDKInstance = async () => {
 
   const zkfi = new Core(coreOpt);
 
-  // creating ethers signer using its wallet class
-  const sepoliaProvider = new ethers.JsonRpcProvider(process.env.RPC_ETHEREUM_SEPOLIA);
-  const envPrivateKey = process.env.SEPOLIA_TEST_PRIV_KEY;
-  const privateKey = envPrivateKey.slice(2).padStart(64, '0');
-  const wallet = new ethers.Wallet(privateKey);
-
-  const signer = wallet.connect(sepoliaProvider);
-  console.log("Creating nebra client");
-  const upaInstanceDescriptor: UpaInstanceDescriptor = {
-    "verifier": "0x3B946743DEB7B6C97F05B7a31B23562448047E3E",
-    "deploymentBlockNumber": 6405136,
-    "deploymentTx": "0xa8626318b76b71cd21cdfb93ef67c9571d94e01383e852a3eb6dc5dc6188808e",
-    "chainId": "11155111"
+  // Nebra is built LAZILY. Only address-registration fixtures outsource proof
+  // verification; transaction fixtures (deposit, withdraw, transfer, adaptor)
+  // never touch it. Constructing it eagerly made every generator depend on a
+  // Sepolia RPC — and RPC_ETHEREUM_SEPOLIA is origin-whitelisted, so it answers
+  // 403 from a CLI, which blocked fixture generation entirely.
+  let _nebra: UpaClient | null = null;
+  const getNebraClient = async (): Promise<UpaClient> => {
+    if (_nebra) return _nebra;
+    const rpc = process.env.RPC_ETHEREUM_SEPOLIA;
+    const envPrivateKey = process.env.SEPOLIA_TEST_PRIV_KEY;
+    if (!rpc || !envPrivateKey) {
+      throw new Error(
+        "Nebra client needs RPC_ETHEREUM_SEPOLIA and SEPOLIA_TEST_PRIV_KEY. " +
+        "Only address-registration fixtures require it; the rest do not."
+      );
+    }
+    const sepoliaProvider = new ethers.JsonRpcProvider(rpc);
+    const privateKey = envPrivateKey.slice(2).padStart(64, '0');
+    const signer = new ethers.Wallet(privateKey).connect(sepoliaProvider);
+    console.log("Creating nebra client");
+    const upaInstanceDescriptor: UpaInstanceDescriptor = {
+      "verifier": "0x3B946743DEB7B6C97F05B7a31B23562448047E3E",
+      "deploymentBlockNumber": 6405136,
+      "deploymentTx": "0xa8626318b76b71cd21cdfb93ef67c9571d94e01383e852a3eb6dc5dc6188808e",
+      "chainId": "11155111"
+    };
+    _nebra = await zkfi.generateNebraClient(signer, upaInstanceDescriptor);
+    return _nebra;
   };
-  const nebraClient: UpaClient = await zkfi.generateNebraClient(signer, upaInstanceDescriptor);
 
   zkfi.getRevokerData = async () => ({
     id: 0,
@@ -136,10 +150,10 @@ export const getSDKInstance = async () => {
     }
   }
 
-  return {
-    sdk: zkfi,
-    nebraClient
-  };
+  // Deliberately NOT exposed as a `nebraClient` getter: destructuring the result
+  // would invoke it and reach Sepolia, which is exactly the eager behaviour this
+  // replaced. Callers that need it must await getNebraClient().
+  return { sdk: zkfi, getNebraClient };
 };
 
 // 26250000000000n
