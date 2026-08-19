@@ -1,0 +1,140 @@
+#!/usr/bin/env node
+/**
+ * PerpVault keeper.
+ *
+ * Without this nothing rebalances, so the de-risk band never runs, bridged
+ * capital never reaches margin, and queued redemptions are never funded. It is
+ * an availability dependency, not a trust one: every action below is either
+ * permissionless or bounded by on-chain checks, so a compromised keeper cannot
+ * take funds — it can only fail to act, or act at a bad moment.
+ *
+ * Ordering matters and is deliberate:
+ *   1. flagDistress   latch a liquidated vault shut before anything else
+ *   2. settleBridge   recognise credited capital so NAV and margin are current
+ *   3. fundClaims     exiting holders come before redeploying into the position
+ *   4. rebalance      only then move the position toward target
+ *
+ * Run:  RPC=... PRIVATE_KEY=0x... VAULT=0x... node keeper.mjs [--once] [--dry]
+ */
+import { createPublicClient, createWalletClient, http, parseAbi, formatUnits } from 'viem';
+import { privateKeyToAccount } from 'viem/accounts';
+
+const RPC = process.env.RPC ?? 'https://rpcs.chain.link/hyperevm/testnet';
+const VAULT = process.env.VAULT;
+const PK = process.env.PRIVATE_KEY;
+const ONCE = process.argv.includes('--once');
+const DRY = process.argv.includes('--dry');
+const INTERVAL_MS = Number(process.env.INTERVAL_MS ?? 60_000);
+// Do not trade for drift smaller than this: every rebalance costs ~9bp round
+// trip, measured on chain 998, so chasing small deviations loses money.
+const DRIFT_BAND_BPS = BigInt(process.env.DRIFT_BAND_BPS ?? 500);
+
+if (!VAULT) throw new Error('VAULT is required');
+
+const abi = parseAbi([
+  'function totalAssets() view returns (uint256)',
+  'function notional() view returns (uint256)',
+  'function coreEquity() view returns (uint256)',
+  'function idleAssets() view returns (uint256)',
+  'function pendingBridge() view returns (uint256)',
+  'function bridgeInFlight() view returns (uint256)',
+  'function claimsOutstanding() view returns (uint256)',
+  'function claimPot() view returns (uint256)',
+  'function targetLeverageBps() view returns (uint256)',
+  'function maxOracleDeviationBps() view returns (uint256)',
+  'function markOracleDeviationBps() view returns (uint256)',
+  'function rebalanceCooldown() view returns (uint256)',
+  'function lastRebalanceAt() view returns (uint256)',
+  'function depositsFrozen() view returns (bool)',
+  'function isDistressed() view returns (bool)',
+  'function maintenanceMargin() view returns (uint256)',
+  'function flagDistress() returns (bool)',
+  'function settleBridge() returns (uint256)',
+  'function fundClaims() returns (uint256)',
+  'function rebalance() returns (int256)',
+]);
+
+const pub = createPublicClient({ transport: http(RPC) });
+const account = PK ? privateKeyToAccount(PK) : null;
+const wallet = account ? createWalletClient({ account, transport: http(RPC) }) : null;
+
+const usd = (v) => Number(formatUnits(v, 6)).toLocaleString(undefined, { minimumFractionDigits: 2 });
+
+async function read() {
+  const keys = [
+    'totalAssets', 'notional', 'coreEquity', 'idleAssets', 'pendingBridge',
+    'bridgeInFlight', 'claimsOutstanding', 'claimPot', 'targetLeverageBps',
+    'maxOracleDeviationBps', 'markOracleDeviationBps', 'rebalanceCooldown',
+    'lastRebalanceAt', 'depositsFrozen', 'isDistressed', 'maintenanceMargin',
+  ];
+  const out = await Promise.all(
+    keys.map((k) => pub.readContract({ address: VAULT, abi, functionName: k }).catch(() => null)),
+  );
+  return Object.fromEntries(keys.map((k, i) => [k, out[i]]));
+}
+
+async function send(fn, why) {
+  if (DRY || !wallet) {
+    console.log(`    would call ${fn}() — ${why}`);
+    return null;
+  }
+  const hash = await wallet.writeContract({ address: VAULT, abi, functionName: fn, chain: null });
+  console.log(`    ${fn}() -> ${hash}   (${why})`);
+  return hash;
+}
+
+async function tick() {
+  const s = await read();
+  if (s.totalAssets === null) {
+    console.log('  vault unreadable — precompiles may be unavailable on this chain');
+    return;
+  }
+
+  const equity = s.totalAssets;
+  const lev = equity > 0n ? (s.notional * 10_000n) / equity : 0n;
+  console.log(
+    `  equity ${usd(equity)}  notional ${usd(s.notional)}  lev ${(Number(lev) / 10_000).toFixed(2)}x` +
+      `  target ${(Number(s.targetLeverageBps) / 10_000).toFixed(2)}x  dev ${s.markOracleDeviationBps ?? 'n/a'}bps` +
+      `${s.depositsFrozen ? '  [DEPOSITS FROZEN]' : ''}`,
+  );
+
+  // 1. A distressed vault must stop taking money before anything else happens.
+  if (s.isDistressed && !s.depositsFrozen) {
+    await send('flagDistress', 'equity at or below maintenance');
+  }
+
+  // 2. Recognise bridged capital, so NAV and available margin are current.
+  if (s.bridgeInFlight > 0n && s.pendingBridge < s.bridgeInFlight) {
+    await send('settleBridge', `${usd(s.bridgeInFlight - s.pendingBridge)} credited`);
+  }
+
+  // 3. Exiting holders are paid before capital is redeployed into the position.
+  if (s.claimsOutstanding > s.claimPot && s.idleAssets > s.claimPot) {
+    await send('fundClaims', `${usd(s.claimsOutstanding - s.claimPot)} still owed`);
+  }
+
+  // 4. Rebalance last, and only when it is both allowed and worth it.
+  const now = BigInt(Math.floor(Date.now() / 1000));
+  const nextAllowed = s.lastRebalanceAt + s.rebalanceCooldown;
+  const drift = lev > s.targetLeverageBps ? lev - s.targetLeverageBps : s.targetLeverageBps - lev;
+
+  if (s.markOracleDeviationBps === null || s.maxOracleDeviationBps === null) {
+    // An older deployment without the oracle guard. Refuse to trade rather than
+    // assume the price is sane.
+    console.log('    skipping rebalance: vault does not expose the oracle guard');
+  } else if (s.markOracleDeviationBps > s.maxOracleDeviationBps) {
+    console.log('    skipping rebalance: mark is dislocated from the index');
+  } else if (now < nextAllowed) {
+    console.log(`    skipping rebalance: cooldown for ${nextAllowed - now}s`);
+  } else if (s.notional > 0n && drift < DRIFT_BAND_BPS) {
+    console.log(`    skipping rebalance: drift ${drift}bps inside the ${DRIFT_BAND_BPS}bps band`);
+  } else {
+    await send('rebalance', `drift ${drift}bps`);
+  }
+}
+
+console.log(`keeper on ${VAULT}${DRY ? '  [dry run]' : ''}${account ? `  as ${account.address}` : '  [read only]'}`);
+await tick();
+if (!ONCE) {
+  setInterval(() => tick().catch((e) => console.error('  tick failed:', e.shortMessage ?? e.message)), INTERVAL_MS);
+}

@@ -27,7 +27,14 @@ divergence. Those are real and are listed as risks in the plan. This exists to
 make the share accounting unambiguous, not to be a backtest.
 """
 
-TAKER_FEE = 0.00045  # 4.5 bps, Hyperliquid base taker
+# Measured on a real chain-998 round trip: 0.013396 + 0.013390 paid on 29.77 of
+# notional, i.e. ~9bp for the pair. The 4.5bp book rate is one side only.
+TAKER_FEE = 0.00045  # 4.5 bps, Hyperliquid base taker, per side
+
+# Funding accrues on NOTIONAL, not equity, so leverage multiplies it directly.
+# Observed on chain 998: +0.0000125/hr on BTC, ETH and SOL = +10.95% APR, paid by
+# longs. A 2x long therefore bleeds ~21.9% APR on equity before any price move.
+FUNDING_RATE_HOURLY = 0.0000125
 MAX_LEVERAGE = 10    # exchange cap on the asset; sets the maintenance requirement
 
 # Cost of a liquidation as a fraction of notional, over and above the taker fee.
@@ -46,6 +53,7 @@ class Vault:
         self.q = 0.0   # position size, BTC (>0 long, <0 short)
         self.S = 0.0   # shares outstanding
         self.fees = 0.0
+        self.funding_paid = 0.0
         self.log = []
 
     # -- views -------------------------------------------------------------
@@ -90,6 +98,15 @@ class Vault:
         self.E -= fee
         self.fees += fee
         self.q = self.L * self.E / self.P  # re-solve after paying the fee
+
+    def accrue_funding(self, hours):
+        """Charge funding on notional. Longs pay a positive rate; shorts receive."""
+        if self.q == 0:
+            return 0.0
+        cost = self.notional * FUNDING_RATE_HOURLY * hours * (1 if self.q > 0 else -1)
+        self.E -= cost
+        self.funding_paid += cost
+        return cost
 
     def move(self, new_price, label):
         self.E += self.q * (new_price - self.P)
@@ -240,17 +257,37 @@ def main():
     print("Restarting the same vault is therefore ARITHMETICALLY FAIR. Whether it")
     print("should restart automatically is a separate question — see the plan.")
 
+    rule("SCENARIO D2 — funding alone, price perfectly flat, no rebalancing")
+    print("Longs pay +10.95% APR on NOTIONAL, so leverage multiplies it.\n")
+    print(f"  {'target':>8}{'30 days':>12}{'90 days':>12}{'365 days':>12}")
+    print("  " + "-" * 44)
+    for L in (2, 5, 10):
+        row = [f"  {L:>7}x"]
+        for days in (30, 90, 365):
+            v = Vault(target_leverage=L, price=100_000)
+            v.deposit(10_000, "Alice")
+            v.accrue_funding(days * 24)
+            row.append(f"{v.E / 10_000 - 1:>11.2%}")
+        print("".join(row))
+    print("\nNothing moved. This is the cost of simply holding the position, and it")
+    print("is far larger than the rebalancing decay measured below.")
+
     rule("SCENARIO D — volatility decay with periodic rebalancing, price ends FLAT")
     print("20 moves, +2% then -1.96% repeated, returning to exactly 100,000.\n")
-    print(f"  {'target':>8}{'final equity':>15}{'return':>10}{'fees':>10}")
-    print("  " + "-" * 41)
+    print(f"  {'target':>8}{'final equity':>15}{'return':>10}{'fees':>10}{'funding':>11}")
+    print("  " + "-" * 54)
     for L in (2, 5, 10):
         d = Vault(target_leverage=L, price=100_000, rebalance_on_move=True)
         d.deposit(10_000, "Alice")
         for _ in range(10):
             d.move(d.P * 1.02, "up")
+            d.accrue_funding(12)  # a 20-move path spanning ~10 days
             d.move(d.P / 1.02, "down")
-        print(f"  {L:>7}x{d.E:>15,.2f}{d.E / 10_000 - 1:>9.2%}{d.fees:>10,.2f}")
+            d.accrue_funding(12)
+        print(
+            f"  {L:>7}x{d.E:>15,.2f}{d.E / 10_000 - 1:>9.2%}"
+            f"{d.fees:>10,.2f}{d.funding_paid:>11,.2f}"
+        )
     print("\nPrice is unchanged and every vault has lost money. This is intrinsic to")
     print("a rebalanced leveraged product — not a bug, not fixable by execution.")
     print("It must be disclosed to depositors in plain language.")
