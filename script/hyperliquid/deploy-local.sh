@@ -48,7 +48,8 @@ VAULT=$(deploy src/adaptors/hyperliquid/PerpVault.sol:PerpVault \
   "$USDC" 0 3 true 20000 "BTC Long 2x" vBTC2L "$ME")
 
 echo "4/4  seeding state..."
-cast send "$MARKPX" "set(uint64)" 100000000000 --rpc-url "$RPC" --private-key "$PK" >/dev/null
+# $100,000 on a szDecimals=5 market: perp px carries 6-szDecimals decimals.
+cast send "$MARKPX" "set(uint64)" 1000000 --rpc-url "$RPC" --private-key "$PK" >/dev/null
 cast send "$MARGIN" "set(int64)" 0             --rpc-url "$RPC" --private-key "$PK" >/dev/null
 cast send "$POSITION" "set(int64,int64,uint32)" 0 0 10 --rpc-url "$RPC" --private-key "$PK" >/dev/null
 cast send "$USDC" "mint(address,uint256)" "$ME" 1000000000000 --rpc-url "$RPC" --private-key "$PK" >/dev/null

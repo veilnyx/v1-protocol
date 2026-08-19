@@ -6,6 +6,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {HyperCore} from "./IHyperCore.sol";
 
 /// @title PerpVault - a single fixed-strategy leveraged perp vault on HyperCore
@@ -17,19 +18,69 @@ import {HyperCore} from "./IHyperCore.sol";
 ///      Veilnyx notes record unit counts while the Pool custodies the token; a
 ///      rebasing share would desynchronise the two and break redemption. The same
 ///      constraint is why LidoAdaptor wraps stETH into wstETH.
-contract PerpVault is ERC20, Ownable {
+contract PerpVault is ERC20, Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
-    /// @dev Core USD values carry 8 decimals; the linked USDC ERC20 on HyperEVM
-    ///      carries 6 (spotMeta reports evm_extra_wei_decimals = -2). Every value
-    ///      crossing the bridge must be scaled by this factor. Getting the
-    ///      direction wrong is a silent 100x error.
+    /// @dev Scale between a Core SPOT token balance and its linked HyperEVM ERC20.
+    ///      USDC carries 8 wei decimals on Core against 6 on the EVM (spotMeta
+    ///      reports evm_extra_wei_decimals = -2), so bridged amounts scale by 100.
+    ///
+    ///      This applies to the BRIDGE ONLY. Perp USD figures use a different
+    ///      convention entirely: `accountValue` from precompile 0x80f and the `ntl`
+    ///      argument of CoreWriter action 7 are both 1e6, i.e. already aligned with
+    ///      6-decimal USDC. Verified on chain 998: a perp account holding 10 USDC
+    ///      reports accountValue = 10_000_000, and moving 10 USDC spot->perp takes
+    ///      ntl = 10_000_000.
+    ///
+    ///      Dividing perp equity by this scale understated NAV a hundredfold.
     uint256 public constant CORE_TO_EVM_SCALE = 100;
+
+    /// @dev Perp USD values (accountValue, usdClassTransfer ntl) carry 6 decimals.
+    uint256 public constant PERP_USD_DECIMALS = 6;
+
+    /// @dev Hyperliquid rejects perp prices with more than this many significant
+    ///      figures. Rejection is silent, so this must be enforced before sending.
+    uint256 public constant PX_SIG_FIGS = 5;
+
+    /// @dev CoreWriter READS and WRITES use different scales, which is the single
+    ///      easiest way to send an order that vanishes:
+    ///        read  (0x800 szi, 0x806 markPx): per-asset, szDecimals and
+    ///                                         6 - szDecimals respectively
+    ///        write (action 1 limitPx, sz)   : a UNIFORM 1e8, per the docs —
+    ///                                         "limitPx and sz should be sent as
+    ///                                          10^8 * the human readable value"
+    ///      Sending read-scaled values produced an order Core dropped with no
+    ///      order, no fill and no error: observed sz=46 where 46_000 was required,
+    ///      and limitPx=647_220 where 6_472_200_000_000 was required.
+    uint256 public constant WIRE_DECIMALS = 8;
 
     uint256 public constant BPS = 10_000;
 
-    /// @dev Exchange maintenance requirement is notional / (2 * maxLeverage).
-    uint256 public constant MAX_LEVERAGE = 10;
+    /// @dev Perp prices from precompile 0x806 carry `6 - szDecimals` decimals, and
+    ///      sizes carry `szDecimals`. Converting between notional and size therefore
+    ///      cancels szDecimals out and leaves a fixed 1e6 factor:
+    ///        sz_raw  = notional_usd * 1e6 / markPx
+    ///        notional_usd = sz_raw * markPx / 1e6
+    ///      Verified against testnet: BTC szDecimals=5, markPx 644110 -> $64,411;
+    ///      SOL szDecimals=2, markPx 774000 -> $77.40.
+    ///      This is unrelated to CORE_TO_EVM_SCALE, which only governs the USDC
+    ///      bridge. Conflating the two understated order size by 1e6.
+    uint256 public constant PERP_PX_SCALE = 1e6;
+
+    /// @dev Maintenance requirement is notional / (2 * maxLeverage), where
+    ///      maxLeverage is per market and read from `perpAssetInfo`. It is NOT a
+    ///      constant: BTC allows 40x while SOL allows 10x, so hardcoding 10
+    ///      overstated maintenance margin fourfold on BTC — firing the de-risk band
+    ///      far too early and misplacing the liquidation price.
+    function maxLeverage() public view returns (uint256) {
+        return HyperCore.perpAssetInfo(perpIndex).maxLeverage;
+    }
+
+    /// @notice Size decimals for this market, read from the exchange rather than
+    ///         assumed. Perp prices carry `6 - szDecimals` decimals.
+    function szDecimals() public view returns (uint8) {
+        return HyperCore.perpAssetInfo(perpIndex).szDecimals;
+    }
 
     IERC20 public immutable asset;
     uint8 internal immutable _assetDecimals;
@@ -41,29 +92,63 @@ contract PerpVault is ERC20, Ownable {
     ///         by position sizing; the exchange's 10x cap is a ceiling, not a mandate.
     uint256 public targetLeverageBps;
 
-    /// @notice Below this multiple of maintenance margin the vault de-levers rather
-    ///         than holding target. This is the chosen alternative to an insurance
-    ///         fund, so it is load bearing.
-    uint256 public deRiskBandBps = 15_000; // 1.5x maintenance
+    /// @notice Multiple of TARGET leverage at which the vault de-levers rather than
+    ///         holding target. 15_000 = 1.5x, so a 2x vault de-risks once effective
+    ///         leverage passes 3x — roughly a third of equity gone. This is the
+    ///         chosen alternative to an insurance fund, so it is load bearing.
+    uint256 public deRiskBandBps = 15_000;
 
     /// @notice Charged on deposit to cover the rebalance this deposit forces.
     ///         Without it, an entrant's execution cost is socialised onto existing
     ///         holders. Excess accrues to the vault, i.e. to those holders.
     uint256 public entryFeeBps = 10;
 
+    /// @notice How far past the touch a rebalance order may be priced, in bps.
+    ///         Bounds what a thin or fast-moving book can cost the vault.
+    uint256 public maxSlippageBps = 50;
+
     bool public depositsFrozen;
     address public keeper;
+
+    /// @notice Minimum seconds between rebalances.
+    /// @dev CoreWriter order actions are deliberately delayed several seconds on
+    ///      Core. Without a cooldown a keeper calling twice inside that window
+    ///      reads the same stale position and places a SECOND order closing the
+    ///      same gap, double-sizing the position. Nothing reverts; the vault simply
+    ///      ends up at twice the intended exposure.
+    uint256 public rebalanceCooldown = 30;
+    uint256 public lastRebalanceAt;
+
+    /// @notice Asset already sent to the Core system address but not yet credited.
+    /// @dev The bridge is not atomic: the ERC20 leaves on this block, Core credits
+    ///      it by a system transaction afterwards. Without tracking it, the amount
+    ///      is invisible to BOTH idleAssets() (balanceOf already fell) and
+    ///      coreEquity() (not credited yet), so totalAssets understates by the full
+    ///      bridged amount for at least a block — usually most of the vault. NAV
+    ///      collapses and recovers, which is a free round trip for anyone watching.
+    uint256 public bridgeInFlight;
+
+    /// @dev Core spot balance observed when the last bridge was initiated, so the
+    ///      credited delta can be measured rather than assumed.
+    uint256 public spotBeforeBridge;
 
     event Deposited(address indexed caller, uint256 assets, uint256 shares, uint256 navUsed);
     event Redeemed(address indexed caller, uint256 shares, uint256 assets, uint256 navUsed);
     event DepositsFrozen(bool frozen);
     event Rebalanced(int256 sizeDelta, uint256 equity, uint256 targetNotional);
+    event OrderPlaced(bool isBuy, uint64 size, uint64 limitPx, uint128 cloid);
+    event DeRisked(uint256 effectiveLeverageBps, uint256 triggerBps, uint256 newLeverageBps);
+    event DistressDetected(uint256 equity, uint256 maintenanceMargin);
+    event BridgeStarted(uint256 amount, uint256 spotBefore);
+    event BridgeSettled(uint256 credited, uint256 stillInFlight);
 
     error ZeroAmount();
     error DepositsAreFrozen();
     error InsufficientIdleLiquidity(uint256 requested, uint256 available);
     error NotKeeper();
     error BadParameter();
+    error RebalanceTooSoon(uint256 nextAllowedAt);
+    error VaultDistressed();
 
     modifier onlyKeeper() {
         if (msg.sender != keeper && msg.sender != owner()) revert NotKeeper();
@@ -80,7 +165,9 @@ contract PerpVault is ERC20, Ownable {
         string memory symbol_,
         address owner_
     ) ERC20(name_, symbol_) Ownable(owner_) {
-        if (targetLeverageBps_ == 0 || targetLeverageBps_ > MAX_LEVERAGE * BPS) revert BadParameter();
+        // Bounded against the market cap at rebalance time, not construction:
+        // perpAssetInfo is unavailable on chains without HyperCore.
+        if (targetLeverageBps_ == 0) revert BadParameter();
         asset = asset_;
         _assetDecimals = IERC20Metadata(address(asset_)).decimals();
         coreTokenIndex = coreTokenIndex_;
@@ -105,11 +192,41 @@ contract PerpVault is ERC20, Ownable {
     function coreEquity() public view returns (uint256) {
         HyperCore.MarginSummary memory m = HyperCore.marginSummary(address(this), 0);
         if (m.accountValue <= 0) return 0;
-        return uint256(uint64(m.accountValue)) / CORE_TO_EVM_SCALE;
+        // accountValue is 1e6; rescale only if the vault's asset is not 6dp.
+        uint256 v = uint256(uint64(m.accountValue));
+        if (_assetDecimals == PERP_USD_DECIMALS) return v;
+        return _assetDecimals > PERP_USD_DECIMALS
+            ? v * (10 ** (_assetDecimals - PERP_USD_DECIMALS))
+            : v / (10 ** (PERP_USD_DECIMALS - _assetDecimals));
     }
 
+    /// @notice Bridged asset Core has not yet credited.
+    /// @dev Derived rather than stored, so it self-corrects as the credit lands
+    ///      without anyone having to call settleBridge first. Storing the raw
+    ///      in-flight figure and also counting coreSpot would double count for the
+    ///      window between the credit arriving and settlement being invoked.
+    function pendingBridge() public view returns (uint256) {
+        if (bridgeInFlight == 0) return 0;
+        uint256 spotNow = coreSpot();
+        if (spotNow <= spotBeforeBridge) return bridgeInFlight;
+        uint256 credited = spotNow - spotBeforeBridge;
+        return credited >= bridgeInFlight ? 0 : bridgeInFlight - credited;
+    }
+
+    /// @notice Every place the vault's asset can be, so NAV never dips because
+    ///         money is between two of them.
+    /// @dev Four locations: the HyperEVM ERC20 balance, in flight across the
+    ///      bridge, the Core SPOT balance, and Core PERP equity. Counting only
+    ///      perp and EVM — as this did — makes NAV collapse and recover on every
+    ///      bridge and every spot-to-perp move, which is a free round trip.
     function totalAssets() public view returns (uint256) {
-        return coreEquity() + idleAssets();
+        return coreEquity() + idleAssets() + coreSpot() + pendingBridge();
+    }
+
+    /// @notice Core spot balance of the vault's asset, in asset decimals.
+    function coreSpot() public view returns (uint256) {
+        uint256 raw = HyperCore.spotBalance(address(this), coreTokenIndex).total;
+        return raw / CORE_TO_EVM_SCALE; // spot is weiDecimals (8), asset is 6
     }
 
     /// @notice Current notional of the open position, in asset decimals.
@@ -117,11 +234,12 @@ contract PerpVault is ERC20, Ownable {
         HyperCore.Position memory p = HyperCore.position(address(this), perpIndex);
         uint256 sz = p.szi < 0 ? uint256(uint64(-p.szi)) : uint256(uint64(p.szi));
         if (sz == 0) return 0;
-        return (sz * HyperCore.markPx(perpIndex)) / CORE_TO_EVM_SCALE;
+        // notional in asset decimals = sz_raw * markPx * 10^assetDecimals / 1e6
+        return (sz * HyperCore.markPx(perpIndex) * (10 ** _assetDecimals)) / PERP_PX_SCALE;
     }
 
     function maintenanceMargin() public view returns (uint256) {
-        return notional() / (2 * MAX_LEVERAGE);
+        return notional() / (2 * maxLeverage());
     }
 
     /// @dev Shares are always 18 decimals regardless of the asset's, and the gap
@@ -130,6 +248,27 @@ contract PerpVault is ERC20, Ownable {
     ///      `balanceOf`, so anyone can donate USDC to the vault, and without the
     ///      offset a 1-wei first deposit followed by a large donation would round
     ///      every subsequent depositor's shares to zero.
+    /// @notice True when the open position is at or past its maintenance
+    ///         requirement, i.e. liquidatable or already being liquidated.
+    function isDistressed() public view returns (bool) {
+        uint256 n = notional();
+        if (n == 0) return false;
+        return coreEquity() <= maintenanceMargin();
+    }
+
+    /// @notice Latch deposits shut if the vault is distressed.
+    /// @dev Permissionless by design. The damaging failure is a liquidated vault
+    ///      quietly accepting new money, and that must not wait on an operator
+    ///      noticing. Clearing the latch stays owner-only, per halt-then-resume.
+    function flagDistress() public returns (bool flagged) {
+        if (!depositsFrozen && isDistressed()) {
+            depositsFrozen = true;
+            flagged = true;
+            emit DistressDetected(coreEquity(), maintenanceMargin());
+            emit DepositsFrozen(true);
+        }
+    }
+
     function decimals() public pure override returns (uint8) {
         return 18;
     }
@@ -159,9 +298,16 @@ contract PerpVault is ERC20, Ownable {
     /// @notice Deposit `assets` and receive shares priced at PRE-deposit NAV.
     /// @dev The pull happens AFTER NAV is read. Reversing that order would let a
     ///      depositor buy their own money, which is the classic ERC-4626 mistake.
-    function deposit(uint256 assets, address receiver) external returns (uint256 shares) {
+    function deposit(uint256 assets, address receiver) external nonReentrant returns (uint256 shares) {
         if (assets == 0) revert ZeroAmount();
+        // Blocked on the LIVE condition, not the latch. Setting the latch here and
+        // then reverting would roll the latch back with the rest of the call, so a
+        // distressed vault would keep accepting deposits until someone happened to
+        // call flagDistress() in its own transaction. Checking isDistressed()
+        // directly means the very first deposit into a distressed vault is refused
+        // whether or not anyone has flagged it yet.
         if (depositsFrozen) revert DepositsAreFrozen();
+        if (isDistressed()) revert VaultDistressed();
 
         uint256 navUsed = pricePerShare();
 
@@ -181,7 +327,7 @@ contract PerpVault is ERC20, Ownable {
     /// @dev Stage 1 is buffer-only: if the buffer cannot cover the payout this
     ///      reverts rather than silently queueing. The CLAIM-token queue that
     ///      handles the overflow case is deliberately not implemented yet.
-    function redeem(uint256 shares, address receiver) external returns (uint256 assets) {
+    function redeem(uint256 shares, address receiver) external nonReentrant returns (uint256 assets) {
         if (shares == 0) revert ZeroAmount();
 
         uint256 navUsed = pricePerShare();
@@ -196,6 +342,28 @@ contract PerpVault is ERC20, Ownable {
         emit Redeemed(msg.sender, shares, assets, navUsed);
     }
 
+    /// @notice Round a perp price to Hyperliquid's 5-significant-figure limit.
+    /// @dev Prices carrying more than 5 significant figures are REJECTED, and a
+    ///      rejected CoreWriter order does not revert — it is dropped silently,
+    ///      leaving no order, no fill and no error. Observed on chain 998: a buy at
+    ///      647169 ($64,716.9, six figures) produced no order at all.
+    /// @param roundUp true for buys, so rounding keeps the order marketable rather
+    ///        than pulling the limit back below the ask.
+    function _roundPxSigFigs(uint256 p, bool roundUp) internal pure returns (uint64) {
+        if (p == 0) return 0;
+        uint256 digits;
+        uint256 t = p;
+        while (t > 0) {
+            digits++;
+            t /= 10;
+        }
+        if (digits <= PX_SIG_FIGS) return uint64(p);
+        uint256 factor = 10 ** (digits - PX_SIG_FIGS);
+        uint256 down = (p / factor) * factor;
+        if (!roundUp || down == p) return uint64(down);
+        return uint64(down + factor);
+    }
+
     // --------------------------------------------------------------- keeper
 
     /// @notice Bring notional back to target, or de-lever if inside the de-risk band.
@@ -203,32 +371,75 @@ contract PerpVault is ERC20, Ownable {
     ///      Core and fills at a price not knowable here, so nothing downstream may
     ///      assume this has executed.
     function rebalance() external onlyKeeper returns (int256 sizeDelta) {
+        if (block.timestamp < lastRebalanceAt + rebalanceCooldown) {
+            revert RebalanceTooSoon(lastRebalanceAt + rebalanceCooldown);
+        }
+        lastRebalanceAt = block.timestamp;
+
+        flagDistress();
+
         uint256 equity = totalAssets();
         if (equity == 0) return 0;
 
         uint256 leverage = targetLeverageBps;
 
-        // De-risk band: below a multiple of maintenance margin, cut leverage rather
-        // than hold target. Chosen over an insurance fund because a fee-funded pot
-        // cannot cover a ~63% liquidation loss at any plausible size.
-        uint256 mm = maintenanceMargin();
-        if (mm > 0 && coreEquity() * BPS < mm * deRiskBandBps) {
-            leverage = leverage / 2;
+        // De-risk band: when the position has drifted above target leverage
+        // because equity fell, cut leverage instead of holding target.
+        //
+        // Measured against TARGET leverage, not maintenance margin. Maintenance is
+        // notional/(2*maxLeverage) while notional is itself target*equity, so a
+        // band expressed as a multiple of maintenance is scale-invariant and never
+        // fires at target. Worked through, a 2x BTC vault (maxLeverage 40) would
+        // only have de-risked after a ~96% equity loss, with liquidation at ~97.5%
+        // — firing moments before the event it exists to avoid.
+        uint256 current_ = notional();
+        if (current_ > 0) {
+            uint256 effLeverageBps = (current_ * BPS) / equity;
+            uint256 trigger = (targetLeverageBps * deRiskBandBps) / BPS;
+            if (effLeverageBps > trigger) {
+                leverage = leverage / 2;
+                emit DeRisked(effLeverageBps, trigger, leverage);
+            }
         }
 
         uint256 targetNotional = (equity * leverage) / BPS;
-        uint256 current = notional();
-
-        sizeDelta = int256(targetNotional) - int256(current);
+        sizeDelta = int256(targetNotional) - int256(current_);
 
         uint64 px = HyperCore.markPx(perpIndex);
         if (px == 0) revert BadParameter();
 
         uint256 deltaAbs = sizeDelta >= 0 ? uint256(sizeDelta) : uint256(-sizeDelta);
-        uint64 sz = uint64((deltaAbs * CORE_TO_EVM_SCALE) / px);
+        // sz_raw = notional * 1e6 / (markPx * 10^assetDecimals)
+        uint64 sz = uint64((deltaAbs * PERP_PX_SCALE) / (uint256(px) * (10 ** _assetDecimals)));
         if (sz > 0) {
             bool buy = isLong ? sizeDelta > 0 : sizeDelta < 0;
-            HyperCore.limitOrder(perpIndex, buy, px, sz, false, HyperCore.TIF_IOC, 0);
+
+            // Price off the far side of the book, not the mark. An IOC at the mark
+            // frequently does not fill because the mark can sit inside or outside
+            // the spread — a buy has to cross the ask. A non-filling order is
+            // silent: it reverts nothing and simply leaves the vault off target.
+            HyperCore.Bbo memory book = HyperCore.bbo(perpIndex);
+            uint64 ref = buy ? book.ask : book.bid;
+            if (ref == 0) ref = px; // empty book: fall back rather than send a zero price
+
+            uint256 bounded = buy
+                ? (uint256(ref) * (BPS + maxSlippageBps)) / BPS
+                : (uint256(ref) * (BPS - maxSlippageBps)) / BPS;
+            // Round for the 5-sig-fig rule while still in precompile units;
+            // scaling by a power of ten does not change significant figures.
+            uint64 limitPxRead = _roundPxSigFigs(bounded, buy);
+
+            // Convert both legs from read scale to CoreWriter's uniform 1e8.
+            uint256 szDec = szDecimals();
+            uint64 szWire = uint64(uint256(sz) * (10 ** (WIRE_DECIMALS - szDec)));
+            uint64 pxWire = uint64(uint256(limitPxRead) * (10 ** (WIRE_DECIMALS - (6 - szDec))));
+
+            // cloid ties the fill back to the rebalance that caused it; without one
+            // fills cannot be correlated to intent at all.
+            uint128 cloid = uint128(uint256(keccak256(abi.encode(address(this), block.number, sz, buy))));
+
+            HyperCore.limitOrder(perpIndex, buy, pxWire, szWire, false, HyperCore.TIF_IOC, cloid);
+            emit OrderPlaced(buy, szWire, pxWire, cloid);
         }
 
         emit Rebalanced(sizeDelta, equity, targetNotional);
@@ -238,10 +449,63 @@ contract PerpVault is ERC20, Ownable {
     /// @dev Two steps with different latencies: the ERC20 transfer is credited by a
     ///      system transaction after this block, while the class transfer is not
     ///      delayed at all.
+    /// @notice Begin bridging idle asset to the Core spot balance.
+    /// @dev Does NOT move spot into perp margin: the credit has not landed yet, so
+    ///      a class transfer here would act on a stale balance. Call settleBridge()
+    ///      once Core has credited it.
     function postMargin(uint256 amount) external onlyKeeper {
         if (amount == 0 || amount > idleAssets()) revert ZeroAmount();
+        spotBeforeBridge = coreSpot();
+        bridgeInFlight += amount;
         asset.safeTransfer(HyperCore.systemAddress(coreTokenIndex), amount);
-        HyperCore.usdClassTransfer(uint64(amount * CORE_TO_EVM_SCALE), true);
+        emit BridgeStarted(amount, spotBeforeBridge);
+    }
+
+    /// @notice Recognise however much of the bridge has actually landed, and move
+    ///         it into perp margin.
+    /// @dev Measures the delta rather than assuming the transfer arrived whole:
+    ///      Core may credit in parts. Permissionless, because leaving capital
+    ///      stranded in flight is worse than letting anyone advance it.
+    function settleBridge() public returns (uint256 credited) {
+        if (bridgeInFlight == 0) return 0;
+        uint256 spotNow = coreSpot();
+        if (spotNow <= spotBeforeBridge) return 0;
+
+        credited = spotNow - spotBeforeBridge;
+        if (credited > bridgeInFlight) credited = bridgeInFlight;
+
+        bridgeInFlight -= credited;
+        spotBeforeBridge = spotNow - credited;
+
+        // ntl is 1e6; the asset may not be.
+        uint256 ntl = _assetDecimals == PERP_USD_DECIMALS
+            ? credited
+            : (_assetDecimals > PERP_USD_DECIMALS
+                ? credited / (10 ** (_assetDecimals - PERP_USD_DECIMALS))
+                : credited * (10 ** (PERP_USD_DECIMALS - _assetDecimals)));
+        if (ntl > 0) HyperCore.usdClassTransfer(uint64(ntl), true);
+        emit BridgeSettled(credited, bridgeInFlight);
+    }
+
+    /// @notice Move USDC between the Core spot and perp balances.
+    /// @dev `postMargin` bridges from the HyperEVM side, which needs a working
+    ///      linked ERC20. Where the Core balance was funded directly instead — as
+    ///      it must be on testnet, whose USDC has no functioning EVM link — this is
+    ///      the only way to get spot into perp margin.
+    /// @param ntl Raw amount in CoreWriter's units for action 7.
+    function moveUsdClass(uint64 ntl, bool toPerp) external onlyKeeper {
+        HyperCore.usdClassTransfer(ntl, toPerp);
+    }
+
+    /// @notice Keeper escape hatch to place an order directly.
+    /// @dev Arguments are in CoreWriter WIRE units, i.e. 1e8 * the human readable
+    ///      value for both, not the per-asset scales the precompiles report.
+    function placeOrder(uint64 szWire, uint64 pxWire, bool isBuy, bool reduceOnly)
+        external
+        onlyKeeper
+    {
+        HyperCore.limitOrder(perpIndex, isBuy, pxWire, szWire, reduceOnly, HyperCore.TIF_IOC, 0);
+        emit OrderPlaced(isBuy, szWire, pxWire, 0);
     }
 
     // ---------------------------------------------------------------- admin
@@ -253,18 +517,28 @@ contract PerpVault is ERC20, Ownable {
         emit DepositsFrozen(frozen);
     }
 
+    function setRebalanceCooldown(uint256 seconds_) external onlyOwner {
+        if (seconds_ > 1 days) revert BadParameter();
+        rebalanceCooldown = seconds_;
+    }
+
     function setKeeper(address keeper_) external onlyOwner {
         keeper = keeper_;
     }
 
     function setTargetLeverageBps(uint256 bps) external onlyOwner {
-        if (bps == 0 || bps > MAX_LEVERAGE * BPS) revert BadParameter();
+        if (bps == 0 || bps > maxLeverage() * BPS) revert BadParameter();
         targetLeverageBps = bps;
     }
 
     function setEntryFeeBps(uint256 bps) external onlyOwner {
         if (bps > 500) revert BadParameter();
         entryFeeBps = bps;
+    }
+
+    function setMaxSlippageBps(uint256 bps) external onlyOwner {
+        if (bps > 1_000) revert BadParameter();
+        maxSlippageBps = bps;
     }
 
     function setDeRiskBandBps(uint256 bps) external onlyOwner {

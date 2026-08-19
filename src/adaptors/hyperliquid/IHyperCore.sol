@@ -16,6 +16,8 @@ library HyperCore {
     address internal constant MARK_PX = 0x0000000000000000000000000000000000000806;
     address internal constant SPOT_PX = 0x0000000000000000000000000000000000000808;
     address internal constant L1_BLOCK = 0x0000000000000000000000000000000000000809;
+    address internal constant PERP_ASSET_INFO = 0x000000000000000000000000000000000000080a;
+    address internal constant BBO = 0x000000000000000000000000000000000000080e;
     address internal constant MARGIN_SUMMARY = 0x000000000000000000000000000000000000080F;
     address internal constant CORE_USER_EXISTS = 0x0000000000000000000000000000000000000810;
 
@@ -42,11 +44,45 @@ library HyperCore {
         bool isIsolated;
     }
 
+    /// @dev Verified against chain 998 for BTC (perp 3): coin "BTC",
+    ///      marginTableId 54, szDecimals 5, maxLeverage 40, onlyIsolated false —
+    ///      matching the `meta` info endpoint.
+    struct PerpAssetInfo {
+        string coin;
+        uint32 marginTableId;
+        uint8 szDecimals;
+        uint8 maxLeverage;
+        bool onlyIsolated;
+    }
+
+    struct Bbo {
+        uint64 bid;
+        uint64 ask;
+    }
+
+    /// @dev Field order and signedness verified against a live position on chain
+    ///      998, cross-checked with clearinghouseState:
+    ///        accountValue 14978324 -> $14.978324  (API 14.985684)
+    ///        marginUsed    1488123 -> $1.488123   (API  1.488491)
+    ///        ntlPos       29762460 -> $29.762460  (API 29.769820)
+    ///        rawUsd      -14784136 -> -$14.784136
+    ///      rawUsd goes NEGATIVE while long — declaring it unsigned makes
+    ///      abi.decode revert the moment a position exists, which reads as the
+    ///      whole vault breaking rather than as a decode error.
+    ///      All values carry 6 decimals, like perp USD generally.
+    /// @dev Spot balances carry the token's weiDecimals — 8 for USDC — which is
+    ///      NOT the 6 that perp USD figures use. Verified via spotMeta.
+    struct SpotBalance {
+        uint64 total;
+        uint64 hold;
+        uint64 entryNtl;
+    }
+
     struct MarginSummary {
         int64 accountValue;
-        uint64 totalNtlPos;
-        uint64 totalRawUsd;
-        uint64 totalMarginUsed;
+        uint64 marginUsed;
+        uint64 ntlPos;
+        int64 rawUsd;
     }
 
     function position(address user, uint32 perp) internal view returns (Position memory p) {
@@ -65,6 +101,27 @@ library HyperCore {
         (bool ok, bytes memory out) = MARK_PX.staticcall(abi.encode(perp));
         if (!ok) revert PrecompileFailed(MARK_PX);
         px = abi.decode(out, (uint64));
+    }
+
+    function spotBalance(address user, uint64 token) internal view returns (SpotBalance memory b) {
+        (bool ok, bytes memory out) = SPOT_BALANCE.staticcall(abi.encode(user, token));
+        if (!ok) revert PrecompileFailed(SPOT_BALANCE);
+        b = abi.decode(out, (SpotBalance));
+    }
+
+    function perpAssetInfo(uint32 perp) internal view returns (PerpAssetInfo memory info) {
+        (bool ok, bytes memory out) = PERP_ASSET_INFO.staticcall(abi.encode(perp));
+        if (!ok) revert PrecompileFailed(PERP_ASSET_INFO);
+        info = abi.decode(out, (PerpAssetInfo));
+    }
+
+    /// @dev Best bid/offer. Needed because an IOC priced at the mark will often not
+    ///      fill: the mark can sit below the bid or above the ask, so a marketable
+    ///      order has to be priced off the far side of the book.
+    function bbo(uint32 perp) internal view returns (Bbo memory b) {
+        (bool ok, bytes memory out) = BBO.staticcall(abi.encode(perp));
+        if (!ok) revert PrecompileFailed(BBO);
+        b = abi.decode(out, (Bbo));
     }
 
     function coreUserExists(address user) internal view returns (bool exists) {
