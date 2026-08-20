@@ -135,7 +135,13 @@ async function tick() {
       .catch(() => 0n);
     const short = owed > freeForClaims ? owed - freeForClaims : 0n;
 
-    if (s.coreSpot > 0n && short > 0n) {
+    // The contract serialises the bridge: withdrawFromCore and moveUsdClass
+    // revert with BridgeBusy while an inbound leg is still measuring its spot
+    // delta. Step 2 settles the inbound leg, so this only defers a tick when a
+    // credit is genuinely still in flight.
+    if (s.bridgeInFlight > 0n) {
+      console.log(`    inbound bridge still in flight (${usd(s.bridgeInFlight)}), deferring exit legs`);
+    } else if (s.coreSpot > 0n && short > 0n) {
       const pull = s.coreSpot < short ? s.coreSpot : short;
       await send('withdrawFromCore', `${usd(pull)} spot -> HyperEVM for exits`, [pull]);
     } else if (short > 0n) {

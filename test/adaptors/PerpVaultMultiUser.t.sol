@@ -446,13 +446,13 @@ contract PerpVaultMultiUserTest is Test {
         vault.deposit(1_000e6, b); // must not revert
     }
 
-    /// @dev AUDIT PoC A: an idle outflow while a withdrawal is in flight shifts
-    ///      the baseline and turns the eventual credit into phantom NAV.
-    function test_poc_withdrawBaselinePhantomNav() public {
+    /// @dev C-1 regression (was AUDIT PoC A, 46% NAV overstatement). An idle
+    ///      outflow while a withdrawal is in flight must not turn the eventual
+    ///      credit into phantom NAV: the baseline now rebases on every idle move.
+    function test_withdrawBaselineSurvivesIdleOutflow() public {
         _resetVault(20_000);
         address alice = _mkUser(920, 1_000_000e6);
         address bob = _mkUser(921, 1_000_000e6);
-        // Direct deposits so idle stays on the EVM side.
         vm.prank(alice);
         vault.deposit(50_000e6, alice);
         vm.prank(bob);
@@ -463,16 +463,13 @@ contract PerpVaultMultiUserTest is Test {
         usdc.transfer(address(0xdead), 60_000e6);
         coreSpot8 = uint64(60_000e6) * 100;
         _sync();
-        assertApproxEqAbs(vault.totalAssets(), 100_000e6, 200e6, "all counted");
 
-        // Keeper starts bringing 30k home; Core debits the spot side.
         vm.prank(vault.keeper());
         vault.withdrawFromCore(30_000e6);
         coreSpot8 -= uint64(30_000e6) * 100;
         _sync();
 
-        // While in flight, Bob redeems ~35k from the buffer: idle falls BELOW
-        // the 40k baseline recorded at withdrawFromCore.
+        // Mid-flight outflow: Bob redeems ~35k from the buffer.
         vm.prank(bob);
         vault.redeem((bShares * 70) / 100, bob);
 
@@ -480,24 +477,93 @@ contract PerpVaultMultiUserTest is Test {
         usdc.mint(address(vault), 30_000e6);
 
         uint256 real = vault.idleAssets() + vault.coreSpot();
-        console2.log("reported totalAssets:", vault.totalAssets());
-        console2.log("real assets         :", real);
-        console2.log("phantom             :", vault.totalAssets() - real);
-        console2.log("pendingWithdraw     :", vault.pendingWithdraw());
+        assertEq(vault.pendingWithdraw(), 0, "credit fully recognised");
+        assertEq(vault.totalAssets(), real, "no phantom NAV");
     }
 
-    /// @dev AUDIT PoC B: liquidity that lands for the queue can be taken by a
-    ///      fresh redeemer before fundClaims earmarks it.
-    function test_poc_redeemJumpsTheClaimQueue() public {
+    /// @dev C-1 regression, mirror direction: a deposit landing mid-flight must
+    ///      not be swallowed as a fake bridge credit (which cleared
+    ///      withdrawInFlight early and understated NAV until the real credit came).
+    function test_depositMidFlightIsNotMisreadAsBridgeCredit() public {
+        _resetVault(20_000);
+        address alice = _mkUser(940, 1_000_000e6);
+        address bob = _mkUser(941, 1_000_000e6);
+        vm.prank(alice);
+        vault.deposit(50_000e6, alice);
+
+        vm.prank(address(vault));
+        usdc.transfer(address(0xdead), 40_000e6);
+        coreSpot8 = uint64(40_000e6) * 100;
+        _sync();
+
+        vm.prank(vault.keeper());
+        vault.withdrawFromCore(30_000e6);
+        coreSpot8 -= uint64(30_000e6) * 100;
+        _sync();
+
+        // Mid-flight inflow: Bob deposits 20k.
+        vm.prank(bob);
+        vault.deposit(20_000e6, bob);
+        assertEq(vault.withdrawInFlight(), 30_000e6, "deposit not eaten as credit");
+        assertEq(vault.pendingWithdraw(), 30_000e6, "still counted while in flight");
+
+        // The real credit lands and is recognised exactly once.
+        usdc.mint(address(vault), 30_000e6);
+        assertEq(vault.pendingWithdraw(), 0, "credit recognised");
+        assertEq(
+            vault.totalAssets(),
+            vault.idleAssets() + vault.coreSpot(),
+            "no phantom, no shortfall"
+        );
+    }
+
+    /// @dev C-1 regression: the two bridge directions measure deltas on the same
+    ///      balances, so the contract now refuses to run them concurrently.
+    function test_bridgeDirectionsAreSerialised() public {
+        _resetVault(20_000);
+        address alice = _mkUser(950, 1_000_000e6);
+        vm.prank(alice);
+        vault.deposit(50_000e6, alice);
+        vm.prank(address(vault));
+        usdc.transfer(address(0xdead), 20_000e6);
+        coreSpot8 = uint64(20_000e6) * 100;
+        _sync();
+
+        // Outbound in flight blocks a new inbound leg. moveUsdClass stays legal
+        // here: nothing measures a spot delta while only the outbound leg runs.
+        vm.startPrank(vault.keeper());
+        vault.withdrawFromCore(10_000e6);
+        vm.expectRevert(PerpVault.BridgeBusy.selector);
+        vault.postMargin(5_000e6);
+
+        // Once the credit lands, the guard self-clears via settlement.
+        vm.stopPrank();
+        usdc.mint(address(vault), 10_000e6);
+        vm.startPrank(vault.keeper());
+        vault.postMargin(5_000e6);
+        assertGt(vault.bridgeInFlight(), 0, "inbound leg started");
+        // Inbound in flight blocks BOTH the outbound leg and class transfers,
+        // because each would move the spot balance the inbound delta is
+        // measured on.
+        vm.expectRevert(PerpVault.BridgeBusy.selector);
+        vault.withdrawFromCore(1_000e6);
+        vm.expectRevert(PerpVault.BridgeBusy.selector);
+        vault.moveUsdClass(1_000_000, true);
+        vm.stopPrank();
+    }
+
+    /// @dev C-2 regression (was AUDIT PoC B: a fresh redeemer took the entire
+    ///      unwind that had landed for a fully queued holder). redeem() now runs
+    ///      fundClaims() before reading the buffer, so landed liquidity settles
+    ///      the queue first and the newcomer queues behind it.
+    function test_redeemCannotJumpTheClaimQueue() public {
         _resetVault(20_000);
         address alice = _mkUser(930, 1_000_000e6);
         address bob = _mkUser(931, 1_000_000e6);
         uint256 aShares = _deposit(alice, 50_000e6);
         uint256 bShares = _deposit(bob, 50_000e6);
-        _settleIdleToCore();
         _rebalance();
 
-        // Alice exits with nothing liquid: fully queued.
         vm.prank(alice);
         vault.redeem(aShares, alice);
         assertApproxEqRel(vault.claimSharesEscrowed(), aShares, 1e12);
@@ -507,14 +573,27 @@ contract PerpVaultMultiUserTest is Test {
         coreEquity8 -= int64(uint64(50_000e6));
         _sync();
 
-        // Bob redeems before any fundClaims call...
+        // Bob redeems before any keeper tick: Alice settles first, Bob queues.
+        uint256 bBefore = usdc.balanceOf(bob);
         vm.prank(bob);
         vault.redeem(bShares, bob);
 
-        console2.log("bob paid immediately :", usdc.balanceOf(bob) - 950_000e6);
-        console2.log("alice claimable      :", vault.claimSharesSettled());
-        console2.log("alice still escrowed :", vault.claimSharesEscrowed());
-        console2.log("bob escrowed now     :", vault.claimToken().balanceOf(bob));
+        assertApproxEqRel(
+            vault.claimSharesSettled(), aShares, 1e12, "the unwind went to the queue"
+        );
+        assertEq(vault.claimSharesEscrowed() > 0, true, "Bob is queued");
+        assertLt(usdc.balanceOf(bob) - bBefore, 100e6, "Bob got dust at most");
+        // Bob is paid the small residue Alice's settlement left in the buffer
+        // (pot was struck a hair under the landed 50k), and queues for the rest.
+        assertApproxEqRel(
+            vault.claimToken().balanceOf(bob), bShares, 2e15, "Bob holds a claim instead"
+        );
+
+        // And Alice can actually take her money.
+        uint256 claimable = vault.claimableShares(alice);
+        vm.prank(alice);
+        uint256 paid = vault.claim(claimable, alice);
+        assertApproxEqRel(paid, 50_000e6, 2e15, "Alice paid from her own unwind");
     }
 
     /// @dev The loop closed end to end: a queued exit must cause the position to

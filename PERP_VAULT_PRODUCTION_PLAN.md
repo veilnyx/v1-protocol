@@ -201,6 +201,15 @@ days, L is a week-class item.
 3. Turn both PoCs into asserting regression tests; add the deposit-mid-flight
    and concurrent-bridge variants.
 **Gate:** all PoCs assert the fixed behaviour; 45+ tests green.
+**Status: DONE.** Baseline rebases at the end of every idle-moving function
+(deposit, redeem, claim, postMargin); bridge directions serialised via
+`BridgeBusy` (inbound also blocks `moveUsdClass`, which moves the measured spot
+balance; outbound does not block it — nothing measures spot then); `redeem()`
+runs `fundClaims()` before reading the buffer. Regressions:
+`test_withdrawBaselineSurvivesIdleOutflow`,
+`test_depositMidFlightIsNotMisreadAsBridgeCredit`,
+`test_bridgeDirectionsAreSerialised`, `test_redeemCannotJumpTheClaimQueue`.
+47 tests green. Keeper defers exit legs while an inbound bridge is in flight.
 
 ### P1 — hardening (H-1 … H-4) — M/L
 4. Min-order handling in keeper + `minOrderNotional` awareness in

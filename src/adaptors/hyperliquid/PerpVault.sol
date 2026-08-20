@@ -199,6 +199,7 @@ contract PerpVault is ERC20, Ownable, ReentrancyGuard {
     error VaultDistressed();
     error ClaimNotSettled(uint256 requested, uint256 settled);
     error PriceDislocated(uint64 markPx, uint64 oraclePx, uint256 deviationBps);
+    error BridgeBusy();
 
     modifier onlyKeeper() {
         if (msg.sender != keeper && msg.sender != owner()) revert NotKeeper();
@@ -424,6 +425,7 @@ contract PerpVault is ERC20, Ownable, ReentrancyGuard {
         shares = convertToShares(credited);
 
         asset.safeTransferFrom(msg.sender, address(this), assets);
+        _rebaseWithdrawBaseline();
         _mint(receiver, shares);
 
         emit Deposited(msg.sender, assets, shares, navUsed);
@@ -444,7 +446,14 @@ contract PerpVault is ERC20, Ownable, ReentrancyGuard {
         // Redemption is equally price-sensitive: exiting at an inflated NAV takes
         // value from whoever stays.
         if (notional() > 0) _assertPriceSane();
-        _settleWithdraw();
+        // C-2 fix: earmark landed liquidity to the escrow queue BEFORE reading the
+        // buffer. Without this, the unwind executed for queued exiters sits as
+        // plain idle until the keeper's fundClaims tick, and a fresh redeemer in
+        // that window takes all of it — the PoC showed a fully queued holder
+        // starved while a later redeemer was paid in full from her unwind. The
+        // keeper's "exits before redeployment" ordering is now enforced here, not
+        // merely intended. fundClaims settles the withdraw leg internally.
+        fundClaims();
 
         uint256 navUsed = pricePerShare();
         assets = convertToAssets(shares);
@@ -471,6 +480,7 @@ contract PerpVault is ERC20, Ownable, ReentrancyGuard {
             emit RedemptionQueued(receiver, sharesQueued);
         }
 
+        _rebaseWithdrawBaseline();
         emit Redeemed(msg.sender, shares, assets, navUsed);
     }
 
@@ -505,8 +515,8 @@ contract PerpVault is ERC20, Ownable, ReentrancyGuard {
     ///      Permissionless: leaving exiters unsettled while asset sits idle is
     ///      worse than letting anyone advance it.
     function fundClaims() public returns (uint256 funded) {
-        if (claimSharesEscrowed == 0) return 0;
         _settleWithdraw();
+        if (claimSharesEscrowed == 0) return 0;
         uint256 free = idleAssets() > claimPot ? idleAssets() - claimPot : 0;
         if (free == 0) return 0;
 
@@ -544,6 +554,7 @@ contract PerpVault is ERC20, Ownable, ReentrancyGuard {
         claimSharesSettled -= amount;
         claimPot -= paid;
         if (paid > 0) asset.safeTransfer(receiver, paid);
+        _rebaseWithdrawBaseline();
         emit Claimed(receiver, amount, paid);
     }
 
@@ -654,10 +665,17 @@ contract PerpVault is ERC20, Ownable, ReentrancyGuard {
     ///      a class transfer here would act on a stale balance. Call settleBridge()
     ///      once Core has credited it.
     function postMargin(uint256 amount) external onlyKeeper {
+        // One bridge direction at a time. An outbound withdrawal debits the same
+        // spot balance this function's delta is measured on (and moves idle, whose
+        // baseline the withdrawal is measured on), so concurrent legs corrupt each
+        // other's measurements. Settle first so a completed leg does not block.
+        _settleWithdraw();
+        if (withdrawInFlight > 0) revert BridgeBusy();
         if (amount == 0 || amount > idleAssets()) revert ZeroAmount();
         spotBeforeBridge = coreSpot();
         bridgeInFlight += amount;
         asset.safeTransfer(HyperCore.systemAddress(coreTokenIndex), amount);
+        _rebaseWithdrawBaseline();
         emit BridgeStarted(amount, spotBeforeBridge);
     }
 
@@ -695,6 +713,10 @@ contract PerpVault is ERC20, Ownable, ReentrancyGuard {
     ///      two have different latencies — the class transfer is immediate, this
     ///      credit arrives by a later system transaction.
     function withdrawFromCore(uint256 amount) external onlyKeeper {
+        // Mirror of the guard in postMargin: the inbound leg measures a delta on
+        // the spot balance this spotSend is about to debit on a delay.
+        settleBridge();
+        if (bridgeInFlight > 0) revert BridgeBusy();
         if (amount == 0) revert ZeroAmount();
         if (amount > coreSpot()) revert BadParameter();
         _settleWithdraw();
@@ -729,6 +751,17 @@ contract PerpVault is ERC20, Ownable, ReentrancyGuard {
         emit WithdrawSettled(credited, withdrawInFlight);
     }
 
+    /// @dev C-1 fix. The in-flight withdrawal is measured as "idle rose above the
+    ///      baseline", so the baseline must move with every idle movement this
+    ///      contract makes — otherwise an outflow mid-flight drops idle below it
+    ///      and the eventual credit double-counts (46% NAV overstatement in the
+    ///      PoC), while an inflow is swallowed as a fake credit. Called at the END
+    ///      of every function that moves the idle balance, after _settleWithdraw
+    ///      has recognised anything that landed before the move.
+    function _rebaseWithdrawBaseline() internal {
+        if (withdrawInFlight > 0) idleBeforeWithdraw = idleAssets();
+    }
+
     /// @notice Move USDC between the Core spot and perp balances.
     /// @dev `postMargin` bridges from the HyperEVM side, which needs a working
     ///      linked ERC20. Where the Core balance was funded directly instead — as
@@ -736,6 +769,13 @@ contract PerpVault is ERC20, Ownable, ReentrancyGuard {
     ///      the only way to get spot into perp margin.
     /// @param ntl Raw amount in CoreWriter's units for action 7.
     function moveUsdClass(uint64 ntl, bool toPerp) external onlyKeeper {
+        // A class transfer moves the spot balance immediately; doing so while an
+        // inbound bridge is measuring a spot delta either masks the credit
+        // (toPerp: bridgeInFlight sticks and pendingBridge turns phantom) or gets
+        // itself misread as the credit (fromPerp). Settle first, then require the
+        // measurement window to be closed.
+        settleBridge();
+        if (bridgeInFlight > 0) revert BridgeBusy();
         HyperCore.usdClassTransfer(ntl, toPerp);
     }
 
