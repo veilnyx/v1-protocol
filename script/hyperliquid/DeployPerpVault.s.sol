@@ -12,6 +12,7 @@ import {AssetType, AssetInitParams, Asset} from "src/libraries/AssetLogic.sol";
 import {PerpVault} from "src/adaptors/hyperliquid/PerpVault.sol";
 import {PerpVaultAdaptor} from "src/adaptors/hyperliquid/PerpVaultAdaptor.sol";
 import {IPool} from "src/interfaces/IPool.sol";
+import {IAdaptorHandler} from "src/interfaces/IAdaptorHandler.sol";
 import {HyperCore} from "src/adaptors/hyperliquid/IHyperCore.sol";
 
 /// @title DeployPerpVault - one vault, correctly configured or not at all
@@ -154,6 +155,9 @@ contract DeployPerpVault is Script {
             });
             Pool(payable(pool)).addAssets(AssetType.ERC20, reg);
             adaptor = address(new PerpVaultAdaptor(IPool(pool)));
+            // Without this the Pool refuses every CALL_ADAPTOR to the adaptor —
+            // registration of the assets alone is not support.
+            Pool(payable(pool)).addAdaptorSupport(IAdaptorHandler(adaptor), true);
         }
 
         vm.stopBroadcast();
