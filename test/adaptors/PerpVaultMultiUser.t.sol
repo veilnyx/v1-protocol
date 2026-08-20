@@ -40,6 +40,7 @@ contract PerpVaultMultiUserTest is Test {
     int64 internal coreEquity8; // Core USD, 8dp
     int64 internal szi; // raw perp size, szDecimals (=5 for BTC)
     uint64 internal px; // raw perp price, (6 - szDecimals) dp
+    uint64 internal coreSpot8; // Core SPOT balance, weiDecimals (8)
 
     address[] internal users;
 
@@ -72,12 +73,13 @@ contract PerpVaultMultiUserTest is Test {
         // Index oracle, mocked in line with the mark so pricing is allowed.
         // Tests that need a dislocation override this one call.
         vm.mockCall(HyperCore.ORACLE_PX, abi.encode(PERP), abi.encode(px));
-        // totalAssets() also reads the Core spot balance; this harness keeps all
-        // equity in perp, so spot stays flat at zero.
+        // totalAssets() also reads the Core spot balance. Most tests keep all
+        // equity in perp and leave this at zero; the withdrawal path moves through
+        // it, so it is a variable rather than a constant.
         vm.mockCall(
             HyperCore.SPOT_BALANCE,
             abi.encode(address(vault), TOKEN_INDEX),
-            abi.encode(HyperCore.SpotBalance(uint64(0), 0, 0))
+            abi.encode(HyperCore.SpotBalance(coreSpot8, 0, 0))
         );
         // Mirrors BTC on chain 998: szDecimals 5, maxLeverage 40.
         vm.mockCall(
@@ -306,6 +308,7 @@ contract PerpVaultMultiUserTest is Test {
         );
         vault.setEntryFeeBps(0);
         coreEquity8 = 0;
+        coreSpot8 = 0;
         szi = 0;
         px = 1_000_000;
         delete users;
@@ -441,6 +444,69 @@ contract PerpVaultMultiUserTest is Test {
         address b = _mkUser(721, 1_000_000e6);
         vm.prank(b);
         vault.deposit(1_000e6, b); // must not revert
+    }
+
+    /// @dev The loop closed end to end: a queued exit must cause the position to
+    ///      unwind, the freed margin to come home, and the claim to settle — with
+    ///      no asset injected by hand anywhere.
+    function test_queuedExitUnwindsAndFundsItself() public {
+        _resetVault(20_000);
+        address alice = _mkUser(910, 1_000_000e6);
+        address bob = _mkUser(911, 1_000_000e6);
+        uint256 aShares = _deposit(alice, 10_000e6);
+        _deposit(bob, 90_000e6);
+        _settleIdleToCore();
+        _rebalance();
+
+        uint256 notional0 = vault.notional();
+        uint256 nav0 = vault.pricePerShare();
+
+        vm.prank(alice);
+        vault.redeem(aShares, alice);
+        assertApproxEqRel(vault.claimSharesEscrowed(), aShares, 1e12, "queued");
+        assertApproxEqAbs(vault.pricePerShare(), nav0, 2, "queueing is NAV-neutral");
+
+        // Sizing now excludes the exiting 10%, so the keeper's ordinary rebalance
+        // trims the position instead of sitting still.
+        skip(60);
+        _rebalance();
+        uint256 notional1 = vault.notional();
+        assertApproxEqRel(notional1, (notional0 * 90) / 100, 2e16, "trimmed ~10%");
+
+        // Freed margin: perp -> spot -> HyperEVM.
+        uint256 free = vault.coreEquity() - (vault.notional() * 10_000) / 20_000;
+        vm.startPrank(vault.keeper());
+        vault.moveUsdClass(uint64(free), false);
+        coreEquity8 -= int64(uint64(free));
+        coreSpot8 += uint64(free * 100);
+        _sync();
+        vault.withdrawFromCore(free);
+        vm.stopPrank();
+
+        // In flight: left Core spot, not yet on HyperEVM. NAV must not dip.
+        coreSpot8 -= uint64(free * 100);
+        _sync();
+        assertApproxEqAbs(vault.pricePerShare(), nav0, 200, "no NAV dip mid-bridge");
+        assertEq(vault.pendingWithdraw(), free, "counted while in flight");
+
+        // Credit lands on HyperEVM.
+        usdc.mint(address(vault), free);
+        assertEq(vault.pendingWithdraw(), 0, "self-clears once credited");
+
+        uint256 navBefore = vault.pricePerShare();
+        vault.fundClaims();
+        assertApproxEqAbs(vault.pricePerShare(), navBefore, 2, "settlement is NAV-neutral");
+
+        uint256 claimable = vault.claimableShares(alice);
+        assertGt(claimable, 0, "the unwind actually funded the exit");
+        vm.prank(alice);
+        uint256 paid = vault.claim(claimable, alice);
+
+        console2.log("notional before :", notional0);
+        console2.log("notional after  :", notional1);
+        console2.log("margin freed    :", free);
+        console2.log("paid to exiter  :", paid);
+        console2.log("still escrowed  :", vault.claimSharesEscrowed());
     }
 
     /// @dev The exit-side mirror of the entry externality, and the reason claims

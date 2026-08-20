@@ -427,10 +427,43 @@ applied to the other direction, and it is verified in
 `test_queuedRedeemerCarriesTheMarketNotTheStayers` — the -15% case pays 6,991
 against a face value of 9,991, so the exiter bears the full 3,000.
 
-Two consequences for integrators. Settlement is partial whenever the unwind
+**Escrowing alone is not enough — something has to unwind.** Escrowed shares move
+neither `totalSupply` nor `totalAssets`, so leverage does not drift and
+`rebalance()` sees nothing to do. Measured on a 100,000 vault at 2x, a 10% exit
+produced a 180 trim rather than the ~20,000 it should: the claim was priced
+correctly and then waited for asset that never arrived. The fix is to size the
+position against equity that is actually staying:
+
+```
+targetNotional = leveragedEquity() * leverage,  leveragedEquity = totalAssets - escrowedValue
+```
+
+The trim is then proportional, which is liquidation-neutral by the C3 corollary —
+notional and margin fall in the same ratio, so leverage is unchanged and the
+holders who stay do not see their liquidation price move. It also frees exactly
+the exiter's own margin, no more.
+
+That margin lands as Core **spot**, while `claim()` pays an ERC20 on HyperEVM, so
+the return leg is `moveUsdClass(perp -> spot)` then `withdrawFromCore`, which
+spot-sends to the token's system address. The two legs sit on separate keeper
+ticks because the class transfer is a CoreWriter action and the spot balance it
+credits is not readable until the transaction that queued it has finished.
+`withdrawInFlight` / `pendingWithdraw()` mirror the inbound bridge so NAV does not
+dip while the money is in neither place.
+
+Three consequences for integrators. Settlement is partial whenever the unwind
 returns less than the full amount, so a "claim all" control must pass
-`claimableShares(holder)` and not the raw CLAIM balance. And because CLAIM is now
-share-denominated, it is an 18-decimal token, not a 6-decimal one.
+`claimableShares(holder)` and not the raw CLAIM balance. Because CLAIM is now
+share-denominated it is an 18-decimal token, not a 6-decimal one. And settlement
+**converges rather than completing in one pass** — each cycle frees the exiter's
+proportional slice, and unwind fees leave a small residue for the next one, so the
+keeper must keep cycling until `claimSharesEscrowed` reaches zero.
+
+**Unverified on chain:** the `spotSend`-to-system-address return leg is covered by
+unit tests against a mocked Core only. A direct `spotSend` from the admin EOA was
+rejected with "Action disabled when unified account is active" and needed
+`sendAsset` instead. Whether a contract hits the same restriction is not yet
+established, and must be confirmed on testnet before launch.
 
 ---
 

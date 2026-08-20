@@ -149,6 +149,18 @@ contract PerpVault is ERC20, Ownable, ReentrancyGuard {
     ///      that is no longer the remaining holders'.
     uint256 public claimPot;
 
+    /// @notice Asset sent from the Core spot balance toward HyperEVM, not yet
+    ///         credited on this side.
+    /// @dev The mirror of bridgeInFlight and needed for the same reason: the spot
+    ///      debit on Core and the ERC20 credit on HyperEVM are not atomic, so
+    ///      without this the money is invisible to BOTH coreSpot() (already fell)
+    ///      and idleAssets() (not yet risen), and NAV dips for the width of the
+    ///      window.
+    uint256 public withdrawInFlight;
+
+    /// @notice HyperEVM balance when the outbound bridge was last started or settled.
+    uint256 public idleBeforeWithdraw;
+
     /// @notice Asset already sent to the Core system address but not yet credited.
     /// @dev The bridge is not atomic: the ERC20 leaves on this block, Core credits
     ///      it by a system transaction afterwards. Without tracking it, the amount
@@ -175,6 +187,8 @@ contract PerpVault is ERC20, Ownable, ReentrancyGuard {
     event Claimed(address indexed receiver, uint256 claimShares, uint256 paid);
     event BridgeStarted(uint256 amount, uint256 spotBefore);
     event BridgeSettled(uint256 credited, uint256 stillInFlight);
+    event WithdrawStarted(uint256 amount, uint256 idleBefore);
+    event WithdrawSettled(uint256 credited, uint256 stillInFlight);
 
     error ZeroAmount();
     error DepositsAreFrozen();
@@ -253,6 +267,28 @@ contract PerpVault is ERC20, Ownable, ReentrancyGuard {
         return credited >= bridgeInFlight ? 0 : bridgeInFlight - credited;
     }
 
+    /// @notice Asset on its way back from Core that HyperEVM has not yet credited.
+    /// @dev Derived, like pendingBridge, so it self-corrects in views as the credit
+    ///      lands rather than depending on anyone having called settleWithdraw.
+    function pendingWithdraw() public view returns (uint256) {
+        if (withdrawInFlight == 0) return 0;
+        uint256 idleNow = idleAssets();
+        if (idleNow <= idleBeforeWithdraw) return withdrawInFlight;
+        uint256 credited = idleNow - idleBeforeWithdraw;
+        return credited >= withdrawInFlight ? 0 : withdrawInFlight - credited;
+    }
+
+    /// @notice Equity that is actually working in the position.
+    /// @dev totalAssets() less the value of shares queued to leave. Those shares
+    ///      still track NAV — that is exactly what keeps the exiter exposed — but
+    ///      their backing must not be levered, or the unwind that funds them never
+    ///      happens.
+    function leveragedEquity() public view returns (uint256) {
+        uint256 eq = totalAssets();
+        uint256 owed = convertToAssets(claimSharesEscrowed);
+        return eq > owed ? eq - owed : 0;
+    }
+
     /// @notice Every place the vault's asset can be, so NAV never dips because
     ///         money is between two of them.
     /// @dev Four locations: the HyperEVM ERC20 balance, in flight across the
@@ -260,7 +296,8 @@ contract PerpVault is ERC20, Ownable, ReentrancyGuard {
     ///      perp and EVM — as this did — makes NAV collapse and recover on every
     ///      bridge and every spot-to-perp move, which is a free round trip.
     function totalAssets() public view returns (uint256) {
-        uint256 gross = coreEquity() + idleAssets() + coreSpot() + pendingBridge();
+        uint256 gross =
+            coreEquity() + idleAssets() + coreSpot() + pendingBridge() + pendingWithdraw();
         // Only the pot is netted. Escrowed shares are still in totalSupply and
         // still backed by gross, which is what keeps a queued redeemer exposed to
         // NAV. Settlement burns escrowed shares and moves exactly their value into
@@ -376,6 +413,7 @@ contract PerpVault is ERC20, Ownable, ReentrancyGuard {
         // Only meaningful while a position exists; with none, equity is cash and
         // no mark is involved in valuing it.
         if (notional() > 0) _assertPriceSane();
+        _settleWithdraw();
 
         uint256 navUsed = pricePerShare();
 
@@ -391,10 +429,11 @@ contract PerpVault is ERC20, Ownable, ReentrancyGuard {
         emit Deposited(msg.sender, assets, shares, navUsed);
     }
 
-    /// @notice Burn `shares` and pay out USDC from the idle buffer.
-    /// @dev Stage 1 is buffer-only: if the buffer cannot cover the payout this
-    ///      reverts rather than silently queueing. The CLAIM-token queue that
-    ///      handles the overflow case is deliberately not implemented yet.
+    /// @notice Redeem `shares`, paying what the buffer covers and queueing the rest.
+    /// @dev What the buffer cannot cover is escrowed in SHARES and priced later by
+    ///      fundClaims(), from the unwind that actually funds it — so the exiter
+    ///      carries NAV and their own exit cost until they are genuinely out,
+    ///      rather than fixing an asset amount today at the stayers' expense.
     function redeem(uint256 shares, address receiver)
         external
         nonReentrant
@@ -405,6 +444,7 @@ contract PerpVault is ERC20, Ownable, ReentrancyGuard {
         // Redemption is equally price-sensitive: exiting at an inflated NAV takes
         // value from whoever stays.
         if (notional() > 0) _assertPriceSane();
+        _settleWithdraw();
 
         uint256 navUsed = pricePerShare();
         assets = convertToAssets(shares);
@@ -466,6 +506,7 @@ contract PerpVault is ERC20, Ownable, ReentrancyGuard {
     ///      worse than letting anyone advance it.
     function fundClaims() public returns (uint256 funded) {
         if (claimSharesEscrowed == 0) return 0;
+        _settleWithdraw();
         uint256 free = idleAssets() > claimPot ? idleAssets() - claimPot : 0;
         if (free == 0) return 0;
 
@@ -544,7 +585,16 @@ contract PerpVault is ERC20, Ownable, ReentrancyGuard {
             }
         }
 
-        uint256 targetNotional = (equity * leverage) / BPS;
+        // Size against equity that is actually staying. Escrowed claim value is on
+        // its way out, so levering it would buy exposure the vault must immediately
+        // sell again — and, worse, would leave the exit unfunded indefinitely:
+        // escrowed shares move neither totalSupply nor totalAssets, so they create
+        // no drift for this function to see and nothing would ever unwind.
+        //
+        // Trimming proportionally is liquidation-neutral. Closing notional and
+        // releasing margin in the same ratio leaves leverage unchanged, so holders
+        // who stay do not see their liquidation price move (C3 corollary).
+        uint256 targetNotional = (leveragedEquity() * leverage) / BPS;
         sizeDelta = int256(targetNotional) - int256(current_);
 
         uint64 px = HyperCore.markPx(perpIndex);
@@ -635,6 +685,48 @@ contract PerpVault is ERC20, Ownable, ReentrancyGuard {
                 : credited * (10 ** (PERP_USD_DECIMALS - _assetDecimals)));
         if (ntl > 0) HyperCore.usdClassTransfer(uint64(ntl), true);
         emit BridgeSettled(credited, bridgeInFlight);
+    }
+
+    /// @notice Send asset from the Core spot balance back to HyperEVM.
+    /// @dev The return leg the claim queue depends on: freed margin lands as Core
+    ///      spot, but claim() pays an ERC20 on HyperEVM. Sending spot to the
+    ///      token's system address is the reverse of postMargin's transfer in.
+    ///      Split from the perp-to-spot class transfer (moveUsdClass) because the
+    ///      two have different latencies — the class transfer is immediate, this
+    ///      credit arrives by a later system transaction.
+    function withdrawFromCore(uint256 amount) external onlyKeeper {
+        if (amount == 0) revert ZeroAmount();
+        if (amount > coreSpot()) revert BadParameter();
+        _settleWithdraw();
+        idleBeforeWithdraw = idleAssets();
+        withdrawInFlight += amount;
+        // spotSend takes weiDecimals (8); asset is 6.
+        HyperCore.spotSend(
+            HyperCore.systemAddress(coreTokenIndex),
+            coreTokenIndex,
+            uint64(amount * CORE_TO_EVM_SCALE)
+        );
+        emit WithdrawStarted(amount, idleBeforeWithdraw);
+    }
+
+    /// @notice Recognise however much of the outbound bridge has reached HyperEVM.
+    /// @dev Permissionless, as settleBridge is, and for the same reason.
+    function settleWithdraw() public returns (uint256 credited) {
+        return _settleWithdraw();
+    }
+
+    function _settleWithdraw() internal returns (uint256 credited) {
+        if (withdrawInFlight == 0) return 0;
+        uint256 idleNow = idleAssets();
+        if (idleNow <= idleBeforeWithdraw) return 0;
+        credited = idleNow - idleBeforeWithdraw;
+        if (credited > withdrawInFlight) credited = withdrawInFlight;
+        withdrawInFlight -= credited;
+        // Any excess over the credit is new deposits, not the bridge. Rebasing to
+        // the live balance stops that excess being read as a credit next time,
+        // which is why this is called before anything else that moves idle.
+        idleBeforeWithdraw = idleNow;
+        emit WithdrawSettled(credited, withdrawInFlight);
     }
 
     /// @notice Move USDC between the Core spot and perp balances.

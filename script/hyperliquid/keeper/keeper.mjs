@@ -39,6 +39,14 @@ const abi = parseAbi([
   'function pendingBridge() view returns (uint256)',
   'function bridgeInFlight() view returns (uint256)',
   'function claimSharesEscrowed() view returns (uint256)',
+  'function coreSpot() view returns (uint256)',
+  'function leveragedEquity() view returns (uint256)',
+  'function pendingWithdraw() view returns (uint256)',
+  'function withdrawInFlight() view returns (uint256)',
+  'function convertToAssets(uint256) view returns (uint256)',
+  'function settleWithdraw() returns (uint256)',
+  'function withdrawFromCore(uint256)',
+  'function moveUsdClass(uint64,bool)',
   'function claimSharesSettled() view returns (uint256)',
   'function claimPot() view returns (uint256)',
   'function targetLeverageBps() view returns (uint256)',
@@ -65,6 +73,7 @@ async function read() {
   const keys = [
     'totalAssets', 'notional', 'coreEquity', 'idleAssets', 'pendingBridge',
     'bridgeInFlight', 'claimSharesEscrowed', 'claimSharesSettled', 'claimPot', 'targetLeverageBps',
+    'coreSpot', 'leveragedEquity', 'pendingWithdraw', 'withdrawInFlight',
     'maxOracleDeviationBps', 'markOracleDeviationBps', 'rebalanceCooldown',
     'lastRebalanceAt', 'depositsFrozen', 'isDistressed', 'maintenanceMargin',
   ];
@@ -74,12 +83,12 @@ async function read() {
   return Object.fromEntries(keys.map((k, i) => [k, out[i]]));
 }
 
-async function send(fn, why) {
+async function send(fn, why, args = []) {
   if (DRY || !wallet) {
-    console.log(`    would call ${fn}() — ${why}`);
+    console.log(`    would call ${fn}(${args.join(', ')}) — ${why}`);
     return null;
   }
-  const hash = await wallet.writeContract({ address: VAULT, abi, functionName: fn, chain: null });
+  const hash = await wallet.writeContract({ address: VAULT, abi, functionName: fn, args, chain: null });
   console.log(`    ${fn}() -> ${hash}   (${why})`);
   return hash;
 }
@@ -109,16 +118,42 @@ async function tick() {
     await send('settleBridge', `${usd(s.bridgeInFlight - s.pendingBridge)} credited`);
   }
 
-  // 3. Exiting holders are paid before capital is redeployed into the position.
-  //    Claims are denominated in SHARES, so what is owed is only known once the
-  //    unwind lands; fund whenever there are escrowed shares and idle asset above
-  //    the pot to settle them against.
+  // 3. Recognise capital coming BACK from Core, so it can fund exits.
+  if (s.withdrawInFlight > 0n && s.pendingWithdraw < s.withdrawInFlight) {
+    await send('settleWithdraw', `${usd(s.withdrawInFlight - s.pendingWithdraw)} landed on HyperEVM`);
+  }
+
+  // 4. Queued exits: walk the freed margin home, perp -> spot -> HyperEVM.
+  //    rebalance() sizes off leveragedEquity(), so step 5 does the trimming; this
+  //    only moves what that trim released. The two legs are deliberately on
+  //    separate ticks: the class transfer is a CoreWriter action, so the spot
+  //    balance it credits is not readable until after this transaction.
   const freeForClaims = s.idleAssets > s.claimPot ? s.idleAssets - s.claimPot : 0n;
+  if (s.claimSharesEscrowed > 0n) {
+    const owed = await pub
+      .readContract({ address: VAULT, abi, functionName: 'convertToAssets', args: [s.claimSharesEscrowed] })
+      .catch(() => 0n);
+    const short = owed > freeForClaims ? owed - freeForClaims : 0n;
+
+    if (s.coreSpot > 0n && short > 0n) {
+      const pull = s.coreSpot < short ? s.coreSpot : short;
+      await send('withdrawFromCore', `${usd(pull)} spot -> HyperEVM for exits`, [pull]);
+    } else if (short > 0n) {
+      // Margin the position no longer needs, now that sizing excludes the exit.
+      const needed = s.targetLeverageBps > 0n ? (s.notional * 10_000n) / s.targetLeverageBps : 0n;
+      const spare = s.coreEquity > needed ? s.coreEquity - needed : 0n;
+      const pull = spare < short ? spare : short;
+      if (pull > 0n) await send('moveUsdClass', `${usd(pull)} perp -> spot for exits`, [pull, false]);
+      else console.log(`    ${usd(short)} owed on exits, waiting on the unwind`);
+    }
+  }
+
+  // 5. Settle whatever the buffer can already cover.
   if (s.claimSharesEscrowed > 0n && freeForClaims > 0n) {
     await send('fundClaims', `${usd(freeForClaims)} free against queued exits`);
   }
 
-  // 4. Rebalance last, and only when it is both allowed and worth it.
+  // 6. Rebalance last, and only when it is both allowed and worth it.
   const now = BigInt(Math.floor(Date.now() / 1000));
   const nextAllowed = s.lastRebalanceAt + s.rebalanceCooldown;
   const drift = lev > s.targetLeverageBps ? lev - s.targetLeverageBps : s.targetLeverageBps - lev;
