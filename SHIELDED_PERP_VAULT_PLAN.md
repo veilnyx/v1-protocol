@@ -459,11 +459,38 @@ share-denominated it is an 18-decimal token, not a 6-decimal one. And settlement
 proportional slice, and unwind fees leave a small residue for the next one, so the
 keeper must keep cycling until `claimSharesEscrowed` reaches zero.
 
-**Unverified on chain:** the `spotSend`-to-system-address return leg is covered by
-unit tests against a mocked Core only. A direct `spotSend` from the admin EOA was
-rejected with "Action disabled when unified account is active" and needed
-`sendAsset` instead. Whether a contract hits the same restriction is not yet
-established, and must be confirmed on testnet before launch.
+**Verified on testnet** (chain 998, vault `0x292331d85707E8EC9Ef8c69b0D02835662393023`,
+40 USDC of real Core margin, 1x BTC long):
+
+| step | result |
+|---|---|
+| queue 25% exit | `leveragedEquity` 39.93 -> 29.97, `totalAssets` unchanged, `totalSupply` unchanged |
+| `rebalance()` | trim order $9.5 — silently dropped, below Hyperliquid's $10 minimum order value |
+| queue 50% total | `leveragedEquity` exactly half of `totalAssets` |
+| `rebalance()` | **real fill**: Close Long 0.00027 BTC @ 71,758; position 0.00055 -> 0.00028, notional 39.47 -> 20.09 |
+| `moveUsdClass(perp -> spot)` | perp 20.49, spot 19.50, `totalAssets` 39.99 — NAV preserved across the move |
+| contract `spotSend` | **accepted.** A probe contract moved 1 USDC out. The "Action disabled when unified account is active" rejection applies to the admin EOA, not to contract addresses |
+
+Two findings from the drill.
+
+**The exchange minimum is a real constraint on small vaults.** A trim below $10 of
+notional is dropped silently, exactly like an over-precise price. A vault small
+enough that a redemption's proportional trim falls under $10 cannot fund that exit
+by unwinding at all. The keeper must detect this and either widen the trim past
+the minimum or surface the exit as unfundable, rather than looping on an order
+that never fills.
+
+**There is no recovery path for Core spot.** `withdrawFromCore` can only send to
+the token's system address. Where that link is broken — as testnet USDC's is, its
+`evmContract` at `0x0b80...c206` being a proxy whose every ERC20 call reverts —
+the asset cannot be retrieved by any route. Two drill vaults hold ~80 USDC that
+cannot be moved. An owner-only sweep would close this, but it is an admin power
+over user funds and therefore belongs in the 6.3 trust discussion, not a
+unilateral addition.
+
+**Still unverified:** the final spot-to-HyperEVM credit, which needs a working
+linked ERC20. Testnet USDC has none, so this leg is exercised only against a
+mocked Core.
 
 ---
 
