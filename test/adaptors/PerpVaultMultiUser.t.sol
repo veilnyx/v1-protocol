@@ -446,6 +446,77 @@ contract PerpVaultMultiUserTest is Test {
         vault.deposit(1_000e6, b); // must not revert
     }
 
+    /// @dev AUDIT PoC A: an idle outflow while a withdrawal is in flight shifts
+    ///      the baseline and turns the eventual credit into phantom NAV.
+    function test_poc_withdrawBaselinePhantomNav() public {
+        _resetVault(20_000);
+        address alice = _mkUser(920, 1_000_000e6);
+        address bob = _mkUser(921, 1_000_000e6);
+        // Direct deposits so idle stays on the EVM side.
+        vm.prank(alice);
+        vault.deposit(50_000e6, alice);
+        vm.prank(bob);
+        uint256 bShares = vault.deposit(50_000e6, bob);
+
+        // 60k of it is on Core spot, 40k stays as buffer.
+        vm.prank(address(vault));
+        usdc.transfer(address(0xdead), 60_000e6);
+        coreSpot8 = uint64(60_000e6) * 100;
+        _sync();
+        assertApproxEqAbs(vault.totalAssets(), 100_000e6, 200e6, "all counted");
+
+        // Keeper starts bringing 30k home; Core debits the spot side.
+        vm.prank(vault.keeper());
+        vault.withdrawFromCore(30_000e6);
+        coreSpot8 -= uint64(30_000e6) * 100;
+        _sync();
+
+        // While in flight, Bob redeems ~35k from the buffer: idle falls BELOW
+        // the 40k baseline recorded at withdrawFromCore.
+        vm.prank(bob);
+        vault.redeem((bShares * 70) / 100, bob);
+
+        // The credit lands on HyperEVM.
+        usdc.mint(address(vault), 30_000e6);
+
+        uint256 real = vault.idleAssets() + vault.coreSpot();
+        console2.log("reported totalAssets:", vault.totalAssets());
+        console2.log("real assets         :", real);
+        console2.log("phantom             :", vault.totalAssets() - real);
+        console2.log("pendingWithdraw     :", vault.pendingWithdraw());
+    }
+
+    /// @dev AUDIT PoC B: liquidity that lands for the queue can be taken by a
+    ///      fresh redeemer before fundClaims earmarks it.
+    function test_poc_redeemJumpsTheClaimQueue() public {
+        _resetVault(20_000);
+        address alice = _mkUser(930, 1_000_000e6);
+        address bob = _mkUser(931, 1_000_000e6);
+        uint256 aShares = _deposit(alice, 50_000e6);
+        uint256 bShares = _deposit(bob, 50_000e6);
+        _settleIdleToCore();
+        _rebalance();
+
+        // Alice exits with nothing liquid: fully queued.
+        vm.prank(alice);
+        vault.redeem(aShares, alice);
+        assertApproxEqRel(vault.claimSharesEscrowed(), aShares, 1e12);
+
+        // The unwind for HER exit lands as idle.
+        usdc.mint(address(vault), 50_000e6);
+        coreEquity8 -= int64(uint64(50_000e6));
+        _sync();
+
+        // Bob redeems before any fundClaims call...
+        vm.prank(bob);
+        vault.redeem(bShares, bob);
+
+        console2.log("bob paid immediately :", usdc.balanceOf(bob) - 950_000e6);
+        console2.log("alice claimable      :", vault.claimSharesSettled());
+        console2.log("alice still escrowed :", vault.claimSharesEscrowed());
+        console2.log("bob escrowed now     :", vault.claimToken().balanceOf(bob));
+    }
+
     /// @dev The loop closed end to end: a queued exit must cause the position to
     ///      unwind, the freed margin to come home, and the claim to settle — with
     ///      no asset injected by hand anywhere.
