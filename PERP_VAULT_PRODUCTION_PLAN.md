@@ -227,6 +227,20 @@ runs `fundClaims()` before reading the buffer. Regressions:
 8. Setter events, zero-checks, doc fixes. [M-4]
 **Gate:** keeper drill on testnet exercises the sub-minimum tail to a fully
 settled queue.
+**Status: DONE.** Drill vault `0x2024F614260025648ebC82498A61f3Fdd8D23b9F`
+(chain 998, real Core margin, 2x BTC): a $4 queued exit produced a $7.71
+required trim; the vault widened it (`TrimWidened $7.71 -> $10.50`), sent
+$10.79 wire, and got a REAL fill — Close Long 0.00015 BTC @ 72,297 ($10.84).
+Margin floor blocked a near-total `moveUsdClass` pull live; a sane pull
+passed; queue settled to zero escrow and the claim paid.
+
+The drill also caught a rounding bug the unit suite had missed: the first
+attempt widened the NOTIONAL to $10.00 but the size division FLOORED, sending
+$9.39 — dropped silently again. Fixed by widening to $10.50 (execution-price
+headroom) and CEILING the size for widened trims. The unit harness missed it
+because it accepted all orders; it now drops sub-$10 notionals exactly like
+the exchange. The dead-link spot->EVM leg remains simulated (testnet USDC has
+no working linked ERC20) — unchanged, tracked under P4 canary.
 
 ### P2 — deployment pipeline (H-5, M-1) — M
 9. `DeployPerpVault.s.sol` with config assertions; Pool registration of share

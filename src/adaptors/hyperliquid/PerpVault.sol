@@ -655,20 +655,31 @@ contract PerpVault is ERC20, Ownable, ReentrancyGuard {
         //  - any other sub-minimum delta is ordinary drift: skip it, say so, and
         //    let a later rebalance absorb it.
         uint256 minNotional = MIN_ORDER_USD * (10 ** _assetDecimals);
+        bool widenedTrim;
         if (deltaAbs > 0 && deltaAbs < minNotional) {
             bool trimming = current_ > targetNotional;
             if (trimming && claimSharesEscrowed > 0) {
-                uint256 widened = minNotional > current_ ? current_ : minNotional;
+                // 5% over the minimum: the exchange checks notional at EXECUTION
+                // price, which can sit below the mark this sizing reads.
+                uint256 widened = (minNotional * 10_500) / BPS;
+                if (widened > current_) widened = current_;
                 emit TrimWidened(deltaAbs, widened);
                 deltaAbs = widened;
+                widenedTrim = true;
             } else {
                 emit OrderBelowMinimum(deltaAbs, minNotional);
                 deltaAbs = 0;
             }
         }
 
-        // sz_raw = notional * 1e6 / (markPx * 10^assetDecimals)
-        uint64 sz = uint64((deltaAbs * PERP_PX_SCALE) / (uint256(px) * (10 ** _assetDecimals)));
+        // sz_raw = notional * 1e6 / (markPx * 10^assetDecimals). Floored normally;
+        // CEILED for a widened trim, because flooring can round the notional back
+        // under the minimum it was just widened past — observed live: $10.00
+        // widened, sz floored to 0.00013 BTC, $9.39 sent, dropped silently.
+        uint256 szDen = uint256(px) * (10 ** _assetDecimals);
+        uint64 sz = widenedTrim
+            ? uint64((deltaAbs * PERP_PX_SCALE + szDen - 1) / szDen)
+            : uint64((deltaAbs * PERP_PX_SCALE) / szDen);
         if (sz > 0) {
             bool buy = isLong ? sizeDelta > 0 : sizeDelta < 0;
 

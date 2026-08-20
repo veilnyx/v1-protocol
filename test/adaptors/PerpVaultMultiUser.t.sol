@@ -134,8 +134,15 @@ contract PerpVaultMultiUserTest is Test {
         bytes memory raw = cw.actions(cw.actionCount() - 1);
         bytes memory payload = new bytes(raw.length - 4);
         for (uint256 i = 0; i < payload.length; i++) payload[i] = raw[i + 4];
-        (, bool isBuy,, uint64 sz,,,) =
+        (, bool isBuy, uint64 pxWire, uint64 sz,,,) =
             abi.decode(payload, (uint32, bool, uint64, uint64, bool, uint8, uint128));
+
+        // Be as unforgiving as the real exchange: orders under $10 notional are
+        // dropped SILENTLY. The P1 drill caught a widened trim whose floored size
+        // rounded back to $9.39 — this harness had accepted it, the exchange did
+        // not. Notional from wire units: (sz/1e8) * (px/1e8) * 1e6 asset units.
+        uint256 wireNotional6 = (uint256(sz) * uint256(pxWire)) / 1e10;
+        if (wireNotional6 < 10e6) return;
 
         // The order is emitted in CoreWriter WIRE units (1e8); the position
         // precompile reports READ units (szDecimals). Convert before adopting, or
