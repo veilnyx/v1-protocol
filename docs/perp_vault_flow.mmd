@@ -1,0 +1,56 @@
+sequenceDiagram
+    autonumber
+    actor A as Alice
+    actor B as Bob
+    participant P as Shielded Pool
+    participant V as PerpVault (EVM)
+    participant K as Keeper
+    participant C as HyperCore
+
+    Note over A,C: PHASE 1 — DEPOSIT · synchronous, one transaction per depositor
+    A->>P: CALL_ADAPTOR · spend 6,000 USDC notes
+    P->>V: deposit(6,000)
+    V->>V: mint at PRE-deposit NAV minus 0.1% entry fee
+    V-->>P: out 5,994.0 SHARES (18dp)
+    P-->>A: SHARE note, 5,994.0
+    B->>P: CALL_ADAPTOR · spend 4,000 USDC notes
+    P->>V: deposit(4,000)
+    V-->>P: out 3,996.0 SHARES, priced at Bob's own moment
+    P-->>B: SHARE note, 3,996.0
+    Note over P,V: no batch, no epoch, no claim on entry — the entry fee pays for the rebalance each deposit forces
+
+    Note over A,C: PHASE 2 — BRIDGE AND OPEN · keeper-driven, NAV counts all five locations throughout
+    K->>V: postMargin(idle minus claimPot)
+    V->>V: settleBridge() first, then baseline = spot minus credited
+    V->>C: ERC20 transfer to Core system address
+    Note over V,C: bridgeInFlight measured as a spot delta · BridgeBusy serialises the two directions
+    C-->>V: spot credited, possibly in parts
+    K->>V: settleBridge() → usdClassTransfer spot to perp
+    K->>V: rebalance() · targetNotional = leveragedEquity × 2
+    V->>C: IOC at far-side BBO, max 50bps slippage, 5 sig figs, min $10
+    C-->>V: fill lands seconds later — rejections are SILENT
+
+    Note over A,C: PHASE 3 — REDEEM · the buffer pays now, the rest queues in SHARES
+    A->>P: CALL_ADAPTOR · spend 5,994.0 SHARE notes
+    P->>V: redeem(5,994.0 shares)
+    V->>V: fundClaims() FIRST — landed liquidity settles the queue before the buffer is read
+    V->>V: buffer covers 1,000 → paid at today's NAV · 4,995.0 shares ESCROWED, not burned
+    V-->>P: out 1,000 USDC + 4,995.0 CLAIM (denominated in shares)
+    P-->>A: USDC note + CLAIM note
+    Note over P,V: Alice still tracks NAV — her exit price is NOT fixed yet, and no newcomer can jump her queue
+
+    Note over A,C: PHASE 4 — UNWIND AND SETTLE · keeper loops until the escrow is empty
+    K->>V: rebalance() — sizing excludes escrowed value, so the drift IS the queued exit
+    V->>C: proportional reduce order · a sub-$10 tail is widened to $10.50, size ceiled
+    C-->>V: real fill · margin freed, liquidation price unmoved for stayers
+    K->>V: moveUsdClass perp to spot · floored at 1.5x maintenance
+    K->>V: withdrawFromCore spot to EVM · pendingWithdraw counted while in flight
+    C-->>V: EVM credit lands
+    K->>V: fundClaims() — burn escrowed shares at CURRENT NAV, move exactly their value into the pot
+    Note over V,K: STRIKE — Alice's exit price is set here, from the realised unwind · NAV-neutral for everyone else
+
+    Note over A,C: PHASE 5 — CLAIM · any time, user-initiated
+    A->>P: CALL_ADAPTOR · spend CLAIM note, 4,995.0
+    P->>V: claim(settled portion)
+    V-->>P: out 4,989.2 USDC at the settled rate + fresh CLAIM note for any unsettled remainder
+    P-->>A: USDC note
