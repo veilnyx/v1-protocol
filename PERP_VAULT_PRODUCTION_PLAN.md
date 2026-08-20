@@ -278,6 +278,25 @@ harnesses stay independent; deploys must set it and the script enforces that.
 15. External review of the four contracts (small surface: ~1,200 lines).
 **Gate:** invariants run clean; external findings triaged to zero
 criticals/highs.
+**Status: internal portion DONE; external review pending.**
+- Item 12: four invariants over ghost-accounting interleavings, clean at
+  24,576 calls each. The suite found and fixed THREE contract bugs before its
+  first clean run (postMargin baseline swallow, pot bridged away, in-tx class
+  transfer ignored by the baseline read) — vindicating exactly the claim that
+  C-1's class needed invariant coverage.
+- Item 13: real-proof fixture e2e through the real Pool passes (10 shielded
+  USDC -> 9.99e18 shares at NAV 1.0 minus entry fee).
+- Item 14: keeper-driven lifecycle drill on final bytecode
+  (`0xE1d9d1d85308fdC87E1B1cA39a5660b7db56B5c8`, chain 998): deposit ->
+  bridge -> 2x BTC -> 30% queued exit -> trim (real fills) -> sub-$10 tail
+  widened to a real $10.76 fill -> margin walked home -> 17.98 of 17.982
+  shares settled, $18.03 claimed, $0.002 dust tail. Three keeper bugs found
+  and fixed: drift measured against totalAssets instead of leveragedEquity
+  (trim never fired), nonce races between same-tick sends (now awaits
+  receipts), and the drift band starving the settlement tail (band now
+  yields while exits are queued).
+- Item 15: `EXTERNAL_REVIEW_BRIEF.md` — scope, system model, attack surface
+  priorities, accepted behaviours, evidence, and full bug history.
 
 ### P4 — launch operations — M
 16. Mainnet canary: real USDC link, deposit cap in the hundreds, the

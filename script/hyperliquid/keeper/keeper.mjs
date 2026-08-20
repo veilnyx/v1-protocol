@@ -89,6 +89,10 @@ async function send(fn, why, args = []) {
     return null;
   }
   const hash = await wallet.writeContract({ address: VAULT, abi, functionName: fn, args, chain: null });
+  // Wait for inclusion before the next action: two writes in one tick otherwise
+  // race the account nonce (found in the P3 drill — the second send used a stale
+  // nonce and the tick crashed mid-sequence).
+  await pub.waitForTransactionReceipt({ hash, timeout: 60_000 });
   console.log(`    ${fn}() -> ${hash}   (${why})`);
   return hash;
 }
@@ -101,7 +105,13 @@ async function tick() {
   }
 
   const equity = s.totalAssets;
-  const lev = equity > 0n ? (s.notional * 10_000n) / equity : 0n;
+  // Drift is measured against the equity the vault actually LEVERS —
+  // leveragedEquity excludes escrowed exits. Measuring against totalAssets
+  // shows a queued exit as zero drift and the trim that funds it never fires
+  // (found in the P3 lifecycle drill: 30% queued, keeper reported 2.00x and
+  // skipped, position never shrank).
+  const levBase = (s.leveragedEquity ?? equity) > 0n ? (s.leveragedEquity ?? equity) : equity;
+  const lev = levBase > 0n ? (s.notional * 10_000n) / levBase : 0n;
   console.log(
     `  equity ${usd(equity)}  notional ${usd(s.notional)}  lev ${(Number(lev) / 10_000).toFixed(2)}x` +
       `  target ${(Number(s.targetLeverageBps) / 10_000).toFixed(2)}x  dev ${s.markOracleDeviationBps ?? 'n/a'}bps` +
@@ -172,10 +182,14 @@ async function tick() {
     console.log('    skipping rebalance: mark is dislocated from the index');
   } else if (now < nextAllowed) {
     console.log(`    skipping rebalance: cooldown for ${nextAllowed - now}s`);
-  } else if (s.notional > 0n && drift < DRIFT_BAND_BPS) {
+  } else if (s.notional > 0n && drift < DRIFT_BAND_BPS && s.claimSharesEscrowed === 0n) {
     console.log(`    skipping rebalance: drift ${drift}bps inside the ${DRIFT_BAND_BPS}bps band`);
   } else {
-    await send('rebalance', `drift ${drift}bps`);
+    // The band suppresses fee churn, but never while exits are queued: a small
+    // residue's drift sits inside any reasonable band forever, and the vault's
+    // sub-minimum trim widening only helps if rebalance is actually called
+    // (found in the P3 drill: 0.38 shares of tail, 163bps of drift, stalled).
+    await send('rebalance', s.claimSharesEscrowed > 0n ? 'exits queued' : `drift ${drift}bps`);
   }
 }
 
