@@ -559,6 +559,37 @@ contract PerpVaultMultiUserTest is Test {
         vault.moveUsdClass(uint64(eq - floor_ * 2), false);
     }
 
+    /// @dev M-1 mitigation: the cap is checked on post-deposit TOTALS, so one
+    ///      large entry cannot overshoot it, and lowering it strands nobody.
+    function test_depositCapBindsOnTotals() public {
+        _resetVault(20_000);
+        vault.setDepositCap(10_000e6);
+        address u = _mkUser(970, 1_000_000e6);
+        vm.prank(u);
+        vault.deposit(6_000e6, u); // idle, not settled: counts toward the cap
+
+        vm.prank(u);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                PerpVault.DepositCapExceeded.selector, 6_000e6 + 5_000e6, 10_000e6
+            )
+        );
+        vault.deposit(5_000e6, u);
+
+        // Exactly to the cap passes.
+        vm.prank(u);
+        vault.deposit(4_000e6, u);
+
+        // Lowering below current totals blocks new money but forces nothing out.
+        vault.setDepositCap(5_000e6);
+        vm.prank(u);
+        vm.expectRevert();
+        vault.deposit(1e6, u);
+        uint256 shares = vault.balanceOf(u);
+        vm.prank(u);
+        vault.redeem(shares / 2, u); // redemption unaffected
+    }
+
     function test_setKeeperRejectsZeroAddress() public {
         vm.expectRevert(PerpVault.BadParameter.selector);
         vault.setKeeper(address(0));

@@ -18,6 +18,7 @@ library HyperCore {
     address internal constant SPOT_PX = 0x0000000000000000000000000000000000000808;
     address internal constant L1_BLOCK = 0x0000000000000000000000000000000000000809;
     address internal constant PERP_ASSET_INFO = 0x000000000000000000000000000000000000080a;
+    address internal constant TOKEN_INFO = 0x000000000000000000000000000000000000080C;
     address internal constant BBO = 0x000000000000000000000000000000000000080e;
     address internal constant MARGIN_SUMMARY = 0x000000000000000000000000000000000000080F;
     address internal constant CORE_USER_EXISTS = 0x0000000000000000000000000000000000000810;
@@ -119,6 +120,26 @@ library HyperCore {
     /// @dev Best bid/offer. Needed because an IOC priced at the mark will often not
     ///      fill: the mark can sit below the bid or above the ask, so a marketable
     ///      order has to be priced off the far side of the book.
+    /// @dev Spot token metadata, including the linked HyperEVM contract. Field
+    ///      order verified against testnet token 0 (USDC): evmContract came back
+    ///      0x0b80659a...c206 and evmExtraWeiDecimals -2, both matching spotMeta.
+    struct TokenInfo {
+        string name;
+        uint64[] spots;
+        uint64 deployerTradingFeeShare;
+        address deployer;
+        address evmContract;
+        uint8 szDecimals;
+        uint8 weiDecimals;
+        int8 evmExtraWeiDecimals;
+    }
+
+    function tokenInfo(uint32 token) internal view returns (TokenInfo memory t) {
+        (bool ok, bytes memory data) = TOKEN_INFO.staticcall(abi.encode(token));
+        if (!ok) revert PrecompileFailed(TOKEN_INFO);
+        t = abi.decode(data, (TokenInfo));
+    }
+
     function bbo(uint32 perp) internal view returns (Bbo memory b) {
         (bool ok, bytes memory out) = BBO.staticcall(abi.encode(perp));
         if (!ok) revert PrecompileFailed(BBO);

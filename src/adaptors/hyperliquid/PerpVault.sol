@@ -123,6 +123,16 @@ contract PerpVault is ERC20, Ownable, ReentrancyGuard {
     ///         Bounds what a thin or fast-moving book can cost the vault.
     uint256 public maxSlippageBps = 50;
 
+    /// @notice Hard ceiling on totalAssets(), in asset units.
+    /// @dev The maintenance model is notional/(2*maxLeverage), which matches
+    ///      HyperCore only in the LOWEST margin tier; larger positions sit in
+    ///      higher marginTableId tiers with bigger requirements, so at size the
+    ///      vault would understate maintenance and latch distress late. Until the
+    ///      tiered table is read on-chain, the cap keeps the position inside the
+    ///      tier where the model is exact. Deploys MUST set it; the constructor
+    ///      default is uncapped only so test harnesses stay independent of it.
+    uint256 public depositCap = type(uint256).max;
+
     bool public depositsFrozen;
     address public keeper;
 
@@ -203,6 +213,7 @@ contract PerpVault is ERC20, Ownable, ReentrancyGuard {
     event MaxSlippageChanged(uint256 bps);
     event DeRiskBandChanged(uint256 bps);
     event RebalanceCooldownChanged(uint256 seconds_);
+    event DepositCapChanged(uint256 cap);
 
     error ZeroAmount();
     error DepositsAreFrozen();
@@ -215,6 +226,7 @@ contract PerpVault is ERC20, Ownable, ReentrancyGuard {
     error PriceDislocated(uint64 markPx, uint64 oraclePx, uint256 deviationBps);
     error BridgeBusy();
     error MarginFloorBreached(uint256 equityAfter, uint256 floor);
+    error DepositCapExceeded(uint256 wouldBe, uint256 cap);
 
     modifier onlyKeeper() {
         if (msg.sender != keeper && msg.sender != owner()) revert NotKeeper();
@@ -432,6 +444,12 @@ contract PerpVault is ERC20, Ownable, ReentrancyGuard {
         _settleWithdraw();
 
         uint256 navUsed = pricePerShare();
+
+        // Checked on POST-deposit totals so the cap cannot be overshot by one
+        // large entry, and after settlement so a landed withdrawal is not
+        // double-counted against it.
+        uint256 wouldBe = totalAssets() + assets;
+        if (wouldBe > depositCap) revert DepositCapExceeded(wouldBe, depositCap);
 
         uint256 fee = (assets * entryFeeBps) / BPS;
         uint256 credited = assets - fee;
@@ -913,5 +931,13 @@ contract PerpVault is ERC20, Ownable, ReentrancyGuard {
         if (bps < BPS) revert BadParameter();
         deRiskBandBps = bps;
         emit DeRiskBandChanged(bps);
+    }
+
+    /// @dev See depositCap. Lowering below current totalAssets() is allowed and
+    ///      simply stops NEW deposits; nothing is forced out.
+    function setDepositCap(uint256 cap) external onlyOwner {
+        if (cap == 0) revert BadParameter();
+        depositCap = cap;
+        emit DepositCapChanged(cap);
     }
 }

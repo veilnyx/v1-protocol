@@ -250,6 +250,24 @@ no working linked ERC20) — unchanged, tracked under P4 canary.
     disclosure. [M-3]
 **Gate:** one-command testnet deploy producing a correctly configured vault,
 verified by the probe checklist.
+**Status: DONE.** `DeployPerpVault.s.sol` deployed vault
+`0x22eadA81D357bEBAB306D08373a88e65C13B587d` on 998 in one command: cap set
+(500 USDC), share registered as Pool asset 65540, CLAIM as 65541, adaptor at
+`0x31B48E0c...41EF`. Pre-flight asserts run against the REAL node via raw
+eth_call (HyperCore precompiles have no bytecode, so fork simulation cannot
+execute them): evm-link pairing, bridge scale == 100, 6dp asset, perp exists,
+target <= market max leverage, cross margin, real cap. Negative test confirmed
+the script REJECTS the exact USD-T0/USDC misconfiguration that shipped once.
+`verify-vault.sh` probes 9 checks post-deploy: 8/9 on the drill vault, the one
+FAIL being the intentionally unlinked mock asset (ALLOW_BROKEN_LINK, testnet
+only). The tokenInfo precompile (0x80C) is now bound in IHyperCore with
+field order verified on chain.
+
+Item 11 (frontend/SDK: CLAIM support, claimableShares in the UI, funding
+disclosure) is deliberately NOT part of this gate — it is workstream-D UI work
+with no deploy dependency. Deposit cap (item 10) shipped: checked on
+post-deposit totals, lowering strands nobody, default uncapped only so test
+harnesses stay independent; deploys must set it and the script enforces that.
 
 ### P3 — verification — L
 12. Invariant/fuzz suite over operation interleavings (the four invariants
