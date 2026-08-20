@@ -57,6 +57,11 @@ contract PerpVault is ERC20, Ownable, ReentrancyGuard {
 
     uint256 public constant BPS = 10_000;
 
+    /// @dev Hyperliquid drops orders below $10 notional as silently as it drops
+    ///      over-precise prices — observed live: a $9.5 trim produced no order, no
+    ///      fill, no error. Every order this contract sends must clear it.
+    uint256 public constant MIN_ORDER_USD = 10;
+
     /// @dev Perp prices from precompile 0x806 carry `6 - szDecimals` decimals, and
     ///      sizes carry `szDecimals`. Converting between notional and size therefore
     ///      cancels szDecimals out and leaves a fixed 1e6 factor:
@@ -189,6 +194,15 @@ contract PerpVault is ERC20, Ownable, ReentrancyGuard {
     event BridgeSettled(uint256 credited, uint256 stillInFlight);
     event WithdrawStarted(uint256 amount, uint256 idleBefore);
     event WithdrawSettled(uint256 credited, uint256 stillInFlight);
+    event TrimWidened(uint256 requestedNotional, uint256 sentNotional);
+    event OrderBelowMinimum(uint256 requestedNotional, uint256 minimumNotional);
+    event KeeperChanged(address keeper);
+    event TargetLeverageChanged(uint256 bps);
+    event EntryFeeChanged(uint256 bps);
+    event MaxOracleDeviationChanged(uint256 bps);
+    event MaxSlippageChanged(uint256 bps);
+    event DeRiskBandChanged(uint256 bps);
+    event RebalanceCooldownChanged(uint256 seconds_);
 
     error ZeroAmount();
     error DepositsAreFrozen();
@@ -200,6 +214,7 @@ contract PerpVault is ERC20, Ownable, ReentrancyGuard {
     error ClaimNotSettled(uint256 requested, uint256 settled);
     error PriceDislocated(uint64 markPx, uint64 oraclePx, uint256 deviationBps);
     error BridgeBusy();
+    error MarginFloorBreached(uint256 equityAfter, uint256 floor);
 
     modifier onlyKeeper() {
         if (msg.sender != keeper && msg.sender != owner()) revert NotKeeper();
@@ -443,25 +458,35 @@ contract PerpVault is ERC20, Ownable, ReentrancyGuard {
     {
         if (shares == 0) revert ZeroAmount();
 
-        // Redemption is equally price-sensitive: exiting at an inflated NAV takes
-        // value from whoever stays.
-        if (notional() > 0) _assertPriceSane();
-        // C-2 fix: earmark landed liquidity to the escrow queue BEFORE reading the
-        // buffer. Without this, the unwind executed for queued exiters sits as
-        // plain idle until the keeper's fundClaims tick, and a fresh redeemer in
-        // that window takes all of it — the PoC showed a fully queued holder
-        // starved while a later redeemer was paid in full from her unwind. The
-        // keeper's "exits before redeployment" ordering is now enforced here, not
-        // merely intended. fundClaims settles the withdraw leg internally.
-        fundClaims();
+        // A dislocated mark blocks anything PRICED — the immediate payment leg and
+        // settlement — but must not block exit INTENT: escrowing shares needs no
+        // price at all (the exit is priced later, at settlement, by design).
+        // Reverting here would lock holders in during exactly the volatility that
+        // makes them want out.
+        bool priceOk = notional() == 0 || markOracleDeviationBps() <= maxOracleDeviationBps;
+        if (priceOk) {
+            // C-2 fix: earmark landed liquidity to the escrow queue BEFORE reading
+            // the buffer. Without this, the unwind executed for queued exiters sits
+            // as plain idle until the keeper's fundClaims tick, and a fresh
+            // redeemer in that window takes all of it — the PoC showed a fully
+            // queued holder starved while a later redeemer was paid in full from
+            // her unwind. The keeper's "exits before redeployment" ordering is now
+            // enforced here, not merely intended. fundClaims settles the withdraw
+            // leg internally.
+            fundClaims();
+        } else {
+            _settleWithdraw();
+        }
 
         uint256 navUsed = pricePerShare();
         assets = convertToAssets(shares);
 
         // Split by SHARES, not by a fixed asset amount. Whatever the buffer covers
         // exits now at today's NAV; the rest stays in shares and is priced later,
-        // from the unwind that actually funds it.
-        uint256 free = idleAssets() > claimPot ? idleAssets() - claimPot : 0;
+        // from the unwind that actually funds it. Under a dislocated mark nothing
+        // is paid now — everything queues.
+        uint256 free =
+            priceOk && idleAssets() > claimPot ? idleAssets() - claimPot : 0;
         uint256 sharesNow = convertToShares(free);
         if (sharesNow > shares) sharesNow = shares;
         uint256 sharesQueued = shares - sharesNow;
@@ -543,7 +568,14 @@ contract PerpVault is ERC20, Ownable, ReentrancyGuard {
 
     /// @notice Redeem a claim receipt for asset at the settled rate.
     /// @dev Pays pro rata against the pot, so tranches settled at different rates
-    ///      blend rather than paying whoever claims first at the best one.
+    ///      BLEND rather than paying whoever claims first at the best one. The
+    ///      blend is a deliberate decision, not an oversight: paying each tranche
+    ///      at its own strike would require tying a CLAIM token to its settlement
+    ///      epoch, and CLAIM is a fungible bearer asset registered once in the
+    ///      Pool — per-epoch rates would need per-epoch asset ids, the exact cost
+    ///      this design rejected for deposits. The exposure is bounded by how much
+    ///      NAV moves between settlements, so the keeper settling every tick keeps
+    ///      tranches small; a holder claiming promptly receives ~their strike.
     function claim(uint256 amount, address receiver) external nonReentrant returns (uint256 paid) {
         if (amount == 0) revert ZeroAmount();
         fundClaims();
@@ -612,6 +644,29 @@ contract PerpVault is ERC20, Ownable, ReentrancyGuard {
         if (px == 0) revert BadParameter();
 
         uint256 deltaAbs = sizeDelta >= 0 ? uint256(sizeDelta) : uint256(-sizeDelta);
+
+        // The exchange's $10 minimum. A sub-minimum order is dropped silently, so
+        // sending one is worse than sending none: the caller believes it traded.
+        // Two cases:
+        //  - a sub-minimum TRIM while exits are queued would stall settlement
+        //    forever (the residue shrinks geometrically and the trim with it), so
+        //    it is WIDENED to the minimum — over-trimming de-levers slightly,
+        //    which is the safe direction, and the excess returns as buffer;
+        //  - any other sub-minimum delta is ordinary drift: skip it, say so, and
+        //    let a later rebalance absorb it.
+        uint256 minNotional = MIN_ORDER_USD * (10 ** _assetDecimals);
+        if (deltaAbs > 0 && deltaAbs < minNotional) {
+            bool trimming = current_ > targetNotional;
+            if (trimming && claimSharesEscrowed > 0) {
+                uint256 widened = minNotional > current_ ? current_ : minNotional;
+                emit TrimWidened(deltaAbs, widened);
+                deltaAbs = widened;
+            } else {
+                emit OrderBelowMinimum(deltaAbs, minNotional);
+                deltaAbs = 0;
+            }
+        }
+
         // sz_raw = notional * 1e6 / (markPx * 10^assetDecimals)
         uint64 sz = uint64((deltaAbs * PERP_PX_SCALE) / (uint256(px) * (10 ** _assetDecimals)));
         if (sz > 0) {
@@ -776,18 +831,24 @@ contract PerpVault is ERC20, Ownable, ReentrancyGuard {
         // measurement window to be closed.
         settleBridge();
         if (bridgeInFlight > 0) revert BridgeBusy();
-        HyperCore.usdClassTransfer(ntl, toPerp);
-    }
 
-    /// @notice Keeper escape hatch to place an order directly.
-    /// @dev Arguments are in CoreWriter WIRE units, i.e. 1e8 * the human readable
-    ///      value for both, not the per-asset scales the precompiles report.
-    function placeOrder(uint64 szWire, uint64 pxWire, bool isBuy, bool reduceOnly)
-        external
-        onlyKeeper
-    {
-        HyperCore.limitOrder(perpIndex, isBuy, pxWire, szWire, reduceOnly, HyperCore.TIF_IOC, 0);
-        emit OrderPlaced(isBuy, szWire, pxWire, 0);
+        // Pulling margin from under the position must not walk it toward
+        // liquidation: a compromised or buggy keeper could otherwise strip margin
+        // and let the market do the stealing. Equity after the pull must clear
+        // 1.5x maintenance. (toPerp adds margin and needs no floor.)
+        if (!toPerp && notional() > 0) {
+            uint256 pull = _assetDecimals == PERP_USD_DECIMALS
+                ? uint256(ntl)
+                : (_assetDecimals > PERP_USD_DECIMALS
+                    ? uint256(ntl) * (10 ** (_assetDecimals - PERP_USD_DECIMALS))
+                    : uint256(ntl) / (10 ** (PERP_USD_DECIMALS - _assetDecimals)));
+            uint256 floor_ = (maintenanceMargin() * 15_000) / BPS;
+            uint256 eq = coreEquity();
+            if (eq < pull + floor_) {
+                revert MarginFloorBreached(eq > pull ? eq - pull : 0, floor_);
+            }
+        }
+        HyperCore.usdClassTransfer(ntl, toPerp);
     }
 
     // ---------------------------------------------------------------- admin
@@ -802,34 +863,44 @@ contract PerpVault is ERC20, Ownable, ReentrancyGuard {
     function setRebalanceCooldown(uint256 seconds_) external onlyOwner {
         if (seconds_ > 1 days) revert BadParameter();
         rebalanceCooldown = seconds_;
+        emit RebalanceCooldownChanged(seconds_);
     }
 
     function setKeeper(address keeper_) external onlyOwner {
+        if (keeper_ == address(0)) revert BadParameter();
         keeper = keeper_;
+        emit KeeperChanged(keeper_);
     }
 
+    /// @dev Takes effect on the next rebalance, including for the sizing of trims
+    ///      that fund queued exits — lowering leverage mid-queue slows settlement.
     function setTargetLeverageBps(uint256 bps) external onlyOwner {
         if (bps == 0 || bps > maxLeverage() * BPS) revert BadParameter();
         targetLeverageBps = bps;
+        emit TargetLeverageChanged(bps);
     }
 
     function setEntryFeeBps(uint256 bps) external onlyOwner {
         if (bps > 500) revert BadParameter();
         entryFeeBps = bps;
+        emit EntryFeeChanged(bps);
     }
 
     function setMaxOracleDeviationBps(uint256 bps) external onlyOwner {
         if (bps == 0 || bps > 2_000) revert BadParameter();
         maxOracleDeviationBps = bps;
+        emit MaxOracleDeviationChanged(bps);
     }
 
     function setMaxSlippageBps(uint256 bps) external onlyOwner {
         if (bps > 1_000) revert BadParameter();
         maxSlippageBps = bps;
+        emit MaxSlippageChanged(bps);
     }
 
     function setDeRiskBandBps(uint256 bps) external onlyOwner {
         if (bps < BPS) revert BadParameter();
         deRiskBandBps = bps;
+        emit DeRiskBandChanged(bps);
     }
 }

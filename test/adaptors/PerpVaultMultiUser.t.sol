@@ -403,13 +403,26 @@ contract PerpVaultMultiUserTest is Test {
     }
 
     /// @dev Exiting at an inflated mark takes value from whoever stays, so the
-    ///      same guard has to apply on the way out.
+    /// @dev A pushed mark corrupts equity itself (HyperCore marks accountValue
+    ///      with its own mark), so nothing may be PAID while mark and index
+    ///      disagree. Exit intent still passes — the redemption queues unpriced
+    ///      and settles only after the mark reverts, at the honest NAV. This is
+    ///      the H-4 shape of the old hard-revert property: the exploit is equally
+    ///      dead, but holders are no longer locked in during dislocation.
     function test_markManipulationCannotRedeemRich() public {
         _resetVault(20_000);
         address honest = _mkUser(710, 1_000_000e6);
         uint256 shares = _deposit(honest, 50_000e6);
         _rebalance();
 
+        // A second depositor leaves a real buffer on the EVM side, so a payment
+        // at the pushed mark WOULD have money to take.
+        address filler = _mkUser(712, 1_000_000e6);
+        vm.prank(filler);
+        vault.deposit(10_000e6, filler);
+        assertGt(vault.idleAssets(), 9_000e6, "buffer exists");
+
+        // Push the mark +10%; the index stays honest.
         uint64 pushed = uint64((uint256(px) * 110) / 100);
         int256 d = int256(uint256(pushed)) - int256(uint256(px));
         coreEquity8 += int64(int256(szi) * d);
@@ -417,14 +430,35 @@ contract PerpVaultMultiUserTest is Test {
         _sync();
         vm.mockCall(HyperCore.ORACLE_PX, abi.encode(PERP), abi.encode(uint64(1_000_000)));
 
+        // Nothing is paid at the pushed mark, buffer or no buffer.
+        uint256 before = usdc.balanceOf(honest);
         vm.prank(honest);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                PerpVault.PriceDislocated.selector, pushed, uint64(1_000_000),
-                vault.markOracleDeviationBps()
-            )
-        );
         vault.redeem(shares / 2, honest);
+        assertEq(usdc.balanceOf(honest) - before, 0, "zero paid at a dislocated mark");
+        assertApproxEqRel(vault.claimSharesEscrowed(), shares / 2, 1e12, "fully queued");
+
+        // Deposits stay hard-blocked: minting needs a price.
+        vm.prank(filler);
+        vm.expectRevert();
+        vault.deposit(1_000e6, filler);
+
+        // The mark reverts; settlement strikes at the HONEST NAV, so the pushed
+        // price leaves no residue in what the exiter is ultimately paid.
+        coreEquity8 -= int64(int256(szi) * d);
+        px = 1_000_000;
+        _sync();
+        vault.fundClaims();
+        uint256 settled = vault.claimSharesSettled();
+        assertGt(settled, 0, "buffer settles part of the queue");
+
+        uint256 honestNav = vault.pricePerShare();
+        // Read BEFORE the prank: an argument-position staticcall consumes it.
+        uint256 claimable = vault.claimableShares(honest);
+        vm.prank(honest);
+        uint256 paid = vault.claim(claimable, honest);
+        assertApproxEqRel(
+            paid, (settled * honestNav) / 1e18, 1e14, "paid at the honest NAV, not the pushed one"
+        );
     }
 
     /// @dev Ordinary basis must not brick the vault. Real divergence on chain 998
@@ -444,6 +478,83 @@ contract PerpVaultMultiUserTest is Test {
         address b = _mkUser(721, 1_000_000e6);
         vm.prank(b);
         vault.deposit(1_000e6, b); // must not revert
+    }
+
+    /// @dev H-1: a trim below the exchange's $10 minimum while exits are queued
+    ///      must be widened to the minimum, or settlement stalls forever — the
+    ///      residue shrinks geometrically and every trim under $10 is dropped
+    ///      silently by the exchange (observed live).
+    function test_subMinimumTrimIsWidenedWhenExitsQueued() public {
+        _resetVault(20_000);
+        address u = _mkUser(960, 1_000_000e6);
+        uint256 shares = _deposit(u, 40e6); // $40 at 2x -> $80 position
+        _rebalance();
+        assertApproxEqRel(vault.notional(), 80e6, 2e16, "position open");
+
+        // Queue a $4 exit: required trim $8, under the $10 minimum.
+        vm.prank(u);
+        vault.redeem(shares / 10, u);
+
+        vm.expectEmit(false, false, false, false);
+        emit PerpVault.TrimWidened(0, 0);
+        _rebalance();
+
+        // The widened $10 sell went out and was applied by the harness.
+        assertApproxEqRel(vault.notional(), 70e6, 3e16, "trimmed by the widened $10");
+    }
+
+    /// @dev H-1: ordinary sub-minimum drift with NO queue is skipped loudly — no
+    ///      order is sent, because the exchange would drop it silently and the
+    ///      vault would believe it traded.
+    function test_subMinimumDriftIsSkippedNotSent() public {
+        _resetVault(20_000);
+        address u = _mkUser(961, 1_000_000e6);
+        _deposit(u, 1_000e6);
+        _rebalance();
+
+        // $3 of new idle: delta = $6 buy, below minimum, nothing queued.
+        vm.prank(u);
+        vault.deposit(3e6, u);
+
+        vm.warp(block.timestamp + vault.rebalanceCooldown() + 1);
+        MockCoreWriter cw = MockCoreWriter(HyperCore.CORE_WRITER);
+        uint256 before = cw.actionCount();
+        vm.expectEmit(false, false, false, false);
+        emit PerpVault.OrderBelowMinimum(0, 0);
+        vault.rebalance();
+        assertEq(cw.actionCount(), before, "no order sent for a sub-minimum drift");
+    }
+
+    /// @dev H-2: pulling margin from under the position is floored at 1.5x
+    ///      maintenance, so a compromised keeper cannot strip margin and let the
+    ///      market do the stealing.
+    function test_moveUsdClassCannotStripMarginBelowFloor() public {
+        _resetVault(20_000);
+        address u = _mkUser(962, 1_000_000e6);
+        _deposit(u, 10_000e6);
+        _rebalance();
+
+        uint256 eq = vault.coreEquity();
+        uint256 floor_ = (vault.maintenanceMargin() * 15_000) / 10_000;
+
+        // Pulling everything but half the floor must revert.
+        uint64 tooMuch = uint64(eq - floor_ / 2);
+        vm.prank(vault.keeper());
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                PerpVault.MarginFloorBreached.selector, floor_ / 2, floor_
+            )
+        );
+        vault.moveUsdClass(tooMuch, false);
+
+        // A pull that leaves the floor intact passes.
+        vm.prank(vault.keeper());
+        vault.moveUsdClass(uint64(eq - floor_ * 2), false);
+    }
+
+    function test_setKeeperRejectsZeroAddress() public {
+        vm.expectRevert(PerpVault.BadParameter.selector);
+        vault.setKeeper(address(0));
     }
 
     /// @dev C-1 regression (was AUDIT PoC A, 46% NAV overstatement). An idle

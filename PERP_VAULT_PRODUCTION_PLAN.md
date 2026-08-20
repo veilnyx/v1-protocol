@@ -216,8 +216,14 @@ runs `fundClaims()` before reading the buffer. Regressions:
    `rebalance()`; buffer-funds-the-tail rule. [H-1]
 5. Constrain or remove `placeOrder`; bound `moveUsdClass`. [H-2]
 6. Escrow-only redemption under dislocation. [H-4]
-7. Claim-rate decision: blend-and-document or per-epoch accumulator. [H-3 —
-   needs your call]
+7. Claim-rate decision: **RESOLVED — blend, documented.** The per-epoch
+   accumulator turned out to conflict with the note model: paying each tranche
+   at its own strike requires tying a CLAIM token to its settlement epoch, and
+   CLAIM is a fungible bearer asset registered once in the Pool — per-epoch
+   rates would need per-epoch asset ids, the exact cost this design already
+   rejected for Option B deposits. The blend's exposure is bounded by NAV
+   movement between settlements; the keeper settling every tick keeps tranches
+   small. Documented on claim(). [H-3]
 8. Setter events, zero-checks, doc fixes. [M-4]
 **Gate:** keeper drill on testnet exercises the sub-minimum tail to a fully
 settled queue.
