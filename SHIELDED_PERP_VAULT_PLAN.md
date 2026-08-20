@@ -118,6 +118,37 @@ Both legs are ordinary synchronous `CALL_ADAPTOR` transactions returning an ERC-
 The asynchrony is carried by the claim token being a real registered asset. The
 same pattern runs in reverse for redemption when the buffer is insufficient.
 
+**As built, only the redemption direction is asynchronous.** Deposits mint
+synchronously (6.1 Option A): the adaptor calls `deposit()`, the vault prices and
+mints in that same transaction, and the Pool commits the share note immediately.
+Nothing waits for HyperCore. That is safe because `totalAssets()` counts all four
+places the asset can sit — HyperEVM balance, in-flight bridge, Core spot, Core
+perp — so the later `postMargin` / `settleBridge` / class-transfer sequence moves
+value between locations without touching NAV. Confirmed on testnet: `totalAssets`
+held at 39.99 across all three.
+
+Redemption is where the two-leg shape is real, and the adaptor carries three
+actions rather than two:
+
+```
+DEPOSIT  spend USDC note      -> shares minted now       -> 1 note out: SHARES
+REDEEM   spend SHARE note     -> buffer pays what it can -> 2 notes out: USDC + CLAIM
+                                 rest escrowed in shares    (1 note if fully liquid)
+CLAIM    spend CLAIM note     -> settled portion paid    -> 2 notes out: USDC + CLAIM
+                                                             (1 note if fully settled)
+```
+
+Both multi-leg cases must return the second note. An earlier version returned only
+the paid leg on a partial redemption, which minted CLAIM to the shared
+`AdaptorHandler` where it was never committed as a note: the holder silently lost
+the queued portion, and it sat where the next caller could take it. `CLAIM` also
+returns a remainder note rather than reverting on partial settlement, so a holder
+is never trapped waiting for the queue to clear completely.
+
+**Deployment requirement:** the CLAIM token must be registered as a Pool asset
+(18 decimals, matching shares) alongside the share token. Without it the adaptor
+reverts on any redemption the buffer cannot cover.
+
 **The `requestId` design is worth copying directly.** ERC-7540 requires that
 requests sharing a `requestId` "MUST transition from Pending to Claimable at the
 same time and receive the same exchange rate", with partial fulfilment applied

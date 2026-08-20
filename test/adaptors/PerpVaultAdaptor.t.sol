@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.24;
 
-import {Test} from "forge-std/Test.sol";
+import {Test, console2} from "forge-std/Test.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {AggregatorV3Interface} from
     "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
@@ -74,6 +74,7 @@ contract PoolStub {
 contract PerpVaultAdaptorTest is Test {
     uint24 constant USDC_ID = 0x010001;
     uint24 constant SHARE_ID = 0x010002;
+    uint24 constant CLAIM_ID = 0x010003;
     uint32 constant PERP = 3;
     uint64 constant TOKEN_INDEX = 0;
 
@@ -102,6 +103,8 @@ contract PerpVaultAdaptorTest is Test {
 
         pool.register(USDC_ID, address(usdc), 6);
         pool.register(SHARE_ID, address(vault), 18);
+        // CLAIM is share-denominated, so 18 decimals like the share token.
+        pool.register(CLAIM_ID, address(vault.claimToken()), 18);
 
         MockCoreWriter cw = new MockCoreWriter();
         vm.etch(HyperCore.CORE_WRITER, address(cw).code);
@@ -197,6 +200,104 @@ contract PerpVaultAdaptorTest is Test {
 
         assertEq(out[0].id, USDC_ID, "redeem returns the underlying");
         assertApproxEqAbs(uint256(out[0].value), 4_000e6, 1, "4,000 shares at NAV 1.0");
+    }
+
+    /// @dev A redemption the buffer cannot cover must hand back BOTH legs. Before
+    ///      this, only the paid leg was returned and the CLAIM was minted to the
+    ///      shared handler, never committed as a note — the holder silently lost
+    ///      the queued portion and it sat where the next caller could take it.
+    function test_partiallyQueuedRedeemReturnsBothLegs() public {
+        _deposit(10_000e6);
+        vm.prank(vault.keeper());
+        vault.postMargin(9_000e6); // only 1,000 left liquid
+
+        PubAsset[] memory inAssets = new PubAsset[](1);
+        inAssets[0] = PubAsset(SHARE_ID, uint224(4_000e18));
+        PubAsset[] memory out = pool.callAdaptor(
+            handler,
+            address(adaptor),
+            inAssets,
+            abi.encode(PerpVaultAdaptor.Action.REDEEM, address(vault))
+        );
+
+        assertEq(out.length, 2, "paid leg and queued leg");
+        assertEq(out[0].id, USDC_ID);
+        assertApproxEqAbs(uint256(out[0].value), 1_000e6, 1, "what the buffer covered");
+        assertEq(out[1].id, CLAIM_ID, "the rest comes back as a CLAIM note");
+        assertApproxEqRel(uint256(out[1].value), 3_000e18, 1e12, "denominated in SHARES");
+        assertEq(
+            vault.claimToken().balanceOf(address(handler)), 0, "nothing stranded at the handler"
+        );
+    }
+
+    /// @dev A CLAIM note converts to asset once the unwind funds it.
+    function test_claimNoteConvertsToUnderlying() public {
+        _deposit(10_000e6);
+        vm.prank(vault.keeper());
+        vault.postMargin(9_000e6);
+
+        PubAsset[] memory inAssets = new PubAsset[](1);
+        inAssets[0] = PubAsset(SHARE_ID, uint224(4_000e18));
+        PubAsset[] memory out = pool.callAdaptor(
+            handler, address(adaptor), inAssets, abi.encode(PerpVaultAdaptor.Action.REDEEM, address(vault))
+        );
+        uint256 claimNote = uint256(out[1].value);
+
+        // The unwind lands, comfortably covering the queue.
+        usdc.mint(address(vault), 10_000e6);
+        vault.fundClaims();
+        assertEq(vault.claimSharesEscrowed(), 0, "queue fully settled");
+
+        PubAsset[] memory claimIn = new PubAsset[](1);
+        claimIn[0] = PubAsset(CLAIM_ID, uint224(claimNote));
+        PubAsset[] memory paid = pool.callAdaptor(
+            handler, address(adaptor), claimIn, abi.encode(PerpVaultAdaptor.Action.CLAIM, address(vault))
+        );
+
+        assertEq(paid.length, 1, "fully settled, so one leg");
+        assertEq(paid[0].id, USDC_ID);
+        assertGt(uint256(paid[0].value), 0, "paid at the settled rate");
+        assertEq(vault.claimSharesSettled(), 0, "claim consumed");
+        assertEq(vault.claimToken().balanceOf(address(handler)), 0, "nothing stranded");
+    }
+
+    /// @dev Partial settlement must not trap the holder: claim what is funded and
+    ///      hand back a fresh CLAIM note for the rest.
+    function test_partiallySettledClaimReturnsRemainderNote() public {
+        _deposit(10_000e6);
+        vm.prank(vault.keeper());
+        vault.postMargin(9_000e6);
+
+        PubAsset[] memory inAssets = new PubAsset[](1);
+        inAssets[0] = PubAsset(SHARE_ID, uint224(4_000e18));
+        PubAsset[] memory out = pool.callAdaptor(
+            handler, address(adaptor), inAssets, abi.encode(PerpVaultAdaptor.Action.REDEEM, address(vault))
+        );
+        uint256 claimNote = uint256(out[1].value);
+
+        // Only part of the unwind comes back.
+        usdc.mint(address(vault), 500e6);
+        vault.fundClaims();
+        uint256 settled = vault.claimSharesSettled();
+        assertGt(settled, 0, "some of it settled");
+        assertLt(settled, claimNote, "but not all of it");
+
+        PubAsset[] memory claimIn = new PubAsset[](1);
+        claimIn[0] = PubAsset(CLAIM_ID, uint224(claimNote));
+        PubAsset[] memory paid = pool.callAdaptor(
+            handler, address(adaptor), claimIn, abi.encode(PerpVaultAdaptor.Action.CLAIM, address(vault))
+        );
+
+        assertEq(paid.length, 2, "paid leg and a remainder note");
+        assertEq(paid[0].id, USDC_ID);
+        assertGt(uint256(paid[0].value), 0, "paid for the settled part");
+        assertEq(paid[1].id, CLAIM_ID, "remainder stays claimable");
+        // Not wei-exact: _claim advances fundClaims() once more before reading, so
+        // it may settle marginally more than the test just did.
+        assertApproxEqRel(
+            uint256(paid[1].value), claimNote - settled, 1e12, "remainder is the unsettled part"
+        );
+        assertEq(vault.claimToken().balanceOf(address(handler)), 0, "nothing stranded");
     }
 
     /// @dev AdaptorHandler reverts unless the tokens it reports are really there,

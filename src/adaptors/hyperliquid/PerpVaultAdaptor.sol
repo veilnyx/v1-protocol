@@ -24,8 +24,13 @@ contract PerpVaultAdaptor is AdaptorBase {
 
     enum Action {
         DEPOSIT,
-        REDEEM
+        REDEEM,
+        CLAIM
     }
+
+    /// @dev Spending a CLAIM note when the unwind has funded none of it would burn
+    ///      a proof for nothing, so refuse rather than round-trip the note.
+    error NothingSettled();
 
     // solhint-disable-next-line no-empty-blocks
     constructor(IPool pool_) AdaptorBase(pool_) {}
@@ -43,14 +48,14 @@ contract PerpVaultAdaptor is AdaptorBase {
 
         (Action action, address vault) = abi.decode(payload, (Action, address));
 
-        outAssets = new AssetAmount[](1);
-
         if (action == Action.DEPOSIT) {
+            outAssets = new AssetAmount[](1);
             (outAssets[0].assetId, outAssets[0].value) =
                 _deposit(inAssets[0].assetId, inAssets[0].value, PerpVault(vault));
         } else if (action == Action.REDEEM) {
-            (outAssets[0].assetId, outAssets[0].value) =
-                _redeem(inAssets[0].assetId, inAssets[0].value, PerpVault(vault));
+            outAssets = _redeem(inAssets[0].assetId, inAssets[0].value, PerpVault(vault));
+        } else if (action == Action.CLAIM) {
+            outAssets = _claim(inAssets[0].assetId, inAssets[0].value, PerpVault(vault));
         } else {
             revert InvalidAction();
         }
@@ -75,9 +80,14 @@ contract PerpVaultAdaptor is AdaptorBase {
         outAssetId = getAsset(address(vault)).id;
     }
 
+    /// @dev Returns ONE asset when the buffer covers the whole exit, and TWO when
+    ///      it does not: the asset paid now, plus a CLAIM note for the shares left
+    ///      escrowed. Returning only the first would strand the CLAIM at the
+    ///      handler — minted, never committed as a note, and sitting where a later
+    ///      caller could take it.
     function _redeem(uint24 inAssetId, uint256 inValue, PerpVault vault)
         internal
-        returns (uint24 outAssetId, uint256 outValue)
+        returns (AssetAmount[] memory outAssets)
     {
         Asset memory inAsset = getAsset(inAssetId);
 
@@ -86,9 +96,54 @@ contract PerpVaultAdaptor is AdaptorBase {
             revert UnsupportedAsset(inAsset.id);
         }
 
-        // Reverts if the vault's idle buffer cannot cover the payout. Failing loudly
-        // is deliberate: the CLAIM-token queue for that case is not built yet.
-        outValue = vault.redeem(inValue, address(this));
-        outAssetId = getAsset(address(vault.asset())).id;
+        uint256 escrowedBefore = vault.claimSharesEscrowed();
+        uint256 paid = vault.redeem(inValue, address(this));
+        uint256 queued = vault.claimSharesEscrowed() - escrowedBefore;
+
+        if (queued == 0) {
+            outAssets = new AssetAmount[](1);
+            outAssets[0] = AssetAmount(getAsset(address(vault.asset())).id, paid);
+        } else {
+            outAssets = new AssetAmount[](2);
+            outAssets[0] = AssetAmount(getAsset(address(vault.asset())).id, paid);
+            outAssets[1] = AssetAmount(getAsset(address(vault.claimToken())).id, queued);
+        }
+    }
+
+    /// @dev Convert a CLAIM note into asset at the settled rate. Settlement is
+    ///      partial whenever the unwind has returned less than the full amount, so
+    ///      this claims what is settled and hands back a fresh CLAIM note for the
+    ///      remainder rather than reverting and stranding the holder until the
+    ///      queue clears completely.
+    function _claim(uint24 inAssetId, uint256 inValue, PerpVault vault)
+        internal
+        returns (AssetAmount[] memory outAssets)
+    {
+        Asset memory inAsset = getAsset(inAssetId);
+
+        if (inValue == 0) revert ZeroValue();
+        if (inAsset.assetAddress != address(vault.claimToken())) {
+            revert UnsupportedAsset(inAsset.id);
+        }
+
+        // Advance settlement first: asset may have landed since the last call, and
+        // claim() would do this anyway. Reading after it means we do not understate
+        // what is claimable right now.
+        vault.fundClaims();
+        uint256 settled = vault.claimSharesSettled();
+        uint256 toClaim = inValue < settled ? inValue : settled;
+        if (toClaim == 0) revert NothingSettled();
+
+        uint256 paid = vault.claim(toClaim, address(this));
+        uint256 leftover = inValue - toClaim;
+
+        if (leftover == 0) {
+            outAssets = new AssetAmount[](1);
+            outAssets[0] = AssetAmount(getAsset(address(vault.asset())).id, paid);
+        } else {
+            outAssets = new AssetAmount[](2);
+            outAssets[0] = AssetAmount(getAsset(address(vault.asset())).id, paid);
+            outAssets[1] = AssetAmount(inAssetId, leftover);
+        }
     }
 }
