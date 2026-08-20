@@ -13,8 +13,11 @@ import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 ///      forever — so a per-epoch token could never be retired and the registry
 ///      would grow without bound.
 ///
-///      Denominated in the vault's ASSET units, being the value owed at the time
-///      the redemption was queued.
+///      Denominated in SHARES, not asset units. Fixing an asset amount at request
+///      time would hand the redeemer their exit price before the unwind that funds
+///      it has happened — free downside protection, paid for by whoever stayed. A
+///      share-denominated claim keeps them exposed to NAV until they are genuinely
+///      out, and the payout is struck from what the unwind actually realises.
 contract ClaimToken is ERC20 {
     address public immutable vault;
     uint8 private immutable _decimals;

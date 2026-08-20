@@ -38,7 +38,8 @@ const abi = parseAbi([
   'function idleAssets() view returns (uint256)',
   'function pendingBridge() view returns (uint256)',
   'function bridgeInFlight() view returns (uint256)',
-  'function claimsOutstanding() view returns (uint256)',
+  'function claimSharesEscrowed() view returns (uint256)',
+  'function claimSharesSettled() view returns (uint256)',
   'function claimPot() view returns (uint256)',
   'function targetLeverageBps() view returns (uint256)',
   'function maxOracleDeviationBps() view returns (uint256)',
@@ -63,7 +64,7 @@ const usd = (v) => Number(formatUnits(v, 6)).toLocaleString(undefined, { minimum
 async function read() {
   const keys = [
     'totalAssets', 'notional', 'coreEquity', 'idleAssets', 'pendingBridge',
-    'bridgeInFlight', 'claimsOutstanding', 'claimPot', 'targetLeverageBps',
+    'bridgeInFlight', 'claimSharesEscrowed', 'claimSharesSettled', 'claimPot', 'targetLeverageBps',
     'maxOracleDeviationBps', 'markOracleDeviationBps', 'rebalanceCooldown',
     'lastRebalanceAt', 'depositsFrozen', 'isDistressed', 'maintenanceMargin',
   ];
@@ -109,8 +110,12 @@ async function tick() {
   }
 
   // 3. Exiting holders are paid before capital is redeployed into the position.
-  if (s.claimsOutstanding > s.claimPot && s.idleAssets > s.claimPot) {
-    await send('fundClaims', `${usd(s.claimsOutstanding - s.claimPot)} still owed`);
+  //    Claims are denominated in SHARES, so what is owed is only known once the
+  //    unwind lands; fund whenever there are escrowed shares and idle asset above
+  //    the pot to settle them against.
+  const freeForClaims = s.idleAssets > s.claimPot ? s.idleAssets - s.claimPot : 0n;
+  if (s.claimSharesEscrowed > 0n && freeForClaims > 0n) {
+    await send('fundClaims', `${usd(freeForClaims)} free against queued exits`);
   }
 
   // 4. Rebalance last, and only when it is both allowed and worth it.

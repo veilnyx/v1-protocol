@@ -443,6 +443,72 @@ contract PerpVaultMultiUserTest is Test {
         vault.deposit(1_000e6, b); // must not revert
     }
 
+    /// @dev The exit-side mirror of the entry externality, and the reason claims
+    ///      are denominated in shares rather than asset.
+    ///
+    ///      Fixing an asset amount at request time hands the redeemer their price
+    ///      before the unwind that funds it has happened. They are then out of the
+    ///      market but still hold a claim on face value — free downside protection,
+    ///      paid for by whoever stayed. Modelled on a 100,000 vault at 2x with a
+    ///      10% exit, a 15% drop cost the remaining holders 3,000 extra.
+    ///
+    ///      Escrowing the shares instead keeps the queued holder on NAV until they
+    ///      are genuinely out.
+    function test_queuedRedeemerCarriesTheMarketNotTheStayers() public {
+        _resetVault(20_000);
+        address alice = _mkUser(800, 1_000_000e6);
+        address bob = _mkUser(801, 1_000_000e6);
+        uint256 aShares = _deposit(alice, 10_000e6);
+        _deposit(bob, 90_000e6);
+        _rebalance();
+
+        uint256 navAtRequest = vault.pricePerShare();
+
+        // Alice exits with nothing liquid, so the whole position queues.
+        vm.prank(alice);
+        vault.redeem(aShares, alice);
+        assertApproxEqRel(vault.claimSharesEscrowed(), aShares, 1e12, "all escrowed");
+        assertApproxEqAbs(vault.pricePerShare(), navAtRequest, 2, "queueing must not move NAV");
+
+        uint256 navBobBefore = vault.pricePerShare();
+
+        // Market falls 15% before the unwind funds her.
+        _movePrice(uint64((uint256(px) * 85) / 100));
+
+        uint256 navAfter = vault.pricePerShare();
+        assertLt(navAfter, navBobBefore, "a 2x vault loses on a 15% drop");
+
+        // Unwind enough to settle her, then let her claim.
+        uint256 owedNow = vault.convertToAssets(aShares);
+        usdc.mint(address(vault), owedNow);
+        coreEquity8 -= int64(uint64(owedNow));
+        _sync();
+
+        // Funding is measured from the realised unwind, so rounding can leave the
+        // last dust unsettled; claim what is actually settled, as a UI would.
+        vault.fundClaims();
+        uint256 claimBal = vault.claimableShares(alice);
+        assertApproxEqRel(claimBal, aShares, 1e12, "essentially all of it settles");
+        vm.prank(alice);
+        uint256 paid = vault.claim(claimBal, alice);
+
+        // She is paid at the POST-drop rate, not the rate at request.
+        uint256 faceAtRequest = (aShares * navAtRequest) / 1e18;
+        assertLt(paid, faceAtRequest, "queued exit must not lock in the pre-drop price");
+        assertApproxEqRel(paid, owedNow, 1e14, "paid at the realised rate");
+
+        // Bob keeps exactly his own share of the move: NAV is untouched by her exit.
+        assertApproxEqAbs(
+            vault.pricePerShare(), navAfter, 2, "settlement must not move NAV for stayers"
+        );
+
+        console2.log("nav at request :", navAtRequest);
+        console2.log("nav at settle  :", navAfter);
+        console2.log("face if fixed  :", faceAtRequest);
+        console2.log("actually paid  :", paid);
+        console2.log("borne by exiter:", faceAtRequest - paid);
+    }
+
     /// @dev A deposit valued immediately afterwards must never be worth more than
     ///      was paid. That is the shape of a share-price attack.
     function testFuzz_roundTripNeverProfits(uint96 amount) public {

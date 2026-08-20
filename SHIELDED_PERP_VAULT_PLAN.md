@@ -394,6 +394,44 @@ launch decision (workstream E), and the UI must show the vault's realised fundin
 cost rather than only its price performance, or holders will not understand why a
 flat market cost them money.
 
+### 4.7 The mirror on the way out: exits must not tax stayers either
+
+§4.2 establishes that synchronous NAV minting socialises **entry** cost. The exit
+side has the same shape and, unlike entry, it is fully fixable.
+
+A redemption cannot always be paid immediately: the asset is margin on Core, and
+freeing it means unwinding, which takes seconds and costs slippage. So a large
+exit pays what is liquid and queues the rest as a CLAIM receipt. The question is
+what that receipt is denominated in.
+
+Fixing an **asset amount** at request time hands the exiter their price before the
+unwind that funds it has happened. They are out of the market but still hold a
+claim on face value, so every adverse move and the entire cost of the unwind falls
+on whoever stayed. That is free downside protection, and it is worth real money.
+Modelled on a 100,000 vault at 2x with a 10% exit:
+
+```
+drop before settlement    extra borne by stayers
+        -5%                       1,000
+       -15%                       3,000
+```
+
+Denominating the receipt in **shares** removes it. On request the vault pays the
+liquid part at today's NAV and moves the rest of the holder's shares into escrow —
+escrowed, not burned, so they keep carrying NAV. At settlement the vault burns
+exactly the escrowed shares the realised unwind covered and moves exactly their
+value into the claim pot. NAV is unchanged for everyone else at both moments, and
+the exiter has carried the market and their own exit cost until they were
+genuinely out. This is the same principle as striking entry from actual fills,
+applied to the other direction, and it is verified in
+`test_queuedRedeemerCarriesTheMarketNotTheStayers` — the -15% case pays 6,991
+against a face value of 9,991, so the exiter bears the full 3,000.
+
+Two consequences for integrators. Settlement is partial whenever the unwind
+returns less than the full amount, so a "claim all" control must pass
+`claimableShares(holder)` and not the raw CLAIM balance. And because CLAIM is now
+share-denominated, it is an 18-decimal token, not a 6-decimal one.
+
 ---
 
 ## 5. Workstreams

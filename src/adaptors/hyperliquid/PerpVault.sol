@@ -133,13 +133,20 @@ contract PerpVault is ERC20, Ownable, ReentrancyGuard {
     /// @notice Receipt handed out when a redemption cannot be paid immediately.
     ClaimToken public immutable claimToken;
 
-    /// @notice Asset owed to queued redeemers, in asset units.
-    uint256 public claimsOutstanding;
+    /// @notice Shares queued for exit and held in escrow by this contract,
+    ///         awaiting the unwind that funds them.
+    /// @dev Escrowed rather than burned. They stay in totalSupply, so they keep
+    ///      tracking NAV and the exiting holder keeps their market exposure — and
+    ///      their share of the unwind cost — until they are genuinely out.
+    uint256 public claimSharesEscrowed;
 
-    /// @notice Asset set aside to pay them, in asset units.
-    /// @dev Held apart from the buffer so that unwind proceeds earmarked for
-    ///      exiting holders are not silently recycled into the position, and so
-    ///      NAV does not count money that is no longer the remaining holders'.
+    /// @notice Shares already converted to asset at a realised rate, claimable now.
+    uint256 public claimSharesSettled;
+
+    /// @notice Asset backing settled claims.
+    /// @dev Held apart from the buffer so proceeds earmarked for exiting holders
+    ///      are not recycled into the position, and so NAV does not count money
+    ///      that is no longer the remaining holders'.
     uint256 public claimPot;
 
     /// @notice Asset already sent to the Core system address but not yet credited.
@@ -163,9 +170,9 @@ contract PerpVault is ERC20, Ownable, ReentrancyGuard {
     event DeRisked(uint256 effectiveLeverageBps, uint256 triggerBps, uint256 newLeverageBps);
     event DistressDetected(uint256 equity, uint256 maintenanceMargin);
     event RebalanceSkipped(uint256 deviationBps);
-    event RedemptionQueued(address indexed receiver, uint256 amount);
-    event ClaimsFunded(uint256 funded, uint256 stillOwed);
-    event Claimed(address indexed receiver, uint256 claimAmount, uint256 paid);
+    event RedemptionQueued(address indexed receiver, uint256 shares);
+    event ClaimsFunded(uint256 assetSettled, uint256 sharesStillEscrowed);
+    event Claimed(address indexed receiver, uint256 claimShares, uint256 paid);
     event BridgeStarted(uint256 amount, uint256 spotBefore);
     event BridgeSettled(uint256 credited, uint256 stillInFlight);
 
@@ -176,6 +183,7 @@ contract PerpVault is ERC20, Ownable, ReentrancyGuard {
     error BadParameter();
     error RebalanceTooSoon(uint256 nextAllowedAt);
     error VaultDistressed();
+    error ClaimNotSettled(uint256 requested, uint256 settled);
     error PriceDislocated(uint64 markPx, uint64 oraclePx, uint256 deviationBps);
 
     modifier onlyKeeper() {
@@ -203,8 +211,9 @@ contract PerpVault is ERC20, Ownable, ReentrancyGuard {
         isLong = isLong_;
         targetLeverageBps = targetLeverageBps_;
         keeper = owner_;
+        // 18 decimals: the claim is denominated in shares, not asset.
         claimToken = new ClaimToken(
-            string.concat(name_, " Claim"), string.concat(symbol_, "-CLAIM"), _assetDecimals
+            string.concat(name_, " Claim"), string.concat(symbol_, "-CLAIM"), 18
         );
     }
 
@@ -252,11 +261,11 @@ contract PerpVault is ERC20, Ownable, ReentrancyGuard {
     ///      bridge and every spot-to-perp move, which is a free round trip.
     function totalAssets() public view returns (uint256) {
         uint256 gross = coreEquity() + idleAssets() + coreSpot() + pendingBridge();
-        // Subtract everything OWED to exiters, not merely what has been set aside
-        // for them. A redemption stops being the remaining holders' equity the
-        // moment it is queued, which is before any pot exists — netting only the
-        // funded part would let the first exit inflate NAV for whoever stays.
-        return gross > claimsOutstanding ? gross - claimsOutstanding : 0;
+        // Only the pot is netted. Escrowed shares are still in totalSupply and
+        // still backed by gross, which is what keeps a queued redeemer exposed to
+        // NAV. Settlement burns escrowed shares and moves exactly their value into
+        // the pot, so NAV is unchanged across it.
+        return gross > claimPot ? gross - claimPot : 0;
     }
 
     /// @notice Core spot balance of the vault's asset, in asset decimals.
@@ -400,20 +409,26 @@ contract PerpVault is ERC20, Ownable, ReentrancyGuard {
         uint256 navUsed = pricePerShare();
         assets = convertToAssets(shares);
 
-        _burn(msg.sender, shares);
-
-        // Anything the buffer covers settles immediately; the rest is queued.
-        // Splitting rather than all-or-nothing means a large exit does not block
-        // on the whole amount being liquid.
+        // Split by SHARES, not by a fixed asset amount. Whatever the buffer covers
+        // exits now at today's NAV; the rest stays in shares and is priced later,
+        // from the unwind that actually funds it.
         uint256 free = idleAssets() > claimPot ? idleAssets() - claimPot : 0;
-        uint256 paidNow = assets > free ? free : assets;
-        uint256 queued = assets - paidNow;
+        uint256 sharesNow = convertToShares(free);
+        if (sharesNow > shares) sharesNow = shares;
+        uint256 sharesQueued = shares - sharesNow;
 
-        if (paidNow > 0) asset.safeTransfer(receiver, paidNow);
-        if (queued > 0) {
-            claimsOutstanding += queued;
-            claimToken.mint(receiver, queued);
-            emit RedemptionQueued(receiver, queued);
+        assets = convertToAssets(sharesNow);
+        if (sharesNow > 0) {
+            _burn(msg.sender, sharesNow);
+            asset.safeTransfer(receiver, assets);
+        }
+        if (sharesQueued > 0) {
+            // Escrowed, not burned: the claim is on shares, so the holder stays
+            // exposed until settlement rather than locking in today's price.
+            _transfer(msg.sender, address(this), sharesQueued);
+            claimSharesEscrowed += sharesQueued;
+            claimToken.mint(receiver, sharesQueued);
+            emit RedemptionQueued(receiver, sharesQueued);
         }
 
         emit Redeemed(msg.sender, shares, assets, navUsed);
@@ -441,31 +456,51 @@ contract PerpVault is ERC20, Ownable, ReentrancyGuard {
         return uint64(down + factor);
     }
 
-    /// @notice Move idle asset into the pot that pays queued redeemers.
-    /// @dev Permissionless: leaving exiters unpaid while the asset sits idle is
+    /// @notice Convert escrowed shares to asset at the CURRENT rate, up to whatever
+    ///         the unwind has actually made liquid.
+    /// @dev This is where the exit price is struck — after the unwind, not at
+    ///      request. Burning escrowed shares and moving exactly their value into
+    ///      the pot leaves NAV unchanged for everyone else, while the queued
+    ///      holder has carried NAV, and their share of the unwind cost, until now.
+    ///      Permissionless: leaving exiters unsettled while asset sits idle is
     ///      worse than letting anyone advance it.
     function fundClaims() public returns (uint256 funded) {
-        uint256 shortfall = claimsOutstanding > claimPot ? claimsOutstanding - claimPot : 0;
-        if (shortfall == 0) return 0;
+        if (claimSharesEscrowed == 0) return 0;
         uint256 free = idleAssets() > claimPot ? idleAssets() - claimPot : 0;
-        funded = shortfall > free ? free : shortfall;
-        if (funded == 0) return 0;
+        if (free == 0) return 0;
+
+        uint256 settleable = convertToShares(free);
+        if (settleable > claimSharesEscrowed) settleable = claimSharesEscrowed;
+        if (settleable == 0) return 0;
+
+        funded = convertToAssets(settleable);
+        _burn(address(this), settleable);
+        claimSharesEscrowed -= settleable;
+        claimSharesSettled += settleable;
         claimPot += funded;
-        emit ClaimsFunded(funded, claimsOutstanding - claimPot);
+        emit ClaimsFunded(funded, claimSharesEscrowed);
     }
 
-    /// @notice Redeem a claim receipt for asset, pro rata against the pot.
-    /// @dev Pro rata rather than first-come-first-served, so a partially funded
-    ///      pot does not pay early claimants in full and leave later ones with
-    ///      nothing. Claims are fungible for exactly this reason.
+    /// @notice How much of `holder`'s claim can be settled right now.
+    /// @dev Funding is partial whenever the unwind has not returned the full
+    ///      amount, so a "claim all" button must pass this rather than the raw
+    ///      CLAIM balance — otherwise it reverts on the dust left by rounding.
+    function claimableShares(address holder) external view returns (uint256) {
+        uint256 bal = claimToken.balanceOf(holder);
+        return bal < claimSharesSettled ? bal : claimSharesSettled;
+    }
+
+    /// @notice Redeem a claim receipt for asset at the settled rate.
+    /// @dev Pays pro rata against the pot, so tranches settled at different rates
+    ///      blend rather than paying whoever claims first at the best one.
     function claim(uint256 amount, address receiver) external nonReentrant returns (uint256 paid) {
         if (amount == 0) revert ZeroAmount();
         fundClaims();
-        if (claimsOutstanding == 0) revert ZeroAmount();
+        if (amount > claimSharesSettled) revert ClaimNotSettled(amount, claimSharesSettled);
 
-        paid = (amount * claimPot) / claimsOutstanding;
+        paid = (amount * claimPot) / claimSharesSettled;
         claimToken.burn(msg.sender, amount);
-        claimsOutstanding -= amount;
+        claimSharesSettled -= amount;
         claimPot -= paid;
         if (paid > 0) asset.safeTransfer(receiver, paid);
         emit Claimed(receiver, amount, paid);

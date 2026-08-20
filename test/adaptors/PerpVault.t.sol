@@ -214,12 +214,14 @@ contract PerpVaultTest is Test {
         vm.prank(alice);
         uint256 assets = vault.redeem(shares, alice);
 
-        assertApproxEqAbs(assets, 10_000e6, 1, "full value is owed");
+        // Only the liquid part is priced now; the rest stays in shares.
+        assertApproxEqAbs(assets, 1_000e6, 1, "settled immediately at today's NAV");
         assertEq(usdc.balanceOf(alice) - before, 1_000e6, "paid what was liquid");
-        assertApproxEqAbs(
-            vault.claimToken().balanceOf(alice), 9_000e6, 1, "remainder queued as a claim"
+        assertApproxEqRel(
+            vault.claimToken().balanceOf(alice), 9_000e18, 1e12, "remainder queued in SHARES"
         );
-        assertEq(vault.balanceOf(alice), 0, "shares are gone either way");
+        assertEq(vault.balanceOf(alice), 0, "holder's own balance is emptied");
+        assertApproxEqRel(vault.claimSharesEscrowed(), 9_000e18, 1e12, "escrowed, not burned");
     }
 
     /// @dev Claims settle pro rata, so a partly funded pot does not pay whoever
@@ -237,7 +239,7 @@ contract PerpVaultTest is Test {
         vault.redeem(aShares, alice);
         vm.prank(bob);
         vault.redeem(bShares, bob);
-        assertApproxEqAbs(vault.claimsOutstanding(), 20_000e6, 2);
+        assertApproxEqRel(vault.claimSharesEscrowed(), 20_000e18, 1e12);
 
         // Unwind half of what is owed back to the EVM side: Core equity falls by
         // the same amount it gains on this side.
@@ -253,10 +255,11 @@ contract PerpVaultTest is Test {
         vm.prank(alice);
         uint256 paid = vault.claim(aClaim, alice);
 
-        assertApproxEqRel(paid, 5_000e6, 1e12, "half funded means half paid");
+        // Alice settles the whole 10,000 of shares the unwind covered; Bob's are
+        // still escrowed and still exposed to NAV.
+        assertApproxEqRel(paid, 10_000e6, 1e12, "settled at the realised rate");
         assertEq(usdc.balanceOf(alice) - aBefore, paid);
-        assertApproxEqRel(vault.claimsOutstanding(), 10_000e6, 1e12, "Bob still owed in full");
-        assertApproxEqRel(vault.claimPot(), 5_000e6, 1e12);
+        assertApproxEqRel(vault.claimSharesEscrowed(), 10_000e18, 1e12, "Bob still queued");
     }
 
     /// @dev The pot belongs to holders who have already left, so counting it in NAV
@@ -278,7 +281,7 @@ contract PerpVaultTest is Test {
         _setCore({equityCoreUnits: 10_000e6, szi: 0, markPx: 1_000_000});
         vault.fundClaims();
 
-        assertApproxEqAbs(vault.pricePerShare(), navBefore, 1, "funding a claim must not move NAV");
+        assertApproxEqAbs(vault.pricePerShare(), navBefore, 1, "settlement must not move NAV");
         assertApproxEqAbs(vault.totalAssets(), 10_000e6, 2, "only Bob's half remains");
     }
 
