@@ -40,3 +40,7 @@ polygon_amoy = "${RPC_POLYGON_AMOY}"
 
 [lint]
 lint_on_build = false
+[invariant]
+runs = 64
+depth = 48
+fail_on_revert = true

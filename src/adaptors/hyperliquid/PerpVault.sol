@@ -755,8 +755,26 @@ contract PerpVault is ERC20, Ownable, ReentrancyGuard {
         // other's measurements. Settle first so a completed leg does not block.
         _settleWithdraw();
         if (withdrawInFlight > 0) revert BridgeBusy();
-        if (amount == 0 || amount > idleAssets()) revert ZeroAmount();
-        spotBeforeBridge = coreSpot();
+        // The pot is NOT bridgeable: it is a liability already owed to settled
+        // claimants, and idleAssets() includes it. Found by the invariant suite:
+        // bridging pot money left claimPot > idle, and the next claim() failed
+        // its transfer — settled exiters stranded by ordinary keeper flow.
+        uint256 free = idleAssets() > claimPot ? idleAssets() - claimPot : 0;
+        if (amount == 0 || amount > free) revert ZeroAmount();
+        // Recognise any landed-but-unsettled credit BEFORE re-baselining. Found by
+        // the invariant suite on its first run: snapshotting coreSpot() with a
+        // credit sitting in it swallows that credit into the new baseline — it
+        // stays inside bridgeInFlight-derived pendingBridge AND in coreSpot, a
+        // double count of exactly the C-1 shape the P0 fix addressed elsewhere.
+        //
+        // And the baseline must be coreSpot() MINUS what settleBridge just
+        // credited (also an invariant-suite find): the class transfer settleBridge
+        // queues executes only after this transaction, so a bare re-read still
+        // shows the pre-transfer balance. Snapshotting that leaves the baseline
+        // high by exactly `credited`, the next credit under-measures, and
+        // pendingBridge turns phantom.
+        uint256 credited = settleBridge();
+        spotBeforeBridge = coreSpot() - credited;
         bridgeInFlight += amount;
         asset.safeTransfer(HyperCore.systemAddress(coreTokenIndex), amount);
         _rebaseWithdrawBaseline();
