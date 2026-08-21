@@ -1,0 +1,35 @@
+sequenceDiagram
+    autonumber
+    actor U as User (UI)
+    participant P as Shielded Pool
+    participant R as Relayer / Paymaster
+    participant B as Burner EOA
+    participant C as HyperCore
+
+    Note over U,C: PHASE 1 — DERIVE · off-chain, nothing touches any chain
+    U->>U: burner key = derive(spending key, index i)
+    Note over U,B: deterministic, so every burner is recoverable from the seed the user already holds · the UI names it, e.g. BTC-10x-LONG
+
+    Note over U,C: PHASE 2 — FUND · the pool's first of two appearances
+    U->>P: shielded WITHDRAW, relayed · target = burner
+    Note over P,R: ONE transaction carries BOTH assets: USDC margin + native HYPE for gas · fee paid in-asset via Paymaster
+    P->>R: proof + payload (relayer sees burner, amount, time — never the user)
+    R->>B: USDC + HYPE land at a fresh address that has touched nothing else
+    Note over B: the burner's gas came FROM THE POOL — funding it from the user's wallet is total deanonymisation
+
+    Note over U,C: PHASE 3 — ACTIVATE AND BRIDGE · burner acts alone from here
+    B->>C: ERC20 transfer to the Core system address (0x20..00 + tokenIndex)
+    C-->>B: spot credited, minus the 1 USDC first-time activation fee
+    B->>C: usdClassTransfer(ntl, toPerp = true) · spot becomes perp margin
+
+    Note over U,C: PHASE 4 — TRADE · signed L1 actions, no pool, no contract
+    B->>C: updateLeverage(asset, isCross = FALSE, leverage) · genuine isolated margin, per position
+    B->>C: place order / cancel / close, signed by the burner key
+    Note over B,C: the position is public — size, entry, liquidation on the API and leaderboards, attached to the burner forever
+
+    Note over U,C: PHASE 5 — RETURN · the pool's second appearance
+    B->>C: close position · usdClassTransfer(toPerp = false)
+    C-->>B: spot sent back to the burner's EVM balance
+    B->>P: PUBLIC deposit into Veilnyx (this deposit is supposed to be public)
+    P-->>U: shielded notes again
+    Note over B,P: the amount is the burner's PnL, rarely a round number — the weakest link in the design (open decision 6.2)
