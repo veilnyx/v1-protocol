@@ -5,6 +5,7 @@ import { fixture, generateTestTransactions } from "./fixture";
 
 const {
   assets: { weth, usdc },
+  sender: { account: senderAccount },
 } = fixture;
 
 /// The funding leg of a private position: ONE shielded withdrawal carrying
@@ -43,7 +44,37 @@ export const reqsPrivatePositionFunding = {
   },
 };
 
+/// The RETURN leg: the burner deposits its proceeds and the notes are owned by
+/// the USER'S main shielded address.
+///
+/// Built with the user's account context — that is what makes the notes theirs.
+/// Nothing in the request names the burner, because nothing needs to: the Pool
+/// never binds msg.sender on deposit (it only sanctions-screens it), so any
+/// address holding the tokens can submit this proof. That is precisely why the
+/// burner needs no shielded account and no registration, which would otherwise
+/// write a PUBLIC EOA -> rootAddress mapping and undo the whole design.
+///
+/// The amount is deliberately PnL-shaped rather than round: it is what the
+/// return actually looks like, and the amount is the one thing this leg leaks
+/// (plan 6.2's remaining half).
+export const reqsPrivatePositionReturn = {
+  private_position_return: {
+    type: TransactionType.DEPOSIT,
+    assetIds: [usdc],
+    values: [parseUnits("1493.52", 6)],
+    feeAssetId: 0, // the burner pays gas directly; no relayer on this leg
+    // The USER'S shielded address. This single field is the whole mechanism:
+    // the notes land in the user's main account, the burner needs no shielded
+    // account of its own, and nothing on chain links the two.
+    to: senderAccount.shieldedAddress.pack(),
+    viaBundler: false,
+    revokerId: 0,
+  },
+};
+
 export const genPrivatePositionFunding = async (sdk: Core) => {
   console.log("proving a 2-asset funding withdrawal (margin + gas)...");
   await generateTestTransactions(reqsPrivatePositionFunding, sdk);
+  console.log("proving the return deposit (notes owned by the user, not the burner)...");
+  await generateTestTransactions(reqsPrivatePositionReturn, sdk);
 };
