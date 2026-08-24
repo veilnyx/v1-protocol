@@ -250,11 +250,19 @@ both, at the cost of the salt store becoming a dependency.
 
 ### 6.2 What is the return path's privacy story?
 
-Closing a position returns funds to the burner, which then deposits publicly into Veilnyx. That
-deposit is *supposed* to be public. But the amount is the burner's PnL, and it is unlikely to be a
-round denomination. Options: return to the same shielded account and accept the amount leak; route
-through an intermediate hop; or hold and batch. **Unresolved, and it is the weakest part of the
-design.**
+**Partially RESOLVED (2026-08): the burner deposits directly to the user's
+main, already-registered shielded address.** Verified against the Pool:
+deposits only sanctions-screen `msg.sender` (no registration required to
+deposit), and the deposit proof shows the output owner is a member of the
+address tree without revealing which member. So no burner-side registration —
+which would have written a public burner-to-shielded-address mapping into
+calldata — and no follow-up internal transfer. The return is ONE public
+transaction whose recipient hides among every registered address.
+
+What remains open is the AMOUNT: the deposit publicly shows the burner
+returning its PnL, which is rarely a round number. Timing jitter, round-amount
+splitting, or hold-and-batch remain the mitigations. This half is still the
+weakest part of the design.
 
 ### 6.3 Who runs the relayer, and what does it see?
 

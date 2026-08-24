@@ -27,9 +27,10 @@ sequenceDiagram
     B->>C: place order / cancel / close, signed by the burner key
     Note over B,C: the position is public — size, entry, liquidation on the API and leaderboards, attached to the burner forever
 
-    Note over U,C: PHASE 5 — RETURN · the pool's second appearance
+    Note over U,C: PHASE 5 — RETURN · the pool's second appearance · ONE transaction
     B->>C: close position · usdClassTransfer(toPerp = false)
     C-->>B: spot sent back to the burner's EVM balance
-    B->>P: PUBLIC deposit into Veilnyx (this deposit is supposed to be public)
-    P-->>U: shielded notes again
-    Note over B,P: the amount is the burner's PnL, rarely a round number — the weakest link in the design (open decision 6.2)
+    U->>U: app proves a deposit whose output notes are owned by the user's MAIN shielded address
+    B->>P: burner submits the PUBLIC deposit — no burner registration, no internal transfer
+    P-->>U: notes land directly in the main account, recipient hidden among ALL registered addresses
+    Note over B,P: only the AMOUNT leaks — the burner returns a PnL-shaped number (6.2's remaining half)
