@@ -45,6 +45,8 @@ const abi = parseAbi([
   'function withdrawInFlight() view returns (uint256)',
   'function convertToAssets(uint256) view returns (uint256)',
   'function settleWithdraw() returns (uint256)',
+  'event Deposited(address indexed caller, uint256 assets, uint256 shares, uint256 navUsed)',
+  'event RedemptionQueued(address indexed receiver, uint256 shares)',
   'function withdrawFromCore(uint256)',
   'function moveUsdClass(uint64,bool)',
   'function claimSharesSettled() view returns (uint256)',
@@ -194,7 +196,52 @@ async function tick() {
 }
 
 console.log(`keeper on ${VAULT}${DRY ? '  [dry run]' : ''}${account ? `  as ${account.address}` : '  [read only]'}`);
-await tick();
+
+// Ticks are serialized: an event landing mid-tick queues exactly one follow-up
+// rather than racing the nonce (the P3 drill's lesson, kept for events too).
+let tickRunning = false;
+let tickQueued = false;
+async function safeTick(reason) {
+  if (tickRunning) {
+    tickQueued = true;
+    return;
+  }
+  tickRunning = true;
+  try {
+    if (reason) console.log(`tick (${reason})`);
+    await tick();
+  } catch (e) {
+    console.error('  tick failed:', e.shortMessage ?? e.message);
+  }
+  tickRunning = false;
+  if (tickQueued) {
+    tickQueued = false;
+    await safeTick('queued during previous tick');
+  }
+}
+
+await safeTick();
 if (!ONCE) {
-  setInterval(() => tick().catch((e) => console.error('  tick failed:', e.shortMessage ?? e.message)), INTERVAL_MS);
+  // Event-driven: a deposit or a queued exit acts within seconds instead of
+  // waiting out the poll. This shrinks the window in which the vault sits off
+  // target after a deposit from INTERVAL_MS to bridge physics, which is the
+  // whole point — the whale-window transfer scales with that gap. The second,
+  // delayed tick covers the rebalance cooldown: if the immediate tick lands
+  // inside it, the retry fires just after it expires.
+  const react = (what) => (logs) => {
+    console.log(`event: ${logs.length} ${what}`);
+    safeTick(what);
+    setTimeout(() => safeTick(`${what}, post-cooldown retry`), 35_000);
+  };
+  pub.watchContractEvent({
+    address: VAULT, abi, eventName: 'Deposited',
+    pollingInterval: 5_000, onLogs: react('deposit'), onError: () => {},
+  });
+  pub.watchContractEvent({
+    address: VAULT, abi, eventName: 'RedemptionQueued',
+    pollingInterval: 5_000, onLogs: react('queued exit'), onError: () => {},
+  });
+  // The poll stays as the heartbeat for everything events cannot see:
+  // bridge credits landing, price drift, funding.
+  setInterval(() => safeTick(), INTERVAL_MS);
 }
