@@ -144,7 +144,9 @@ export const generateTestTransaction = async (
     viaBundler: req.viaBundler,
     paymaster: req.paymaster,
     revokerId: req.revokerId,
-    requiredPrefundEth: parseEther("0.00025")
+    requiredPrefundEth: parseEther("0.00025"),
+    // Direct-relayer fee mode, for chains with no bundler.
+    ...(req.relayed ? { relayed: true, relayFee: req.relayFee } : {}),
   };
   const tx = await sdk.createTransaction(req, opts);
   // console.log("TX: ", tx);

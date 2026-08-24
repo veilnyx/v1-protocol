@@ -6,6 +6,7 @@ import { genTestCallAdaptors, genMorphoSupplyAdaptorTx, genMorphoWithdrawAdaptor
 
 import { getSDKInstance } from "./sdk";
 import { genHyperEvmTreeUpdate } from "./genHyperEvmTreeUpdate";
+import { genPrivatePositionFunding } from "./genPrivatePositionFunding";
 import {
 	genTreeUpdateData,
 	genTreeUpdateDataWithPartialQueue,
@@ -48,6 +49,9 @@ const main = async () => {
 	// earlier in the sequence. Running last means it consumes state without
 	// disturbing anyone.
 	await genPerpVaultDepositTx(sdk);
+	// Private positions: the 2-asset funding withdrawal. Runs last for the same
+	// reason as the perp-vault fixture — generators share one commitment tree.
+	await genPrivatePositionFunding(sdk);
 	// await genTreeUpdateDataWithPartialQueue(sdk);
 };
 
