@@ -357,3 +357,29 @@ Step 5 is the real acceptance test. Steps 1–4 only prove it functions.
 - Any operator-signed / API-wallet design (§2.4).
 - Spot trading, HIP-3 dexes, vaults, staking.
 - Mainnet deployment, pending handover §7.2 on keys.
+
+---
+
+## 8. Stars / HIP-3 allowlisting — observed on testnet, 2026-08
+
+Hyperliquid testnet now lets a HIP-3 (builder-deployed) perp dex be
+address-allowlisted for trading: only deployer-approved addresses can OPEN
+positions; everyone can still fund and submit reduce-only orders, so nobody can
+be trapped in a position. Allowlist cap observed: 10k addresses. Verified
+against the ktob "BTC Star DEX" transactions — the actions are `perpDeploy`
+with `star: {dex, operation: "activate" | {modifyApprovals: [[addr, bool]]}}`.
+
+**Do NOT use this for burners.** Every `modifyApprovals` is a public deployer
+transaction naming the burner, timestamped. Approval time correlates with
+burner creation and pool-withdrawal time — exactly the correlation section 7
+exists to destroy — and it concentrates burners into a labelled set instead of
+letting them hide among all of Hyperliquid's fresh addresses. Burners gain
+nothing from it: they already trade the main dex's full books.
+
+**Where it IS interesting:** the allowlist is a compliance primitive, and
+Veilnyx owns the other half (Screener / ASP). A screened venue with private
+funding is a distinct third product; see `docs/STAR_DEX_SCREENED_VENUE_PLAN.md`.
+If that is built, the timing leak has a known fix: batch approvals on a fixed
+schedule so approval time decorrelates from funding time — the same
+hold-and-batch shape as the 6.2 return path.
+
