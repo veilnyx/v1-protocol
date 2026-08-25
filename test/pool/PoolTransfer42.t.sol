@@ -25,8 +25,7 @@ contract PoolTransfer42Test is PoolTest {
         VerifierTransact42 vt42 = new VerifierTransact42();
         TransactionVerifierInfo memory info = TransactionVerifierInfo({
             id: 42,
-            addr: address(vt42),
-            selector: vt42.verifyProof.selector
+            addr: address(vt42)
         });
         verifier.addTransactionVerifier(info);
     }
@@ -38,7 +37,9 @@ contract PoolTransfer42Test is PoolTest {
         _mintAsset(asset2, address(this), deposit2);
         _approveAsset(asset1, address(pool), deposit1);
         _approveAsset(asset2, address(pool), deposit2);
-        ShieldedTransaction memory stx = _loadShieldedTransaction("deposit_pre_tx_4x2_a");
+        ShieldedTransaction memory stx = _loadShieldedTransaction(
+            "deposit_pre_tx_4x2_a"
+        );
         pool.transact(stx);
         _processCommitmentTreeQueue();
     }
@@ -50,7 +51,9 @@ contract PoolTransfer42Test is PoolTest {
         _mintAsset(asset2, address(this), deposit2);
         _approveAsset(asset1, address(pool), deposit1);
         _approveAsset(asset2, address(pool), deposit2);
-        ShieldedTransaction memory stx = _loadShieldedTransaction("deposit_pre_tx_4x2_b");
+        ShieldedTransaction memory stx = _loadShieldedTransaction(
+            "deposit_pre_tx_4x2_b"
+        );
         pool.transact(stx);
         _processCommitmentTreeQueue();
     }

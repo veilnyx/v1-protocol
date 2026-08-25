@@ -17,12 +17,16 @@ import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interf
 /// @param verifier The address of the verifier contract. Verifier contract verifies the stx's zk proof, address proof and merkle tree queue proof.
 /// @param adaptorHandler The address of the adaptor handler contract, responsible for delegate calling adaptors of external DeFi protocols.
 /// @param screener The address of the screener contract, responsible for screening sanctioned addresseses.
+///        Must either be a contract or address(0) (screening disabled); an EOA is rejected.
 /// @param hasher The address of the hasher contract. It provides a single interface to Poseidon hashing functions
+/// @param pauser The address allowed to pause the pool alongside the owner. Pass address(0)
+///        to leave pausing exclusive to the owner; can later be set via `setPauser`.
 struct InitAddressParams {
     IVerifier verifier;
     IAdaptorHandler adaptorHandler;
     IScreener screener;
     IHasher hasher;
+    address pauser;
 }
 
 /// @param withdrawFeeBps Withdrawal fee in basis points (1 bps = 0.01%).
@@ -54,6 +58,9 @@ interface IPool {
         uint32 indexed leafIndex,
         bytes shieldedAddress
     );
+    /// @dev `metadata` decodes as `(string pinataCID)` — see {registerRevoker}. Consumers should
+    /// not fall back to the earlier `(string name, string description)` layout: decoding that one
+    /// as a single string succeeds and returns the name, so the two cannot be told apart by trying.
     event RevokerRegistered(
         uint256 indexed id,
         uint256[2] revokerPublicKey,
@@ -96,6 +103,10 @@ interface IPool {
     event PriceFeedStalenessThresholdUpdated(uint256 threshold);
     event NativeWTokenUpdated(IWToken indexed nativeWToken);
     event PauserUpdated(address indexed oldPauser, address indexed newPauser);
+    event VerifierUpdated(
+        address indexed previousVerifier,
+        address indexed newVerifier
+    );
     event PriceStalenessThresholdUpdated(uint256 threshold);
 
     /////////////////////////////////////////
@@ -119,6 +130,7 @@ interface IPool {
     error DuplicateAsset(address assetAddress);
     error InactiveAsset(uint24 assetId);
     error InvalidRevoker(uint256 id);
+    error InvalidCurvePoint(uint256 x, uint256 y);
     error DuplicateRevoker(uint256[2] publicKey);
     error NoFeeToClaim(address paymaster, uint24 assetId);
     error WithdrawalFeeTooHigh(uint256 feeBps, uint256 maxFeeBps);
@@ -134,6 +146,9 @@ interface IPool {
     ///      An EOA screener would make every isSanctioned() call revert. The zero
     ///      address is still accepted — it is the kill-switch that disables screening.
     error InvalidScreenerAddress(address screener);
+    /// @dev A verifier must be a deployed contract. An EOA or the zero address
+    ///      would make proof verification calls fail and brick Pool operations.
+    error InvalidVerifierAddress(address verifier);
 
     /// @dev msg.value was sent for a non-DEPOSIT transaction. Native ETH is only
     ///      accepted on DEPOSIT to be wrapped into the configured nativeWToken.
@@ -154,9 +169,9 @@ interface IPool {
     ///      once.
     error DuplicatePubAssetId(uint24 assetId);
 
-    /// @dev msg.value exceeds the (pre-fee) wToken pubAsset value of the
+    /// @dev msg.value exceeds the (pre-fee) nativeWToken pubAsset value of the
     ///      deposit. Refusing to wrap to avoid locking the surplus ETH in the
-    ///      Pool. Send `msg.value <= wTokenValue` and approve the wToken
+    ///      Pool. Send `msg.value <= wTokenValue` and approve the nativeWToken
     ///      remainder if msg.value < wTokenValue.
     error NativeEthExceedsDeposit(uint256 sent, uint256 expected);
     error NotPauser();
@@ -211,7 +226,9 @@ interface IPool {
     /// @notice Can only be called by the owner.
     /// @param revokerPublicKey The public key of the revoker. Public key represents a point of the elliptic curve, hence it is a pair of two 256-bit integers.
     /// @param encryptionPublicKey The guardian network's public key used for encrypting the transactions.
-    /// @param revokerMetadata Metadata for the revoker (e.g. name, description).
+    /// @param revokerMetadata `abi.encode(string pinataCID)` — an IPFS CIDv1 (raw codec, sha2-256,
+    /// base32) resolving to a JSON document `{"name": ..., "description": ...}`. Stored nowhere;
+    /// the pool only re-emits it in {RevokerRegistered}, and there is no way to change it later.
     function registerRevoker(
         uint256[2] calldata revokerPublicKey,
         uint256[2] calldata encryptionPublicKey,
@@ -233,6 +250,11 @@ interface IPool {
     function setScreener(IScreener screener) external;
 
     event ScreenerUpdated(address indexed screener);
+
+    /// @notice Atomically updates the verifier used for address, transaction,
+    ///         and commitment-tree update proofs.
+    /// @notice Can only be called by the owner.
+    function setVerifier(IVerifier newVerifier) external;
 
     /// @notice Sets the no. of bips (basis points: 1/10000) fee that is charged for withdrawing assets from the pool.
     /// @notice Can only be called by the owner.
@@ -286,13 +308,13 @@ interface IPool {
 
     /// @notice Validates and executes a stx.
     /// @notice Can only be called when the contract is not paused.
-    /// @notice Payable: when the transaction is a DEPOSIT and `wToken` is set,
-    ///         the caller may attach native ETH equal to the (pre-fee) wToken
-    ///         pubAsset value. The Pool then wraps the ETH into wToken on
-    ///         behalf of the caller in lieu of pulling wToken from the caller's
+    /// @notice Payable: when the transaction is a DEPOSIT and `nativeWToken` is set,
+    ///         the caller may attach native ETH equal to the (pre-fee) nativeWToken
+    ///         pubAsset value. The Pool then wraps the ETH into nativeWToken on
+    ///         behalf of the caller in lieu of pulling nativeWToken from the caller's
     ///         wallet via `transferFrom`. msg.value of 0 preserves the
     ///         pre-existing ERC20 transferFrom flow for any asset (including
-    ///         wToken).
+    ///         nativeWToken).
     /// @param stx The stx to be executed.
     function transact(ShieldedTransaction calldata stx) external payable;
 

@@ -96,7 +96,7 @@ contract TvlGuardTest is PoolTest {
         pool.transact(stx); // TVL after ≈ $20 M < $500 M → success
 
         // depositing testnet WETH (this should invoke Chainlink feed on forked chains)
-        address testnet_weth = config.wToken();
+        address testnet_weth = config.nativeWToken();
         vm.deal(address(this), 2 ether);
         IWToken(testnet_weth).deposit{value: 2 ether}();
         IWToken(testnet_weth).approve(address(pool), 2 ether);

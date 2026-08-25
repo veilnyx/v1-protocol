@@ -36,7 +36,10 @@ library ShieldedAddressLogic {
         uint256 rootAddress = uint256(bytes32(self.shieldedAddress[0:32]));
         _validateShieldedAddressData(self, rootAddress, rootAddresses);
 
-        if (!verifyProof(self, address(verifier))) {
+        // Recover the signer BEFORE verifying, so it can be bound into the proof.
+        address publicAddress = ECDSA.recover(hashTypedData, self.signature);
+
+        if (!verifyProof(self, address(verifier), publicAddress)) {
             revert IPool.InvalidAddressProof();
         }
 
@@ -45,7 +48,7 @@ library ShieldedAddressLogic {
             addressTree,
             publicAddresses,
             rootAddresses,
-            hashTypedData,
+            publicAddress,
             rootAddress
         );
     }
@@ -76,11 +79,9 @@ library ShieldedAddressLogic {
         MerkleTree storage addressTree,
         mapping(address => uint256) storage publicAddresses,
         mapping(uint256 => bool) storage rootAddresses,
-        bytes32 hashTypedData,
+        address publicAddress,
         uint256 rootAddress
     ) internal {
-        address publicAddress = ECDSA.recover(hashTypedData, self.signature);
-
         if (publicAddresses[publicAddress] != 0) {
             revert IPool.PublicAddressAlreadyRegistered(publicAddress);
         }
@@ -97,11 +98,24 @@ library ShieldedAddressLogic {
         );
     }
 
+    /// @dev The register circuit declares `publicAddress` as a public input purely so
+    ///      the proof is bound to one registrant. Without it the proof commits only to
+    ///      the shielded address, and the EIP-712 struct names no signer either, so an
+    ///      observer could re-sign the same shielded address with their own key and
+    ///      front-run the registration -- permanently binding the victim's rootAddress
+    ///      to an address of the attacker's choosing. That binding is what a decrypted
+    ///      note is ultimately resolved to, so a hijacked registration silently
+    ///      redirects the last step of deanonymisation, with no way to repair it.
     function verifyProof(
         ShieldedAddressRegistrationData calldata self,
-        address verifier
+        address verifier,
+        address publicAddress
     ) internal view returns (bool) {
-        bytes memory vInp = abi.encodePacked(self.proof, self.shieldedAddress);
+        bytes memory vInp = abi.encodePacked(
+            self.proof,
+            self.shieldedAddress,
+            uint256(uint160(publicAddress))
+        );
         return IVerifier(verifier).verifyAddressProof(vInp);
     }
 

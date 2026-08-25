@@ -3,6 +3,32 @@ import { HardhatRuntimeEnvironment } from "hardhat/types";
 import { HttpNetworkConfig } from "hardhat/types";
 
 /**
+ * True when the node behind the current network is a local development chain (anvil, or Hardhat's
+ * in-process EVM) rather than a real one.
+ *
+ * `hre.network.config.forking?.enabled` only covers Hardhat's built-in forking. A fork served by an
+ * external anvil process looks like any other HTTP network, so fall back to asking the node what it
+ * is: anvil answers `anvil/v1.4.0`, Hardhat answers `HardhatNetwork/...`.
+ *
+ * Used both to skip real-network-only steps (Etherscan verification) and, more importantly, as the
+ * safety gate for networks that carry a real chain id but are meant to be forks.
+ */
+export async function isDevelopmentNode(hre: HardhatRuntimeEnvironment): Promise<boolean> {
+    if ((hre.network.config as any).forking?.enabled === true) {
+        return true;
+    }
+
+    try {
+        const clientVersion = (await hre.network.provider.send("web3_clientVersion")) as string;
+        return /anvil|hardhat/i.test(clientVersion);
+    } catch {
+        // A node that will not answer web3_clientVersion is treated as real — this gate must fail
+        // closed, since callers use it to decide whether deploying is safe.
+        return false;
+    }
+}
+
+/**
  * Gets the chain configuration for the current network
  * - For standard chains, returns the built-in viem chain object
  * - For custom chains, creates a custom chain definition

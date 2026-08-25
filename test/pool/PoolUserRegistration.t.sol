@@ -23,7 +23,10 @@ contract PoolUserRegistration is PoolBaseTest {
 
     function setUp() public {
         _setUp();
-        (senderAddr, senderPK) = makeAddrAndKey("sender");
+        // Deterministic registrant from config.json `.registrant` -- the same account the
+        // fixture generator binds into the register proof as `publicAddress`.
+        senderAddr = fixture.registrant.addr;
+        senderPK = fixture.registrant.privateKey;
 
         addressRegistrationData = _loadShieldedAddressRegistrationData(
             "register_sender"
