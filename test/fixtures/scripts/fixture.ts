@@ -20,8 +20,6 @@ import {
 import {
   UserOperation,
   getPackedUserOperation,
-  getRequiredPrefund,
-  ENTRYPOINT_ADDRESS_V07,
 } from "permissionless";
 import { ShieldedAccount } from "@veilnyx-sdk/account";
 import { Point, poseidonDecrypt, PointType } from "@veilnyx-sdk/babyjubjub";
@@ -30,7 +28,7 @@ import {
   TransactionOptions,
   TransactionRequest,
 } from "@veilnyx-sdk/shared-types";
-import { Core } from "@veilnyx-sdk/core";
+import { Core, quoteUserOpGasCost } from "@veilnyx-sdk/core";
 import { ZTransaction } from "@veilnyx-sdk/zk-prover";
 import { Note, SIZE_ENCRYPTED_DECRYPTION_KEY, SIZE_FULLY_ENCRYPTED_NOTE_DATA } from "@veilnyx-sdk/transaction";
 import config from "../config.json";
@@ -55,13 +53,27 @@ export const USER_OP_PAYMASTER_VERIFICATION_GAS = BigInt(50_000);
 export const PAYMASTER_ADDR_FIXTURE = config.paymaster;
 export const GATEWAY_ADDR_FIXTURE = config.gateway;
 
+// Dedicated deterministic account used ONLY for shielded address registration.
+//
+// The register proof binds the registrant's public address as a public input, so it must
+// equal the address the Pool recovers from the EIP-712 registration signature
+// (see ShieldedAddressLogic.register). That means it has to be a real EOA with a known
+// private key -- `config.sender.pubAddress` cannot serve here, as it is derived from the
+// shielded rootAddress (a Poseidon output) and has no secp256k1 key. It is also already
+// load-bearing as the withdrawal recipient, so it is left untouched.
+//
+// `config.registrant` is the single source of truth: Solidity reads the same entry via
+// FixtureLib so the signer and the proof's public input can never drift apart.
+// Key is keccak256("veilnyx.fixture.registrant"); test-only, never used outside fixtures.
+export const REGISTER_SIGNER_ADDRESS = getAddress(config.registrant.address);
+
 const assets = {
   weth: config.assets.weth,
   usdc: config.assets.usdc,
   reentrantToken: config.assets.reentrantToken,
   testnetWeth: config.assets.testnetWeth,
   testnetUsdc: config.assets.testnetUsdc,
-  usde: config.assets.usde
+  morphoVaultToken: config.assets.morphoVaultToken
 };
 
 const revokerPublicKey = Point.fromAffine({
@@ -129,7 +141,7 @@ export const generateTestTransaction = async (
     viaBundler: req.viaBundler,
     paymaster: req.paymaster,
     revokerId: req.revokerId,
-    requiredPrefundEth: parseEther("0.00025")
+    userOpFeeQuoteEth: parseEther("0.00025")
   };
   const tx = await sdk.createTransaction(req, opts);
   // console.log("TX: ", tx);
@@ -164,7 +176,7 @@ export const generateTestTransactionWithOutsourcedProofVerification = async (
     viaBundler: req.viaBundler,
     paymaster: req.paymaster,
     revokerId: req.revokerId,
-    requiredPrefundEth: parseEther("0.00025")
+    userOpFeeQuoteEth: parseEther("0.00025")
   };
   const tx = await sdk.createTransaction(req, opts);
   // console.log("TX: ", tx);
@@ -182,30 +194,35 @@ export const generateTestTransactionWithOutsourcedProofVerification = async (
 
 export const generateTestAddressRegistrations = async (
   reqs: Record<string, {}>,
-  sdk: Core
+  sdk: Core,
+  publicAddress: Hex = REGISTER_SIGNER_ADDRESS
 ) => {
   const reqArr = Object.entries(reqs);
   for (const [name, req] of reqArr) {
-    await generateTestAddressRegistration(name, sdk);
+    await generateTestAddressRegistration(name, sdk, publicAddress);
   }
 };
 
 export const generateTestAddrRegWithOutsourceProofVerifications = async (
   reqs: Record<string, {}>,
   sdk: Core,
-  nebraClient: any
+  nebraClient: any,
+  publicAddress: Hex = REGISTER_SIGNER_ADDRESS
 ) => {
   const reqArr = Object.entries(reqs);
   for (const [name, req] of reqArr) {
-    await generateTestAddrRegWithOutsourcedProofVerification(name, sdk, nebraClient);
+    await generateTestAddrRegWithOutsourcedProofVerification(name, sdk, nebraClient, publicAddress);
   }
 };
 
 const generateTestAddressRegistration = async (
   name: string,
-  sdk: Core
+  sdk: Core,
+  publicAddress: Hex
 ) => {
-  const zaddrReg = await sdk.proveAddress("0x"); // signature will be generated inside the protocol test setup `_getRegisterAddressSignature` function, so passing dummy data here
+  // signature will be generated inside the protocol test setup `_getRegisterAddressSignature` function, so passing dummy data here.
+  // `publicAddress` however is a public input of the proof and must match the signer the Pool recovers.
+  const zaddrReg = await sdk.proveAddress("0x", publicAddress);
   const encoded = zaddrReg.encode();
   writeFileSync(`${dirFixtureData}/${name}.txt`, encoded);
 };
@@ -213,9 +230,10 @@ const generateTestAddressRegistration = async (
 const generateTestAddrRegWithOutsourcedProofVerification = async (
   name: string,
   sdk: Core,
-  nebraClient: any
+  nebraClient: any,
+  publicAddress: Hex
 ) => {
-  const zaddrReg = await sdk.proveAddressAndOutsourceVerification("0x", nebraClient);
+  const zaddrReg = await sdk.proveAddressAndOutsourceVerification("0x", nebraClient, publicAddress);
   console.log("zaddrReg obj returned after proof gen & submission to Nebra:", zaddrReg);
   console.log("Encoding to gen fixture");
   const encoded = zaddrReg.shieldedAddressRegistrationData.encode();
@@ -360,7 +378,27 @@ export async function mockNotesWithOffset(depositName: string, sdk: Core, leafIn
   console.log("commit tree root after mockNotesWithOffset", sdk.commitmentTreeSource.root);
 }
 
-export const generatePackedUserOps = async (name: string, req: TransactionRequest & TransactionOptions, sdk: Core, isPreVerified: boolean, nebraClient) => {
+export const generatePackedUserOps = async (name: string, req: TransactionRequest & TransactionOptions, sdk: Core, isPreVerified: boolean, nebraClient: any) => {
+  return generatePackedUserOpsWithFeeQuote(name, req, sdk, isPreVerified, nebraClient, {
+    baseFeePerGas: BigInt(0),
+  });
+}
+
+type UserOpFeeQuoteOverrides = {
+  maxFeePerGas?: bigint;
+  maxPriorityFeePerGas?: bigint;
+  baseFeePerGas: bigint;
+  headroomBps?: number;
+};
+
+export const generatePackedUserOpsWithFeeQuote = async (
+  name: string,
+  req: TransactionRequest & TransactionOptions,
+  sdk: Core,
+  isPreVerified: boolean,
+  nebraClient: any,
+  feeQuote: UserOpFeeQuoteOverrides,
+) => {
 
   const nonce = concatHex([
     padHex(randomHex(24), { size: 24 }),
@@ -377,8 +415,8 @@ export const generatePackedUserOps = async (name: string, req: TransactionReques
     callGasLimit: USER_OP_CALL_GAS_LIMIT, // 30 M gas is block gas limit = 30_000_000 gas
     verificationGasLimit: USER_OP_VERIFICATION_GAS_LIMIT,
     preVerificationGas: USER_OP_PRE_VERIFICATION_GAS,
-    maxFeePerGas: USER_OP_MAX_FEE_PER_GAS,
-    maxPriorityFeePerGas: USER_OP_MAX_FEE_PER_GAS,
+    maxFeePerGas: feeQuote.maxFeePerGas ?? USER_OP_MAX_FEE_PER_GAS,
+    maxPriorityFeePerGas: feeQuote.maxPriorityFeePerGas ?? USER_OP_MAX_PRIORITY_FEE_PER_GAS,
     paymaster: PAYMASTER_ADDR_FIXTURE as `0x${string}`, // make sure this matches the Paymaster address from solidity test setup
     paymasterVerificationGasLimit: USER_OP_PAYMASTER_VERIFICATION_GAS,
     paymasterPostOpGasLimit: BigInt(5),
@@ -386,9 +424,19 @@ export const generatePackedUserOps = async (name: string, req: TransactionReques
     signature: "0x",
   };
 
-  const requiredPrefundEth = getRequiredPrefund({
-    userOperation: userOp,
-    entryPoint: ENTRYPOINT_ADDRESS_V07
+  const requiredGas =
+    userOp.callGasLimit +
+    userOp.verificationGasLimit +
+    userOp.preVerificationGas +
+    (userOp.paymasterVerificationGasLimit ?? BigInt(0)) +
+    (userOp.paymasterPostOpGasLimit ?? BigInt(0));
+  const maxCost = requiredGas * userOp.maxFeePerGas;
+  const userOpFeeQuoteEth = quoteUserOpGasCost({
+    maxCost,
+    maxFeePerGas: userOp.maxFeePerGas,
+    maxPriorityFeePerGas: userOp.maxPriorityFeePerGas,
+    baseFeePerGas: feeQuote.baseFeePerGas,
+    headroomBps: feeQuote.headroomBps,
   });
 
   // Generating ztx (preparing userop calldata)
@@ -396,7 +444,7 @@ export const generatePackedUserOps = async (name: string, req: TransactionReques
     viaBundler: req.viaBundler,
     paymaster: req.paymaster,
     revokerId: req.revokerId,
-    requiredPrefundEth: requiredPrefundEth
+    userOpFeeQuoteEth
   };
 
   const tx = await sdk.createTransaction(req, opts);
@@ -414,7 +462,7 @@ export const generatePackedUserOps = async (name: string, req: TransactionReques
   // writeFileSync(`${dirFixtureData}/${name}_preVerificationEncodedStruct.txt`, encodedPreVerification);
 
   // Generating & Updating calldata in UserOp
-  const gatewayAbi = JSON.parse(readFileSync("artifacts/Gateway.sol/Gateway.json", "utf-8")).abi;
+  const gatewayAbi = JSON.parse(readFileSync("artifacts/src/core/Gateway.sol/Gateway.json", "utf-8")).abi;
   userOp.callData = encodeFunctionData({
     abi: gatewayAbi,
     functionName: "handleUserOp",

@@ -5,11 +5,13 @@ import {Test} from "forge-std/Test.sol";
 import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
 import {Asset, AssetType} from "src/libraries/AssetLogic.sol";
 import {IPool} from "src/interfaces/IPool.sol";
+import {IVerifier} from "src/interfaces/IVerifier.sol";
 import {IScreener} from "src/interfaces/IScreener.sol";
 import {Screener} from "src/core/Screener.sol";
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {MockAggregatorV3} from "test/mocks/MockAggregatorV3.sol";
 import {MockScreener} from "test/mocks/MockScreener.sol";
+import {MockVerifier} from "test/mocks/MockVerifier.sol";
 import {ShieldedTransaction} from "src/libraries/ShieldedTransactionLogic.sol";
 import {MockERC20} from "test/mocks/MockERC20.sol";
 import {TVL_USD_DECIMALS, MIN_PRICE_STALENESS_THRESHOLD} from "src/base/Constants.sol";
@@ -712,6 +714,58 @@ contract PoolGuardrailsTest is PoolTest {
         pool.setScreener(IScreener(address(0)));
 
         pool.transact(stx); // must not revert
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // setVerifier
+    // ─────────────────────────────────────────────────────────────────────────
+
+    function test_setVerifier_updatesAllProofPaths() public {
+        MockVerifier newVerifier = new MockVerifier();
+
+        vm.expectEmit(true, true, false, true);
+        emit IPool.VerifierUpdated(address(verifier), address(newVerifier));
+
+        pool.setVerifier(IVerifier(address(newVerifier)));
+
+        assertEq(address(pool.verifier()), address(newVerifier));
+        assertEq(
+            address(pool.getCommitmentTreeVerifier()),
+            address(newVerifier)
+        );
+    }
+
+    function test_revert_setVerifier_zeroAddress() public {
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IPool.InvalidVerifierAddress.selector,
+                address(0)
+            )
+        );
+        pool.setVerifier(IVerifier(address(0)));
+    }
+
+    function test_revert_setVerifier_eoa() public {
+        address eoa = makeAddr("eoaVerifier");
+
+        vm.expectRevert(
+            abi.encodeWithSelector(IPool.InvalidVerifierAddress.selector, eoa)
+        );
+        pool.setVerifier(IVerifier(eoa));
+    }
+
+    function test_revert_setVerifier_notOwner() public {
+        MockVerifier newVerifier = new MockVerifier();
+        address notOwner = makeAddr("notOwner");
+
+        vm.prank(notOwner);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                OwnableUpgradeable.OwnableUnauthorizedAccount.selector,
+                notOwner
+            )
+        );
+        pool.setVerifier(IVerifier(address(newVerifier)));
     }
 
     // ─────────────────────────────────────────────────────────────────────────

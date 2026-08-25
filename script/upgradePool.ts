@@ -1,24 +1,25 @@
 import hre from "hardhat";
-import { toFunctionSelector } from "viem";
 import { DeployContractConfig } from '@nomicfoundation/hardhat-viem/types';
+import { isAddressEqual } from "viem";
 import { loadConfigs, ChainParams, CommonParams } from "./configs";
 import { deployPaymaster, fundPaymaster } from "./erc4337Infra";
+import { deployVerifier } from "./verifier";
+import mainnetDeployment from "../deployments/mainnetFork-1.json";
 // constants
 const config = loadConfigs();
 const poolAbi = hre.artifacts.readArtifactSync("Pool").abi;
-const poolProxyAbi = hre.artifacts.readArtifactSync("PoolProxy").abi;
-const verifierAbi = hre.artifacts.readArtifactSync("Verifier").abi;
-const existingPoolProxy = process.env.EXISTING_POOL_PROXY_ADDRESS as `0x${string}`;
-const existingVerifier = process.env.VERIFIER_ADDRESS as `0x${string}`;
-const GATEWAY_ADDRESS = `0x6465a561c22f7286f1ca97d5f754627b5823b0b9` as `0x${string}`;
+const deployedAddresses = mainnetDeployment.addresses as Record<string, `0x${string}`>;
+const existingPoolProxy = (process.env.EXISTING_POOL_PROXY_ADDRESS ?? deployedAddresses.poolProxy) as `0x${string}`;
+const GATEWAY_ADDRESS = deployedAddresses.gateway;
 
-// Deployed library addresses — update these when redeploying libraries.
+// Mainnet library addresses from the deployment manifest. The upgrade deploys
+// only libraries whose source changed and reuses these addresses for the rest.
 const DEPLOYED_LIBS = {
-    AssetLogic: `0x976b21916c51303a23b6d292e7750fdadabb2b26` as `0x${string}`,
-    MerkleTreeLogic: `0x3e89cfd1ef7999de608d76e59ca4dfbef07b2cc5` as `0x${string}`,
-    QueuedMerkleTreeLogic: `0x0b84b501e07ee4012f2ef134d65976aa4611cd31` as `0x${string}`,
-    ShieldedAddressLogic: `0x45bee23b29db93b60ea488e54a0b348a6fef1a9b` as `0x${string}`,
-    ShieldedTransactionLogic: `0xaaed44a5d1dec54e79ba1c666264f8e5ec6d576d` as `0x${string}`,
+    AssetLogic: deployedAddresses.assetLogic,
+    MerkleTreeLogic: deployedAddresses.merkleTreeLogic,
+    QueuedMerkleTreeLogic: deployedAddresses.queuedMerkleTreeLogic,
+    ShieldedAddressLogic: deployedAddresses.shieldedAddressLogic,
+    ShieldedTransactionLogic: deployedAddresses.shieldedTransactionLogic,
 };
 const verificationTrackerService = `0x${"75a4dA1697aF884c99724474d26F2EAe23cc58Bc"}` as `0x${string}`;
 const nebraVerifierSepolia = `0x${"3B946743DEB7B6C97F05B7a31B23562448047E3E"}` as `0x${string}`;
@@ -37,7 +38,7 @@ const setup = async () => {
     client = await hre.viem.getPublicClient();
     chainId = await client.getChainId();
     commonParams = config.common as CommonParams;
-    chainParams = config[chainId] as ChainParams;
+    chainParams = (config as unknown as Record<number, ChainParams>)[chainId];
 
     wallets = await hre.viem.getWalletClients();
     wallet = wallets[0];
@@ -54,13 +55,13 @@ const setup = async () => {
 // Returns a linked Pool factory. OZ validates the storage layout from the
 // compiled artifact, but ethers still requires library addresses at factory
 // creation time due to the unlinked bytecode check.
-const getPoolFactory = () => hre.ethers.getContractFactory("Pool", {
+const getPoolFactory = (libraries = DEPLOYED_LIBS) => hre.ethers.getContractFactory("Pool", {
     libraries: {
-        AssetLogic: DEPLOYED_LIBS.AssetLogic,
-        MerkleTreeLogic: DEPLOYED_LIBS.MerkleTreeLogic,
-        QueuedMerkleTreeLogic: DEPLOYED_LIBS.QueuedMerkleTreeLogic,
-        ShieldedAddressLogic: DEPLOYED_LIBS.ShieldedAddressLogic,
-        ShieldedTransactionLogic: DEPLOYED_LIBS.ShieldedTransactionLogic,
+        AssetLogic: libraries.AssetLogic,
+        MerkleTreeLogic: libraries.MerkleTreeLogic,
+        QueuedMerkleTreeLogic: libraries.QueuedMerkleTreeLogic,
+        ShieldedAddressLogic: libraries.ShieldedAddressLogic,
+        ShieldedTransactionLogic: libraries.ShieldedTransactionLogic,
     },
 });
 
@@ -95,9 +96,9 @@ const registerExistingDeployment = async () => {
 
 // Updates the manifest baseline after a successful upgrade so the next run
 // validates against the layout just deployed. Commit .openzeppelin/ after this.
-const recordUpgradeLayout = async () => {
+const recordUpgradeLayout = async (libraries: typeof DEPLOYED_LIBS) => {
     console.log("Recording new Pool storage layout in OZ manifest...");
-    const PoolFactory = await getPoolFactory();
+    const PoolFactory = await getPoolFactory(libraries);
     await hre.upgrades.forceImport(existingPoolProxy, PoolFactory, {
         kind: "uups",
     });
@@ -123,7 +124,7 @@ const deployPoolImpl = async (commonLibs: any) => {
             AssetLogic: commonLibs.asset,
             MerkleTreeLogic: commonLibs.merkleTree,
             QueuedMerkleTreeLogic: commonLibs.queuedMerkleTree,
-            ShieldedAddressLogic: `0x45bee23b29db93b60ea488e54a0b348a6fef1a9b` as `0x${string}`,
+            ShieldedAddressLogic: commonLibs.shieldedAddress,
             ShieldedTransactionLogic: commonLibs.shieldedTransaction,
         },
     });
@@ -141,7 +142,7 @@ const deployPoolImpl = async (commonLibs: any) => {
             AssetLogic: commonLibs.asset,
             MerkleTreeLogic: commonLibs.merkleTree,
             QueuedMerkleTreeLogic: commonLibs.queuedMerkleTree,
-            ShieldedAddressLogic: `0x45bee23b29db93b60ea488e54a0b348a6fef1a9b` as `0x${string}`,
+            ShieldedAddressLogic: commonLibs.shieldedAddress,
             ShieldedTransactionLogic: commonLibs.shieldedTransaction,
         },
     }
@@ -205,11 +206,38 @@ const upgradePoolProxy = async (newPoolImpl: `0x${string}`) => {
     await bumpVersion();
 }
 
+const setPoolVerifier = async (newVerifier: `0x${string}`) => {
+    console.log("Updating Pool verifier to:", newVerifier);
+
+    // @ts-ignore
+    const hash = await wallet.writeContract({
+        address: existingPoolProxy,
+        abi: poolAbi,
+        functionName: "setVerifier",
+        args: [newVerifier],
+    });
+    await client.waitForTransactionReceipt({ hash, timeout: 5 * 60 * 1000 });
+
+    const configuredVerifier = await client.readContract({
+        address: existingPoolProxy,
+        abi: poolAbi,
+        functionName: "verifier",
+    }) as `0x${string}`;
+    if (!isAddressEqual(configuredVerifier, newVerifier)) {
+        throw new Error(
+            `Pool verifier update failed: expected ${newVerifier}, got ${configuredVerifier}`
+        );
+    }
+
+    console.log("✅ Pool verifier updated:", configuredVerifier);
+}
+
 const deployCommonLibs = async () => {
 
-    // deploying common libraries
-    const asset = await hre.viem.deployContract("AssetLogic");
-    console.log("AssetLogic deployed:", asset.address);
+    // QueuedMerkleTreeLogic changed in this upgrade. Reuse every unchanged
+    // mainnet library to minimize deployment surface and linking mistakes.
+    const queuedMerkleTree = await hre.viem.deployContract("QueuedMerkleTreeLogic");
+    console.log("QueuedMerkleTreeLogic deployed:", queuedMerkleTree.address);
     /**
     const merkleTree = await hre.viem.deployContract("MerkleTreeLogic");
     console.log("MerkleTreeLogic deployed:", merkleTree.address);
@@ -233,37 +261,12 @@ const deployCommonLibs = async () => {
     console.log("ShieldedTransactionLogic deployed:", shieldedTransaction.address);
  */
     return {
-        asset: asset.address as `0x${string}`,
-        merkleTree: `0x3e89cfd1ef7999de608d76e59ca4dfbef07b2cc5` as `0x${string}`,
-        queuedMerkleTree: `0x0b84b501e07ee4012f2ef134d65976aa4611cd31` as `0x${string}`,
-        shieldedTransaction: `0xaaed44a5d1dec54e79ba1c666264f8e5ec6d576d` as `0x${string}`
+        asset: DEPLOYED_LIBS.AssetLogic,
+        merkleTree: DEPLOYED_LIBS.MerkleTreeLogic,
+        queuedMerkleTree: queuedMerkleTree.address as `0x${string}`,
+        shieldedAddress: DEPLOYED_LIBS.ShieldedAddressLogic,
+        shieldedTransaction: DEPLOYED_LIBS.ShieldedTransactionLogic
     }
-}
-
-const registerNewVerifiers = async () => {
-    const verifier42Abi = hre.artifacts.readArtifactSync("VerifierTransact42").abi;
-    const verifier44Abi = hre.artifacts.readArtifactSync("VerifierTransact44").abi;
-
-    const verifierTransact42 = await hre.viem.deployContract("VerifierTransact42", [], deployConfig);
-    console.log("VerifierTransact42 deployed:", verifierTransact42.address);
-
-    const verifierTransact44 = await hre.viem.deployContract("VerifierTransact44", [], deployConfig);
-    console.log("VerifierTransact44 deployed:", verifierTransact44.address);
-
-    const txvInfos = [
-        { id: 42, selector: toFunctionSelector(verifier42Abi[0]), addr: verifierTransact42.address },
-        { id: 44, selector: toFunctionSelector(verifier44Abi[0]), addr: verifierTransact44.address },
-    ];
-
-    // @ts-ignore
-    const hash = await wallet.writeContract({
-        address: existingVerifier,
-        abi: verifierAbi,
-        functionName: "addTransactionVerifiers",
-        args: [txvInfos],
-    });
-    await client.waitForTransactionReceipt({ hash, timeout: 5 * 60 * 1000 });
-    console.log("✅ VerifierTransact42 and VerifierTransact44 registered in Verifier.");
 }
 
 const deployAndSetupPaymaster = async () => {
@@ -287,16 +290,30 @@ const main = async () => {
     // Common Libs
     const commonLibs = await deployCommonLibs();
 
+    // Deploy the replacement Verifier and all of its initialized sub-verifiers
+    // before upgrading the Pool. This leaves the current Pool untouched if any
+    // verifier deployment fails.
+    const { verifier: newVerifier } = await deployVerifier(
+        deployConfig,
+        commonParams.hardwareWalletOwner
+    );
+
     // ERC4337 infra
     // const erc4337Contracts = await deployErc4337Infra(chainParams, existingPoolProxy, deployConfig);
 
     const newPoolImpl = await deployPoolImpl(commonLibs);
     await upgradePoolProxy(newPoolImpl);
-    await recordUpgradeLayout();
+    await setPoolVerifier(newVerifier);
+    await recordUpgradeLayout({
+        AssetLogic: commonLibs.asset,
+        MerkleTreeLogic: commonLibs.merkleTree,
+        QueuedMerkleTreeLogic: commonLibs.queuedMerkleTree,
+        ShieldedAddressLogic: commonLibs.shieldedAddress,
+        ShieldedTransactionLogic: commonLibs.shieldedTransaction,
+    });
 
     // Extras
     await deployAndSetupPaymaster();
-    await registerNewVerifiers();
 }
 
 // Recovery path: pool proxy was already upgraded but the script aborted mid-run.
@@ -304,9 +321,7 @@ const main = async () => {
 const resumeAfterUpgrade = async () => {
     await setup();
     await bumpVersion();
-    // await registerNewVerifiers();
     // await deployAndSetupPaymaster();
-    // await recordUpgradeLayout();
 }
 
 const entry = process.env.REGISTER_ONLY === "true"

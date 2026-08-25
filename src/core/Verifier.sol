@@ -9,9 +9,24 @@ import {MerkleTree} from "../libraries/MerkleTreeLogic.sol";
 
 struct TransactionVerifierInfo {
     uint16 id;
-    bytes4 selector;
     address addr;
 }
+
+/// @dev Byte length of a Groth16 proof as consumed by the snarkjs-generated
+///      verifiers: uint256[2] _pA + uint256[2][2] _pB + uint256[2] _pC.
+uint256 constant GROTH16_PROOF_LENGTH = 256;
+
+/// @dev Public-input counts declared by each circuit's `component main { public [...] }`.
+///      These MUST match the deployed verifiers, whose IC point counts are
+///      nPublicInputs + 1 (13 / 6 / 65 respectively).
+uint256 constant TRANSACTION_PUBLIC_INPUTS = 12;
+uint256 constant ADDRESS_PUBLIC_INPUTS = 6;
+uint256 constant TREE_UPDATE_PUBLIC_INPUTS = 64;
+/// @dev Every transaction verifier must expose this exact snarkJS-generated
+///      signature. Circuit shapes differ only by verification key, not ABI.
+bytes4 constant TRANSACTION_VERIFY_PROOF_SELECTOR = bytes4(
+    keccak256("verifyProof(uint256[2],uint256[2][2],uint256[2],uint256[12])")
+);
 
 contract Verifier is IVerifier, Ownable {
     /**
@@ -24,12 +39,12 @@ contract Verifier is IVerifier, Ownable {
     /// @notice Address authorised to add, update and remove verifiers.
     address public verifierManager;
 
-    event TransactionVerifierAdded(
+    event TransactionVerifierAdded(uint16 indexed id, address addr);
+    event TransactionVerifierUpdated(
         uint16 indexed id,
-        bytes4 selector,
-        address addr
+        address previousAddr,
+        address newAddr
     );
-    event TransactionVerifierRemoved(uint16 indexed id);
     event TreeUpdateVerifierUpdated(address indexed newTreeUpdateVerifier);
     event AddressVerifierUpdated(address indexed newAddressVerifier);
     event VerifierManagerUpdated(
@@ -39,7 +54,9 @@ contract Verifier is IVerifier, Ownable {
 
     error ZeroAddress();
     error VerifierAlreadyExists(uint16 id);
+    error VerifierNotFound(uint16 id);
     error NotVerifierManager();
+    error InvalidVerifierId(uint16 id);
 
     modifier onlyVerifierManager() {
         if (msg.sender != verifierManager) revert NotVerifierManager();
@@ -61,7 +78,7 @@ contract Verifier is IVerifier, Ownable {
         uint256 len = txvInfos.length;
 
         for (uint256 i = 0; i < len; ) {
-            if (txvInfos[i].addr == address(0)) revert ZeroAddress();
+            _validateNewTransactionVerifier(txvInfos[i]);
             _transactionVerifiers[txvInfos[i].id] = txvInfos[i];
             unchecked {
                 ++i;
@@ -112,17 +129,10 @@ contract Verifier is IVerifier, Ownable {
     function addTransactionVerifier(
         TransactionVerifierInfo calldata txvInfo
     ) external onlyVerifierManager {
-        if (txvInfo.addr == address(0)) revert ZeroAddress();
-        if (_transactionVerifiers[txvInfo.id].addr != address(0)) {
-            revert VerifierAlreadyExists(txvInfo.id);
-        }
+        _validateNewTransactionVerifier(txvInfo);
 
         _transactionVerifiers[txvInfo.id] = txvInfo;
-        emit TransactionVerifierAdded(
-            txvInfo.id,
-            txvInfo.selector,
-            txvInfo.addr
-        );
+        emit TransactionVerifierAdded(txvInfo.id, txvInfo.addr);
     }
 
     /// @notice Adds multiple transaction verifiers in batch
@@ -134,17 +144,10 @@ contract Verifier is IVerifier, Ownable {
         uint256 len = txvInfos.length;
 
         for (uint256 i = 0; i < len; ) {
-            if (txvInfos[i].addr == address(0)) revert ZeroAddress();
-            if (_transactionVerifiers[txvInfos[i].id].addr != address(0)) {
-                revert VerifierAlreadyExists(txvInfos[i].id);
-            }
+            _validateNewTransactionVerifier(txvInfos[i]);
 
             _transactionVerifiers[txvInfos[i].id] = txvInfos[i];
-            emit TransactionVerifierAdded(
-                txvInfos[i].id,
-                txvInfos[i].selector,
-                txvInfos[i].addr
-            );
+            emit TransactionVerifierAdded(txvInfos[i].id, txvInfos[i].addr);
 
             unchecked {
                 ++i;
@@ -152,23 +155,64 @@ contract Verifier is IVerifier, Ownable {
         }
     }
 
-    /// @notice Removes a transaction verifier
-    /// @dev Only callable by verifier manager
-    /// @param vId The verifier ID to remove
-    function removeTransactionVerifier(
-        uint16 vId
+    /// @dev Validates a transaction verifier before registering it.
+    function _validateNewTransactionVerifier(
+        TransactionVerifierInfo memory txvInfo
+    ) internal view {
+        if (txvInfo.addr == address(0)) revert ZeroAddress();
+        if (txvInfo.id == 0) revert InvalidVerifierId(txvInfo.id);
+        if (_transactionVerifiers[txvInfo.id].addr != address(0)) {
+            revert VerifierAlreadyExists(txvInfo.id);
+        }
+    }
+
+    /// @notice Atomically replaces the verifier contract for an existing ID.
+    /// @dev Cannot register a new ID; use addTransactionVerifier for that.
+    ///      Only callable by the verifier manager.
+    /// @param txvInfo Existing verifier ID and its replacement configuration.
+    function updateTransactionVerifier(
+        TransactionVerifierInfo calldata txvInfo
     ) external onlyVerifierManager {
-        if (_transactionVerifiers[vId].addr == address(0)) {
-            revert("Verifier: verifier not found");
+        if (txvInfo.addr == address(0)) revert ZeroAddress();
+        if (txvInfo.id == 0) revert InvalidVerifierId(txvInfo.id);
+
+        TransactionVerifierInfo memory previous = _transactionVerifiers[
+            txvInfo.id
+        ];
+        if (previous.addr == address(0)) {
+            revert VerifierNotFound(txvInfo.id);
         }
 
-        delete _transactionVerifiers[vId];
-        emit TransactionVerifierRemoved(vId);
+        _transactionVerifiers[txvInfo.id] = txvInfo;
+        emit TransactionVerifierUpdated(
+            txvInfo.id,
+            previous.addr,
+            txvInfo.addr
+        );
+    }
+
+    /// @dev The snarkjs verifiers take only statically-sized parameters, so the ABI
+    ///      decoder reads `_pubSignals` at a fixed calldata offset and silently ignores
+    ///      any trailing bytes. Callers build verifier calldata as `proof ‖ publicInputs`
+    ///      with `proof` an unbounded `bytes`, so without an exact length check a caller
+    ///      can embed its own public signals inside the proof blob and push the honestly
+    ///      computed ones into the ignored tail, defeating verification entirely.
+    ///      Requiring the exact length is what forces the public inputs to land where the
+    ///      verifier actually reads them.
+    function _assertVParamsLength(
+        uint256 actual,
+        uint256 nPublicInputs
+    ) private pure {
+        if (actual != GROTH16_PROOF_LENGTH + 32 * nPublicInputs) {
+            revert("Verifier: invalid proof length");
+        }
     }
 
     function verifyAddressProof(
         bytes calldata vParams
     ) public view returns (bool) {
+        _assertVParamsLength(vParams.length, ADDRESS_PUBLIC_INPUTS);
+
         (bool success, bytes memory result) = _addressVerifier.staticcall(
             bytes.concat(VerifierRegister.verifyProof.selector, vParams)
         );
@@ -183,6 +227,8 @@ contract Verifier is IVerifier, Ownable {
     function verifyTreeUpdateProof(
         bytes calldata vParams
     ) public view returns (bool) {
+        _assertVParamsLength(vParams.length, TREE_UPDATE_PUBLIC_INPUTS);
+
         (bool success, bytes memory result) = _treeUpdateVerifier.staticcall(
             bytes.concat(VerifierTreeUpdate.verifyProof.selector, vParams)
         );
@@ -204,8 +250,10 @@ contract Verifier is IVerifier, Ownable {
             revert("Verifier: verifier not found");
         }
 
+        _assertVParamsLength(vParams.length, TRANSACTION_PUBLIC_INPUTS);
+
         (bool success, bytes memory result) = vInfo.addr.staticcall(
-            bytes.concat(vInfo.selector, vParams)
+            bytes.concat(TRANSACTION_VERIFY_PROOF_SELECTOR, vParams)
         );
 
         if (!success) {
@@ -237,6 +285,7 @@ contract Verifier is IVerifier, Ownable {
             nOutsCopy /= 10;
         }
         noOfDigits = noOfDigits == 0 ? 1 : noOfDigits;
+
         uint256 verifierID = nIns * 10 ** noOfDigits + nOuts;
 
         if (verifierID > type(uint16).max) {

@@ -5,6 +5,7 @@ import {Test, console} from "forge-std/Test.sol";
 import {EntryPoint} from "@account-abstraction/contracts/core/EntryPoint.sol";
 import {PackedUserOperation} from "@account-abstraction/contracts/interfaces/PackedUserOperation.sol";
 import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {Paymaster} from "src/core/Paymaster.sol";
 import {Asset} from "src/libraries/AssetLogic.sol";
 import {ShieldedTransaction, ShieldedTransactionType} from "src/libraries/ShieldedTransactionLogic.sol";
@@ -31,8 +32,18 @@ contract PaymasterTest is PoolTest {
     uint8 public constant USDC_DECIMALS = 6;
     uint256 public constant ETH_SEPOLIA = 11155111;
     uint256 public constant ETH_MAINNET = 1;
+    uint256 public constant MAX_FEE_PER_GAS = 100 gwei;
+    uint256 public constant MAX_PRIORITY_FEE_PER_GAS = 2 gwei;
+    uint256 public constant BASE_FEE_PER_GAS = 20 gwei;
+    uint256 public constant EFFECTIVE_GAS_PRICE =
+        BASE_FEE_PER_GAS + MAX_PRIORITY_FEE_PER_GAS;
 
     uint24 feeAssetId;
+    // Represents EntryPoint's maxCostEth in these validation tests. Previously,
+    // this full worst-case amount was also committed as the STX fee unchanged.
+    // Effective-price tests replace the STX fee with expectedEffectiveCost but
+    // still pass feeValue as maxCostEth so Paymaster can recover the gas units
+    // using `maxCostEth / MAX_FEE_PER_GAS`.
     uint256 feeValue = 0.002 ether;
     uint256 feeValueForOutsourcedVerification = 0.001 ether;
 
@@ -61,6 +72,9 @@ contract PaymasterTest is PoolTest {
 
         userOp.sender = gatewayAddr;
         userOp.callData = abi.encodeCall(Pool.transact, (stx));
+        // Preserve the original maxCost-based expectations in existing tests by
+        // using EntryPoint's legacy mode (max fee equals priority fee).
+        userOp.gasFees = _packGasFees(1, 1);
         _;
     }
 
@@ -70,13 +84,18 @@ contract PaymasterTest is PoolTest {
         entryPoint = address(new EntryPoint());
         gateway = new Gateway(
             IEntryPoint(entryPoint),
-            IWToken(makeAddr("wToken")),
+            IWToken(makeAddr("nativeWToken")),
             IPool(address(pool))
         );
 
         StdCheats.deployCodeTo(
             "Paymaster.sol:Paymaster",
-            abi.encode(entryPoint, address(gateway), address(pool), pool.priceFeedStalenessThreshold()),
+            abi.encode(
+                entryPoint,
+                address(gateway),
+                address(pool),
+                pool.priceFeedStalenessThreshold()
+            ),
             fixture.paymaster
         );
         console2.log("paymaster:", fixture.paymaster);
@@ -124,6 +143,26 @@ contract PaymasterTest is PoolTest {
         AggregatorV3Interface feed = _getEthUsdcFeed();
         (, price, , updatedAt, ) = feed.latestRoundData();
         decimals = feed.decimals();
+    }
+
+    function _packGasFees(
+        uint256 maxPriorityFeePerGas,
+        uint256 maxFeePerGas
+    ) internal pure returns (bytes32) {
+        return bytes32((maxPriorityFeePerGas << 128) | uint128(maxFeePerGas));
+    }
+
+    function _setFeeData(uint24 assetId, uint256 value) internal {
+        stx.feeData = uint256(
+            bytes32(
+                bytes.concat(
+                    bytes20(address(paymaster)),
+                    bytes3(assetId),
+                    bytes9(uint72(value))
+                )
+            )
+        );
+        userOp.callData = abi.encodeCall(Pool.transact, (stx));
     }
 
     function test_convertFeeFromGasTokenToUSDC() public {
@@ -231,9 +270,7 @@ contract PaymasterTest is PoolTest {
         ) = _getEthUsdcFeedData();
 
         vm.warp(
-            block.timestamp +
-                paymaster.priceStalenessThreshold() +
-                2 hours
+            block.timestamp + paymaster.priceStalenessThreshold() + 2 hours
         ); // Move forward in time to make the price feed stale
         vm.expectRevert(
             abi.encodeWithSelector(
@@ -334,7 +371,169 @@ contract PaymasterTest is PoolTest {
                 feeValue
             )
         );
-        paymaster.validatePaymasterUserOp(userOp, bytes32(0), feeValue); // feeValue is maxCostEth (paymaster) / requiredPreFund (entrypoint)
+        // Legacy mode makes the effective cost equal EntryPoint's maxCost.
+        paymaster.validatePaymasterUserOp(userOp, bytes32(0), feeValue);
+    }
+
+    function test_validatePaymasterUserOpUsesEffectiveGasPrice()
+        public
+        createPackedUserOps(address(gateway))
+    {
+        // vm.fee sets block.basefee. UserOperationLib.gasPrice() therefore returns
+        // min(100 gwei max fee, 20 gwei base fee + 2 gwei priority fee) = 22 gwei.
+        vm.fee(BASE_FEE_PER_GAS);
+        userOp.gasFees = _packGasFees(
+            MAX_PRIORITY_FEE_PER_GAS,
+            MAX_FEE_PER_GAS
+        );
+
+        // Replace the STX's old maxCostEth-denominated fee with the effective
+        // cost; feeValue remains the maxCostEth argument used to recover gas units.
+        uint256 expectedEffectiveCost = Math.mulDiv(
+            feeValue,
+            EFFECTIVE_GAS_PRICE,
+            MAX_FEE_PER_GAS
+        );
+        _setFeeData(feeAssetId, expectedEffectiveCost);
+
+        vm.prank(entryPoint);
+        paymaster.validatePaymasterUserOp(userOp, bytes32(0), feeValue);
+
+        assertLt(expectedEffectiveCost, feeValue);
+    }
+
+    function test_revertWhenFeeIsBelowEffectiveGasCost()
+        public
+        createPackedUserOps(address(gateway))
+    {
+        // Set block.basefee so the inclusion gas price is EFFECTIVE_GAS_PRICE (20 + 2 gwei).
+        vm.fee(BASE_FEE_PER_GAS);
+        userOp.gasFees = _packGasFees(
+            MAX_PRIORITY_FEE_PER_GAS,
+            MAX_FEE_PER_GAS
+        );
+
+        uint256 expectedEffectiveCost = Math.mulDiv(
+            feeValue,
+            EFFECTIVE_GAS_PRICE,
+            MAX_FEE_PER_GAS
+        );
+        _setFeeData(feeAssetId, expectedEffectiveCost - 1);
+
+        vm.prank(entryPoint);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                Paymaster.InsufficientFee.selector,
+                expectedEffectiveCost - 1,
+                expectedEffectiveCost
+            )
+        );
+        paymaster.validatePaymasterUserOp(userOp, bytes32(0), feeValue);
+    }
+
+    function test_bufferedQuoteAcceptsBaseFeeWithinHeadroom()
+        public
+        createPackedUserOps(address(gateway))
+    {
+        userOp.gasFees = _packGasFees(
+            MAX_PRIORITY_FEE_PER_GAS,
+            MAX_FEE_PER_GAS
+        );
+        // Quote-time price: 20 gwei base fee + 2 gwei priority fee, plus 50% = 33 gwei.
+        uint256 bufferedQuote = Math.mulDiv(feeValue, 33 gwei, MAX_FEE_PER_GAS);
+        _setFeeData(feeAssetId, bufferedQuote);
+
+        // Inclusion price reaches the quote but remains within its headroom.
+        vm.fee(31 gwei);
+        vm.prank(entryPoint);
+        paymaster.validatePaymasterUserOp(userOp, bytes32(0), feeValue);
+    }
+
+    function test_revertWhenBaseFeeExceedsBufferedQuote()
+        public
+        createPackedUserOps(address(gateway))
+    {
+        userOp.gasFees = _packGasFees(
+            MAX_PRIORITY_FEE_PER_GAS,
+            MAX_FEE_PER_GAS
+        );
+        uint256 bufferedQuote = Math.mulDiv(feeValue, 33 gwei, MAX_FEE_PER_GAS);
+        _setFeeData(feeAssetId, bufferedQuote);
+
+        vm.fee(32 gwei);
+        uint256 inclusionCost = Math.mulDiv(feeValue, 34 gwei, MAX_FEE_PER_GAS);
+        vm.prank(entryPoint);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                Paymaster.InsufficientFee.selector,
+                bufferedQuote,
+                inclusionCost
+            )
+        );
+        paymaster.validatePaymasterUserOp(userOp, bytes32(0), feeValue);
+    }
+
+    function test_effectiveGasPriceIsCappedAtMaxFeePerGas()
+        public
+        createPackedUserOps(address(gateway))
+    {
+        vm.fee(99 gwei);
+        userOp.gasFees = _packGasFees(
+            MAX_PRIORITY_FEE_PER_GAS,
+            MAX_FEE_PER_GAS
+        );
+        _setFeeData(feeAssetId, feeValue - 1);
+
+        vm.prank(entryPoint);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                Paymaster.InsufficientFee.selector,
+                feeValue - 1,
+                feeValue
+            )
+        );
+        paymaster.validatePaymasterUserOp(userOp, bytes32(0), feeValue);
+    }
+
+    function test_legacyGasPriceRequiresFullMaxCost()
+        public
+        createPackedUserOps(address(gateway))
+    {
+        vm.fee(1 gwei);
+        userOp.gasFees = _packGasFees(MAX_FEE_PER_GAS, MAX_FEE_PER_GAS);
+        _setFeeData(feeAssetId, feeValue - 1);
+
+        vm.prank(entryPoint);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                Paymaster.InsufficientFee.selector,
+                feeValue - 1,
+                feeValue
+            )
+        );
+        paymaster.validatePaymasterUserOp(userOp, bytes32(0), feeValue);
+    }
+
+    function test_zeroMaxFeeAndZeroMaxCostAreAccepted()
+        public
+        createPackedUserOps(address(gateway))
+    {
+        userOp.gasFees = bytes32(0);
+        _setFeeData(feeAssetId, 0);
+
+        vm.prank(entryPoint);
+        paymaster.validatePaymasterUserOp(userOp, bytes32(0), 0);
+    }
+
+    function test_revertWhenMaxCostIsNonZeroAndMaxFeeIsZero()
+        public
+        createPackedUserOps(address(gateway))
+    {
+        userOp.gasFees = bytes32(0);
+
+        vm.prank(entryPoint);
+        vm.expectRevert(Paymaster.InvalidMaxFeePerGas.selector);
+        paymaster.validatePaymasterUserOp(userOp, bytes32(0), feeValue);
     }
 
     function test_revertWhenPaymasterFeesInUSDCIsNotEnough()
@@ -380,6 +579,42 @@ contract PaymasterTest is PoolTest {
             )
         );
         paymaster.validatePaymasterUserOp(userOp, bytes32(0), feeValue); // feeValue is maxCostEth
+    }
+
+    function test_revertWhenConvertedFeeIsBelowEffectiveGasCost()
+        public
+        createPackedUserOps(address(gateway))
+    {
+        if (block.chainid != ETH_SEPOLIA && block.chainid != ETH_MAINNET) {
+            vm.skip(true);
+        }
+
+        // Set block.basefee so the inclusion gas price is EFFECTIVE_GAS_PRICE (20 + 2 gwei).
+        vm.fee(BASE_FEE_PER_GAS);
+        userOp.gasFees = _packGasFees(
+            MAX_PRIORITY_FEE_PER_GAS,
+            MAX_FEE_PER_GAS
+        );
+        uint256 effectiveGasCost = Math.mulDiv(
+            feeValue,
+            EFFECTIVE_GAS_PRICE,
+            MAX_FEE_PER_GAS
+        );
+        uint256 requiredFee = paymaster.convertFeeFromGasTokenToFeeAsset(
+            effectiveGasCost,
+            asset2.id
+        );
+        _setFeeData(asset2.id, requiredFee - 1);
+
+        vm.prank(entryPoint);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                Paymaster.InsufficientFee.selector,
+                requiredFee - 1,
+                requiredFee
+            )
+        );
+        paymaster.validatePaymasterUserOp(userOp, bytes32(0), feeValue);
     }
 
     function test_revertWhenPaymasterFeesInETHIsNotEnoughForPreVerifiedTx()
