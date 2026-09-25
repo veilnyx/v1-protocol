@@ -9,9 +9,22 @@ import {ShieldedAddressRegistrationData} from "src/libraries/ShieldedAddressLogi
 import {ShieldedAccount} from "test/helpers/ShieldedAccount.sol";
 import {TreeUpdateData} from "src/libraries/QueuedMerkleTreeLogic.sol";
 
+/// @notice Deterministic EOA used solely to sign shielded address registrations.
+/// @dev The register proof binds `addr` as a public input, so it must equal the address
+///      the Pool recovers from the EIP-712 signature. Sourced from `.registrant` in
+///      config.json -- the same entry the fixture generator reads for the proof's
+///      `publicAddress` input -- so signer and proof cannot drift apart.
+///      Deliberately separate from `sender.pubAddress`, which is derived from the
+///      shielded rootAddress (no private key) and is the withdrawal recipient.
+struct Registrant {
+    uint256 privateKey;
+    address addr;
+}
+
 struct Fixture {
     address payable paymaster;
     address payable gateway;
+    Registrant registrant;
     uint8 addressTreeDepth;
     uint8 commitmentTreeDepth;
     uint8 commitmentTreeQueueSize;
@@ -42,6 +55,16 @@ library FixtureLib {
 
         fixture.gateway = payable(
             vm.parseJsonAddress(configJsonStr, ".gateway")
+        );
+
+        // Registration signer
+        fixture.registrant.privateKey = vm.parseJsonUint(
+            configJsonStr,
+            ".registrant.privateKey"
+        );
+        fixture.registrant.addr = vm.parseJsonAddress(
+            configJsonStr,
+            ".registrant.address"
         );
 
         // Tree params

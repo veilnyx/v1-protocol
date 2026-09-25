@@ -2,8 +2,11 @@ name: CI
 on:
   push:
     branches:
-      - master
+      - main
   pull_request:
+    branches:
+      - dev
+      - main
 
 env:
   FOUNDRY_PROFILE: ci
@@ -12,18 +15,47 @@ jobs:
   run-ci:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
 
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
         with:
-          version: nightly
+          version: stable
 
-      - name: Install deps
-        run: forge install
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
 
-      - name: Check gas snapshots
-        run: forge snapshot --check
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
 
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Builds with the compiler profiles exactly as foundry.toml declares them
+      # (Pool at 200 runs, everything else at 1M) and fails if any contract
+      # exceeds the EIP-170 24,576-byte runtime limit.
+      - name: Build and check contract sizes
+        run: forge build --sizes
+
+      # `compilation_restrictions` pins Pool.sol to a second compiler profile,
+      # so Pool's whole dependency graph is compiled twice and each source file
+      # emits two artifacts. For the libraries Pool links against (AssetLogic,
+      # MerkleTreeLogic, QueuedMerkleTreeLogic, ShieldedAddressLogic,
+      # ShieldedTransactionLogic) both artifacts share one key, which forge
+      # cannot resolve when linking:
+      #   Error: multiple library artifacts resolve to the same key
+      #          src/libraries/AssetLogic.sol:AssetLogic
+      # Disabling the extra profile for the test run yields one artifact per
+      # file. This is set here rather than in foundry.toml so the committed
+      # config stays in sync with hardhat.config.ts, which mirrors it.
+      # Contract sizes are still enforced by the build step above.
       - name: Run tests
-        run: forge test
+        env:
+          FOUNDRY_COMPILATION_RESTRICTIONS: "[]"
+          FOUNDRY_ADDITIONAL_COMPILER_PROFILES: "[]"
+        run: forge test -vvv

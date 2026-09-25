@@ -57,21 +57,9 @@ contract PoolBaseTest is BaseTest {
         TransactionVerifierInfo[] memory vInfos = new TransactionVerifierInfo[](
             3
         );
-        vInfos[0] = TransactionVerifierInfo({
-            id: 21,
-            addr: address(vt21),
-            selector: vt21.verifyProof.selector
-        });
-        vInfos[1] = TransactionVerifierInfo({
-            id: 22,
-            addr: address(vt22),
-            selector: vt22.verifyProof.selector
-        });
-        vInfos[2] = TransactionVerifierInfo({
-            id: 23,
-            addr: address(vt23),
-            selector: vt23.verifyProof.selector
-        });
+        vInfos[0] = TransactionVerifierInfo({id: 21, addr: address(vt21)});
+        vInfos[1] = TransactionVerifierInfo({id: 22, addr: address(vt22)});
+        vInfos[2] = TransactionVerifierInfo({id: 23, addr: address(vt23)});
 
         verifier = new Verifier(
             vInfos,
@@ -90,7 +78,8 @@ contract PoolBaseTest is BaseTest {
             verifier: IVerifier(address(verifier)),
             adaptorHandler: IAdaptorHandler(address(adaptorHandler)),
             screener: IScreener(address(screener)),
-            hasher: IHasher(address(hasher))
+            hasher: IHasher(address(hasher)),
+            pauser: address(0)
         });
 
         PoolConfigParams memory configParams = PoolConfigParams({
@@ -99,16 +88,12 @@ contract PoolBaseTest is BaseTest {
             minDepositUsd: 0,
             maxDepositUsd: type(uint256).max,
             priceFeedStalenessThreshold: 1 days,
-            nativeWToken: IWToken(config.wToken())
+            nativeWToken: IWToken(config.nativeWToken())
         });
 
         bytes memory initData = abi.encodeCall(
             Pool.initialize,
-            (
-                fixture.commitmentTreeQueueSize,
-                initAddressParams,
-                configParams
-            )
+            (initAddressParams, configParams)
         );
 
         ERC1967Proxy poolProxy = new ERC1967Proxy(address(pool), initData);

@@ -70,13 +70,18 @@ contract PaymasterTest is PoolTest {
         entryPoint = address(new EntryPoint());
         gateway = new Gateway(
             IEntryPoint(entryPoint),
-            IWToken(makeAddr("wToken")),
+            IWToken(makeAddr("nativeWToken")),
             IPool(address(pool))
         );
 
         StdCheats.deployCodeTo(
             "Paymaster.sol:Paymaster",
-            abi.encode(entryPoint, address(gateway), address(pool), pool.priceFeedStalenessThreshold()),
+            abi.encode(
+                entryPoint,
+                address(gateway),
+                address(pool),
+                pool.priceFeedStalenessThreshold()
+            ),
             fixture.paymaster
         );
         console2.log("paymaster:", fixture.paymaster);
@@ -231,9 +236,7 @@ contract PaymasterTest is PoolTest {
         ) = _getEthUsdcFeedData();
 
         vm.warp(
-            block.timestamp +
-                paymaster.priceStalenessThreshold() +
-                2 hours
+            block.timestamp + paymaster.priceStalenessThreshold() + 2 hours
         ); // Move forward in time to make the price feed stale
         vm.expectRevert(
             abi.encodeWithSelector(

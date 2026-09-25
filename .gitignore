@@ -4,6 +4,8 @@ cache_hardhat/
 out/
 .env
 artifacts/
+# Dry-run deployment records (fork addresses under a real chain id) — real ones are tracked
+deployments/*Fork-*.json
 broadcast/
 typechain/
 typechain-types/

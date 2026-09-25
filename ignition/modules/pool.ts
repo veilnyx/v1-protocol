@@ -6,7 +6,6 @@ import adaptorHandlerModule from "./adaptorHandler";
 import assetModule from "./asset";
 import merkleTreeModule from "./merkleTree";
 import queuedMerkleTreeModule from "./queuedMerkleTree";
-import eip712Module from "./eip712";
 import shieldedAddressModule from "./shieldedAddress";
 import shieldedTransactionModule from "./shieldedTransaction";
 import { camelCase } from "../utils";
@@ -15,12 +14,15 @@ const contractName = "Pool";
 const moduleId = camelCase(contractName);
 
 const module = buildModule(moduleId, (m) => {
-  const addressTreeDepth = m.getParameter<number>("addressTreeDepth");
-  const commitmentTreeDepth = m.getParameter<number>("commitmentTreeDepth");
-  const commitmentTreeQueueSize = m.getParameter<number>(
-    "commitmentTreeQueueSize"
-  );
+  const pauser = m.getParameter<string>("pauser");
   const withdrawFeeBps = m.getParameter<number>("withdrawFeeBps");
+  const tvlLimitUsd = m.getParameter<bigint>("tvlLimitUsd");
+  const minDepositUsd = m.getParameter<bigint>("minDepositUsd");
+  const maxDepositUsd = m.getParameter<bigint>("maxDepositUsd");
+  const priceFeedStalenessThreshold = m.getParameter<bigint>(
+    "priceFeedStalenessThreshold"
+  );
+  const nativeWToken = m.getParameter<string>("nativeWToken");
 
   // Dependencies
   const { hasher } = m.useModule(hasherModule);
@@ -34,7 +36,6 @@ const module = buildModule(moduleId, (m) => {
   const { shieldedTransaction } = m.useModule(shieldedTransactionModule);
   const { shieldedAddress } = m.useModule(shieldedAddressModule);
   const { queuedMerkleTree } = m.useModule(queuedMerkleTreeModule);
-  const { eip712 } = m.useModule(eip712Module);
 
   const poolImpl = m.contract("Pool", [], {
     libraries: {
@@ -43,21 +44,29 @@ const module = buildModule(moduleId, (m) => {
       QueuedMerkleTreeLogic: queuedMerkleTree,
       ShieldedAddressLogic: shieldedAddress,
       ShieldedTransactionLogic: shieldedTransaction,
-      EIP712: eip712,
     },
   });
 
-  // return { poolImpl };
-
-  const initData = m.encodeFunctionCall(poolImpl, "initialize", [
-    addressTreeDepth,
-    commitmentTreeDepth,
-    commitmentTreeQueueSize,
+  const initAddressParams = {
     verifier,
     adaptorHandler,
     screener,
     hasher,
+    pauser,
+  };
+
+  const configParams = {
     withdrawFeeBps,
+    tvlLimitUsd,
+    minDepositUsd,
+    maxDepositUsd,
+    priceFeedStalenessThreshold,
+    nativeWToken,
+  };
+
+  const initData = m.encodeFunctionCall(poolImpl, "initialize", [
+    initAddressParams,
+    configParams,
   ]);
 
   const poolProxy = m.contract("PoolProxy", [poolImpl, initData]);
