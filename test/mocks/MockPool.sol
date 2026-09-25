@@ -17,6 +17,10 @@ contract MockPool is Pool {
         _commitmentTree.verifier = IVerifier(verifier_);
     }
 
+    function getCommitmentTreeVerifier() external view returns (IVerifier) {
+        return _commitmentTree.verifier;
+    }
+
     function mock_queueCommitments(uint256[] memory commitments) public {
         _commitmentTree.queueLeaves(commitments);
     }
