@@ -153,6 +153,8 @@ library ShieldedTransactionLogic {
     /// @custom:invariant ACCESS-4 Revoker must be active to be used in transaction
     /// @custom:invariant ADP-1: Adaptor should be supported by the protocol to be used in CALL_ADAPTOR transaction
     /// @custom:invariant STX-1: pubAssets length cannot exceed commitments length
+    /// @custom:invariant STX-2: every nullifier, commitment and notesMemo word is a canonical field element
+    /// @custom:invariant STX-3: a non-zero fee is carved out of a public asset of the same id, never on a DEPOSIT
     function validate(
         ShieldedTransaction calldata stx,
         MerkleTree storage addressTree,
@@ -184,6 +186,10 @@ library ShieldedTransactionLogic {
         ) {
             revert IPool.UnsupportedAdaptor();
         }
+
+        // Both checks run before anything is marked and before the (expensive) proof check.
+        _requireCanonicalFieldElements(stx);
+        _requireBackedFee(stx);
 
         _checkAndMarkNullifiers(stx, commitmentTree, markedNullifiers);
 
@@ -714,6 +720,73 @@ library ShieldedTransactionLogic {
                 ++i;
             }
         }
+    }
+
+    /// @notice Rejects any nullifier, commitment or notesMemo word that is not a canonical
+    ///         field element (< FIELD_SIZE).
+    /// @dev These words are not verifier public inputs: they reach the proof only through the
+    ///      UHF (`gamma` reduces each word mod p; `alpha` is derived from the raw words and is a
+    ///      free input to the circuit). So `x` and `x + k*p` produce the same statement, while
+    ///      the pool keys nullifiers on the raw word and queues raw commitments. Without this:
+    ///        - one note spends up to 5 times (nullifiers n, n+p, ..., n+4p);
+    ///        - one commitment >= p is queued, the tree-update verifier rejects it as a public
+    ///          input forever, and no later note is ever inserted;
+    ///        - notesMemo ciphertext words >= p verify but break revoker/recipient decryption.
+    ///      Honest values are field elements already (Poseidon outputs, ciphertext elements),
+    ///      so this rejects nothing the SDK produces.
+    function _requireCanonicalFieldElements(
+        ShieldedTransaction calldata stx
+    ) internal pure {
+        uint256 n = stx.nullifiers.length;
+        for (uint256 i = 0; i < n; ++i) {
+            if (stx.nullifiers[i] >= FIELD_SIZE) {
+                revert IPool.NonCanonicalFieldElement(stx.nullifiers[i]);
+            }
+        }
+        n = stx.commitments.length;
+        for (uint256 i = 0; i < n; ++i) {
+            if (stx.commitments[i] >= FIELD_SIZE) {
+                revert IPool.NonCanonicalFieldElement(stx.commitments[i]);
+            }
+        }
+        // _decomposeNotesMemo pins the exact length (a multiple of 32) during proof checking.
+        n = stx.notesMemo.length / 32;
+        for (uint256 i = 0; i < n; ++i) {
+            uint256 word = uint256(bytes32(stx.notesMemo[i * 32:(i + 1) * 32]));
+            if (word >= FIELD_SIZE) {
+                revert IPool.NonCanonicalFieldElement(word);
+            }
+        }
+    }
+
+    /// @notice Rejects a fee in `feeData` that no public asset pays for.
+    /// @dev The circuit has no fee signal; `feeData` reaches it only inside the signed `hash`.
+    ///      `execute` credits `feeValue` to the paymaster and covers it by carving it out of the
+    ///      public asset with the same id (`_copyParamsToMemory`). So a fee is only backed when:
+    ///        - the tx is not a DEPOSIT (there, carving it out REDUCES what the pool pulls while
+    ///          the circuit still mints the full value), and
+    ///        - a public asset with `id == feeAssetId` and `value >= feeValue` exists.
+    ///      `feeData` is ignored entirely when there are no public assets, as before.
+    function _requireBackedFee(ShieldedTransaction calldata stx) internal pure {
+        uint256 pubLen = stx.pubAssets.length;
+        if (pubLen == 0) return;
+
+        uint24 feeAssetId = uint24(stx.feeData >> 72);
+        uint256 feeValue = uint72(stx.feeData);
+        if (feeValue == 0) return;
+
+        if (stx.txType == ShieldedTransactionType.DEPOSIT) {
+            revert IPool.UnbackedFee(feeAssetId, feeValue);
+        }
+        for (uint256 i = 0; i < pubLen; ++i) {
+            if (
+                uint24(bytes3(bytes31(stx.pubAssets[i]))) == feeAssetId &&
+                uint224(stx.pubAssets[i]) >= feeValue
+            ) {
+                return;
+            }
+        }
+        revert IPool.UnbackedFee(feeAssetId, feeValue);
     }
 
     /// @notice Marks nullifiers to prevent double-spending

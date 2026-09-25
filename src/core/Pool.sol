@@ -9,6 +9,7 @@ import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/Pau
 import {EIP712Upgradeable} from "@openzeppelin/contracts-upgradeable/utils/cryptography/EIP712Upgradeable.sol";
 
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
+import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {IVerifier} from "../interfaces/IVerifier.sol";
 import {IPool, InitAddressParams, PoolConfigParams} from "../interfaces/IPool.sol";
 import {IAdaptorHandler} from "../interfaces/IAdaptorHandler.sol";
@@ -346,6 +347,13 @@ contract Pool is
             )
         );
 
+        // The account being bound is the EIP-712 signer, not `msg.sender`: a sanctioned signer
+        // could otherwise register through any unsanctioned relayer. `register` recovers the
+        // same signer again and binds it into the proof.
+        _screenForSanctionedAddr(
+            ECDSA.recover(hashTypedData, addressRegData.signature)
+        );
+
         addressRegData.register({
             addressTree: _addressTree,
             publicAddresses: _publicAddresses,
@@ -408,6 +416,32 @@ contract Pool is
             revert IPool.NativeWTokenNotConfigured();
         if (msg.sender != address(nativeWToken))
             revert IPool.UnexpectedNativeEthSender(msg.sender);
+    }
+
+    /// @notice Owner-only recovery of fees credited to a paymaster that cannot claim them.
+    /// @dev Fees are credited to the paymaster address named in `feeData`, and the deployed
+    ///      Paymaster requires that to be itself, but it has no function that calls
+    ///      `withdrawPaymasterFee`, so everything it earned is locked here. This moves only
+    ///      what is already credited to `paymaster`; it cannot touch user notes. The owner
+    ///      (who can upgrade this contract) already controls the Paymaster, so it adds no
+    ///      new trust.
+    function withdrawPaymasterFeeFor(
+        address paymaster,
+        uint24 assetId,
+        address to
+    ) external onlyOwner nonReentrant {
+        uint256 fee = _paymasterFees[paymaster][assetId];
+        if (fee == 0) {
+            revert NoFeeToClaim(paymaster, assetId);
+        }
+
+        _paymasterFees[paymaster][assetId] = 0;
+        AssetLogic.transferAsset({
+            assets: _assets,
+            to: to,
+            assetId: assetId,
+            value: fee
+        });
     }
 
     /// @custom:invariant ACCESS-3: Only paymasters can withdraw their accumulated fees
@@ -634,6 +668,11 @@ contract Pool is
     ) private view {
         if (stx.txType != ShieldedTransactionType.DEPOSIT) return;
         _screenForSanctionedAddr(msg.sender);
+        // A contract caller (e.g. Gateway.handleWrapAndDeposit, which is permissionless) would
+        // otherwise be the only screened party, letting a sanctioned EOA deposit through it.
+        if (tx.origin != msg.sender) {
+            _screenForSanctionedAddr(tx.origin);
+        }
 
         uint256 _min = minDepositUsd;
         uint256 _max = maxDepositUsd;

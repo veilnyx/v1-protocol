@@ -172,6 +172,16 @@ interface IPool {
     /// @dev renounceOwnership() was called. Ownership cannot be renounced
     ///      because the Pool would become permanently unadministrable.
     error RenounceDisabled();
+    /// @notice A nullifier, commitment or notesMemo word is not a canonical field element.
+    /// @dev These values reach the proof only through the UHF, which reduces them mod p,
+    ///      so `x` and `x + k*p` prove identically. The pool keys nullifiers and queues
+    ///      commitments on the RAW word, so a non-canonical value would alias (double spend)
+    ///      or poison the commitment queue (tree update can never verify).
+    error NonCanonicalFieldElement(uint256 value);
+    /// @notice `feeData` carries a fee that no public asset pays for.
+    /// @dev The circuit has no fee signal: the fee is only covered when it is carved out of
+    ///      a public asset of the same id, and a deposit may not carry a fee at all.
+    error UnbackedFee(uint24 feeAssetId, uint256 feeValue);
 
     /////////////////////////////////////////
     //         ADMIN WRITE METHODS         //
@@ -311,6 +321,9 @@ interface IPool {
     /// @param assetId The id of the asset for which the paymaster wants to claim the fee.
     /// @param to The address to which the fee will be transferred.
     function withdrawPaymasterFee(uint24 assetId, address to) external;
+
+    /// @notice Owner-only: move fees credited to `paymaster` (one that cannot claim them) to `to`.
+    function withdrawPaymasterFeeFor(address paymaster, uint24 assetId, address to) external;
 
     /////////////////////////////////////////
     //         READ METHODS                //
