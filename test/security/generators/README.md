@@ -40,6 +40,20 @@ palliora/
   v1-protocol/      # this repo
 ```
 
+**SDK build used.** Jest resolves `@veilnyx-sdk/*` to each workspace package's built `dist/`.
+The committed fixtures came from `v1-sdk` 66483ba (`hyperliquid/testnet-e2e`). In the SDK
+packages these generators use, that commit's source matches `dev` except for a type-only change
+in `shared-types`.
+
+The `dist/` that ran matched that source exactly except in one function:
+`transaction` `deriveDataEncryptionKeys` carried the refund-key fix `toBytes(h, { size: 32 })`,
+the fix published in `@veilnyx-sdk/transaction@1.3.4`. It only affects memo-key derivation. Without
+it, about 2.3% of keys disagree with the circuit and witness generation fails, so rerun or apply
+the fix. It has nothing to do with fees, `pubAssets`, nullifiers or commitments.
+
+Every deviation from honest SDK use is in the generator files themselves: fee fields set after
+build, and `proveRaw`. There, it is deliberate: it models an attacker who does not use the SDK.
+
 Then:
 
 ```bash
