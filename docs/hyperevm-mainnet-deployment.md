@@ -1,5 +1,8 @@
 # Deploying the Veilnyx pool to HyperEVM mainnet (chain 999)
 
+> **Start with the full guide:** `veilnyx-hyperliquid/docs/HYPERLIQUID_MAINNET_DEPLOYMENT.md`. It covers
+> the pool (this runbook), proving keys, the revoker, the burner-funding adaptor, the frontend and go-live.
+
 Branch `feat/hyperevm-mainnet-deploy`, based on **`fix/pool-security-2026-09`** (PR #38):
 `72cb8de`, the commit the Ethereum pool was built from, plus the 2026-09 security fixes.
 **The deployment is independent of Ethereum.** It does not wait for the Ethereum upgrade and does
