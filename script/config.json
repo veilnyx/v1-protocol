@@ -200,6 +200,39 @@
       65538
     ]
   },
+  "999": {
+    "chain": "hyperevm-mainnet",
+    "entryPoint": "0x0000000071727De22E5E9d8BAf0edAc6f37da032",
+    "gateway": "0x0000000000000000000000000000000000000000",
+    "paymaster": "0x0000000000000000000000000000000000000000",
+    "nebraVerifier": "0x0000000000000000000000000000000000000000",
+    "nativeWToken": "0x5555555555555555555555555555555555555555",
+    "poseidonT3": "0x0000000000000000000000000000000000000000",
+    "poseidonT4": "0x0000000000000000000000000000000000000000",
+    "sanctionsList": "0x0000000000000000000000000000000000000000",
+    "screeningDisabled": true,
+    "initAssetType": 1,
+    "initAssetAddresses": [
+      "0x5555555555555555555555555555555555555555",
+      "0xb88339CB7199b77E23DB6E890353E22632Ba630f"
+    ],
+    "initAssetsPrecision": [
+      18,
+      6
+    ],
+    "initNativeGasTokenToAssetChainlinkFeeds": [
+      "0x0000000000000000000000000000000000000000",
+      "0xa8a94Da411425634e3Ed6C331a32ab4fd774aa43"
+    ],
+    "initAssetToUSDChainlinkFeeds": [
+      "0xa8a94Da411425634e3Ed6C331a32ab4fd774aa43",
+      "0x4C89968338b75551243C99B452c84a01888282fD"
+    ],
+    "initAssetIdsVeilnyx": [
+      65537,
+      65538
+    ]
+  },
   "7800": {
     "chain": "veilnyx-mainnet-simulation",
     "entryPoint": "0x0000000071727De22E5E9d8BAf0edAc6f37da032",

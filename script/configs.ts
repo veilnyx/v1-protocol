@@ -17,6 +17,9 @@ export type ChainParams = {
   initAssetToUSDChainlinkFeeds: Hex[];
   initAssetIdsVeilnyx: number[];
   nebraVerifier: Hex;
+  /// Explicit record that sanctions screening is off (sanctionsList is the zero address). Only
+  /// read by the HyperEVM preflight, where no Chainalysis oracle exists.
+  screeningDisabled?: boolean;
 };
 
 export type AdaptorParams = {
@@ -254,6 +257,8 @@ export function loadConfigs() {
       initAssetToUSDChainlinkFeeds: initAssetToUSDChainlinkFeeds.map(getHex),
       initAssetIdsVeilnyx: initAssetIdsVeilnyx.map(assetId => Number(assetId)),
       nebraVerifier: getHex(nebraVerifier),
+      // Optional; only an explicit `true` in config.json counts as the recorded decision.
+      ...((params as any).screeningDisabled === true ? { screeningDisabled: true } : {}),
     };
   }
 
