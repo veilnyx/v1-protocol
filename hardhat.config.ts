@@ -20,6 +20,7 @@ const rpcTenderlyMainnet = process.env.RPC_TENDERLY_MAINNET as string;
 const rpcVeilnyxTestnet = process.env.RPC_VEILNYX_TESTNET as string;
 const rpcArcTestnet = process.env.RPC_ARC_TESTNET as string;
 const rpcTenderlyMainnetCustomId = process.env.RPC_TENDERLY_MAINNET_CUSTOM_ID as string;
+const rpcHyperEvmMainnet = process.env.RPC_HYPEREVM_MAINNET as string;
 const privateKeys = [process.env.PRIVATE_KEY as string];
 const veilnyxPrivateKeys = [process.env.VEILNYX_TEST_PRIV_KEY as string];
 const forkEnabled = process.env.HARDHAT_FORK === "true";
@@ -87,6 +88,20 @@ const config: HardhatUserConfig = {
       url: "http://127.0.0.1:8546",
       chainId: 1
     },
+    // HyperEVM mainnet. The deployer must have big blocks enabled (checked by the HyperEVM
+    // preflight in deployCoreWithAdp.ts) — see docs/hyperevm-mainnet-deployment.md.
+    hyperevm: {
+      url: rpcHyperEvmMainnet,
+      accounts: privateKeys,
+      chainId: 999
+    },
+    // Dry runs against a local anvil fork of HyperEVM mainnet, same rules as mainnetFork above:
+    //   pnpm fork:hyperevm                        (terminal 1, keep running)
+    //   pnpm deployCoreWithAdp:hyperevm:fork      (terminal 2)
+    hyperevmFork: {
+      url: "http://127.0.0.1:8547",
+      chainId: 999
+    },
     sepolia: {
       url: rpcEthereumSepolia,
       accounts: privateKeys,
@@ -132,6 +147,7 @@ const config: HardhatUserConfig = {
     apiKey: {
       mainnet: etherscanApiKey,
       sepolia: etherscanApiKey,
+      hyperevm: etherscanApiKey,
     },
     customChains: [
       {
@@ -140,6 +156,14 @@ const config: HardhatUserConfig = {
         urls: {
           apiURL: "https://api.etherscan.io/v2/api?chainid=1",
           browserURL: "https://etherscan.io",
+        },
+      },
+      {
+        network: "hyperevm",
+        chainId: 999,
+        urls: {
+          apiURL: "https://api.etherscan.io/v2/api?chainid=999",
+          browserURL: "https://hyperevmscan.io",
         },
       },
       {

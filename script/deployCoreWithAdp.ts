@@ -21,6 +21,7 @@ import { deployHasher } from "./hasher";
 import { deployVerifier } from "./verifier";
 import { getChainForCurrentNetwork, isDevelopmentNode } from "./utils/chainUtils";
 import { assertVerifiersMatchCeremony } from "./utils/verifierProvenance";
+import { assertHyperEvmReady, HYPEREVM_MAINNET_CHAIN_ID } from "./utils/hyperevmPreflight";
 import {
   assertRevokerMetadata,
   checkRevokerMetadataIsPinned,
@@ -348,7 +349,19 @@ const verifyAll = async (contracts: {
 // Sequential on purpose: every adaptor registers assets, and the ids they receive come from a
 // monotonic counter, so the enabled set and its order here decide the id of every adaptor asset.
 // Returns the addresses so the caller can record them without module-level state.
+// True when adaptorConfig.json configures at least one address for the chain. A chain whose
+// entry is all zero addresses (HyperEVM: none of Uniswap/Aave/Lido/Morpho exist there) deploys no
+// adaptors — deploying them anyway would register dead adaptors against zero-address dependencies.
+const hasConfiguredAdaptor = (o: any): boolean =>
+  typeof o === "string"
+    ? o.startsWith("0x") && !isUnconfigured(o)
+    : o !== null && typeof o === "object" && Object.values(o).some(hasConfiguredAdaptor);
+
 const deployAdaptors = async (pool: any, adpParams: any, deployConfig: any): Promise<Record<string, Hex>> => {
+  if (!hasConfiguredAdaptor(adpParams)) {
+    console.log("No adaptors configured for this chain — skipping adaptor deployment");
+    return {};
+  }
   const { uniswap: uniswapParams, aave: aaveParams, lido: lidoParams, curve: curveParams, ethena: ethenaParams, beefy: beefyParams, morpho: morphoParams, rocketPool: rocketPoolParams, oneInch: oneInchParams } = adpParams;
 
   return {
@@ -675,6 +688,17 @@ const main = async () => {
         `floor. A run that stops midway leaves a pool that cannot be repaired in place.`
       );
     }
+  }
+
+  // HyperEVM-specific checks (screening decision, asset decimals, live price feeds, big blocks).
+  // Still before anything costs gas.
+  if (chainId === HYPEREVM_MAINNET_CHAIN_ID) {
+    await assertHyperEvmReady({
+      client,
+      chainParams,
+      deployer: wallets[0].account.address as Hex,
+      dryRun,
+    });
   }
 
   // Add assets
