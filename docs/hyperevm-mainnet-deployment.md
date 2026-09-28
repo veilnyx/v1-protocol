@@ -1,21 +1,28 @@
 # Deploying the Veilnyx pool to HyperEVM mainnet (chain 999)
 
-Branch `feat/hyperevm-mainnet-deploy`, based on **72cb8de**, the exact commit the live Ethereum
-pool (`0x4cecb7f9…21ad11`) was built from.
+Branch `feat/hyperevm-mainnet-deploy`, based on **`fix/pool-security-2026-09`** (PR #38):
+`72cb8de`, the commit the Ethereum pool was built from, plus the 2026-09 security fixes.
+**The deployment is independent of Ethereum.** It does not wait for the Ethereum upgrade and does
+not compare against Ethereum; it is verified against this commit's own build.
 
 ## What you are deploying
 
-The **same pool as Ethereum mainnet, byte for byte.**
-
-- A full dry run of this script against a HyperEVM mainnet fork produced 24 contracts. All 24 are
-  identical to their live Ethereum twins once the addresses that legitimately differ per chain are
-  masked (library links, immutables, WHYPE in place of WETH). That covers the pool, all nine
-  Groth16 verifiers, the verifier router, the Poseidon hashers, the paymaster, the gateway and the
-  adaptor handler.
-- The verifiers carry the production ceremony keys (`8a65d25`), so the Ethereum zkeys serve 999
-  unchanged. **Never deploy or prove with the 998 testnet circuits**: they use test entropy and
-  their proofs are forgeable.
-- **No `src/` file differs from 72cb8de.** This branch only changes deploy tooling and config:
+- The pool with **all 2026-09 security fixes** (see `docs/pool-security-upgrade-2026-09.md`):
+  - fee credits must be paid by a public asset (`UnbackedFee`);
+  - nullifiers, commitments and `notesMemo` words must be `< p` (`NonCanonicalFieldElement`);
+  - `batchSize = 0` tree updates are rejected;
+  - deposits screen `tx.origin` and registrations screen the signer, whenever screening is enabled;
+  - owner `withdrawPaymasterFeeFor`.
+- The Paymaster is the live Ethereum Paymaster's source (`aca3110`: fee checked against the
+  effective gas price), plus the fee-paid check and `claimPoolFees`.
+- A dry run on a HyperEVM mainnet fork (2026-09-28) produced 24 contracts. `verify-deployment.py`
+  confirmed all 24 byte-identical to this commit's Hardhat build, with only library links and
+  immutables masked, at the compiler-reported offsets. It also confirmed their wiring. Live
+  probes on the deployed pool hit every new check (step 1).
+- The verifiers carry the production ceremony keys (`8a65d25`). They are unchanged by the fixes,
+  so the Ethereum zkeys serve 999. **Never deploy or prove with the 998 testnet circuits**: they
+  use test entropy and their proofs are forgeable.
+- On top of the security fixes, this branch only changes deploy tooling and config:
 
 | File | Change |
 |---|---|
@@ -25,7 +32,8 @@ The **same pool as Ethereum mainnet, byte for byte.**
 | `script/deployCoreWithAdp.ts` | Runs the preflight on 999; skips the adaptor step when a chain configures none (chain 1 is unchanged) |
 | `script/utils/chainUtils.ts` | viem maps chain id 999 to *Wanchain Testnet*; 999 now gets its own HyperEVM definition |
 | `hardhat.config.ts`, `package.json` | `hyperevm` + `hyperevmFork` networks and commands |
-| `script/hyperevm/compare-with-ethereum.py` | Post-deploy proof that what landed is the Ethereum code |
+| `script/hyperevm/verify-deployment.py` | Post-deploy proof that what landed is this commit's build, correctly wired. Needs only the 999 RPC |
+| `script/hyperevm/check-zkeys.py` | Checks a zkey set against the ceremony manifest |
 
 The existing guards all still apply:
 
@@ -77,7 +85,8 @@ pnpm install --frozen-lockfile
 # .env: RPC_HYPEREVM_MAINNET=<https RPC>, PRIVATE_KEY=<anything for the fork>
 pnpm fork:hyperevm                       # terminal 1 (anvil, 30M-gas blocks = big blocks)
 pnpm deployCoreWithAdp:hyperevm:fork     # terminal 2
-python3 script/hyperevm/compare-with-ethereum.py deployments/hyperevmFork-999.json --rpc http://127.0.0.1:8547
+npx hardhat compile
+python3 script/hyperevm/verify-deployment.py deployments/hyperevmFork-999.json --rpc http://127.0.0.1:8547
 ```
 
 Expect:
@@ -89,7 +98,20 @@ Expect:
 - "asset 65537 = 0x5555… (nativeWToken)";
 - "No adaptors configured";
 - five ✅ ownership transfers;
-- the compare script printing **24 contracts IDENTICAL**.
+- `verify-deployment.py` printing **`DEPLOYMENT OK: 24 contracts identical to this build, wiring verified`**.
+
+Optionally, confirm the fixes on the fork. Impersonate the owner, `unpause()`, then `cast call`
+the pool; each call must revert with the error shown:
+
+| Call | Expected revert |
+|---|---|
+| `transact` with nullifier `p + 1` | `NonCanonicalFieldElement` |
+| `transact` with commitment `p + 7` | `NonCanonicalFieldElement` |
+| WITHDRAW whose fee is larger than its public amount | `UnbackedFee` |
+| 20 USDC DEPOSIT with a fee | `UnbackedFee` |
+| tree update with `batchSize = 0` | `InvalidBatchSize` |
+
+All five passed on the 2026-09-28 dry run.
 
 ### 2. Live run
 
@@ -103,8 +125,14 @@ survive even if verification fails. Commit that file.
 
 ### 3. Verify, then (owner) unpause
 
-1. Run `python3 script/hyperevm/compare-with-ethereum.py deployments/hyperevm-999.json --rpc $RPC_HYPEREVM_MAINNET`.
-   Anything other than 24 IDENTICAL means **do not unpause**.
+1. Run `python3 script/hyperevm/verify-deployment.py deployments/hyperevm-999.json --rpc $RPC_HYPEREVM_MAINNET`
+   from this commit, after `npx hardhat compile`. Anything other than `DEPLOYMENT OK` means
+   **do not unpause**. It checks every contract against this build, byte for byte including
+   metadata, and it checks the wiring:
+   - the proxy implementation;
+   - the Pool's verifier, hasher, adaptor handler and native token;
+   - all nine verifiers registered in the router;
+   - the Gateway, Paymaster and Hasher immutables.
 2. Check `owner()` on all five contracts = the owner. The deployer must own nothing. The script
    asserts this, but re-read it from a block explorer.
 3. Check `getAsset(65537)` = WHYPE and `getAsset(65538)` = Circle USDC with precision 6; the
@@ -141,6 +169,11 @@ See `veilnyx-hyperliquid/docs/MAINNET_DIRECT_FUNDING.md`.
 
 ## Security review (2026-09-25)
 
+**Update 2026-09-25/28:** a fresh audit of `72cb8de` found two Critical issues (fee-credit mint,
+nullifier `n + p` double-spend), a High (tree freeze) and several Mediums. All are fixed on the
+base branch of this one; see PR #38 and `docs/pool-security-upgrade-2026-09.md`. The review below
+predates that audit and still applies to everything it covers.
+
 The pool was re-audited for this deployment. There were two independent passes:
 
 - **Provenance:** the live Ethereum pool was rebuilt from source and matched byte for byte to 72cb8de.
@@ -160,7 +193,8 @@ Conditions, with their status on this branch:
 
 | Condition | Status |
 |---|---|
-| Every contract byte-identical to Ethereum | ✅ 24/24 on the fork dry run; `compare-with-ethereum.py` re-checks the real deploy |
+| 2026-09 security fixes included | ✅ based on `fix/pool-security-2026-09`; live probes pass on the fork deploy |
+| Every contract byte-identical to this commit's build, correctly wired | ✅ 24/24 on the fork dry run; `verify-deployment.py` re-checks the real deploy |
 | Verifiers from the 8a65d25 ceremony, not 3fbcd0a / 831794a / a13860c | ✅ manifest check + bytecode |
 | Frontend proves 999 with the mainnet circuit set, served correctly (incl. transact84) | app routes 999 to `mainnet-circuits`; **hosting still open, see step 3b** |
 | Only non-fee-on-transfer, non-rebasing assets (WHYPE, Circle USDC) | ✅ |
@@ -177,8 +211,8 @@ Known and accepted, same as Ethereum:
 
 Chain compatibility:
 
-- The code deployed is the audited code already securing Ethereum, including the crypto-audit
-  remediation (1e6f04d) and its ceremony.
+- The code deployed is the audited Ethereum code plus the 2026-09 fixes. That includes the
+  crypto-audit remediation (1e6f04d) and its ceremony.
 - HyperEVM is compatible:
   - the BN254 and modexp precompiles return identical results;
   - the code targets EVM `paris` with no transient storage or blob opcodes;
