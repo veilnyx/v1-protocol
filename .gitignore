@@ -14,3 +14,6 @@ typechain-types/
 # source of truth for upgrade validation. Never gitignore it.
 .claude/
 .vscode/
+
+# Fork rehearsals of script/upgradePoolSecurity.ts — never a real deployment record
+deployments/*-fork-rehearsal.json

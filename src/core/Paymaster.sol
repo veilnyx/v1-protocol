@@ -11,12 +11,15 @@ import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interf
 import {IPaymaster} from "@account-abstraction/contracts/interfaces/IPaymaster.sol";
 import {IEntryPoint} from "@account-abstraction/contracts/interfaces/IEntryPoint.sol";
 import {PackedUserOperation} from "@account-abstraction/contracts/interfaces/PackedUserOperation.sol";
-import {ShieldedTransaction} from "../libraries/ShieldedTransactionLogic.sol";
+import {UserOperationLib} from "@account-abstraction/contracts/core/UserOperationLib.sol";
+import {ShieldedTransaction, ShieldedTransactionType} from "../libraries/ShieldedTransactionLogic.sol";
 import {Asset, AssetLogic} from "../libraries/AssetLogic.sol";
 import {IPool} from "../interfaces/IPool.sol";
 import {MIN_PRICE_STALENESS_THRESHOLD} from "../base/Constants.sol";
 
 contract Paymaster is IPaymaster, Ownable {
+    using UserOperationLib for PackedUserOperation;
+
     uint256 public constant VALIDATION_SUCCESS = 0;
     uint24 public constant GAS_ASSET_ID = 65537; // AssetId for the active chain's native gas token
     uint8 public constant ETH_DECIMALS = 18;
@@ -37,7 +40,12 @@ contract Paymaster is IPaymaster, Ownable {
     error InvalidSender(address sender);
     error ZeroAddress();
     error InvalidCallData();
+    error InvalidMaxFeePerGas();
     error InsufficientFee(uint256 given, uint256 required);
+    /// @dev The advertised fee is not paid by the transaction: it is a DEPOSIT, has no public
+    ///      assets (the pool then ignores `feeData` and credits nothing), or no public asset of
+    ///      the fee asset carries at least the fee.
+    error FeeNotPaidByTransaction(uint24 feeAssetId, uint256 fee);
     error FeeAssetNotSupportedByVeilnyx(uint24 assetId);
     error AssetNotSupportedAsFeeAsset(uint24 assetId);
     error ChainlinkPriceFeedNotFound(uint24 assetId);
@@ -168,9 +176,9 @@ contract Paymaster is IPaymaster, Ownable {
         return entryPoint.balanceOf(address(this));
     }
 
-    /// @notice Returns the `maxCostEth` (native gas token of the active chain) value in `feeAssetId` using Chainlink's price feeds.
+    /// @notice Returns a native gas token amount in `feeAssetId` using Chainlink's price feeds.
     function convertFeeFromGasTokenToFeeAsset(
-        uint256 maxCostEth,
+        uint256 costInGasToken,
         uint24 feeAssetId
     ) public view returns (uint256 feeInAsset) {
         Asset memory feeAsset = pool.getAsset(feeAssetId);
@@ -180,7 +188,7 @@ contract Paymaster is IPaymaster, Ownable {
             revert FeeAssetNotSupportedByVeilnyx(feeAssetId);
         }
 
-        // if chainlink feed for assetId not found, return maxCostEth
+        // if chainlink feed for assetId not found, return costInGasToken
         if (
             address(assetIdToChainlinkFeed[feeAssetId]) == address(0) &&
             feeAssetId != GAS_ASSET_ID
@@ -193,11 +201,11 @@ contract Paymaster is IPaymaster, Ownable {
             feeAssetId == GAS_ASSET_ID
         ) {
             // fee asset is GAS_TOKEN itself, returning default value
-            return maxCostEth;
+            return costInGasToken;
         }
 
         AggregatorV3Interface feed = assetIdToChainlinkFeed[feeAssetId];
-        // for conversion we assume price fetching of assetId in ETH only since maxCostEth is in ETH
+        // for conversion we assume price fetching of assetId in ETH only since costInGasToken is in ETH
         uint8 feedDecimals = feed.decimals();
 
         (, int256 priceETHInAsset, , uint256 updatedAt, ) = feed
@@ -218,11 +226,11 @@ contract Paymaster is IPaymaster, Ownable {
         uint256 feePrec = feeAsset.precision;
         uint256 baseExp = gasAsset.precision + feedDecimals;
         feeInAsset = feePrec >= baseExp
-            ? (maxCostEth *
+            ? (costInGasToken *
                 uint256(priceETHInAsset) *
                 10 ** (feePrec - baseExp))
             : Math.mulDiv(
-                maxCostEth,
+                costInGasToken,
                 uint256(priceETHInAsset),
                 10 ** (baseExp - feePrec)
             );
@@ -252,34 +260,70 @@ contract Paymaster is IPaymaster, Ownable {
             revert InvalidSender(userOp.sender);
         }
 
+        // Decoded once: the fee params and the fee-paid check below both read it.
+        ShieldedTransaction memory stx = abi.decode(
+            userOp.callData[4:],
+            (ShieldedTransaction)
+        );
         (
             address paymaster,
             uint24 feeAssetId,
             uint256 givenFee
-        ) = _parseFeeParams(userOp);
+        ) = _parseFeeParams(stx);
 
         // Fee recipient must be this contract
         if (paymaster != address(this)) {
             revert InvalidPaymaster(paymaster);
         }
 
-        uint256 requiredFee = _getRequiredFee(feeAssetId, maxCostEth);
+        uint256 effectiveGasCost = _getEffectiveGasCost(userOp, maxCostEth);
+        uint256 requiredFee = _getRequiredFee(feeAssetId, effectiveGasCost);
 
         if (givenFee < requiredFee) {
             revert InsufficientFee(givenFee, requiredFee);
         }
 
+        // Checked last so the existing errors keep their precedence. The fee in `feeData` is
+        // only real if the pool will actually collect it — mirror the pool's rule
+        // (ShieldedTransactionLogic._requireBackedFee). Without this, a TRANSFER with no
+        // public assets advertises any fee, the pool ignores `feeData`, and this paymaster
+        // sponsors the op for free.
+        _requireFeePaidByTransaction(stx, feeAssetId, givenFee);
+
         return ("", VALIDATION_SUCCESS);
     }
 
-    function _parseFeeParams(
-        PackedUserOperation calldata userOp
-    ) internal pure returns (address, uint24, uint256) {
-        ShieldedTransaction memory stx = abi.decode(
-            userOp.callData[4:],
-            (ShieldedTransaction)
-        );
+    function _requireFeePaidByTransaction(
+        ShieldedTransaction memory stx,
+        uint24 feeAssetId,
+        uint256 fee
+    ) internal pure {
+        if (stx.txType != ShieldedTransactionType.DEPOSIT) {
+            uint256 pubLen = stx.pubAssets.length;
+            for (uint256 i = 0; i < pubLen; ++i) {
+                if (
+                    uint24(bytes3(bytes31(stx.pubAssets[i]))) == feeAssetId &&
+                    uint224(stx.pubAssets[i]) >= fee
+                ) {
+                    return;
+                }
+            }
+        }
+        revert FeeNotPaidByTransaction(feeAssetId, fee);
+    }
 
+    /// @notice Claim the fees the pool has credited to this paymaster.
+    /// @dev The previous Paymasters had no way to call `pool.withdrawPaymasterFee`, so their
+    ///      earnings were locked in the pool (recoverable only via the pool owner's
+    ///      `withdrawPaymasterFeeFor`).
+    function claimPoolFees(uint24 assetId, address to) external onlyOwner {
+        if (to == address(0)) revert ZeroAddress();
+        pool.withdrawPaymasterFee(assetId, to);
+    }
+
+    function _parseFeeParams(
+        ShieldedTransaction memory stx
+    ) internal pure returns (address, uint24, uint256) {
         // FeeData is packed as follows (in order):
         // 20 bytes - paymaster address
         // 3 bytes - feeAssetId (24 bits)
@@ -295,12 +339,35 @@ contract Paymaster is IPaymaster, Ownable {
         return (paymaster, feeAssetId, feeValue);
     }
 
-    /// @notice Returns `maxCostEth` amt of ETH in asset.
+    /// @notice Scales EntryPoint's worst-case prefund to the UserOp gas price
+    ///         that applies in the current block.
+    /// @dev EntryPoint calculates `maxCostEth` as the UserOp's total prefunded
+    ///      gas units multiplied by `maxFeePerGas`. It is used here only to
+    ///      recover that gas-unit basis. Multiplying those gas units by
+    ///      `userOp.gasPrice()` produces the effective gas cost for this block:
+    ///      `maxCostEth * userOp.gasPrice() / maxFeePerGas`.
+    function _getEffectiveGasCost(
+        PackedUserOperation calldata userOp,
+        uint256 maxCostEth
+    ) internal view returns (uint256) {
+        uint256 maxFeePerGas = userOp.unpackMaxFeePerGas();
+        if (maxFeePerGas == 0) {
+            if (maxCostEth != 0) revert InvalidMaxFeePerGas();
+            return 0;
+        }
+
+        return Math.mulDiv(maxCostEth, userOp.gasPrice(), maxFeePerGas);
+    }
+
+    /// @notice Returns a native gas token amount in `feeAssetId`.
     function _getRequiredFee(
         uint24 feeAssetId,
-        uint256 maxCostEth
+        uint256 costInGasToken
     ) internal view returns (uint256 feeInAsset) {
-        feeInAsset = convertFeeFromGasTokenToFeeAsset(maxCostEth, feeAssetId);
+        feeInAsset = convertFeeFromGasTokenToFeeAsset(
+            costInGasToken,
+            feeAssetId
+        );
         return feeInAsset;
     }
 
