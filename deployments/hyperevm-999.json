@@ -1,0 +1,32 @@
+{
+  "network": "hyperevm",
+  "chainId": 999,
+  "dryRun": false,
+  "deployedAt": "2026-09-30T10:48:01.822Z",
+  "addresses": {
+    "poolProxy": "0x25913fa4a703aff4b15b7bf00f9723dde0446917",
+    "poolImpl": "0x8d7304fac928e312f06535b93abaa18afa44be4c",
+    "verifier": "0x17b46e30bc7cdc63aab9f7ab945a611bdd6c865c",
+    "hasher": "0xa9d61c4a66705314157d3deb726463162f2d95b5",
+    "adaptorHandler": "0xfb49e16373d04bd0f000092c79c88bb42065dfd1",
+    "gateway": "0x6e1daa932ed0e15cd4590e53f64554c576bcbcc4",
+    "paymaster": "0x44e76c26fc9b988ce9731d1795b1bbfa85eca4c5",
+    "assetLogic": "0x6ee46c92f9828fb2a83e8e8e6147ba4aebad3369",
+    "merkleTreeLogic": "0xc7f35af6a145b4daac85257049716636ae996268",
+    "queuedMerkleTreeLogic": "0xf6c1bfb915c729be7aa5d8076d970f0388314c37",
+    "shieldedAddressLogic": "0xb0e0b5ca091c1eb566cc11436f4bfc7556dc6c8d",
+    "shieldedTransactionLogic": "0x39a8d403e4c64e577374c88966e78f0ddb34b668",
+    "poseidonT3": "0xb09c9188f4f2d44c39db4e7a7d8a206f094cc60d",
+    "poseidonT4": "0x760f48d7da028790dd14a03768c83c23ac24a0d5",
+    "poseidonT5": "0xb78ad27b86e07b33b181e67d1073eae0579bc9a9",
+    "verifierRegister": "0x82c8cd776707eeed95a4b248d73b63dabae2d10b",
+    "verifierTreeUpdate": "0x70bd8f99f328d1967d5075402d73588a20c08cb9",
+    "verifierTransact21": "0x9c75948e2e0f63c003a96c0202b02aebd95fa152",
+    "verifierTransact22": "0x6dc08a79e37490f050fd481bf1e3237835354b06",
+    "verifierTransact23": "0xa9fd688c51d4279a087ba2ae3ec4739c44ee8bf4",
+    "verifierTransact42": "0x6c0972faa323ed2cbcaeac6345d3625c39dba1bb",
+    "verifierTransact44": "0xd08eaffbfc9bdbf54ed65dfe0091c205082d8538",
+    "verifierTransact82": "0xab0c362d4fb0f10b32e1e6d3cf2b91076c90ba53",
+    "verifierTransact84": "0xa88771e6e7104d5423acfff246c1b08ac13d69a9"
+  }
+}
