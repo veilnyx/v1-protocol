@@ -15,21 +15,10 @@ const {
 
 // Spends notes from `deposit_2_testnet_weth`. Consumed by PoolDepositWithdraw.
 export const reqs = {
-  withdraw_10_weth_with_weth_fee: {
+  withdraw_100_weth_without_fee: {
     type: TransactionType.WITHDRAW,
     assetIds: [weth],
-    values: [parseEther("10")],
-    feeAssetId: weth,
-    to: senderPubAddress,
-    viaBundler: true,
-    paymaster: PAYMASTER_ADDR_FIXTURE as `0x${string}`,
-    revokerId: 0
-  }
-  /**
-  withdraw_1_testnet_weth_without_fee: {
-    type: TransactionType.WITHDRAW,
-    assetIds: [testnetWeth],
-    values: [parseEther("1")],
+    values: [parseEther("100")],
     feeAssetId: 0,
     to: senderPubAddress,
     viaBundler: false,
@@ -65,13 +54,40 @@ export const reqsFromPreTxDeposit = {
     paymaster: PAYMASTER_ADDR_FIXTURE as `0x${string}`,
     revokerId: 0,
   },
+  withdraw_1_testnet_weth_without_fee: {
+    type: TransactionType.WITHDRAW,
+    assetIds: [testnetWeth],
+    values: [parseEther("1")],
+    feeAssetId: 0,
+    to: senderPubAddress,
+    viaBundler: false,
+    paymaster: zeroAddress,
+    revokerId: 0,
+  }
+};
+
+  withdraw_10_weth_with_weth_fee: {
+    type: TransactionType.WITHDRAW,
+    assetIds: [weth],
+    values: [parseEther("10")],
+    feeAssetId: weth,
+    to: senderPubAddress,
+    viaBundler: true,
+    paymaster: PAYMASTER_ADDR_FIXTURE as `0x${string}`,
+    revokerId: 0
+  }
+// Spends notes from `deposit_pre_tx` (10000 WETH + 10000 USDC), which is what
+// `_makePreDeposit()` puts on-chain. Consumed by PoolWithdraw, PoolGuardrails,
+// TvlGuard and Paymaster.
+export const reqsFromPreTxDeposit = {,
+  */
   /**
   withdraw_500_weth_without_fee: {
     type: TransactionType.WITHDRAW,
     assetIds: [weth],
     values: [parseEther("500")],
     feeAssetId: 0,
-    to: senderPubAddress,
+    to: "0x8F2FbdFDa8BE4Da8B9454aE9F0301150932AE4b5",
     viaBundler: false,
     paymaster: zeroAddress,
     revokerId: 0,
