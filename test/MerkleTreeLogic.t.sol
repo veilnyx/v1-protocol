@@ -159,4 +159,24 @@ contract MerkleTreeLogicTest is BaseTest {
             MerkleTreeLogic.isKnownRoot(_commitmentTree, commitmentTreeRoot)
         );
     }
+
+    /// Unwritten slots in the root-history buffer are zero, so a zero root must be
+    /// rejected explicitly rather than matching one of them.
+    function test_isRootKnown_rejectsZeroRoot() public {
+        assertFalse(
+            MerkleTreeLogic.isKnownRoot(_commitmentTree, 0),
+            "zero root accepted on a fresh tree"
+        );
+
+        MerkleTreeLogic.insert(
+            _commitmentTree,
+            uint256(keccak256(abi.encode("commitment1"))) % FIELD_SIZE
+        );
+
+        // Still rejected once the buffer is partially written.
+        assertFalse(
+            MerkleTreeLogic.isKnownRoot(_commitmentTree, 0),
+            "zero root accepted after insert"
+        );
+    }
 }

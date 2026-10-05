@@ -18,17 +18,17 @@ interface IPaymaster {
 }
 
 contract PaymasterOps is BaseScript {
-    address paymaster = 0x63F7a75d7cf330A8a0eb7d7FF9E760dC2B094729;
+    address paymaster = 0x1E6f6127d3FaAeff937b17790F2F2e390C11A55A;
 
     function _readChainlinkFeed() internal view {
-        uint24 gasAssetId = 65538; // GAS_ASSET_ID (WETH)
+        uint24 gasAssetId = 65537; // GAS_ASSET_ID (WETH)
 
         address feed = IPaymaster(paymaster).assetIdToChainlinkFeed(gasAssetId);
-        console2.log("Chainlink feed for assetId 65538:", feed);
+        console2.log("Chainlink feed for assetId 65537:", feed);
 
         if (feed == address(0)) {
             console2.log(
-                "WARNING: No Chainlink feed configured for assetId 65538"
+                "WARNING: No Chainlink feed configured for assetId 65537"
             );
         }
     }

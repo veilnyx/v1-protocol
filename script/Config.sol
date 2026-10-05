@@ -16,12 +16,11 @@ contract Config is Script {
     uint256[2] internal _encryptionPublicKey;
     uint8 public immutable addressTreeDepth;
     uint8 public immutable commitmentTreeDepth;
-    uint8 public immutable commitmentTreeQueueSize;
     uint256 public immutable withdrawFeeBps;
     address public immutable entryPoint;
     address public immutable gateway;
     address public immutable paymaster;
-    address public immutable wToken;
+    address public immutable nativeWToken;
     address public immutable sanctionsList;
     address public immutable nebraVerifier;
 
@@ -57,10 +56,6 @@ contract Config is Script {
             vm.parseJsonUint(configJson, ".common.commitmentTreeDepth")
         );
 
-        commitmentTreeQueueSize = uint8(
-            vm.parseJsonUint(configJson, ".common.commitmentTreeQueueSize")
-        );
-
         withdrawFeeBps = vm.parseJsonUint(configJson, ".common.withdrawFeeBps");
 
         // chain specific config
@@ -86,9 +81,9 @@ contract Config is Script {
             string.concat(chainPrefix, ".nebraVerifier")
         );
 
-        wToken = vm.parseJsonAddress(
+        nativeWToken = vm.parseJsonAddress(
             configJson,
-            string.concat(chainPrefix, ".wToken")
+            string.concat(chainPrefix, ".nativeWToken")
         );
 
         sanctionsList = vm.parseJsonAddress(

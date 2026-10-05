@@ -25,7 +25,7 @@ interface IGateway is IAccount {
         uint256 amount
     ) external;
 
-    function wToken() external view returns (IWToken);
+    function nativeWToken() external view returns (IWToken);
 
     function entryPoint() external view returns (IEntryPoint);
 }

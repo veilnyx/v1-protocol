@@ -10,9 +10,13 @@ import {BaseScript} from "../BaseScript.sol";
 contract GatewayDeploy is BaseScript {
     function run() external broadcast {
         address entryPoint = _config.entryPoint();
-        address wToken = _config.wToken();
+        address nativeWToken = _config.nativeWToken();
         address pool = _getContract("PoolProxy");
 
-        new Gateway(IEntryPoint(entryPoint), IWToken(wToken), IPool(pool));
+        new Gateway(
+            IEntryPoint(entryPoint),
+            IWToken(nativeWToken),
+            IPool(pool)
+        );
     }
 }

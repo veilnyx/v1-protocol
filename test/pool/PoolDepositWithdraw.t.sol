@@ -18,7 +18,7 @@ contract PoolDepositWithdrawTest is PoolTest {
         if (block.chainid != ETH_SEPOLIA && block.chainid != 1) {
             vm.skip(true);
         }
-        address testnet_weth = config.wToken();
+        address testnet_weth = config.nativeWToken();
         uint256 deposit = 2 ether;
         uint256 ethBalanceBefore = address(this).balance;
 

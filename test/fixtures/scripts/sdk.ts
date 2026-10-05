@@ -22,7 +22,6 @@ import { fp, poseidonHash } from "@veilnyx-sdk/babyjubjub";
 import { UpaClient, UpaInstanceDescriptor } from "@nebrazkp/upa/sdk";
 import { toBigInt } from "@veilnyx-sdk/utils";
 import {
-  MockAddressResolver,
   MockNotesSource,
   MockTreeSource,
 } from "./mockServices";
@@ -64,7 +63,6 @@ export const getSDKInstance = async () => {
 
   const commitmentTreeSource = new MockTreeSource(commitmentTree);
   const addressTreeSource = new MockTreeSource(addressTree);
-  const addressResolver = new MockAddressResolver();
   const notesSource = new MockNotesSource();
 
   addressTreeSource.insert(senderAccount.rootAddress);
@@ -80,7 +78,6 @@ export const getSDKInstance = async () => {
     services: {
       commitmentTreeSource,
       addressTreeSource,
-      addressResolver,
       notesSource,
       contractSource: {} as any,
     }

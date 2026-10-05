@@ -17,7 +17,7 @@ import {IHasher} from "../interfaces/IHasher.sol";
 import {IWToken} from "../interfaces/IWToken.sol";
 import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {EIP712_DOMAIN_NAME, EIP712_DOMAIN_VERSION, MAX_WITHDRAW_FEE_BPS, MERKLE_TREE_DEPTH, COMMITMENT_TREE_DEPTH, TVL_USD_DECIMALS, MIN_PRICE_STALENESS_THRESHOLD} from "../base/Constants.sol";
+import {EIP712_DOMAIN_NAME, EIP712_DOMAIN_VERSION, MAX_WITHDRAW_FEE_BPS, MERKLE_TREE_DEPTH, COMMITMENT_TREE_DEPTH, TVL_USD_DECIMALS, MIN_PRICE_STALENESS_THRESHOLD, FIELD_SIZE, BABYJUBJUB_A, BABYJUBJUB_D} from "../base/Constants.sol";
 import {PoolStorage} from "../base/PoolStorage.sol";
 import {Asset, AssetType, AssetLogic, AssetInitParams} from "../libraries/AssetLogic.sol";
 import {MerkleTree, MerkleTreeLogic} from "../libraries/MerkleTreeLogic.sol";
@@ -47,9 +47,7 @@ contract Pool is
 
     /// @notice Initializes the Pool contract with the given parameters.
     /// @dev Pool is an UUPSUpgradeable contract, so it needs to be initialized.
-    /// @param commitmentTreeQueueSize The size of the queue for the commitment tree. This determines how many leaves can be queued at MAX before a tree update is required. Defined by the circuit `treeUpdate::nLeaves`
     function initialize(
-        uint8 commitmentTreeQueueSize,
         InitAddressParams calldata initAddressParams,
         PoolConfigParams calldata configParams
     ) external initializer {
@@ -85,7 +83,8 @@ contract Pool is
         verifier = initAddressParams.verifier;
         adaptorHandler = initAddressParams.adaptorHandler;
         hasher = initAddressParams.hasher;
-        screener = initAddressParams.screener;
+        _setScreener(initAddressParams.screener);
+        _setPauser(initAddressParams.pauser);
 
         withdrawFeeBps = configParams.withdrawFeeBps;
         tvlLimitUsd = configParams.tvlLimitUsd;
@@ -95,7 +94,7 @@ contract Pool is
         nativeWToken = configParams.nativeWToken;
 
         _addressTree.init(hasher);
-        _commitmentTree.init(commitmentTreeQueueSize, hasher, verifier);
+        _commitmentTree.init(hasher, verifier);
     }
 
     /////////////////////////////////////////
@@ -123,8 +122,26 @@ contract Pool is
 
     /// @custom:invariant ACCESS-1 Owner can delegate pausing to a separate address
     function setPauser(address newPauser) external onlyOwner {
-        emit IPool.PauserUpdated(pauser, newPauser);
-        pauser = newPauser;
+        _setPauser(newPauser);
+    }
+
+    /// @notice Atomically updates the verifier used by all Pool proof paths.
+    /// @dev Updates both the primary verifier reference and the verifier cached
+    ///      by the commitment tree. Only callable by the owner.
+    function setVerifier(IVerifier newVerifier) external onlyOwner {
+        address newVerifierAddress = address(newVerifier);
+        if (
+            newVerifierAddress == address(0) ||
+            newVerifierAddress.code.length == 0
+        ) {
+            revert IPool.InvalidVerifierAddress(newVerifierAddress);
+        }
+
+        address previousVerifier = address(verifier);
+        verifier = newVerifier;
+        _commitmentTree.setVerifier(newVerifier);
+
+        emit IPool.VerifierUpdated(previousVerifier, newVerifierAddress);
     }
 
     function addAssets(
@@ -160,6 +177,15 @@ contract Pool is
         uint256[2] calldata encryptionPublicKey,
         bytes calldata revokerMetadata
     ) external onlyOwner {
+        // The circuit uses these keys as scalar-multiplication bases. A point off
+        // the curve, or of low order, makes the multiplication degenerate: with
+        // revokerPublicKey = (0, y) every nullifier collapses to
+        // Poseidon(leafIndex, commitment, 0), which is computable from public
+        // chain data alone, silently destroying nullifier privacy for every note
+        // registered under this revoker. Validate before it can ever be selected.
+        _assertValidCurvePoint(revokerPublicKey);
+        _assertValidCurvePoint(encryptionPublicKey);
+
         uint16 id = _revokerCount;
         uint256 revokerPublicKeyHash = uint256(
             keccak256((abi.encode(revokerPublicKey)))
@@ -222,15 +248,7 @@ contract Pool is
     ///      Any non-zero `screener_` must be a contract: setting an EOA would
     ///      make `isSanctioned` revert and brick registrations and deposits.
     function setScreener(IScreener screener_) external onlyOwner {
-        if (
-            address(screener_) != address(0) &&
-            address(screener_).code.length == 0
-        ) {
-            revert IPool.InvalidScreenerAddress(address(screener_));
-        }
-
-        screener = screener_;
-        emit ScreenerUpdated(address(screener_));
+        _setScreener(screener_);
     }
 
     /// @custom:invariant FEE-1: withdrawFeeBps cannot be set above MAX_WITHDRAW_FEE_BPS
@@ -379,10 +397,10 @@ contract Pool is
         IWToken _wToken = nativeWToken;
         uint24 _wTokenAssetId = _resolveWTokenAssetId(_wToken);
 
-        // If the caller attached native ETH, wrap it into wToken up-front so
-        // the ensuing deposit logic can treat the wToken portion as already
+        // If the caller attached native ETH, wrap it into nativeWToken up-front so
+        // the ensuing deposit logic can treat the nativeWToken portion as already
         // credited to the Pool. msg.value == 0 preserves the ERC20
-        // transferFrom flow for every pubAsset (including wToken).
+        // transferFrom flow for every pubAsset (including nativeWToken).
         if (msg.value > 0) {
             _wrapNativeEthForDeposit(stx, _wToken, _wTokenAssetId);
         }
@@ -586,6 +604,28 @@ contract Pool is
             revert IPool.BadArguments();
     }
 
+    /// @dev Shared by `initialize` and `setScreener`. Rejects an EOA screener: a
+    ///      non-contract address would make `isSanctioned` revert and brick
+    ///      registrations and deposits. address(0) is allowed and disables screening.
+    function _setScreener(IScreener screener_) private {
+        if (
+            address(screener_) != address(0) &&
+            address(screener_).code.length == 0
+        ) {
+            revert IPool.InvalidScreenerAddress(address(screener_));
+        }
+
+        screener = screener_;
+        emit IPool.ScreenerUpdated(address(screener_));
+    }
+
+    /// @dev Shared by `initialize` and `setPauser`. address(0) leaves pausing
+    ///      exclusive to the owner.
+    function _setPauser(address newPauser) private {
+        emit IPool.PauserUpdated(pauser, newPauser);
+        pauser = newPauser;
+    }
+
     function _setAssetPriceFeed(
         uint24 assetId,
         AggregatorV3Interface feed
@@ -744,7 +784,7 @@ contract Pool is
     /// @notice Returns the asset id of `_wToken_` in this pool, or 0 if it is
     ///         not configured or not registered as an asset. Does not revert.
     ///         Used by `transact` to drive both the DEPOSIT wrap path and the
-    ///         WITHDRAW unwrap path without reading wToken storage twice.
+    ///         WITHDRAW unwrap path without reading nativeWToken storage twice.
     function _resolveWTokenAssetId(
         IWToken _wToken_
     ) internal view returns (uint24) {
@@ -752,25 +792,25 @@ contract Pool is
         return _assetIds[address(_wToken_)];
     }
 
-    /// @notice Wraps the attached `msg.value` into the configured wToken so it
-    ///         can be used as the wToken portion of a DEPOSIT.
+    /// @notice Wraps the attached `msg.value` into the configured nativeWToken so it
+    ///         can be used as the nativeWToken portion of a DEPOSIT.
     /// @dev    Called from `transact` only when `msg.value > 0`. Validates that
     ///         the call shape is consistent with wrapping native ETH:
     ///         - `txType` must be DEPOSIT (otherwise the ETH would be locked).
-    ///         - `wToken` must be configured and registered as an active
+    ///         - `nativeWToken` must be configured and registered as an active
     ///           ERC20 asset (otherwise wrapping has no destination).
-    ///         - exactly one pubAsset must reference the wToken's asset id, otherwise can lead to deduction of `msg.value` from multiple pubAssets with the same assetId.
+    ///         - exactly one pubAsset must reference the nativeWToken's asset id, otherwise can lead to deduction of `msg.value` from multiple pubAssets with the same assetId.
     ///         - `msg.value` must be `<=` that pubAsset's full value
     ///           so no surplus ETH is locked in the Pool. Strict-less means
     ///           the caller has chosen to top up the deposit by approving the
-    ///           remainder in wToken (ERC20) form; we pull that delta with
+    ///           remainder in nativeWToken (ERC20) form; we pull that delta with
     ///           `transferFrom(msg.sender, address(this), delta)` so the Pool
-    ///           ends up holding the full `wTokenValue` of wToken before the
+    ///           ends up holding the full `wTokenValue` of nativeWToken before the
     ///           library proceeds. The library skips its own per-asset
-    ///           `transferFrom` for the wToken id via `prefundedAssetId`.
+    ///           `transferFrom` for the nativeWToken id via `prefundedAssetId`.
     /// @param  stx The shielded transaction being executed.
-    /// @param  _wToken_ The resolved wToken contract (from `_resolveWTokenAssetId`).
-    /// @param  wTokenAssetId The resolved wToken asset id (from `_resolveWTokenAssetId`).
+    /// @param  _wToken_ The resolved nativeWToken contract (from `_resolveWTokenAssetId`).
+    /// @param  wTokenAssetId The resolved nativeWToken asset id (from `_resolveWTokenAssetId`).
     function _wrapNativeEthForDeposit(
         ShieldedTransaction calldata stx,
         IWToken _wToken_,
@@ -814,16 +854,16 @@ contract Pool is
             revert IPool.NativeEthExceedsDeposit(msg.value, wTokenValue);
         }
 
-        // Wrap the attached native ETH into wToken; the resulting wToken
+        // Wrap the attached native ETH into nativeWToken; the resulting nativeWToken
         // balance is held directly by this Pool.
         _wToken_.deposit{value: msg.value}();
 
         // If the caller chose to fund only part of the deposit with native
-        // ETH, pull the remainder in wToken (ERC20) form. This requires the
+        // ETH, pull the remainder in nativeWToken (ERC20) form. This requires the
         // caller to have approved at least (wTokenValue - msg.value) of
-        // wToken to this Pool. Combined with the wrap above, the Pool now
-        // holds exactly `wTokenValue` of wToken for this deposit, allowing
-        // the library to skip its own transferFrom for the wToken id.
+        // nativeWToken to this Pool. Combined with the wrap above, the Pool now
+        // holds exactly `wTokenValue` of nativeWToken for this deposit, allowing
+        // the library to skip its own transferFrom for the nativeWToken id.
         uint256 remainder = wTokenValue - msg.value;
         if (remainder != 0) {
             AssetLogic.receiveAsset({
@@ -832,6 +872,35 @@ contract Pool is
                 assetId: wTokenAssetId,
                 value: remainder
             });
+        }
+    }
+
+    /// @dev Rejects points that are not on BabyJubJub, and the low-order points
+    ///      x == 0 (the identity and the order-2 point), which are the ones that
+    ///      collapse a scalar multiplication to a constant.
+    function _assertValidCurvePoint(uint256[2] calldata point) private pure {
+        uint256 x = point[0];
+        uint256 y = point[1];
+
+        if (x == 0 || x >= FIELD_SIZE || y >= FIELD_SIZE) {
+            revert InvalidCurvePoint(x, y);
+        }
+
+        uint256 x2 = mulmod(x, x, FIELD_SIZE);
+        uint256 y2 = mulmod(y, y, FIELD_SIZE);
+        uint256 lhs = addmod(
+            mulmod(BABYJUBJUB_A, x2, FIELD_SIZE),
+            y2,
+            FIELD_SIZE
+        );
+        uint256 rhs = addmod(
+            1,
+            mulmod(BABYJUBJUB_D, mulmod(x2, y2, FIELD_SIZE), FIELD_SIZE),
+            FIELD_SIZE
+        );
+
+        if (lhs != rhs) {
+            revert InvalidCurvePoint(x, y);
         }
     }
 }

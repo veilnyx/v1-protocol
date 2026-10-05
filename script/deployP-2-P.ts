@@ -6,9 +6,7 @@
 
 import hre from "hardhat";
 import {
-    encodeAbiParameters,
     encodeFunctionData,
-    parseAbiParameters,
     zeroAddress
 } from "viem";
 import { DeployContractConfig, KeyedClient } from '@nomicfoundation/hardhat-viem/types';
@@ -17,6 +15,7 @@ import { deployHasher } from "./hasher";
 import { deployVerifier } from "./verifier";
 import { deployErc4337Infra } from "./erc4337Infra";
 import { getChainForCurrentNetwork } from "./utils/chainUtils";
+import { assertRevokerMetadata, encodeRevokerMetadata } from "./utils/revokerMetadata";
 
 const config = loadConfigs();
 const poolAbi = hre.artifacts.readArtifactSync("Pool").abi;
@@ -35,6 +34,10 @@ const main = async () => {
 
     const commonParams = config.common as CommonParams;
     const chainParams = config[chain.id] as ChainParams;
+
+    // Before anything costs gas: revoker metadata is write-once per keypair, and registration
+    // below shares a try block with addAssets, so a CID problem found there is unrepairable.
+    assertRevokerMetadata(commonParams.revokers);
 
     const deployConfig: DeployContractConfig = {
         client: {
@@ -100,27 +103,29 @@ const main = async () => {
         const { hasher } = await deployHasher(wallet, client, deployConfig);
         console.log("Hasher deployed:", hasher);
 
-        const verifier = await deployVerifier(deployConfig, wallet.account.address);
+        // Verifier ownership stays with the deployer here, as it did when deployVerifier
+        // handled the transfer and was passed the deployer as owner.
+        const { verifier } = await deployVerifier(deployConfig, wallet.account.address);
 
         const initAddressParams = {
             verifier: verifier,
             adaptorHandler: zeroAddress,
             screener: chainParams.sanctionsList,
-            hasher: hasher
+            hasher: hasher,
+            pauser: commonParams.pauserAddress, // zeroAddress leaves pausing exclusive to the owner
         }
 
-        const ONE_DAY = 86400n;
+        const ONE_HOUR = 3600n;
         const configParams = {
             withdrawFeeBps: BigInt(commonParams.withdrawFeeBps),
             tvlLimitUsd: BigInt(5_000e6),    // $5,000 (6-decimal precision)
             minDepositUsd: BigInt(2e6),      // $2 (6-decimal precision)
             maxDepositUsd: BigInt(200e6),    // $200 (6-decimal precision)
-            priceFeedStalenessThreshold: ONE_DAY * 5n, // 5 days in seconds
-            wToken: chainParams.wToken,      // wrapped native token (e.g. WETH) for native ETH deposits
+            priceFeedStalenessThreshold: ONE_HOUR * 2n, // 2 hours in seconds
+            nativeWToken: chainParams.nativeWToken,      // wrapped native token (e.g. WETH) for native ETH deposits
         };
 
         const args = [
-            commonParams.commitmentTreeQueueSize,
             initAddressParams,
             configParams,
         ];
@@ -186,12 +191,7 @@ const main = async () => {
         for (let i = 0; i < commonParams.revokers.length; i++) {
             const revokerPublicKey = commonParams.revokers[i].revokerPublicKey;
             const encryptionPublicKey = commonParams.revokers[i].encryptionPublicKey;
-            const revokerName = commonParams.revokers[i].name;
-            const revokerDescription = commonParams.revokers[i].description;
-            const metadata = encodeAbiParameters(
-                parseAbiParameters("string name, string description"),
-                [revokerName, revokerDescription]
-            );
+            const metadata = encodeRevokerMetadata(commonParams.revokers[i].pinataCID);
 
             //@ts-ignore
             const hash = await wallet.writeContract({

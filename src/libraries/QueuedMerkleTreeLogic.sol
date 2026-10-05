@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-BUSL
 pragma solidity 0.8.24;
 
-import {ZERO_LEAF, COMMITMENT_MERKLE_TREE_ROOT_HISTORY_SIZE, COMMITMENT_TREE_DEPTH} from "../base/Constants.sol";
+import {ZERO_LEAF, COMMITMENT_MERKLE_TREE_ROOT_HISTORY_SIZE, COMMITMENT_TREE_DEPTH, TREE_UPDATE_QUEUE_SIZE} from "../base/Constants.sol";
 import {IHasher} from "../interfaces/IHasher.sol";
 import {IVerifier} from "../interfaces/IVerifier.sol";
 
@@ -30,13 +30,13 @@ struct TreeUpdateData {
 library QueuedMerkleTreeLogic {
     error MerkleTreeFull();
     error InvalidProof();
+    error InvalidBatchSize();
     error ZeroAddress();
 
     /// @custom:invariant QMT-1: queueStartIndex <= queueEndIndex always
     /// @custom:invariant QMT-2: queueEndIndex - queueStartIndex <= total leaves queued at all times
     function init(
         QueuedMerkleTree storage self,
-        uint8 queueSize,
         IHasher hasher,
         IVerifier verifier
     ) public {
@@ -47,7 +47,9 @@ library QueuedMerkleTreeLogic {
         self.hasher = hasher;
         self.verifier = verifier;
         self.capacity = uint32(1 << COMMITMENT_TREE_DEPTH);
-        self.queueSize = queueSize;
+        // Fixed by the treeUpdate circuit's nLeaves parameter and retained in
+        // storage for proxy layout compatibility and efficient runtime access.
+        self.queueSize = TREE_UPDATE_QUEUE_SIZE;
         self.queueStartIndex = 0;
         self.queueEndIndex = 0;
 
@@ -63,6 +65,16 @@ library QueuedMerkleTreeLogic {
         }
 
         self.roots[0] = zero;
+    }
+
+    /// @dev Updates the verifier used for commitment-tree update proofs.
+    ///      Access control is enforced by the calling Pool contract.
+    function setVerifier(
+        QueuedMerkleTree storage self,
+        IVerifier newVerifier
+    ) internal {
+        if (address(newVerifier) == address(0)) revert ZeroAddress();
+        self.verifier = newVerifier;
     }
 
     function queueLeaves(
@@ -131,11 +143,9 @@ library QueuedMerkleTreeLogic {
         self.roots[newRootIndex] = data.newRoot;
         self.levelSubtrees = data.newLevelSubtrees;
 
-        if (data.batchSize < self.queueSize) {
-            self.queueStartIndex = self.queueEndIndex;
-        } else {
-            self.queueStartIndex += insertedLeaves;
-        }
+        // `insertedLeaves` is bounded by `pending` in _verifyUpdateProof, so this can
+        // never advance past `queueEndIndex`.
+        self.queueStartIndex += insertedLeaves;
         self.nextLeafIndex += insertedLeaves;
     }
 
@@ -143,16 +153,27 @@ library QueuedMerkleTreeLogic {
         QueuedMerkleTree storage self,
         TreeUpdateData calldata data
     ) internal view returns (bool valid, uint32 insertedLeaves) {
-        insertedLeaves = data.batchSize < self.queueSize
-            ? data.batchSize
-            : self.queueSize;
+        // `batchSize` stays caller-supplied on purpose: deriving it from queue state
+        // would let anyone invalidate an in-flight update proof by enqueueing one more
+        // leaf, which is the DDoS vector that made it a parameter in the first place.
+        //
+        // It must still be bounded. It only reaches the circuit as `nZeroLeaves`, and
+        // padding an empty slot with ZERO_LEAF is a root no-op, so an OVERSTATED
+        // batchSize is honestly provable while advancing `queueStartIndex` past
+        // `queueEndIndex`. Every later `queueEndIndex - queueStartIndex` would then
+        // underflow and revert, including the one on the transact path, permanently
+        // bricking the pool.
+        uint32 pending = self.queueEndIndex - self.queueStartIndex;
+        if (data.batchSize > pending || data.batchSize > self.queueSize) {
+            revert InvalidBatchSize();
+        }
+        insertedLeaves = data.batchSize;
+
         uint256[] memory leaves = _getQueuedLeaves(self);
         uint256[COMMITMENT_TREE_DEPTH] storage lastSubtrees = self
             .levelSubtrees;
         uint256 lastRoot = self.roots[self.currentRootIndex];
-        uint256 nZeroLeaves = data.batchSize < self.queueSize
-            ? self.queueSize - data.batchSize
-            : 0;
+        uint256 nZeroLeaves = self.queueSize - insertedLeaves;
 
         bytes memory vParams = abi.encodePacked(
             data.proof,

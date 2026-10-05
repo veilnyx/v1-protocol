@@ -1,6 +1,7 @@
 import hre from "hardhat";
-import { encodeAbiParameters, Hex, parseAbiParameters } from "viem";
+import { Hex } from "viem";
 import { loadConfigs, ChainParams, CommonParams } from "./configs";
+import { assertRevokerMetadata, encodeRevokerMetadata } from "./utils/revokerMetadata";
 
 const config = loadConfigs();
 const poolAbi = hre.artifacts.readArtifactSync("Pool").abi;
@@ -37,17 +38,16 @@ export const registerRevokers = async (poolAddress: Hex) => {
   const wallet = wallets[0];
   const commonParams = config.common as CommonParams;
 
+  // Metadata is write-once per keypair, so validate every CID before sending the first one.
+  assertRevokerMetadata(commonParams.revokers);
+
   for (let i = 0; i < commonParams.revokers.length; i++) {
     const revokerName = commonParams.revokers[i].name;
-    const revokerDescription = commonParams.revokers[i].description;
 
     const revokerPublicKey = commonParams.revokers[i].revokerPublicKey;
     const encryptionPublicKey = commonParams.revokers[i].encryptionPublicKey;
 
-    const metadata = encodeAbiParameters(
-      parseAbiParameters("string name, string description"),
-      [revokerName, revokerDescription]
-    );
+    const metadata = encodeRevokerMetadata(commonParams.revokers[i].pinataCID);
 
     console.log(`Registering revoker no. ${i}: ${revokerName}...`);
 

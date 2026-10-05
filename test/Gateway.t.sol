@@ -47,8 +47,8 @@ contract MockPool {
         return feeAsset;
     }
 
-    function setMockWTokenAddress(address wToken) external {
-        mockWTokenAddress = wToken;
+    function setMockWTokenAddress(address nativeWToken) external {
+        mockWTokenAddress = nativeWToken;
     }
 }
 
@@ -58,7 +58,7 @@ contract GatewayTest is Test {
     Paymaster paymaster;
 
     Gateway gateway;
-    address wToken;
+    address nativeWToken;
     address payable beneficiary = payable(address(0x123));
 
     uint128 baseFee = 2 gwei;
@@ -69,18 +69,23 @@ contract GatewayTest is Test {
     function setUp() public {
         entryPoint = new EntryPoint();
         pool = new MockPool();
-        wToken = address(new MockWToken());
-        pool.setMockWTokenAddress(wToken);
+        nativeWToken = address(new MockWToken());
+        pool.setMockWTokenAddress(nativeWToken);
         gateway = new Gateway(
             IEntryPoint(address(entryPoint)),
-            IWToken(address(wToken)),
+            IWToken(address(nativeWToken)),
             IPool(address(pool))
         );
         Fixture memory fixture = FixtureLib.load(vm);
 
         StdCheats.deployCodeTo(
             "Paymaster.sol:Paymaster",
-            abi.encode(entryPoint, address(gateway), address(pool), uint256(1 days)),
+            abi.encode(
+                entryPoint,
+                address(gateway),
+                address(pool),
+                uint256(1 days)
+            ),
             fixture.paymaster
         );
         console2.log("paymaster:", fixture.paymaster);

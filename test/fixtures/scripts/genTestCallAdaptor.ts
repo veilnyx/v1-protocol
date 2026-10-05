@@ -4,7 +4,7 @@ import { TransactionType } from "@veilnyx-sdk/shared-types";
 import { fixture, generateTestTransactions, mockNotes, PAYMASTER_ADDR_FIXTURE } from "./fixture";
 
 const {
-    assets: { testnetWeth, testnetUsdc, usde },
+    assets: { testnetWeth, testnetUsdc, morphoVaultToken },
     sender: { account: senderAccount, pubAddress: senderPubAddress },
     receiver: { account: receiverAccount },
 } = fixture;
@@ -16,6 +16,7 @@ enum Action {
 
 // @todo: implement this payload encoding for other test fixtures
 export const reqs = {
+    /**
     stake_1_testnet_weth_rocketpool: {
         type: TransactionType.CALL_ADAPTER,
         assetIds: [testnetWeth],
@@ -44,7 +45,6 @@ export const reqs = {
         viaBundler: false,
         paymaster: zeroAddress
     }
-    /**
     swap_1_testnet_weth_to_usdc: {
         type: TransactionType.CALL_ADAPTER,
         assetIds: [testnetWeth],
@@ -58,7 +58,6 @@ export const reqs = {
         viaBundler: false,
         paymaster: zeroAddress
     }
-    /**
     swap_1_testnet_weth_to_usdc_via_bundler: {
         type: TransactionType.CALL_ADAPTER,
         assetIds: [testnetWeth],
@@ -71,6 +70,7 @@ export const reqs = {
         payload:
             "0x000000000000000000000000000000000000000000000000000000000001000500000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000" as `0x${string}`, // refund: pool address (address(0))
     },
+    */
     stake_1_testnet_weth_lido: {
         type: TransactionType.CALL_ADAPTER,
         assetIds: [testnetWeth],
@@ -249,4 +249,67 @@ export const reqs = {
 export const genTestCallAdaptors = async (sdk: Core) => {
     await mockNotes("deposit_2_testnet_weth", sdk);
     await generateTestTransactions(reqs, sdk);
+};
+
+// @dev The Morpho adaptor txs below each spend notes from the deposit their test
+// actually puts on-chain, so they get their own note-scoped generators. Supplying
+// consumes the loan token (testnetWeth); withdrawing consumes the vault token.
+const MORPHO_VAULT = '0x2371e134e3455e0593363cBF89d3b6cf53740618';
+
+export const reqsMorphoSupply = {
+    supply_2_morphoLoanToken: {
+        type: TransactionType.CALL_ADAPTER,
+        assetIds: [testnetWeth],
+        values: [parseEther("2")],
+        feeAssetId: 0,
+        // adaptor to which the ZkFi AdaptorHandler will call to execute supply
+        to: "0xbF71c5Ae43827387dAAF7358acAB5C81642b74b8",
+        payload: encodeAbiParameters(
+            [{
+                type: "uint8",
+                name: "action"
+            }, {
+                type: "address",
+                name: "morphoVault"
+            }],
+            [Action.SUPPLY, MORPHO_VAULT]
+        ),
+        revokerId: 0,
+        viaBundler: false,
+        paymaster: zeroAddress
+    },
+};
+
+export const reqsMorphoWithdraw = {
+    withdraw_2_morphoLoanToken: {
+        type: TransactionType.CALL_ADAPTER,
+        assetIds: [morphoVaultToken],
+        values: [parseEther("2")],
+        feeAssetId: 0,
+        // adaptor to which the ZkFi AdaptorHandler will call to execute withdraw
+        to: "0xbF71c5Ae43827387dAAF7358acAB5C81642b74b8",
+        payload: encodeAbiParameters(
+            [{
+                type: "uint8",
+                name: "action"
+            }, {
+                type: "address",
+                name: "morphoVault"
+            }],
+            [Action.WITHDRAW, MORPHO_VAULT]
+        ),
+        revokerId: 0,
+        viaBundler: false,
+        paymaster: zeroAddress
+    },
+};
+
+export const genMorphoSupplyAdaptorTx = async (sdk: Core) => {
+    await mockNotes("deposit_2_morphoLoanToken", sdk);
+    await generateTestTransactions(reqsMorphoSupply, sdk);
+};
+
+export const genMorphoWithdrawAdaptorTx = async (sdk: Core) => {
+    await mockNotes("deposit_2_morphoVaultToken", sdk);
+    await generateTestTransactions(reqsMorphoWithdraw, sdk);
 };
