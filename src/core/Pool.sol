@@ -219,7 +219,16 @@ contract Pool is
     ///      unavailable or starts reverting, the owner can disable screening to
     ///      keep the protocol live rather than have core flows revert. Re-enable
     ///      by setting a working screener again. Emits {ScreenerUpdated}.
+    ///      Any non-zero `screener_` must be a contract: setting an EOA would
+    ///      make `isSanctioned` revert and brick registrations and deposits.
     function setScreener(IScreener screener_) external onlyOwner {
+        if (
+            address(screener_) != address(0) &&
+            address(screener_).code.length == 0
+        ) {
+            revert IPool.InvalidScreenerAddress(address(screener_));
+        }
+
         screener = screener_;
         emit ScreenerUpdated(address(screener_));
     }
@@ -311,6 +320,14 @@ contract Pool is
             nativeWToken = nativeWToken_;
             emit IPool.NativeWTokenUpdated(nativeWToken_);
         }
+    }
+
+    /// @notice Renouncing ownership is disabled. owner() is the only account that can configure
+    ///         assets, revokers, fees, limits and upgrades, so it must always exist. Use
+    ///         transferOwnership to change it.
+    /// @dev    Reverts with `IPool.RenounceDisabled` for the owner
+    function renounceOwnership() public view override onlyOwner {
+        revert IPool.RenounceDisabled();
     }
 
     /////////////////////////////////////////
