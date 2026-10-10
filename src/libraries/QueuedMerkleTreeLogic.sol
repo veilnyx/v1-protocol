@@ -100,35 +100,25 @@ library QueuedMerkleTreeLogic {
         self.queueEndIndex += nLeaves;
     }
 
+    /// @dev Returns `n` leaves: the first min(totalQueued, nQueued, n) queued leaves, then ZERO_LEAF.
+    ///      Leaves queued after those are not read, so they cannot change the result.
     function peekQueuedLeaves(
         QueuedMerkleTree storage self,
-        uint32 n
-    ) public view returns (uint256[] memory) {
+        uint32 n,
+        uint32 nQueued
+    ) public view returns (uint256[] memory leaves) {
         uint32 startIdx = self.queueStartIndex;
-        uint32 endIdx = self.queueEndIndex;
+        uint32 totalQueued = self.queueEndIndex - startIdx;
 
-        uint32 batchSize = endIdx - startIdx;
-        uint32 nLeaves = batchSize > n ? n : batchSize;
-
-        uint256[] memory leaves = new uint256[](n);
-
-        for (uint32 i = 0; i < nLeaves; ) {
-            leaves[i] = self.queuedLeaves[startIdx + i];
-
+        leaves = new uint256[](n);
+        for (uint32 i = 0; i < n; ) {
+            leaves[i] = i < nQueued && i < totalQueued
+                ? self.queuedLeaves[startIdx + i]
+                : ZERO_LEAF;
             unchecked {
                 ++i;
             }
         }
-
-        for (uint32 i = nLeaves; i < n; ) {
-            leaves[i] = ZERO_LEAF;
-
-            unchecked {
-                ++i;
-            }
-        }
-
-        return leaves;
     }
 
     /// @custom:invariant QMT-3: `nextLeafIndex` advances by exactly min(batchSize, queueSize) per update
@@ -149,7 +139,7 @@ library QueuedMerkleTreeLogic {
         self.roots[newRootIndex] = data.newRoot;
         self.levelSubtrees = data.newLevelSubtrees;
 
-        // `insertedLeaves` is bounded by `pending` in _verifyUpdateProof, so this can
+        // `insertedLeaves` is bounded by `totalQueued` in _verifyUpdateProof, so this can
         // never advance past `queueEndIndex`.
         self.queueStartIndex += insertedLeaves;
         self.nextLeafIndex += insertedLeaves;
@@ -174,17 +164,22 @@ library QueuedMerkleTreeLogic {
         // is honestly provable from public data, and its public inputs do not change between
         // calls, so one proof could be replayed to push duplicate roots and evict the whole
         // root history, invalidating every in-flight transaction.
-        uint32 pending = self.queueEndIndex - self.queueStartIndex;
+        uint32 totalQueued = self.queueEndIndex - self.queueStartIndex;
         if (
             data.batchSize == 0 ||
-            data.batchSize > pending ||
+            data.batchSize > totalQueued ||
             data.batchSize > self.queueSize
         ) {
             revert InvalidBatchSize();
         }
         insertedLeaves = data.batchSize;
 
-        uint256[] memory leaves = _getQueuedLeaves(self);
+        // The circuit takes all `queueSize` leaves as public inputs and requires every leaf
+        // after the batch to be ZERO_LEAF. Pass exactly the first `batchSize` queued leaves
+        // and pad the rest. Reading all pending leaves here would let anyone invalidate an
+        // in-flight proof by queueing one more leaf, because that leaf would land in a
+        // padding slot and change a public input.
+        uint256[] memory leaves = peekQueuedLeaves(self, self.queueSize, data.batchSize);
         uint256[COMMITMENT_TREE_DEPTH] storage lastSubtrees = self
             .levelSubtrees;
         uint256 lastRoot = self.roots[self.currentRootIndex];
@@ -208,7 +203,7 @@ library QueuedMerkleTreeLogic {
         QueuedMerkleTree storage tree
     ) internal view returns (uint256[] memory) {
         uint32 nLeaves = tree.queueSize;
-        uint256[] memory leaves = peekQueuedLeaves(tree, nLeaves);
+        uint256[] memory leaves = peekQueuedLeaves(tree, nLeaves, nLeaves);
         return leaves;
     }
 
@@ -255,8 +250,13 @@ library QueuedMerkleTreeLogic {
     {
         // queuedLeaves is always padded to queueSize with ZERO_LEAF. Real leaves occupy the
         // front (indices 0 .. queueEndIndex-queueStartIndex-1); the remainder are ZERO_LEAF
-        // sentinels. This fixed-length array matches the ZK circuit's treeUpdate input width
-        // so the off-chain update service can pass it directly without reshaping.
+        // sentinels. This fixed-length array matches the ZK circuit's treeUpdate input width.
+        //
+        // The update service must prove a batch of `batchSize` leaves: keep the first
+        // `batchSize` entries and replace every entry after them with ZERO_LEAF. That is
+        // exactly what `update` passes to the verifier, so the proof stays valid when more
+        // leaves are queued afterwards. Choosing `batchSize = min(totalQueued, queueSize)` at
+        // proving time uses all the leaves that are pending then.
         queuedLeaves = _getQueuedLeaves(self);
         subtrees = self.levelSubtrees;
         nextLeafIndex = self.nextLeafIndex;
