@@ -9,6 +9,7 @@ import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/Pau
 import {EIP712Upgradeable} from "@openzeppelin/contracts-upgradeable/utils/cryptography/EIP712Upgradeable.sol";
 
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
+import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {IVerifier} from "../interfaces/IVerifier.sol";
 import {IPool, InitAddressParams, PoolConfigParams} from "../interfaces/IPool.sol";
 import {IAdaptorHandler} from "../interfaces/IAdaptorHandler.sol";
@@ -47,7 +48,9 @@ contract Pool is
 
     /// @notice Initializes the Pool contract with the given parameters.
     /// @dev Pool is an UUPSUpgradeable contract, so it needs to be initialized.
+    /// @param commitmentTreeQueueSize The size of the queue for the commitment tree. This determines how many leaves can be queued at MAX before a tree update is required. Defined by the circuit `treeUpdate::nLeaves`
     function initialize(
+        uint8 commitmentTreeQueueSize,
         InitAddressParams calldata initAddressParams,
         PoolConfigParams calldata configParams
     ) external initializer {
@@ -94,7 +97,7 @@ contract Pool is
         nativeWToken = configParams.nativeWToken;
 
         _addressTree.init(hasher);
-        _commitmentTree.init(hasher, verifier);
+        _commitmentTree.init(commitmentTreeQueueSize, hasher, verifier);
     }
 
     /////////////////////////////////////////
@@ -123,25 +126,6 @@ contract Pool is
     /// @custom:invariant ACCESS-1 Owner can delegate pausing to a separate address
     function setPauser(address newPauser) external onlyOwner {
         _setPauser(newPauser);
-    }
-
-    /// @notice Atomically updates the verifier used by all Pool proof paths.
-    /// @dev Updates both the primary verifier reference and the verifier cached
-    ///      by the commitment tree. Only callable by the owner.
-    function setVerifier(IVerifier newVerifier) external onlyOwner {
-        address newVerifierAddress = address(newVerifier);
-        if (
-            newVerifierAddress == address(0) ||
-            newVerifierAddress.code.length == 0
-        ) {
-            revert IPool.InvalidVerifierAddress(newVerifierAddress);
-        }
-
-        address previousVerifier = address(verifier);
-        verifier = newVerifier;
-        _commitmentTree.setVerifier(newVerifier);
-
-        emit IPool.VerifierUpdated(previousVerifier, newVerifierAddress);
     }
 
     function addAssets(
@@ -363,6 +347,13 @@ contract Pool is
             )
         );
 
+        // The account being bound is the EIP-712 signer, not `msg.sender`: a sanctioned signer
+        // could otherwise register through any unsanctioned relayer. `register` recovers the
+        // same signer again and binds it into the proof.
+        _screenForSanctionedAddr(
+            ECDSA.recover(hashTypedData, addressRegData.signature)
+        );
+
         addressRegData.register({
             addressTree: _addressTree,
             publicAddresses: _publicAddresses,
@@ -425,6 +416,32 @@ contract Pool is
             revert IPool.NativeWTokenNotConfigured();
         if (msg.sender != address(nativeWToken))
             revert IPool.UnexpectedNativeEthSender(msg.sender);
+    }
+
+    /// @notice Owner-only recovery of fees credited to a paymaster that cannot claim them.
+    /// @dev Fees are credited to the paymaster address named in `feeData`, and the deployed
+    ///      Paymaster requires that to be itself, but it has no function that calls
+    ///      `withdrawPaymasterFee`, so everything it earned is locked here. This moves only
+    ///      what is already credited to `paymaster`; it cannot touch user notes. The owner
+    ///      (who can upgrade this contract) already controls the Paymaster, so it adds no
+    ///      new trust.
+    function withdrawPaymasterFeeFor(
+        address paymaster,
+        uint24 assetId,
+        address to
+    ) external onlyOwner nonReentrant {
+        uint256 fee = _paymasterFees[paymaster][assetId];
+        if (fee == 0) {
+            revert NoFeeToClaim(paymaster, assetId);
+        }
+
+        _paymasterFees[paymaster][assetId] = 0;
+        AssetLogic.transferAsset({
+            assets: _assets,
+            to: to,
+            assetId: assetId,
+            value: fee
+        });
     }
 
     /// @custom:invariant ACCESS-3: Only paymasters can withdraw their accumulated fees
@@ -651,6 +668,11 @@ contract Pool is
     ) private view {
         if (stx.txType != ShieldedTransactionType.DEPOSIT) return;
         _screenForSanctionedAddr(msg.sender);
+        // A contract caller (e.g. Gateway.handleWrapAndDeposit, which is permissionless) would
+        // otherwise be the only screened party, letting a sanctioned EOA deposit through it.
+        if (tx.origin != msg.sender) {
+            _screenForSanctionedAddr(tx.origin);
+        }
 
         uint256 _min = minDepositUsd;
         uint256 _max = maxDepositUsd;
@@ -878,7 +900,9 @@ contract Pool is
     /// @dev Rejects points that are not on BabyJubJub, and the low-order points
     ///      x == 0 (the identity and the order-2 point), which are the ones that
     ///      collapse a scalar multiplication to a constant.
-    function _assertValidCurvePoint(uint256[2] calldata point) private pure {
+    function _assertValidCurvePoint(
+        uint256[2] calldata point
+    ) private pure {
         uint256 x = point[0];
         uint256 y = point[1];
 
@@ -888,11 +912,7 @@ contract Pool is
 
         uint256 x2 = mulmod(x, x, FIELD_SIZE);
         uint256 y2 = mulmod(y, y, FIELD_SIZE);
-        uint256 lhs = addmod(
-            mulmod(BABYJUBJUB_A, x2, FIELD_SIZE),
-            y2,
-            FIELD_SIZE
-        );
+        uint256 lhs = addmod(mulmod(BABYJUBJUB_A, x2, FIELD_SIZE), y2, FIELD_SIZE);
         uint256 rhs = addmod(
             1,
             mulmod(BABYJUBJUB_D, mulmod(x2, y2, FIELD_SIZE), FIELD_SIZE),

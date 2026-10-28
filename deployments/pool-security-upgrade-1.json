@@ -1,0 +1,231 @@
+{
+  "chainId": 1,
+  "poolProxy": "0x4cecb7f987d220fe2e8608149fa76ed6d021ad11",
+  "previousImplementation": "0x56b5ca5378e3a7920152cadb61f57953abBcFD90",
+  "previousLibraries": {
+    "reused": {
+      "AssetLogic": "0x2B556A0337f384B1Ff2509484a1bbA7686897fC9",
+      "MerkleTreeLogic": "0xc5e8eD64A83B762E69C5C02C941D0F78046B9332",
+      "ShieldedAddressLogic": "0xdC2B542A221147c1223581aBa9d6B1e5E54b3Ab6"
+    },
+    "replaced": [
+      "0x08c459Ddcd78B9A74C11Fc469Da1823A92A53F82",
+      "0x74d9334702D1D999e310BFC5AC31026fe1766471"
+    ]
+  },
+  "newImplementation": "0x8f88fb9c8eb3a2165306b9bc82205744c28dd980",
+  "newLibraries": {
+    "AssetLogic": "0x2B556A0337f384B1Ff2509484a1bbA7686897fC9",
+    "MerkleTreeLogic": "0xc5e8eD64A83B762E69C5C02C941D0F78046B9332",
+    "ShieldedAddressLogic": "0xdC2B542A221147c1223581aBa9d6B1e5E54b3Ab6",
+    "QueuedMerkleTreeLogic": "0x3f4a4690b06305dd19e4bf5b5bf7568b0422deb2",
+    "ShieldedTransactionLogic": "0xd797cd5b5ea7a4141f03e6e6e5e736e99942ee6f"
+  },
+  "oldPaymasters": [
+    "0x81B7044BB60f895193e947814b1d9df421e03D66",
+    "0xB75619e85E4D5A16CA4FD050FfffF3ff6339f855"
+  ],
+  "newPaymaster": "0xfc3339056878424a7d82ceb2436972d4c6aa4168",
+  "newPaymasterOwner": "0xa285717BfD608468566bfBda742b56b1177494f7",
+  "expectedVersion": "2",
+  "preUpgradeState": {
+    "owner": "0xa285717BfD608468566bfBda742b56b1177494f7",
+    "pauser": "0x50887b9a36E734cF861FE236fA6b4bE68D205113",
+    "paused": true,
+    "version": "1",
+    "verifier": "0xcf9F64c6b60beB11695fd33A5F69a7F5239eE464",
+    "commitmentTree": {
+      "root": "5922362202067371698277844563540208586215733148868707550870007980696856715145",
+      "rootIndex": 80,
+      "nextLeafIndex": 162,
+      "subtreesHash": "0xc8acd404dc4ad73396b194357cf861faa841c51ba621611550504c4f93adb5f9"
+    },
+    "addressTree": {
+      "root": "15713441362003155333905097818158744349283915100412401720656440170828829842254",
+      "rootIndex": 12,
+      "nextLeafIndex": 12
+    },
+    "revoker0": "{\"id\":0,\"isActive\":true,\"revokerPublicKey\":[\"19670944452806042525069794818829249411975318219685565589987272359777840230253\",\"5705876210490413354479267746861793442476799294826521514340924438581325830039\"],\"encryptionPublicKey\":[\"8415733266590874906051569398859887253801673499116319370506942542327247131378\",\"4303763666990812745724909494561603880133773663501392405214554054831058921986\"]}",
+    "assets": {
+      "65537": {
+        "address": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+        "active": true,
+        "balance": "73454616338288504",
+        "withdrawFees": "0",
+        "paymasterFees": {
+          "0x81B7044BB60f895193e947814b1d9df421e03D66": "5638031909456485",
+          "0xB75619e85E4D5A16CA4FD050FfffF3ff6339f855": "20163642688626624"
+        }
+      },
+      "65538": {
+        "address": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+        "active": true,
+        "balance": "38656361",
+        "withdrawFees": "0",
+        "paymasterFees": {
+          "0x81B7044BB60f895193e947814b1d9df421e03D66": "676550",
+          "0xB75619e85E4D5A16CA4FD050FfffF3ff6339f855": "6709074"
+        }
+      },
+      "65539": {
+        "address": "0x252231882FB38481497f3C767469106297c8d93b",
+        "active": true,
+        "balance": "933559042786595",
+        "withdrawFees": "0",
+        "paymasterFees": {
+          "0x81B7044BB60f895193e947814b1d9df421e03D66": "0",
+          "0xB75619e85E4D5A16CA4FD050FfffF3ff6339f855": "0"
+        }
+      },
+      "65540": {
+        "address": "0x73edDFa87C71ADdC275c2b9890f5c3a8480bC9E6",
+        "active": true,
+        "balance": "0",
+        "withdrawFees": "0",
+        "paymasterFees": {
+          "0x81B7044BB60f895193e947814b1d9df421e03D66": "0",
+          "0xB75619e85E4D5A16CA4FD050FfffF3ff6339f855": "0"
+        }
+      },
+      "65541": {
+        "address": "0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0",
+        "active": true,
+        "balance": "3221634469164248",
+        "withdrawFees": "0",
+        "paymasterFees": {
+          "0x81B7044BB60f895193e947814b1d9df421e03D66": "0",
+          "0xB75619e85E4D5A16CA4FD050FfffF3ff6339f855": "0"
+        }
+      },
+      "65542": {
+        "address": "0x2371e134e3455e0593363cBF89d3b6cf53740618",
+        "active": true,
+        "balance": "11621393956294024",
+        "withdrawFees": "0",
+        "paymasterFees": {
+          "0x81B7044BB60f895193e947814b1d9df421e03D66": "0",
+          "0xB75619e85E4D5A16CA4FD050FfffF3ff6339f855": "0"
+        }
+      },
+      "65543": {
+        "address": "0xbeef088055857739C12CD3765F20b7679Def0f51",
+        "active": true,
+        "balance": "968389101705635510",
+        "withdrawFees": "0",
+        "paymasterFees": {
+          "0x81B7044BB60f895193e947814b1d9df421e03D66": "0",
+          "0xB75619e85E4D5A16CA4FD050FfffF3ff6339f855": "0"
+        }
+      }
+    }
+  },
+  "ownerTransactions": [
+    {
+      "note": "Pause (pauser or owner). Skip if already paused.",
+      "from": "0x50887b9a36E734cF861FE236fA6b4bE68D205113",
+      "to": "0x4cecb7f987d220fe2e8608149fa76ed6d021ad11",
+      "value": "0",
+      "functionName": "pause",
+      "args": [],
+      "data": "0x8456cb59"
+    },
+    {
+      "note": "Upgrade to the fixed implementation and set version 2 in the same call.",
+      "from": "0xa285717BfD608468566bfBda742b56b1177494f7",
+      "to": "0x4cecb7f987d220fe2e8608149fa76ed6d021ad11",
+      "value": "0",
+      "functionName": "upgradeToAndCall",
+      "args": [
+        "0x8f88fb9c8eb3a2165306b9bc82205744c28dd980",
+        "0xcf864d150000000000000000000000000000000000000000000000000000000000000002"
+      ],
+      "data": "0x4f1ef2860000000000000000000000008f88fb9c8eb3a2165306b9bc82205744c28dd98000000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000000024cf864d15000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000"
+    },
+    {
+      "note": "Recover 5638031909456485 of asset 65537 credited to old Paymaster 0x81B7044BB60f895193e947814b1d9df421e03D66.",
+      "from": "0xa285717BfD608468566bfBda742b56b1177494f7",
+      "to": "0x4cecb7f987d220fe2e8608149fa76ed6d021ad11",
+      "value": "0",
+      "functionName": "withdrawPaymasterFeeFor",
+      "args": [
+        "0x81B7044BB60f895193e947814b1d9df421e03D66",
+        "65537",
+        "0xa285717BfD608468566bfBda742b56b1177494f7"
+      ],
+      "data": "0xb1bbb96500000000000000000000000081b7044bb60f895193e947814b1d9df421e03d660000000000000000000000000000000000000000000000000000000000010001000000000000000000000000a285717bfd608468566bfbda742b56b1177494f7"
+    },
+    {
+      "note": "Recover 676550 of asset 65538 credited to old Paymaster 0x81B7044BB60f895193e947814b1d9df421e03D66.",
+      "from": "0xa285717BfD608468566bfBda742b56b1177494f7",
+      "to": "0x4cecb7f987d220fe2e8608149fa76ed6d021ad11",
+      "value": "0",
+      "functionName": "withdrawPaymasterFeeFor",
+      "args": [
+        "0x81B7044BB60f895193e947814b1d9df421e03D66",
+        "65538",
+        "0xa285717BfD608468566bfBda742b56b1177494f7"
+      ],
+      "data": "0xb1bbb96500000000000000000000000081b7044bb60f895193e947814b1d9df421e03d660000000000000000000000000000000000000000000000000000000000010002000000000000000000000000a285717bfd608468566bfbda742b56b1177494f7"
+    },
+    {
+      "note": "Recover 20163642688626624 of asset 65537 credited to old Paymaster 0xB75619e85E4D5A16CA4FD050FfffF3ff6339f855.",
+      "from": "0xa285717BfD608468566bfBda742b56b1177494f7",
+      "to": "0x4cecb7f987d220fe2e8608149fa76ed6d021ad11",
+      "value": "0",
+      "functionName": "withdrawPaymasterFeeFor",
+      "args": [
+        "0xB75619e85E4D5A16CA4FD050FfffF3ff6339f855",
+        "65537",
+        "0xa285717BfD608468566bfBda742b56b1177494f7"
+      ],
+      "data": "0xb1bbb965000000000000000000000000b75619e85e4d5a16ca4fd050fffff3ff6339f8550000000000000000000000000000000000000000000000000000000000010001000000000000000000000000a285717bfd608468566bfbda742b56b1177494f7"
+    },
+    {
+      "note": "Recover 6709074 of asset 65538 credited to old Paymaster 0xB75619e85E4D5A16CA4FD050FfffF3ff6339f855.",
+      "from": "0xa285717BfD608468566bfBda742b56b1177494f7",
+      "to": "0x4cecb7f987d220fe2e8608149fa76ed6d021ad11",
+      "value": "0",
+      "functionName": "withdrawPaymasterFeeFor",
+      "args": [
+        "0xB75619e85E4D5A16CA4FD050FfffF3ff6339f855",
+        "65538",
+        "0xa285717BfD608468566bfBda742b56b1177494f7"
+      ],
+      "data": "0xb1bbb965000000000000000000000000b75619e85e4d5a16ca4fd050fffff3ff6339f8550000000000000000000000000000000000000000000000000000000000010002000000000000000000000000a285717bfd608468566bfbda742b56b1177494f7"
+    },
+    {
+      "note": "Retire old Paymaster 0x81B7044BB60f895193e947814b1d9df421e03D66: withdraw its EntryPoint deposit (23267062838716879 wei) to its owner. Then fund the new Paymaster with depositToEntryPoint() (anyone can).",
+      "from": "0x2985D7e551081b132671FCf3C9D1A75f4FA4cCF8",
+      "to": "0x81B7044BB60f895193e947814b1d9df421e03D66",
+      "value": "0",
+      "functionName": "withdrawFromEntryPoint",
+      "args": [
+        "0x2985D7e551081b132671FCf3C9D1A75f4FA4cCF8",
+        "23267062838716879"
+      ],
+      "data": "0xc7d763080000000000000000000000002985d7e551081b132671fcf3c9d1a75f4fa4ccf80000000000000000000000000000000000000000000000000052a9453777e9cf"
+    },
+    {
+      "note": "Retire old Paymaster 0xB75619e85E4D5A16CA4FD050FfffF3ff6339f855: withdraw its EntryPoint deposit (16979197314644731 wei) to its owner. Then fund the new Paymaster with depositToEntryPoint() (anyone can).",
+      "from": "0xa285717BfD608468566bfBda742b56b1177494f7",
+      "to": "0xB75619e85E4D5A16CA4FD050FfffF3ff6339f855",
+      "value": "0",
+      "functionName": "withdrawFromEntryPoint",
+      "args": [
+        "0xa285717BfD608468566bfBda742b56b1177494f7",
+        "16979197314644731"
+      ],
+      "data": "0xc7d76308000000000000000000000000a285717bfd608468566bfbda742b56b1177494f7000000000000000000000000000000000000000000000000003c527d7082bafb"
+    },
+    {
+      "note": "Unpause (owner only) AFTER `UPGRADE_STEP=verify` passes.",
+      "from": "0xa285717BfD608468566bfBda742b56b1177494f7",
+      "to": "0x4cecb7f987d220fe2e8608149fa76ed6d021ad11",
+      "value": "0",
+      "functionName": "unpause",
+      "args": [],
+      "data": "0x3f4ba83a"
+    }
+  ],
+  "deployedAt": "2026-10-06T00:24:15.624Z"
+}

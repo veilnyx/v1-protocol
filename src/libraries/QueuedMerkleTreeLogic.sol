@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-BUSL
 pragma solidity 0.8.24;
 
-import {ZERO_LEAF, COMMITMENT_MERKLE_TREE_ROOT_HISTORY_SIZE, COMMITMENT_TREE_DEPTH, TREE_UPDATE_QUEUE_SIZE} from "../base/Constants.sol";
+import {ZERO_LEAF, COMMITMENT_MERKLE_TREE_ROOT_HISTORY_SIZE, COMMITMENT_TREE_DEPTH, TREE_UPDATE_QUEUE_SIZE, FIELD_SIZE} from "../base/Constants.sol";
 import {IHasher} from "../interfaces/IHasher.sol";
 import {IVerifier} from "../interfaces/IVerifier.sol";
 
@@ -31,12 +31,15 @@ library QueuedMerkleTreeLogic {
     error MerkleTreeFull();
     error InvalidProof();
     error InvalidBatchSize();
+    error InvalidLeaf(uint256 leaf);
+    error InvalidQueueSize(uint8 given, uint8 expected);
     error ZeroAddress();
 
     /// @custom:invariant QMT-1: queueStartIndex <= queueEndIndex always
     /// @custom:invariant QMT-2: queueEndIndex - queueStartIndex <= total leaves queued at all times
     function init(
         QueuedMerkleTree storage self,
+        uint8 queueSize,
         IHasher hasher,
         IVerifier verifier
     ) public {
@@ -44,12 +47,19 @@ library QueuedMerkleTreeLogic {
             revert ZeroAddress();
         }
 
+        // The treeUpdate circuit is compiled as TreeUpdate(COMMITMENT_TREE_DEPTH, 10),
+        // so its public-input count -- and therefore the verifier calldata layout --
+        // is fixed at this queue size. Any other value would silently produce
+        // vParams of the wrong length and make every tree update revert, halting
+        // commitment insertion permanently.
+        if (queueSize != TREE_UPDATE_QUEUE_SIZE) {
+            revert InvalidQueueSize(queueSize, TREE_UPDATE_QUEUE_SIZE);
+        }
+
         self.hasher = hasher;
         self.verifier = verifier;
         self.capacity = uint32(1 << COMMITMENT_TREE_DEPTH);
-        // Fixed by the treeUpdate circuit's nLeaves parameter and retained in
-        // storage for proxy layout compatibility and efficient runtime access.
-        self.queueSize = TREE_UPDATE_QUEUE_SIZE;
+        self.queueSize = queueSize;
         self.queueStartIndex = 0;
         self.queueEndIndex = 0;
 
@@ -67,16 +77,6 @@ library QueuedMerkleTreeLogic {
         self.roots[0] = zero;
     }
 
-    /// @dev Updates the verifier used for commitment-tree update proofs.
-    ///      Access control is enforced by the calling Pool contract.
-    function setVerifier(
-        QueuedMerkleTree storage self,
-        IVerifier newVerifier
-    ) internal {
-        if (address(newVerifier) == address(0)) revert ZeroAddress();
-        self.verifier = newVerifier;
-    }
-
     function queueLeaves(
         QueuedMerkleTree storage self,
         uint256[] calldata leaves
@@ -85,6 +85,12 @@ library QueuedMerkleTreeLogic {
         uint32 nLeaves = uint32(leaves.length);
 
         for (uint32 i = 0; i < nLeaves; ) {
+            // Defence in depth (ShieldedTransactionLogic.validate already rejects these): a
+            // leaf >= p can never be a tree-update public input, so queueing one would stall
+            // the queue permanently. MerkleTreeLogic.insert enforces the same bound.
+            if (leaves[i] >= FIELD_SIZE) {
+                revert InvalidLeaf(leaves[i]);
+            }
             self.queuedLeaves[nextIndex + i] = leaves[i];
             unchecked {
                 ++i;
@@ -163,8 +169,17 @@ library QueuedMerkleTreeLogic {
         // `queueEndIndex`. Every later `queueEndIndex - queueStartIndex` would then
         // underflow and revert, including the one on the transact path, permanently
         // bricking the pool.
+        //
+        // It must also be non-zero. A zero-size update inserts nothing (newRoot == lastRoot),
+        // is honestly provable from public data, and its public inputs do not change between
+        // calls, so one proof could be replayed to push duplicate roots and evict the whole
+        // root history, invalidating every in-flight transaction.
         uint32 pending = self.queueEndIndex - self.queueStartIndex;
-        if (data.batchSize > pending || data.batchSize > self.queueSize) {
+        if (
+            data.batchSize == 0 ||
+            data.batchSize > pending ||
+            data.batchSize > self.queueSize
+        ) {
             revert InvalidBatchSize();
         }
         insertedLeaves = data.batchSize;

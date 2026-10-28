@@ -33,6 +33,7 @@ export type AdaptorParams = {
 
 export type CommonParams = {
   commitmentTreeDepth: number;
+  commitmentTreeQueueSize: number;
   addressTreeDepth: number;
   withdrawFeeBps: bigint;
   protocolVersion: bigint;
@@ -61,6 +62,7 @@ export const getHex = (v: any) => {
 export function loadConfigs() {
   const commonParams = {
     commitmentTreeDepth: Number(common.commitmentTreeDepth),
+    commitmentTreeQueueSize: Number(common.commitmentTreeQueueSize),
     addressTreeDepth: Number(common.addressTreeDepth),
     withdrawFeeBps: BigInt(common.withdrawFeeBps),
     protocolVersion: BigInt(common.protocolVersion),

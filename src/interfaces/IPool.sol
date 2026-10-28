@@ -103,10 +103,6 @@ interface IPool {
     event PriceFeedStalenessThresholdUpdated(uint256 threshold);
     event NativeWTokenUpdated(IWToken indexed nativeWToken);
     event PauserUpdated(address indexed oldPauser, address indexed newPauser);
-    event VerifierUpdated(
-        address indexed previousVerifier,
-        address indexed newVerifier
-    );
     event PriceStalenessThresholdUpdated(uint256 threshold);
 
     /////////////////////////////////////////
@@ -146,9 +142,6 @@ interface IPool {
     ///      An EOA screener would make every isSanctioned() call revert. The zero
     ///      address is still accepted — it is the kill-switch that disables screening.
     error InvalidScreenerAddress(address screener);
-    /// @dev A verifier must be a deployed contract. An EOA or the zero address
-    ///      would make proof verification calls fail and brick Pool operations.
-    error InvalidVerifierAddress(address verifier);
 
     /// @dev msg.value was sent for a non-DEPOSIT transaction. Native ETH is only
     ///      accepted on DEPOSIT to be wrapped into the configured nativeWToken.
@@ -179,6 +172,16 @@ interface IPool {
     /// @dev renounceOwnership() was called. Ownership cannot be renounced
     ///      because the Pool would become permanently unadministrable.
     error RenounceDisabled();
+    /// @notice A nullifier, commitment or notesMemo word is not a canonical field element.
+    /// @dev These values reach the proof only through the UHF, which reduces them mod p,
+    ///      so `x` and `x + k*p` prove identically. The pool keys nullifiers and queues
+    ///      commitments on the RAW word, so a non-canonical value would alias (double spend)
+    ///      or poison the commitment queue (tree update can never verify).
+    error NonCanonicalFieldElement(uint256 value);
+    /// @notice `feeData` carries a fee that no public asset pays for.
+    /// @dev The circuit has no fee signal: the fee is only covered when it is carved out of
+    ///      a public asset of the same id, and a deposit may not carry a fee at all.
+    error UnbackedFee(uint24 feeAssetId, uint256 feeValue);
 
     /////////////////////////////////////////
     //         ADMIN WRITE METHODS         //
@@ -251,11 +254,6 @@ interface IPool {
 
     event ScreenerUpdated(address indexed screener);
 
-    /// @notice Atomically updates the verifier used for address, transaction,
-    ///         and commitment-tree update proofs.
-    /// @notice Can only be called by the owner.
-    function setVerifier(IVerifier newVerifier) external;
-
     /// @notice Sets the no. of bips (basis points: 1/10000) fee that is charged for withdrawing assets from the pool.
     /// @notice Can only be called by the owner.
     function setWithdrawFeeBips(uint256 feeBips) external;
@@ -323,6 +321,9 @@ interface IPool {
     /// @param assetId The id of the asset for which the paymaster wants to claim the fee.
     /// @param to The address to which the fee will be transferred.
     function withdrawPaymasterFee(uint24 assetId, address to) external;
+
+    /// @notice Owner-only: move fees credited to `paymaster` (one that cannot claim them) to `to`.
+    function withdrawPaymasterFeeFor(address paymaster, uint24 assetId, address to) external;
 
     /////////////////////////////////////////
     //         READ METHODS                //

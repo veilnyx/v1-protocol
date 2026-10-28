@@ -768,6 +768,7 @@ const main = async () => {
   };
 
   const args = [
+    commonParams.commitmentTreeQueueSize,
     initAddressParams,
     configParams,
   ];

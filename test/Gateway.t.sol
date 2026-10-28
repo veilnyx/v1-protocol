@@ -135,6 +135,8 @@ contract GatewayTest is Test {
         console2.log("required preFundEth uint256:", requiredPrefundEth);
         console2.log("required preFundEth uint96:", uint96(requiredPrefundEth));
 
+        // A bundler-sponsored op is never a deposit (see Paymaster.t.sol createPackedUserOps).
+        stx.txType = ShieldedTransactionType.WITHDRAW;
         stx.pubAssets = pubAssets;
         stx.feeData = uint256(
             bytes32(

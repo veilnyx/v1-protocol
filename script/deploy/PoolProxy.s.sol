@@ -16,6 +16,7 @@ contract PoolProxyDeploy is BaseScript {
         // address poolImpl = _getContract("PoolImpl");
         // uint8 addressTreeDepth = _config.addressTreeDepth();
         // uint8 commitmentTreeDepth = _config.commitmentTreeDepth();
+        // uint8 commitmentTreeQueueSize = _config.commitmentTreeQueueSize();
         // uint256 withdrawFeeBps = _config.withdrawFeeBps();
         // AssetType initAssetType = _config.initAssetType();
         // address[] memory initAssetAddresses = _config.initAssetAddresses();
@@ -26,6 +27,7 @@ contract PoolProxyDeploy is BaseScript {
         //     (
         //         addressTreeDepth,
         //         commitmentTreeDepth,
+        //         commitmentTreeQueueSize,
         //         verifier,
         //         adaptorHandler,
         //         screener,

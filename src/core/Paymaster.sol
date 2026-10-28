@@ -12,7 +12,7 @@ import {IPaymaster} from "@account-abstraction/contracts/interfaces/IPaymaster.s
 import {IEntryPoint} from "@account-abstraction/contracts/interfaces/IEntryPoint.sol";
 import {PackedUserOperation} from "@account-abstraction/contracts/interfaces/PackedUserOperation.sol";
 import {UserOperationLib} from "@account-abstraction/contracts/core/UserOperationLib.sol";
-import {ShieldedTransaction} from "../libraries/ShieldedTransactionLogic.sol";
+import {ShieldedTransaction, ShieldedTransactionType} from "../libraries/ShieldedTransactionLogic.sol";
 import {Asset, AssetLogic} from "../libraries/AssetLogic.sol";
 import {IPool} from "../interfaces/IPool.sol";
 import {MIN_PRICE_STALENESS_THRESHOLD} from "../base/Constants.sol";
@@ -42,6 +42,10 @@ contract Paymaster is IPaymaster, Ownable {
     error InvalidCallData();
     error InvalidMaxFeePerGas();
     error InsufficientFee(uint256 given, uint256 required);
+    /// @dev The advertised fee is not paid by the transaction: it is a DEPOSIT, has no public
+    ///      assets (the pool then ignores `feeData` and credits nothing), or no public asset of
+    ///      the fee asset carries at least the fee.
+    error FeeNotPaidByTransaction(uint24 feeAssetId, uint256 fee);
     error FeeAssetNotSupportedByVeilnyx(uint24 assetId);
     error AssetNotSupportedAsFeeAsset(uint24 assetId);
     error ChainlinkPriceFeedNotFound(uint24 assetId);
@@ -256,11 +260,16 @@ contract Paymaster is IPaymaster, Ownable {
             revert InvalidSender(userOp.sender);
         }
 
+        // Decoded once: the fee params and the fee-paid check below both read it.
+        ShieldedTransaction memory stx = abi.decode(
+            userOp.callData[4:],
+            (ShieldedTransaction)
+        );
         (
             address paymaster,
             uint24 feeAssetId,
             uint256 givenFee
-        ) = _parseFeeParams(userOp);
+        ) = _parseFeeParams(stx);
 
         // Fee recipient must be this contract
         if (paymaster != address(this)) {
@@ -274,17 +283,47 @@ contract Paymaster is IPaymaster, Ownable {
             revert InsufficientFee(givenFee, requiredFee);
         }
 
+        // Checked last so the existing errors keep their precedence. The fee in `feeData` is
+        // only real if the pool will actually collect it — mirror the pool's rule
+        // (ShieldedTransactionLogic._requireBackedFee). Without this, a TRANSFER with no
+        // public assets advertises any fee, the pool ignores `feeData`, and this paymaster
+        // sponsors the op for free.
+        _requireFeePaidByTransaction(stx, feeAssetId, givenFee);
+
         return ("", VALIDATION_SUCCESS);
     }
 
-    function _parseFeeParams(
-        PackedUserOperation calldata userOp
-    ) internal pure returns (address, uint24, uint256) {
-        ShieldedTransaction memory stx = abi.decode(
-            userOp.callData[4:],
-            (ShieldedTransaction)
-        );
+    function _requireFeePaidByTransaction(
+        ShieldedTransaction memory stx,
+        uint24 feeAssetId,
+        uint256 fee
+    ) internal pure {
+        if (stx.txType != ShieldedTransactionType.DEPOSIT) {
+            uint256 pubLen = stx.pubAssets.length;
+            for (uint256 i = 0; i < pubLen; ++i) {
+                if (
+                    uint24(bytes3(bytes31(stx.pubAssets[i]))) == feeAssetId &&
+                    uint224(stx.pubAssets[i]) >= fee
+                ) {
+                    return;
+                }
+            }
+        }
+        revert FeeNotPaidByTransaction(feeAssetId, fee);
+    }
 
+    /// @notice Claim the fees the pool has credited to this paymaster.
+    /// @dev The previous Paymasters had no way to call `pool.withdrawPaymasterFee`, so their
+    ///      earnings were locked in the pool (recoverable only via the pool owner's
+    ///      `withdrawPaymasterFeeFor`).
+    function claimPoolFees(uint24 assetId, address to) external onlyOwner {
+        if (to == address(0)) revert ZeroAddress();
+        pool.withdrawPaymasterFee(assetId, to);
+    }
+
+    function _parseFeeParams(
+        ShieldedTransaction memory stx
+    ) internal pure returns (address, uint24, uint256) {
         // FeeData is packed as follows (in order):
         // 20 bytes - paymaster address
         // 3 bytes - feeAssetId (24 bits)

@@ -16,6 +16,7 @@ contract Config is Script {
     uint256[2] internal _encryptionPublicKey;
     uint8 public immutable addressTreeDepth;
     uint8 public immutable commitmentTreeDepth;
+    uint8 public immutable commitmentTreeQueueSize;
     uint256 public immutable withdrawFeeBps;
     address public immutable entryPoint;
     address public immutable gateway;
@@ -54,6 +55,10 @@ contract Config is Script {
 
         commitmentTreeDepth = uint8(
             vm.parseJsonUint(configJson, ".common.commitmentTreeDepth")
+        );
+
+        commitmentTreeQueueSize = uint8(
+            vm.parseJsonUint(configJson, ".common.commitmentTreeQueueSize")
         );
 
         withdrawFeeBps = vm.parseJsonUint(configJson, ".common.withdrawFeeBps");

@@ -57,9 +57,21 @@ contract PoolBaseTest is BaseTest {
         TransactionVerifierInfo[] memory vInfos = new TransactionVerifierInfo[](
             3
         );
-        vInfos[0] = TransactionVerifierInfo({id: 21, addr: address(vt21)});
-        vInfos[1] = TransactionVerifierInfo({id: 22, addr: address(vt22)});
-        vInfos[2] = TransactionVerifierInfo({id: 23, addr: address(vt23)});
+        vInfos[0] = TransactionVerifierInfo({
+            id: 21,
+            addr: address(vt21),
+            selector: vt21.verifyProof.selector
+        });
+        vInfos[1] = TransactionVerifierInfo({
+            id: 22,
+            addr: address(vt22),
+            selector: vt22.verifyProof.selector
+        });
+        vInfos[2] = TransactionVerifierInfo({
+            id: 23,
+            addr: address(vt23),
+            selector: vt23.verifyProof.selector
+        });
 
         verifier = new Verifier(
             vInfos,
@@ -93,7 +105,7 @@ contract PoolBaseTest is BaseTest {
 
         bytes memory initData = abi.encodeCall(
             Pool.initialize,
-            (initAddressParams, configParams)
+            (fixture.commitmentTreeQueueSize, initAddressParams, configParams)
         );
 
         ERC1967Proxy poolProxy = new ERC1967Proxy(address(pool), initData);

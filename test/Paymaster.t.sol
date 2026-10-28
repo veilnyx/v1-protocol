@@ -51,6 +51,10 @@ contract PaymasterTest is PoolTest {
     PackedUserOperation userOp;
 
     modifier createPackedUserOps(address gatewayAddr) {
+        // Bundler-sponsored ops are never deposits (the SDK refuses a deposit with a fee, and
+        // the pool and paymaster now reject one). Model the real flow: an outflow tx whose
+        // public asset of the fee asset carries the fee.
+        stx.txType = ShieldedTransactionType.WITHDRAW;
         stx.pubAssets = new uint248[](1);
         stx.pubAssets[0] = uint248(
             bytes31(bytes.concat(bytes3(feeAssetId), bytes12(uint96(10 ether))))

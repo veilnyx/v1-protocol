@@ -124,15 +124,14 @@ const config: HardhatUserConfig = {
     unit: "kB"
   },
   // Consumed by @nomicfoundation/hardhat-verify (`hre.run("verify:verify")`).
-  // `apiKey` and `customChains` are both keyed by the *network name* as declared
-  // in `networks` above, so every network we verify on needs an entry in each.
-  // The scripts also read `customChains[].urls.apiURL` directly for raw Etherscan
-  // V2 API calls (see verifyProxy in script/deployCoreWithAdp.ts).
+  // A single string `apiKey` makes hardhat-verify (>= 2.0.14) use the Etherscan V2
+  // API with the chain's `chainid`; a per-network object falls back to the retired
+  // V1 API. `customChains` is keyed by the *network name* as declared in `networks`
+  // above, so every network we verify on needs an entry. The scripts also read
+  // `customChains[].urls.apiURL` directly for raw Etherscan V2 API calls (see
+  // verifyProxy in script/deployCoreWithAdp.ts).
   etherscan: {
-    apiKey: {
-      mainnet: etherscanApiKey,
-      sepolia: etherscanApiKey,
-    },
+    apiKey: etherscanApiKey,
     customChains: [
       {
         network: "mainnet",

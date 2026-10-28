@@ -2,6 +2,7 @@
   "env": "testnet",
   "common": {
     "commitmentTreeDepth": 25,
+    "commitmentTreeQueueSize": 10,
     "addressTreeDepth": 20,
     "revokers": [
       {

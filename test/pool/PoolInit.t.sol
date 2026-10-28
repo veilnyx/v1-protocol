@@ -214,7 +214,14 @@ contract PoolInitTest is PoolTest {
         });
 
         return
-            abi.encodeCall(Pool.initialize, (initAddressParams, configParams));
+            abi.encodeCall(
+                Pool.initialize,
+                (
+                    fixture.commitmentTreeQueueSize,
+                    initAddressParams,
+                    configParams
+                )
+            );
     }
 
     function _getRevokerKeys()

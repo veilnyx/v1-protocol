@@ -14,6 +14,10 @@ const contractName = "Pool";
 const moduleId = camelCase(contractName);
 
 const module = buildModule(moduleId, (m) => {
+  // Must equal TREE_UPDATE_QUEUE_SIZE (the treeUpdate circuit's nLeaves) or init reverts.
+  const commitmentTreeQueueSize = m.getParameter<number>(
+    "commitmentTreeQueueSize"
+  );
   const pauser = m.getParameter<string>("pauser");
   const withdrawFeeBps = m.getParameter<number>("withdrawFeeBps");
   const tvlLimitUsd = m.getParameter<bigint>("tvlLimitUsd");
@@ -65,6 +69,7 @@ const module = buildModule(moduleId, (m) => {
   };
 
   const initData = m.encodeFunctionCall(poolImpl, "initialize", [
+    commitmentTreeQueueSize,
     initAddressParams,
     configParams,
   ]);
