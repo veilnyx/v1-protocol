@@ -1,4 +1,5 @@
 {
+  "purpose": "Sepolia testnet: full core protocol deployment (Pool, Verifier with all transaction verifiers, Gateway, Paymaster, AdaptorHandler with the Aave, Lido, Morpho and Uniswap adaptors) via script/deployCoreWithAdp.ts.",
   "network": "sepolia",
   "chainId": 11155111,
   "dryRun": false,

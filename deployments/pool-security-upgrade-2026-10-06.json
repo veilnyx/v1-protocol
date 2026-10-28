@@ -1,4 +1,5 @@
 {
+  "purpose": "Ethereum mainnet: upgrade the Pool to fix the 2026-09 security audit findings (fee mint, nullifier-aliasing double-spend, tree freeze, root-history eviction, non-canonical notesMemo, sanctions bypass) and add owner recovery of stuck paymaster fees; replace the Paymaster so it rejects fee-less sponsored ops. Runbook: audit/pool-security-upgrade-2026-09.md.",
   "chainId": 1,
   "poolProxy": "0x4cecb7f987d220fe2e8608149fa76ed6d021ad11",
   "previousImplementation": "0x56b5ca5378e3a7920152cadb61f57953abBcFD90",

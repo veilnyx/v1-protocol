@@ -28,8 +28,7 @@ import {
 } from "./utils/revokerMetadata";
 import { assertOwnershipTransferred, transferOwnershipToOwner } from "./utils/ownership";
 import { deployErc4337Infra } from "./erc4337Infra";
-import { mkdirSync, writeFileSync } from "fs";
-import { join } from "path";
+import { RecordTarget, assertRecordWritable, writeRecord } from "./utils/deploymentRecord";
 
 const config = loadConfigs();
 
@@ -550,17 +549,21 @@ const assertGasAssetRegistered = async (poolAddr: Hex, chainParams: any, client:
 }
 
 /**
- * Writes every deployed address to `deployments/`, keyed by network name rather than chain id: a
- * dry run against the mainnet fork shares mainnet's chain id, and a file that reads as the
- * canonical mainnet registry must not contain anvil addresses. `dryRun` is recorded in the payload
- * for the same reason.
+ * The record for this run: `deployments/<DEPLOYMENT_NAME>-<date>.json` (name defaults to the
+ * network's), with DEPLOYMENT_PURPOSE as its first key. A dry run against the mainnet fork shares
+ * mainnet's chain id, so its file carries a `-dry-run` suffix and `dryRun` is in the payload: a
+ * file that reads as the canonical mainnet registry must not contain anvil addresses.
  */
+const deploymentRecordTarget = (dryRun: boolean): RecordTarget => ({
+  name: process.env.DEPLOYMENT_NAME ?? hre.network.name,
+  purpose: process.env.DEPLOYMENT_PURPOSE ?? "",
+  suffix: dryRun ? "-dry-run" : "",
+});
+
 const writeDeploymentRecord = (chainId: number, dryRun: boolean, addresses: Record<string, Hex>) => {
-  const dir = join(__dirname, "..", "deployments");
-  mkdirSync(dir, { recursive: true });
-  const path = join(dir, `${hre.network.name}-${chainId}.json`);
-  const record = { network: hre.network.name, chainId, dryRun, deployedAt: new Date().toISOString(), addresses };
-  writeFileSync(path, JSON.stringify(record, null, 2));
+  const path = writeRecord(deploymentRecordTarget(dryRun), {
+    network: hre.network.name, chainId, dryRun, deployedAt: new Date().toISOString(), addresses,
+  });
   console.log("Deployment record written to:", path);
 };
 
@@ -583,6 +586,9 @@ const main = async () => {
   if (dryRun) {
     console.log(`Dry run: ${hre.network.name} is a local development node`);
   }
+  // The record is written after everything is deployed; a missing purpose or an existing record
+  // must fail here, while nothing has been spent.
+  assertRecordWritable(deploymentRecordTarget(dryRun));
 
   const client = await hre.viem.getPublicClient({ chain });
 

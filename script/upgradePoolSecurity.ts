@@ -1,33 +1,41 @@
 /**
- * Pool security upgrade (2026-09 audit fixes) — see docs/pool-security-upgrade-2026-09.md.
+ * Pool upgrade tooling, first written for the 2026-09 audit fixes — see
+ * audit/pool-security-upgrade-2026-09.md.
  *
  * Steps (UPGRADE_STEP):
  *   plan      read-only: current implementation, linked libraries, owner/pauser, stuck paymaster fees
  *   deploy    any funded EOA: deploys QueuedMerkleTreeLogic, ShieldedTransactionLogic, the Pool
  *             implementation and (if OLD_PAYMASTERS is set) a replacement Paymaster, then writes
- *             deployments/pool-security-upgrade-<chainId>.json with the owner transactions
+ *             deployments/<DEPLOYMENT_NAME>-<YYYY-MM-DD>.json with the owner transactions
  *   verify    read-only: checks deployed bytecode against this build, the proxy's implementation
  *             and version, preserved state, and probes the new checks with eth_call
  *   rehearse  local fork only: deploy + execute the owner transactions by impersonation + verify
  *
  * Env:
  *   POOL_PROXY      pool proxy address (required)
+ *   DEPLOYMENT_NAME     names the record, e.g. queue-stable-batch (required by deploy, verify, rehearse);
+ *                       see script/utils/deploymentRecord.ts
+ *   DEPLOYMENT_PURPOSE  why this upgrade happens; the record's first key (required by deploy, rehearse)
  *   OLD_PAYMASTERS  comma-separated Paymasters the pool has credited fees to, CURRENT ONE FIRST
  *                   (it is the configuration template for the replacement). Enables fee recovery
  *                   and Paymaster replacement (optional)
  *   FEE_RECIPIENT   receives the recovered paymaster fees (default: pool owner)
  *   NEW_PAYMASTER_OWNER  owner of the replacement Paymaster (default: pool owner)
+ *   PAUSE           "false" leaves pause()/unpause() out of the owner transactions, for an upgrade
+ *                   that is safe to apply to a live pool (default: true). `verify` then reports
+ *                   address-tree growth from live registrations instead of failing on it
  *   PROBE_DEPOSIT_ASSET_ID / PROBE_DEPOSIT_AMOUNT
  *                   deposit used by the fee probe; must be within the pool's deposit USD bounds
  *                   (default 65538 / 20000000 = 20 USDC on Ethereum)
  *
  * Usage:
  *   UPGRADE_STEP=plan     POOL_PROXY=0x.. npx hardhat run script/upgradePoolSecurity.ts --network mainnet
- *   UPGRADE_STEP=rehearse POOL_PROXY=0x.. OLD_PAYMASTERS=0x..,0x.. npx hardhat run script/upgradePoolSecurity.ts --network mainnetFork
+ *   UPGRADE_STEP=rehearse POOL_PROXY=0x.. DEPLOYMENT_NAME=.. DEPLOYMENT_PURPOSE=".." \
+ *                         npx hardhat run script/upgradePoolSecurity.ts --network mainnetFork
  */
 import hre from "hardhat";
 import fs from "fs";
-import path from "path";
+import { assertRecordWritable, findRecord, writeRecord } from "./utils/deploymentRecord";
 import {
     Abi, Hex, encodeFunctionData, getAddress, isAddressEqual, keccak256, toHex,
     BaseError, ContractFunctionRevertedError, decodeErrorResult, pad,
@@ -47,6 +55,9 @@ const step = (process.env.UPGRADE_STEP ?? "plan").toLowerCase();
 const POOL_PROXY = process.env.POOL_PROXY as Addr;
 const OLD_PAYMASTERS = (process.env.OLD_PAYMASTERS ?? "").split(",").map(x => x.trim()).filter(Boolean)
     .map(x => getAddress(x) as Addr);
+const PAUSE = (process.env.PAUSE ?? "true").toLowerCase() !== "false";
+const DEPLOYMENT_NAME = process.env.DEPLOYMENT_NAME ?? "";
+const DEPLOYMENT_PURPOSE = process.env.DEPLOYMENT_PURPOSE ?? "";
 
 const art = (name: string) => hre.artifacts.readArtifactSync(name);
 const poolAbi = art("Pool").abi as Abi;
@@ -64,8 +75,9 @@ let chainId: number;
 
 const isLocal = () => hre.network.name === "hardhat" || /127\.0\.0\.1|localhost/.test((hre.network.config as any).url ?? "");
 // Fork runs get their own file so a rehearsal can never be mistaken for the real deployment record.
-const outFile = () => path.join(__dirname, "..", "deployments",
-    `pool-security-upgrade-${chainId}${isLocal() ? "-fork-rehearsal" : ""}.json`);
+const recordTarget = () => ({
+    name: DEPLOYMENT_NAME, purpose: DEPLOYMENT_PURPOSE, suffix: isLocal() ? "-fork-rehearsal" : "",
+});
 const read = (address: Addr, functionName: string, args: any[] = [], abi: Abi = poolAbi) =>
     client.readContract({ address, abi, functionName, args });
 
@@ -250,7 +262,8 @@ const runProbes = async () => {
         if (r.isActive) revokerId = i;
     }
     if (revokerId < 0) throw new Error("no active revoker; probes need one to reach the new checks");
-    const pm = OLD_PAYMASTERS[0] ?? "0x000000000000000000000000000000000000fEE1";
+    // Lowercase: viem rejects mixed case that is not a valid EIP-55 checksum.
+    const pm = OLD_PAYMASTERS[0] ?? "0x000000000000000000000000000000000000fee1";
     const base = {
         txType: 1, revokerId, addressTreeRoot: addrRoot, commitmentTreeRoot: cmRoot,
         feeData: 0n, refundAddress: 0n, betaUHF: 0n, pubAssets: [] as bigint[],
@@ -317,6 +330,8 @@ const plan = async () => {
 };
 
 const deploy = async () => {
+    // Before anything is deployed: a missing purpose or an existing record must not cost gas.
+    assertRecordWritable(recordTarget());
     const { impl, libs, snap, unmatched } = await plan();
     const [wallet] = await hre.viem.getWalletClients();
     console.log("\nDeployer:", wallet.account.address);
@@ -338,12 +353,13 @@ const deploy = async () => {
     const tx = (to: Addr, abi: Abi, functionName: string, args: any[], note: string, from = owner) =>
         ({ note, from, to, value: "0", functionName, args: args.map(String), data: encodeFunctionData({ abi, functionName, args }) });
 
-    const ownerTxs: any[] = [
-        tx(POOL_PROXY, poolAbi, "pause", [], "Pause (pauser or owner). Skip if already paused.", snap.pauser as Addr),
-        tx(POOL_PROXY, poolAbi, "upgradeToAndCall",
-            [poolImpl.address, encodeFunctionData({ abi: poolAbi, functionName: "setVersion", args: [nextVersion] })],
-            `Upgrade to the fixed implementation and set version ${nextVersion} in the same call.`),
-    ];
+    const ownerTxs: any[] = [];
+    if (PAUSE) {
+        ownerTxs.push(tx(POOL_PROXY, poolAbi, "pause", [], "Pause (pauser or owner). Skip if already paused.", snap.pauser as Addr));
+    }
+    ownerTxs.push(tx(POOL_PROXY, poolAbi, "upgradeToAndCall",
+        [poolImpl.address, encodeFunctionData({ abi: poolAbi, functionName: "setVersion", args: [nextVersion] })],
+        `Upgrade to the fixed implementation and set version ${nextVersion} in the same call.`));
 
     let newPaymaster: Addr | undefined;
     let newPaymasterOwner: Addr | undefined;
@@ -391,25 +407,25 @@ const deploy = async () => {
             }
         }
     }
-    ownerTxs.push(tx(POOL_PROXY, poolAbi, "unpause", [], "Unpause (owner only) AFTER `UPGRADE_STEP=verify` passes."));
+    if (PAUSE) {
+        ownerTxs.push(tx(POOL_PROXY, poolAbi, "unpause", [], "Unpause (owner only) AFTER `UPGRADE_STEP=verify` passes."));
+    }
 
     const record = {
         chainId, poolProxy: POOL_PROXY, previousImplementation: impl, previousLibraries: { reused: libs, replaced: unmatched },
         newImplementation: poolImpl.address, newLibraries: newLibs,
         oldPaymasters: OLD_PAYMASTERS, newPaymaster: newPaymaster ?? null, newPaymasterOwner: newPaymasterOwner ?? null,
-        expectedVersion: nextVersion.toString(), preUpgradeState: snap, ownerTransactions: ownerTxs,
+        expectedVersion: nextVersion.toString(), pause: PAUSE, preUpgradeState: snap, ownerTransactions: ownerTxs,
         deployedAt: new Date().toISOString(),
     };
-    fs.mkdirSync(path.dirname(outFile()), { recursive: true });
-    fs.writeFileSync(outFile(), JSON.stringify(record, null, 2));
-    console.log("\nWrote", outFile());
+    console.log("\nWrote", writeRecord(recordTarget(), record));
     console.log("\nPrivileged transactions, in order (check `from` for each: pauser, pool owner, or an old Paymaster's owner):");
     ownerTxs.forEach((t, i) => console.log(`\n[${i + 1}] ${t.note}\n    from ${t.from}\n    cast send ${t.to} ${t.data} --ledger --rpc-url $RPC`));
     return record;
 };
 
 const verify = async () => {
-    const rec = JSON.parse(fs.readFileSync(outFile(), "utf8"));
+    const rec = JSON.parse(fs.readFileSync(findRecord(DEPLOYMENT_NAME, recordTarget().suffix), "utf8"));
     let ok = true;
     const check = (label: string, cond: boolean, detail = "") => {
         console.log(`  ${cond ? "PASS" : "FAIL"}  ${label}${detail ? "  " + detail : ""}`);
@@ -450,10 +466,15 @@ const verify = async () => {
     check("owner", cur.owner === pre.owner);
     check("pauser", cur.pauser === pre.pauser);
     check("verifier", cur.verifier === pre.verifier);
-    check("address tree", JSON.stringify(cur.addressTree) === JSON.stringify(pre.addressTree));
-    check("revoker 0", cur.revoker0 === pre.revoker0);
     // Tree and balances move with user activity if the pool was not paused — reported, not failed.
     const same = (a: any, b: any) => JSON.stringify(a) === JSON.stringify(b);
+    // Records written before PAUSE existed have no `pause` field; they paused, so stay strict.
+    if (rec.pause === false && !same(cur.addressTree, pre.addressTree)) {
+        console.log(`  INFO  address tree changed (registrations while live)`);
+    } else {
+        check("address tree", same(cur.addressTree, pre.addressTree));
+    }
+    check("revoker 0", cur.revoker0 === pre.revoker0);
     console.log(`  ${same(cur.commitmentTree, pre.commitmentTree) ? "PASS" : "INFO"}  commitment tree ${same(cur.commitmentTree, pre.commitmentTree) ? "unchanged" : "changed (user activity?)"}`);
     for (const [id, a] of Object.entries<any>(pre.assets)) {
         const c = cur.assets[id];

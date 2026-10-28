@@ -117,6 +117,9 @@ export POOL_PROXY=0x4cecb7f987d220fe2e8608149fa76ed6d021ad11
 export OLD_PAYMASTERS=0x81b7044bb60f895193e947814b1d9df421e03d66,0xb75619e85e4d5a16ca4fd050fffff3ff6339f855
 export FEE_RECIPIENT=<treasury address that receives the recovered paymaster fees; default = owner>
 # optional: export NEW_PAYMASTER_OWNER=<address>   (default = pool owner)
+# the record is deployments/<DEPLOYMENT_NAME>-<YYYY-MM-DD>.json, with DEPLOYMENT_PURPOSE as its first key
+export DEPLOYMENT_NAME=pool-security-upgrade
+export DEPLOYMENT_PURPOSE="<why this upgrade happens>"
 ```
 
 ---
@@ -153,7 +156,7 @@ The rehearsal does the following:
 5. It runs `verify`.
 
 It must end with `VERIFY OK`. Its output goes to
-`deployments/pool-security-upgrade-1-fork-rehearsal.json`. **Never use that file for mainnet.**
+`deployments/pool-security-upgrade-<date>-fork-rehearsal.json`. **Never use that file for mainnet.**
 
 ### Step 2 — Plan (read-only, mainnet)
 
@@ -188,8 +191,10 @@ This deploys:
 - the new `Paymaster`
 
 It copies the current Paymaster's feeds onto the new one and transfers the new Paymaster to the owner (or `NEW_PAYMASTER_OWNER`). It refuses to continue if the old Paymasters differ in `entryPoint`, `sender` or pool. It then writes
-`deployments/pool-security-upgrade-1.json`, which holds:
+`deployments/pool-security-upgrade-<date>.json`, which holds (the Ethereum run is
+[`pool-security-upgrade-2026-10-06.json`](../deployments/pool-security-upgrade-2026-10-06.json)):
 
+- its `purpose`, the first key;
 - the addresses;
 - a pre-upgrade state snapshot;
 - the exact owner transactions, with `to`, `data` and a `cast send` line for each.

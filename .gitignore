@@ -6,6 +6,7 @@ out/
 artifacts/
 # Dry-run deployment records (fork addresses under a real chain id) — real ones are tracked
 deployments/*Fork-*.json
+deployments/*-dry-run.json
 broadcast/
 typechain/
 typechain-types/
