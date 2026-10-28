@@ -1,0 +1,115 @@
+{
+  "purpose": "Ethereum mainnet: fix the commitment-tree update race (#40). Tree-update proofs no longer fail when leaves are queued after they were generated.",
+  "chainId": 1,
+  "poolProxy": "0x4cecb7f987d220fe2e8608149fa76ed6d021ad11",
+  "previousImplementation": "0x8f88fB9c8EB3A2165306B9bc82205744C28Dd980",
+  "previousLibraries": {
+    "reused": {
+      "AssetLogic": "0x2B556A0337f384B1Ff2509484a1bbA7686897fC9",
+      "MerkleTreeLogic": "0xc5e8eD64A83B762E69C5C02C941D0F78046B9332",
+      "ShieldedAddressLogic": "0xdC2B542A221147c1223581aBa9d6B1e5E54b3Ab6"
+    },
+    "replaced": [
+      "0x3F4A4690B06305dD19E4bF5b5Bf7568b0422DEB2",
+      "0xd797cd5B5EA7a4141f03E6e6E5e736e99942eE6f"
+    ]
+  },
+  "newImplementation": "0x934d10e93666481e25e2e6f77a7c3109a8502225",
+  "newLibraries": {
+    "AssetLogic": "0x2B556A0337f384B1Ff2509484a1bbA7686897fC9",
+    "MerkleTreeLogic": "0xc5e8eD64A83B762E69C5C02C941D0F78046B9332",
+    "ShieldedAddressLogic": "0xdC2B542A221147c1223581aBa9d6B1e5E54b3Ab6",
+    "QueuedMerkleTreeLogic": "0x2fe20c2863dd838fbe4be61941a60209a7599572",
+    "ShieldedTransactionLogic": "0x339aada58b2e1e88ad5c8cc8edb998a33c686e56"
+  },
+  "oldPaymasters": [],
+  "newPaymaster": null,
+  "newPaymasterOwner": null,
+  "expectedVersion": "3",
+  "pause": false,
+  "preUpgradeState": {
+    "owner": "0xa285717BfD608468566bfBda742b56b1177494f7",
+    "pauser": "0x50887b9a36E734cF861FE236fA6b4bE68D205113",
+    "paused": false,
+    "version": "2",
+    "verifier": "0xcf9F64c6b60beB11695fd33A5F69a7F5239eE464",
+    "commitmentTree": {
+      "root": "11583419030179344768821794082471446424790653402662542425124173437945344874514",
+      "rootIndex": 96,
+      "nextLeafIndex": 190,
+      "subtreesHash": "0x114d1a79a6d3a659e6228c9f2ede841ad28ec36e55c36abb791631bc3ce090f1"
+    },
+    "addressTree": {
+      "root": "1984345070463384373863754038217934996562930683089948860112509106861627117815",
+      "rootIndex": 13,
+      "nextLeafIndex": 13
+    },
+    "revoker0": "{\"id\":0,\"isActive\":true,\"revokerPublicKey\":[\"19670944452806042525069794818829249411975318219685565589987272359777840230253\",\"5705876210490413354479267746861793442476799294826521514340924438581325830039\"],\"encryptionPublicKey\":[\"8415733266590874906051569398859887253801673499116319370506942542327247131378\",\"4303763666990812745724909494561603880133773663501392405214554054831058921986\"]}",
+    "assets": {
+      "65537": {
+        "address": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+        "active": true,
+        "balance": "52427241523614399",
+        "withdrawFees": "0",
+        "paymasterFees": {}
+      },
+      "65538": {
+        "address": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+        "active": true,
+        "balance": "48708500",
+        "withdrawFees": "0",
+        "paymasterFees": {}
+      },
+      "65539": {
+        "address": "0x252231882FB38481497f3C767469106297c8d93b",
+        "active": true,
+        "balance": "933559042786595",
+        "withdrawFees": "0",
+        "paymasterFees": {}
+      },
+      "65540": {
+        "address": "0x73edDFa87C71ADdC275c2b9890f5c3a8480bC9E6",
+        "active": true,
+        "balance": "0",
+        "withdrawFees": "0",
+        "paymasterFees": {}
+      },
+      "65541": {
+        "address": "0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0",
+        "active": true,
+        "balance": "803634469164248",
+        "withdrawFees": "0",
+        "paymasterFees": {}
+      },
+      "65542": {
+        "address": "0x2371e134e3455e0593363cBF89d3b6cf53740618",
+        "active": true,
+        "balance": "9815020682959320",
+        "withdrawFees": "0",
+        "paymasterFees": {}
+      },
+      "65543": {
+        "address": "0xbeef088055857739C12CD3765F20b7679Def0f51",
+        "active": true,
+        "balance": "2896736111529136598",
+        "withdrawFees": "0",
+        "paymasterFees": {}
+      }
+    }
+  },
+  "ownerTransactions": [
+    {
+      "note": "Upgrade to the fixed implementation and set version 3 in the same call.",
+      "from": "0xa285717BfD608468566bfBda742b56b1177494f7",
+      "to": "0x4cecb7f987d220fe2e8608149fa76ed6d021ad11",
+      "value": "0",
+      "functionName": "upgradeToAndCall",
+      "args": [
+        "0x934d10e93666481e25e2e6f77a7c3109a8502225",
+        "0xcf864d150000000000000000000000000000000000000000000000000000000000000003"
+      ],
+      "data": "0x4f1ef286000000000000000000000000934d10e93666481e25e2e6f77a7c3109a850222500000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000000024cf864d15000000000000000000000000000000000000000000000000000000000000000300000000000000000000000000000000000000000000000000000000"
+    }
+  ],
+  "deployedAt": "2026-10-28T18:26:37.446Z"
+}
