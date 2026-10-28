@@ -117,6 +117,8 @@ pnpm deployCoreWithProofAggrInfra:sepolia
 ## Documentation
 [Veilnyx Docs](http://veilnyx.gitbook.io/)
 
+[Paymaster fee quoting](docs/paymaster-fee-quoting.md)
+
 ---
 
 ## ⚠️ CRITICAL: Upgrade Safety Warning

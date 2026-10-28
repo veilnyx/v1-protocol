@@ -52,7 +52,12 @@ contract ERC4337 is PoolTest {
 
         StdCheats.deployCodeTo(
             "Paymaster.sol:Paymaster",
-            abi.encode(entryPointContract, fixture.gateway, address(pool), pool.priceFeedStalenessThreshold()),
+            abi.encode(
+                entryPointContract,
+                fixture.gateway,
+                address(pool),
+                pool.priceFeedStalenessThreshold()
+            ),
             fixture.paymaster
         );
         console2.log("paymaster:", fixture.paymaster);
@@ -66,7 +71,10 @@ contract ERC4337 is PoolTest {
         paymaster.depositToEntryPoint{value: 100 ether}();
 
         // Set Chainlink Oracle Price Feed address to fetch prices
-        paymaster.setChainlinkFeed(asset1.id, AggregatorV3Interface(address(0)));
+        paymaster.setChainlinkFeed(
+            asset1.id,
+            AggregatorV3Interface(address(0))
+        );
         if (block.chainid == 11155111) {
             // Sepolia
             paymaster.setChainlinkFeed(
@@ -74,7 +82,10 @@ contract ERC4337 is PoolTest {
                 AggregatorV3Interface(CHAINLINK_ETH_USDC_FEED_SEPOLIA)
             );
         } else {
-            paymaster.setChainlinkFeed(asset2.id, AggregatorV3Interface(address(0)));
+            paymaster.setChainlinkFeed(
+                asset2.id,
+                AggregatorV3Interface(address(0))
+            );
         }
 
         // Deposit funds to test transfer/withdraw tx supported by ERC4337
@@ -108,6 +119,63 @@ contract ERC4337 is PoolTest {
             address(paymaster)
         );
         assert(paymasterFeeCollected == parsedFeeValue);
+    }
+
+    function testHandleOpsAcceptsEffectiveGasPriceFee() public {
+        uint256 verificationGasLimit = 75_000;
+        uint256 callGasLimit = 900_000;
+        uint256 preVerificationGas = 75_000;
+        uint256 paymasterVerificationGasLimit = 50_000;
+        uint256 paymasterPostOpGasLimit = 5;
+        uint256 maxFeePerGas = 100 gwei;
+        uint256 maxPriorityFeePerGas = 2 gwei;
+        uint256 baseFeePerGas = 20 gwei;
+
+        uint256 requiredGas = verificationGasLimit +
+            callGasLimit +
+            preVerificationGas +
+            paymasterVerificationGasLimit +
+            paymasterPostOpGasLimit;
+        uint256 effectiveFee = requiredGas *
+            (baseFeePerGas + maxPriorityFeePerGas);
+
+        ShieldedTransaction memory stx = _loadShieldedTransaction(
+            "transfer_20_weth_with_weth_fee_effective_gas_price"
+        );
+        PackedUserOperation memory packedUserOp = _loadPackedUserOp(
+            "transfer_20_weth_with_weth_fee_effective_gas_price_packed_userop"
+        );
+
+        (, uint24 parsedFeeAssetId, uint256 parsedFeeValue) = _parseFeeParams(
+            stx
+        );
+        assertEq(parsedFeeAssetId, feeAssetId);
+        assertEq(parsedFeeValue, effectiveFee);
+        assertEq(
+            uint256(packedUserOp.accountGasLimits >> 128),
+            verificationGasLimit
+        );
+        assertEq(
+            uint256(uint128(uint256(packedUserOp.accountGasLimits))),
+            callGasLimit
+        );
+        assertEq(packedUserOp.preVerificationGas, preVerificationGas);
+        assertEq(uint256(packedUserOp.gasFees >> 128), maxPriorityFeePerGas);
+        assertEq(uint256(uint128(uint256(packedUserOp.gasFees))), maxFeePerGas);
+
+        PackedUserOperation[] memory ops = new PackedUserOperation[](1);
+        ops[0] = packedUserOp;
+        vm.fee(baseFeePerGas);
+
+        uint256 depositBefore = paymaster.getEntryPointDeposit();
+        entryPointContract.handleOps(ops, payable(address(this)));
+
+        assertLt(effectiveFee, requiredGas * maxFeePerGas);
+        assertLt(paymaster.getEntryPointDeposit(), depositBefore);
+        assertEq(
+            pool.getCollectedPaymasterFee(feeAssetId, address(paymaster)),
+            effectiveFee
+        );
     }
 
     /**
