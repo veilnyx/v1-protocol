@@ -39,6 +39,9 @@ contract RedeployHardeningTest is PoolBaseTest {
     uint256 constant LIVE_ENC_X = 8415733266590874906051569398859887253801673499116319370506942542327247131378;
     uint256 constant LIVE_ENC_Y = 4303763666990812745724909494561603880133773663501392405214554054831058921986;
 
+    /// hashV2(_sampleTx(), chainId 999, pool 0x...9001)
+    uint256 constant HASH_V2_VECTOR = 10287438950420733548199270422711720398136271865018227309152055955606452881044;
+
     function setUp() public {
         _setUp();
     }
@@ -123,7 +126,8 @@ contract RedeployHardeningTest is PoolBaseTest {
         s.targetData = abi.encodePacked(address(0xA11CE));
     }
 
-    /// The exact formula the SDK must reproduce.
+    /// The exact formula the SDK must reproduce. The value is pinned so the SDK can use the same
+    /// transaction as a test vector (docs/palliora-redeploy-999.md).
     function test_hashV2_matchesSpec() public pure {
         ShieldedTransaction memory s = _sampleTx();
         uint256 expected = uint256(
@@ -139,6 +143,7 @@ contract RedeployHardeningTest is PoolBaseTest {
             )
         ) % FIELD_SIZE;
         assertEq(ShieldedTransactionLogic.hashV2(s, 999, address(0x9001)), expected);
+        assertEq(expected, HASH_V2_VECTOR, "pinned SDK test vector");
     }
 
     /// Every field the user chooses changes the v2 hash, and so do the chain and the pool. Only

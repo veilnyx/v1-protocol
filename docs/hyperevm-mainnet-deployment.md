@@ -1,5 +1,9 @@
 # Deploying the Veilnyx pool to HyperEVM mainnet (chain 999)
 
+> **Palliora redeploy (replacing the 2026-09-30 pool `0x25913fa4`):** read
+> `docs/palliora-redeploy-999.md` first. It lists what changed, the client changes that must ship
+> with the new pool, and how to wind down the old one. The steps below still apply.
+
 > **Start with the full guide:** `veilnyx-hyperliquid/docs/HYPERLIQUID_MAINNET_DEPLOYMENT.md`. It covers
 > the pool (this runbook), proving keys, the revoker, the burner-funding adaptor, the frontend and go-live.
 
@@ -23,8 +27,8 @@ not compare against Ethereum; it is verified against this commit's own build.
   immutables masked, at the compiler-reported offsets. It also confirmed their wiring. Live
   probes on the deployed pool hit every new check (step 1).
 - The verifiers carry the production ceremony keys (`8a65d25`). They are unchanged by the fixes,
-  so the Ethereum zkeys serve 999. **Never deploy or prove with the 998 testnet circuits**: they
-  use test entropy and their proofs are forgeable.
+  so the Ethereum zkeys serve 999. **Never deploy or prove with the 998 testnet circuits**: their
+  zkeys are single-party dev keys (one contribution), not the ceremony.
 - On top of the security fixes, this branch only changes deploy tooling and config:
 
 | File | Change |
