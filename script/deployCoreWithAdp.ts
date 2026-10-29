@@ -750,6 +750,10 @@ const main = async () => {
   );
   console.log("ShieldedTransactionLogic deployed:", shieldedTransaction.address);
 
+  // External library Pool calls for the revoker-key subgroup check (registerRevoker).
+  const babyJubJub = await hre.viem.deployContract("BabyJubJubLogic", [], deployConfig);
+  console.log("BabyJubJubLogic deployed:", babyJubJub.address);
+
   const adaptorHandler = await hre.viem.deployContract("AdaptorHandler", [], deployConfig);
   console.log("AdaptorHandler deployed: ", adaptorHandler.address);
 
@@ -761,6 +765,7 @@ const main = async () => {
       QueuedMerkleTreeLogic: queuedMerkleTree.address,
       ShieldedAddressLogic: shieldedAddress.address,
       ShieldedTransactionLogic: shieldedTransaction.address,
+      BabyJubJubLogic: babyJubJub.address,
     },
   });
   console.log("Pool deployed:", poolImpl.address);
@@ -825,6 +830,24 @@ const main = async () => {
   });
   await client.waitForTransactionReceipt({ hash: setVersionHash });
   console.log("Pool: version set to", commonParams.protocolVersion);
+
+  // v2 transaction hash, before the pool is ever unpaused (one-way, owner-gated, so it must run
+  // while the deployer still owns the pool).
+  if (chainParams.txHashV2) {
+    // @ts-ignore
+    const v2Hash = await wallets[0].writeContract({
+      address: poolProxy.address,
+      abi: poolAbi,
+      functionName: "enableTxHashV2",
+    });
+    await client.waitForTransactionReceipt({ hash: v2Hash });
+    // @ts-ignore
+    const version = await client.readContract({ address: poolProxy.address, abi: poolAbi, functionName: "txHashVersion" });
+    if (Number(version) !== 2) {
+      throw new Error(`enableTxHashV2 did not take effect (txHashVersion = ${version})`);
+    }
+    console.log("Pool: v2 transaction hash enabled");
+  }
 
   // nativeWToken is set via PoolConfigParams during initialize() above; no separate
   // setWToken call is needed for fresh deployments.
@@ -897,6 +920,7 @@ const main = async () => {
     queuedMerkleTreeLogic: queuedMerkleTree.address,
     shieldedAddressLogic: shieldedAddress.address,
     shieldedTransactionLogic: shieldedTransaction.address,
+    babyJubJubLogic: babyJubJub.address,
     poseidonT3,
     poseidonT4,
     poseidonT5,

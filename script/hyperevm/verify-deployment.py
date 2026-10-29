@@ -25,7 +25,7 @@ import argparse, glob, json, os, subprocess, sys
 ROOT = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
 WHYPE = "0x5555555555555555555555555555555555555555"
 LIBRARIES = {"AssetLogic", "MerkleTreeLogic", "QueuedMerkleTreeLogic", "ShieldedAddressLogic",
-             "ShieldedTransactionLogic"}
+             "ShieldedTransactionLogic", "BabyJubJubLogic"}
 TX_VERIFIER_IDS = [21, 22, 23, 42, 44, 82, 84]
 
 fails = 0
@@ -120,6 +120,10 @@ def main():
         check(f"pool.{getter.split('(')[0]} = {key}", v == rec[key], v)
     nw = call(pool, "nativeWToken()(address)").lower()
     check("pool.nativeWToken = WHYPE", nw == WHYPE, nw)
+    domain = call(pool, "eip712Domain()(bytes1,string,string,uint256,address,bytes32,uint256[])")
+    check('pool EIP-712 domain name = "Palliora"', '"Palliora"' in domain, domain.splitlines()[1] if domain else "")
+    hv = call(pool, "txHashVersion()(uint8)")
+    check("pool.txHashVersion = 2 (v2 transaction hash)", hv == "2", hv)
     a1 = call(pool, "getAsset(uint24)((uint24,uint8,address,bool,uint8,address,uint8))", 65537)
     check("asset 65537 = WHYPE (Paymaster GAS_ASSET_ID)", WHYPE in a1.lower(), a1[:80])
 

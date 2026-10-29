@@ -211,6 +211,7 @@
     "poseidonT4": "0x0000000000000000000000000000000000000000",
     "sanctionsList": "0x0000000000000000000000000000000000000000",
     "screeningDisabled": true,
+    "txHashV2": true,
     "initAssetType": 1,
     "initAssetAddresses": [
       "0x5555555555555555555555555555555555555555",

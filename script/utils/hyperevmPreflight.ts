@@ -58,6 +58,12 @@ export const assertHyperEvmReady = async (params: {
       `contract, or record the decision with "screeningDisabled": true in config.json`
     );
   }
+  // Palliora redeploy: the 999 pool is deployed with the v2 transaction hash (chain id, pool
+  // address and every field signed). Clients are released for it before the pool exists, so a
+  // legacy-hash pool would reject every transaction they make.
+  if ((chainParams as any).txHashV2 !== true) {
+    errors.push(`config.json must set "txHashV2": true for HyperEVM mainnet (Pool.enableTxHashV2)`);
+  }
   if (!screenerUnset && chainParams.screeningDisabled === true) {
     errors.push(`config.json sets both a sanctionsList and "screeningDisabled": true — pick one`);
   }
