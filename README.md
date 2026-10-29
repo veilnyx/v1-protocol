@@ -127,7 +127,9 @@ pnpm deployCoreWithProofAggrInfra:sepolia
 
 > **DO NOT MODIFY THE EIP-712 DOMAIN NAME OR VERSION WHEN UPGRADING THE POOL CONTRACT**
 
-Changing the `EIP712_DOMAIN_NAME` or `EIP712_DOMAIN_VERSION` during a contract upgrade will **permanently break all existing shielded accounts**.
+Re-initializing the EIP-712 domain of a deployed pool (calling `__EIP712_init*` in an upgrade) will **permanently break all existing shielded accounts** of clients that derive them from the pool's domain.
+
+`EIP712_DOMAIN_NAME` itself is only read by `initialize`. A deployed proxy keeps the name it was initialized with in `EIP712Upgradeable` storage, so changing the constant (it became `"Palliora"` for the HyperEVM redeploy, see `docs/palliora-redeploy-999.md`) affects fresh deployments only. The Ethereum pool still reports `"Veilnyx"`, and must keep doing so.
 
 ### Why This Is Critical
 
@@ -141,6 +143,10 @@ If the domain name or version changes:
 -  The same wallet signature produces a **different** shielded account
 -  Users **permanently lose access** to their original shielded accounts
 -  **All funds in those accounts become irrecoverable, unless another upgrade reverts the EIP712 domain and version changes**
+
+### Transaction hash version
+
+`Pool.enableTxHashV2()` (owner, one-way) switches the hash the user's Schnorr signature covers from the legacy `ShieldedTransactionLogic.hash` to `hashV2`, which adds every remaining user-chosen field plus the chain id and the pool address. Every client of that pool must sign `hashV2` from then on (read `txHashVersion()`). Fresh 999 deployments enable it in `deployCoreWithAdp.ts` (`"txHashV2": true`); never enable it on a live pool without a client release first.
 
 ---
 

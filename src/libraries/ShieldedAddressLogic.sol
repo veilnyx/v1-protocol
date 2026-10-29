@@ -6,6 +6,7 @@ import {FIELD_SIZE, FIELD_SIZE_DIV_2, EIP712_TYPEHASH_REGISTER_ADDRESS, MESSAGE_
 import {MerkleTree, MerkleTreeLogic} from "./MerkleTreeLogic.sol";
 import {IPool} from "../interfaces/IPool.sol";
 import {IVerifier} from "../interfaces/IVerifier.sol";
+import {BabyJubJubLogic} from "./BabyJubJubLogic.sol";
 
 struct ShieldedAddressRegistrationData {
     bytes proof;
@@ -24,7 +25,7 @@ library ShieldedAddressLogic {
     bytes32 internal constant MASK_PACK =
         hex"8000000000000000000000000000000000000000000000000000000000000000";
 
-    /// @notice Registers a shielded address by verifying the proof on-chain via the Veilnyx verifier.
+    /// @notice Registers a shielded address by verifying the proof on-chain via the pool verifier.
     function register(
         ShieldedAddressRegistrationData calldata self,
         MerkleTree storage addressTree,
@@ -71,6 +72,22 @@ library ShieldedAddressLogic {
 
         if (rootAddress == 0) {
             revert ZeroRootAddress();
+        }
+
+        // The register circuit does not check the two public keys that follow the root address
+        // (signing key, then viewing key). An off-curve or degenerate key only ever hurts the
+        // registrant and anyone paying them, but it is cheap to reject here.
+        _requireValidPublicKey(self.shieldedAddress[32:96]);
+        _requireValidPublicKey(self.shieldedAddress[96:160]);
+    }
+
+    /// @dev `key` is (x, y), 32 bytes each. Rejects off-curve points and x == 0 (the identity
+    ///      and the order-2 point).
+    function _requireValidPublicKey(bytes calldata key) internal pure {
+        uint256 x = uint256(bytes32(key[0:32]));
+        uint256 y = uint256(bytes32(key[32:64]));
+        if (x == 0 || !BabyJubJubLogic.isOnCurve(x, y)) {
+            revert IPool.InvalidCurvePoint(x, y);
         }
     }
 

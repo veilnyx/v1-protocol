@@ -47,6 +47,11 @@ contract MockPool {
         return feeAsset;
     }
 
+    /// nativeWToken's asset id, as the Gateway resolves it
+    function getAsset(address /*assetAddress*/) external pure returns (Asset memory a) {
+        a.id = 65537;
+    }
+
     function setMockWTokenAddress(address nativeWToken) external {
         mockWTokenAddress = nativeWToken;
     }
@@ -97,11 +102,52 @@ contract GatewayTest is Test {
         paymaster.setChainlinkFeed(assetId, AggregatorV3Interface(address(0)));
     }
 
+    function _wrapDeposit(
+        ShieldedTransactionType txType,
+        uint24 id,
+        uint224 value
+    ) internal pure returns (ShieldedTransaction memory stx) {
+        stx.txType = txType;
+        stx.pubAssets = new uint248[](1);
+        stx.pubAssets[0] = uint248(bytes31(bytes.concat(bytes3(id), bytes28(value))));
+    }
+
     function test_handleWrapAndDeposit() public {
         vm.deal(address(this), DEPOSIT_VALUE);
-        ShieldedTransaction memory stx;
-        stx.txType = ShieldedTransactionType.DEPOSIT;
+        ShieldedTransaction memory stx = _wrapDeposit(
+            ShieldedTransactionType.DEPOSIT,
+            assetId,
+            uint224(DEPOSIT_VALUE)
+        );
         gateway.handleWrapAndDeposit{value: DEPOSIT_VALUE}(stx);
+        assertEq(IWToken(nativeWToken).balanceOf(address(gateway)), 0, "nothing stranded");
+    }
+
+    /// msg.value must equal the deposit's nativeWToken amount: any surplus would stay wrapped in
+    /// the Gateway, and a non-DEPOSIT transaction pulls nothing at all.
+    function test_handleWrapAndDeposit_rejectsMismatch() public {
+        vm.deal(address(this), 4 * DEPOSIT_VALUE);
+
+        ShieldedTransaction memory empty;
+        empty.txType = ShieldedTransactionType.DEPOSIT;
+        vm.expectRevert(abi.encodeWithSelector(Gateway.WrapAmountMismatch.selector, DEPOSIT_VALUE, 0));
+        gateway.handleWrapAndDeposit{value: DEPOSIT_VALUE}(empty);
+
+        ShieldedTransaction memory less = _wrapDeposit(ShieldedTransactionType.DEPOSIT, assetId, uint224(DEPOSIT_VALUE - 1));
+        vm.expectRevert(abi.encodeWithSelector(Gateway.WrapAmountMismatch.selector, DEPOSIT_VALUE, DEPOSIT_VALUE - 1));
+        gateway.handleWrapAndDeposit{value: DEPOSIT_VALUE}(less);
+
+        ShieldedTransaction memory otherAsset = _wrapDeposit(ShieldedTransactionType.DEPOSIT, assetId + 1, uint224(DEPOSIT_VALUE));
+        vm.expectRevert(abi.encodeWithSelector(Gateway.WrapAmountMismatch.selector, DEPOSIT_VALUE, 0));
+        gateway.handleWrapAndDeposit{value: DEPOSIT_VALUE}(otherAsset);
+
+        ShieldedTransaction memory transfer = _wrapDeposit(ShieldedTransactionType.TRANSFER, assetId, uint224(DEPOSIT_VALUE));
+        vm.expectRevert(abi.encodeWithSelector(Gateway.WrapAmountMismatch.selector, DEPOSIT_VALUE, 0));
+        gateway.handleWrapAndDeposit{value: DEPOSIT_VALUE}(transfer);
+
+        ShieldedTransaction memory zero = _wrapDeposit(ShieldedTransactionType.DEPOSIT, assetId, 0);
+        vm.expectRevert(abi.encodeWithSelector(Gateway.WrapAmountMismatch.selector, 0, 0));
+        gateway.handleWrapAndDeposit{value: 0}(zero);
     }
 
     function test_handleUserOp() public {

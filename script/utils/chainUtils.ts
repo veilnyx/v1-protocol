@@ -44,8 +44,13 @@ export async function getChainForCurrentNetwork(hre: HardhatRuntimeEnvironment):
         throw new Error(`Chain ID not defined for network: ${networkName}`);
     }
 
+    // Chain ids viem's built-in list gets wrong for us. 999 is HyperEVM mainnet, but viem's
+    // bundled list maps it to Wanchain Testnet — a mis-labelled chain carrying another network's
+    // multicall3 address. Always build these from the network config instead.
+    const CUSTOM_ONLY_CHAIN_IDS = new Set([999]);
+
     // Try to import standard chain from viem/chains first
-    try {
+    if (!CUSTOM_ONLY_CHAIN_IDS.has(chainId)) try {
         // This is a dynamic import attempt to get built-in chain definition
         const viemChains = await import("viem/chains");
 
@@ -76,6 +81,12 @@ export async function getChainForCurrentNetwork(hre: HardhatRuntimeEnvironment):
         name: "Ether",
         symbol: "ETH",
     };
+
+    if (chainId === 999) {
+        // HyperEVM mainnet: native gas token is HYPE (18 decimals)
+        nativeCurrency.name = "HYPE";
+        nativeCurrency.symbol = "HYPE";
+    }
 
     if (chainId === 5042002) {
         // Arc Testnet specific configuration

@@ -2,7 +2,7 @@
 pragma solidity 0.8.24;
 
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
-import {FIELD_SIZE} from "../base/Constants.sol";
+import {FIELD_SIZE, TX_HASH_V2_TAG, TX_HASH_VERSION_V2} from "../base/Constants.sol";
 import {ArrayUtils} from "./ArrayUtils.sol";
 import {Asset, AssetLogic} from "./AssetLogic.sol";
 import {MerkleTree, MerkleTreeLogic} from "./MerkleTreeLogic.sol";
@@ -148,6 +148,62 @@ library ShieldedTransactionLogic {
         return txHash;
     }
 
+    /// @notice The v2 transaction hash: what the Schnorr signature inside the proof covers once
+    ///         the pool has called `enableTxHashV2`.
+    /// @dev The legacy `hash` leaves out commitments, pubAssets, notesMemo, revokerId and both
+    ///      roots because the proof binds them. That is enough while the signer is also the
+    ///      prover, but not when anyone else can prove: whoever holds the viewing key and the note
+    ///      openings, plus one signature, could re-prove the same nullifiers into different
+    ///      outputs or amounts. v2 signs every field the user chooses, plus the chain id and the
+    ///      pool address, so a signature is only good for the one transaction on the one pool.
+    ///      Only `proof` (which carries the signature) and `betaUHF` (derived from notesMemo)
+    ///      are left out.
+    ///
+    ///      txHash = uint256(keccak256(abi.encode(
+    ///          TX_HASH_V2_TAG, chainId, pool,
+    ///          keccak256(abi.encode(txType, revokerId, addressTreeRoot, commitmentTreeRoot,
+    ///                               feeData, refundAddress)),
+    ///          keccak256(abi.encode(pubAssets, nullifiers, commitments)),
+    ///          keccak256(abi.encode(assetsMemo, keysMemo, notesMemo, targetData))
+    ///      ))) % FIELD_SIZE
+    /// @param self ShieldedTransaction
+    /// @param chainId Chain the pool is on (`block.chainid` when the pool validates)
+    /// @param pool Address of the pool proxy (`address(this)` when the pool validates)
+    /// @return Hash of the transaction
+    function hashV2(
+        ShieldedTransaction memory self,
+        uint256 chainId,
+        address pool
+    ) public pure returns (uint256) {
+        bytes32 head = keccak256(
+            abi.encode(
+                self.txType,
+                self.revokerId,
+                self.addressTreeRoot,
+                self.commitmentTreeRoot,
+                self.feeData,
+                self.refundAddress
+            )
+        );
+        bytes32 arrays = keccak256(
+            abi.encode(self.pubAssets, self.nullifiers, self.commitments)
+        );
+        bytes32 memos = keccak256(
+            abi.encode(
+                self.assetsMemo,
+                self.keysMemo,
+                self.notesMemo,
+                self.targetData
+            )
+        );
+        return
+            uint256(
+                keccak256(
+                    abi.encode(TX_HASH_V2_TAG, chainId, pool, head, arrays, memos)
+                )
+            ) % FIELD_SIZE;
+    }
+
     /// @notice Validates a shielded transaction
     /// @param stx ShieldedTransaction to be executed
     /// @custom:invariant ACCESS-4 Revoker must be active to be used in transaction
@@ -162,7 +218,8 @@ library ShieldedTransactionLogic {
         IVerifier verifier,
         mapping(uint256 => uint32) storage markedNullifiers,
         mapping(IAdaptorHandler => bool) storage supportedAdaptors,
-        mapping(uint256 => RevokerData) storage revokerDataMap
+        mapping(uint256 => RevokerData) storage revokerDataMap,
+        uint8 txHashVersion
     ) external {
         RevokerData memory revokerData = revokerDataMap[stx.revokerId];
 
@@ -187,6 +244,15 @@ library ShieldedTransactionLogic {
             revert IPool.UnsupportedAdaptor();
         }
 
+        // The adaptor's outputs are committed to `refundAddress` (`_handleAdaptorCall`), and
+        // 0 has no opening, so they could never be spent.
+        if (
+            stx.txType == ShieldedTransactionType.CALL_ADAPTOR &&
+            stx.refundAddress == 0
+        ) {
+            revert IPool.ZeroRefundAddress();
+        }
+
         // Both checks run before anything is marked and before the (expensive) proof check.
         _requireCanonicalFieldElements(stx);
         _requireBackedFee(stx);
@@ -197,7 +263,11 @@ library ShieldedTransactionLogic {
             revert IPool.PubAssetsCannotExceedCommitments();
         }
 
-        if (!verifyProof(stx, revokerData, verifier)) {
+        // `address(this)` is the pool: library functions run in the pool's context.
+        uint256 txHash = txHashVersion == TX_HASH_VERSION_V2
+            ? hashV2(stx, block.chainid, address(this))
+            : hash(stx);
+        if (!_verifyProof(stx, revokerData, verifier, txHash)) {
             revert IPool.InvalidTransactionProof();
         }
     }
@@ -280,16 +350,26 @@ library ShieldedTransactionLogic {
         _printNotes(commitmentTree, params, memoParams);
     }
 
+    /// @notice Verifies the proof against the legacy transaction hash.
     function verifyProof(
         ShieldedTransaction calldata stx,
         RevokerData memory revokerData,
         IVerifier verifier
     ) public view returns (bool) {
+        return _verifyProof(stx, revokerData, verifier, hash(stx));
+    }
+
+    function _verifyProof(
+        ShieldedTransaction calldata stx,
+        RevokerData memory revokerData,
+        IVerifier verifier,
+        uint256 txHash
+    ) internal view returns (bool) {
         uint16 vId = verifier.getTransactionVerifierId(
             stx.nullifiers.length,
             stx.commitments.length
         );
-        bytes memory vInp = toVerifierInput(stx, revokerData);
+        bytes memory vInp = _toVerifierInput(stx, revokerData, txHash);
         return verifier.verifyTransactionProof(vId, vInp);
     }
 
@@ -298,16 +378,25 @@ library ShieldedTransactionLogic {
      * @param self ShieldedTransaction to convert to a proper verifier input
      * @param revokerData The RevokerData used for this transaction
      * @return Calldata bytes for appropriate verifier contract
-     * @dev We divide the public inputs into 2 chunks to avoid stack too deep error
+     * @dev Uses the legacy transaction hash.
      */
     function toVerifierInput(
         ShieldedTransaction calldata self,
         RevokerData memory revokerData
     ) public pure returns (bytes memory) {
+        return _toVerifierInput(self, revokerData, hash(self));
+    }
+
+    /// @dev We divide the public inputs into 2 chunks to avoid stack too deep error
+    function _toVerifierInput(
+        ShieldedTransaction calldata self,
+        RevokerData memory revokerData,
+        uint256 txHash
+    ) internal pure returns (bytes memory) {
         bytes memory pubDataChunk1 = abi.encodePacked(
             self.addressTreeRoot,
             self.commitmentTreeRoot,
-            hash(self),
+            txHash,
             self.txType == ShieldedTransactionType.DEPOSIT
                 ? uint256(0)
                 : uint256(1)

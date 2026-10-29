@@ -21,6 +21,7 @@ import { deployHasher } from "./hasher";
 import { deployVerifier } from "./verifier";
 import { getChainForCurrentNetwork, isDevelopmentNode } from "./utils/chainUtils";
 import { assertVerifiersMatchCeremony } from "./utils/verifierProvenance";
+import { assertHyperEvmReady, HYPEREVM_MAINNET_CHAIN_ID } from "./utils/hyperevmPreflight";
 import {
   assertRevokerMetadata,
   checkRevokerMetadataIsPinned,
@@ -347,7 +348,19 @@ const verifyAll = async (contracts: {
 // Sequential on purpose: every adaptor registers assets, and the ids they receive come from a
 // monotonic counter, so the enabled set and its order here decide the id of every adaptor asset.
 // Returns the addresses so the caller can record them without module-level state.
+// True when adaptorConfig.json configures at least one address for the chain. A chain whose
+// entry is all zero addresses (HyperEVM: none of Uniswap/Aave/Lido/Morpho exist there) deploys no
+// adaptors — deploying them anyway would register dead adaptors against zero-address dependencies.
+const hasConfiguredAdaptor = (o: any): boolean =>
+  typeof o === "string"
+    ? o.startsWith("0x") && !isUnconfigured(o)
+    : o !== null && typeof o === "object" && Object.values(o).some(hasConfiguredAdaptor);
+
 const deployAdaptors = async (pool: any, adpParams: any, deployConfig: any): Promise<Record<string, Hex>> => {
+  if (!hasConfiguredAdaptor(adpParams)) {
+    console.log("No adaptors configured for this chain — skipping adaptor deployment");
+    return {};
+  }
   const { uniswap: uniswapParams, aave: aaveParams, lido: lidoParams, curve: curveParams, ethena: ethenaParams, beefy: beefyParams, morpho: morphoParams, rocketPool: rocketPoolParams, oneInch: oneInchParams } = adpParams;
 
   return {
@@ -683,6 +696,17 @@ const main = async () => {
     }
   }
 
+  // HyperEVM-specific checks (screening decision, asset decimals, live price feeds, big blocks).
+  // Still before anything costs gas.
+  if (chainId === HYPEREVM_MAINNET_CHAIN_ID) {
+    await assertHyperEvmReady({
+      client,
+      chainParams,
+      deployer: wallets[0].account.address as Hex,
+      dryRun,
+    });
+  }
+
   // Add assets
   // addAssets([`0x94a9D9AC8a22534E3FaCa9F4e7F2E2cf85d5E4C8` as `0x${string}`], [18], 1, `0x62e7485535ea31382dcc3bbfc399ddd6b9c9b27f` as `0x${string}`, wallets[0], client);
 
@@ -726,6 +750,10 @@ const main = async () => {
   );
   console.log("ShieldedTransactionLogic deployed:", shieldedTransaction.address);
 
+  // External library Pool calls for the revoker-key subgroup check (registerRevoker).
+  const babyJubJub = await hre.viem.deployContract("BabyJubJubLogic", [], deployConfig);
+  console.log("BabyJubJubLogic deployed:", babyJubJub.address);
+
   const adaptorHandler = await hre.viem.deployContract("AdaptorHandler", [], deployConfig);
   console.log("AdaptorHandler deployed: ", adaptorHandler.address);
 
@@ -737,6 +765,7 @@ const main = async () => {
       QueuedMerkleTreeLogic: queuedMerkleTree.address,
       ShieldedAddressLogic: shieldedAddress.address,
       ShieldedTransactionLogic: shieldedTransaction.address,
+      BabyJubJubLogic: babyJubJub.address,
     },
   });
   console.log("Pool deployed:", poolImpl.address);
@@ -801,6 +830,24 @@ const main = async () => {
   });
   await client.waitForTransactionReceipt({ hash: setVersionHash });
   console.log("Pool: version set to", commonParams.protocolVersion);
+
+  // v2 transaction hash, before the pool is ever unpaused (one-way, owner-gated, so it must run
+  // while the deployer still owns the pool).
+  if (chainParams.txHashV2) {
+    // @ts-ignore
+    const v2Hash = await wallets[0].writeContract({
+      address: poolProxy.address,
+      abi: poolAbi,
+      functionName: "enableTxHashV2",
+    });
+    await client.waitForTransactionReceipt({ hash: v2Hash });
+    // @ts-ignore
+    const version = await client.readContract({ address: poolProxy.address, abi: poolAbi, functionName: "txHashVersion" });
+    if (Number(version) !== 2) {
+      throw new Error(`enableTxHashV2 did not take effect (txHashVersion = ${version})`);
+    }
+    console.log("Pool: v2 transaction hash enabled");
+  }
 
   // nativeWToken is set via PoolConfigParams during initialize() above; no separate
   // setWToken call is needed for fresh deployments.
@@ -873,6 +920,7 @@ const main = async () => {
     queuedMerkleTreeLogic: queuedMerkleTree.address,
     shieldedAddressLogic: shieldedAddress.address,
     shieldedTransactionLogic: shieldedTransaction.address,
+    babyJubJubLogic: babyJubJub.address,
     poseidonT3,
     poseidonT4,
     poseidonT5,

@@ -5,7 +5,7 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {IAccount} from "@account-abstraction/contracts/interfaces/IAccount.sol";
 import {IEntryPoint} from "@account-abstraction/contracts/interfaces/IEntryPoint.sol";
 import {PackedUserOperation} from "@account-abstraction/contracts/interfaces/PackedUserOperation.sol";
-import {ShieldedTransaction} from "../libraries/ShieldedTransactionLogic.sol";
+import {ShieldedTransaction, ShieldedTransactionType} from "../libraries/ShieldedTransactionLogic.sol";
 import {IWToken} from "../interfaces/IWToken.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IPool} from "../interfaces/IPool.sol";
@@ -21,6 +21,8 @@ contract Gateway is IGateway, Ownable {
 
     error InvalidEntryPoint(address entryPoint);
     error ZeroAddress();
+    /// @notice `handleWrapAndDeposit` needs a DEPOSIT whose nativeWToken public asset equals msg.value.
+    error WrapAmountMismatch(uint256 sent, uint256 deposited);
 
     /// @custom:invariant ACCESS-5 Entrypoint to be the only caller of `validateUserOp` and `handleUserOp`
     modifier onlyEntryPoint() {
@@ -61,9 +63,26 @@ contract Gateway is IGateway, Ownable {
         pool.transact(stx);
     }
 
+    /// @dev The pool pulls exactly the deposit's nativeWToken value from this contract, so any
+    ///      other msg.value (or a non-DEPOSIT transaction, which pulls nothing) would leave the
+    ///      wrapped surplus stranded here.
     function handleWrapAndDeposit(
         ShieldedTransaction calldata stx
     ) external payable {
+        uint256 deposited;
+        if (stx.txType == ShieldedTransactionType.DEPOSIT) {
+            uint24 wTokenAssetId = pool.getAsset(address(nativeWToken)).id;
+            uint256 n = stx.pubAssets.length;
+            for (uint256 i; i < n; ++i) {
+                if (uint24(bytes3(bytes31(stx.pubAssets[i]))) == wTokenAssetId) {
+                    deposited = uint224(stx.pubAssets[i]);
+                    break;
+                }
+            }
+        }
+        if (msg.value == 0 || deposited != msg.value) {
+            revert WrapAmountMismatch(msg.value, deposited);
+        }
         nativeWToken.deposit{value: msg.value}();
         nativeWToken.forceApprove(address(pool), msg.value);
         pool.transact(stx);

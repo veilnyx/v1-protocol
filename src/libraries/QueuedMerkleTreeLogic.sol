@@ -84,6 +84,18 @@ library QueuedMerkleTreeLogic {
         uint32 nextIndex = self.queueEndIndex;
         uint32 nLeaves = uint32(leaves.length);
 
+        // queueEndIndex counts every leaf ever queued (inserted + pending). The treeUpdate circuit
+        // range-checks `nextLeafIndex + i` to 25 bits for all `queueSize` slots, padding included,
+        // so an update can only start at nextLeafIndex <= capacity - queueSize. Capping the total
+        // at capacity - (queueSize - 1) keeps every queued leaf insertable; past it a deposit would
+        // take funds for a note that can never enter the tree.
+        if (
+            uint256(nextIndex) + nLeaves >
+            uint256(self.capacity) - (self.queueSize - 1)
+        ) {
+            revert MerkleTreeFull();
+        }
+
         for (uint32 i = 0; i < nLeaves; ) {
             // Defence in depth (ShieldedTransactionLogic.validate already rejects these): a
             // leaf >= p can never be a tree-update public input, so queueing one would stall
@@ -180,6 +192,10 @@ library QueuedMerkleTreeLogic {
         // in-flight proof by queueing one more leaf, because that leaf would land in a
         // padding slot and change a public input.
         uint256[] memory leaves = peekQueuedLeaves(self, self.queueSize, data.batchSize);
+        // `lastSubtrees` and `lastRoot` MUST come from storage. The circuit only reads
+        // `lastRoot` when nothing is inserted, which batchSize >= 1 rules out, and never checks
+        // it against `lastSubtrees`: the new root's soundness rests on these subtrees being
+        // the ones this contract stored.
         uint256[COMMITMENT_TREE_DEPTH] storage lastSubtrees = self
             .levelSubtrees;
         uint256 lastRoot = self.roots[self.currentRootIndex];

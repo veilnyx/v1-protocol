@@ -10,6 +10,7 @@ Regenerating the fixtures reproduces the whole chain: tx building â†’ proving â†
 | `genFeeFixtures.test.ts` | `poc_fee_deposit`, `poc_fee_withdraw0`, `poc_fee_transfer_nopub` | **production** (`v1-interface/public/mainnet-circuits`; vKeys = `src/verifiers` at `72cb8de`) | `FeeBacking.t.sol`, `PaymasterFeeBacking.t.sol` |
 | `genFieldAliasFixtures.test.ts` | `poc_register`, `poc_deposit`, `poc_deposit_aliased_cm`, `poc_deposit_victim_r0`, `poc_tree_update`, `poc_tree_update_dos`, `poc_tree_update_noop`, `poc_withdraw`, `poc_withdraw_aliased` | **dev** (`v1-circuits/artifacts`, v1-circuits `7270065`) | `FieldCanonicality.t.sol`, `DepositScreening.t.sol` |
 | `genQueueBatchFixtures.test.ts` | `poc_tree_update_batch3` | `v1-circuits/artifacts/treeUpdate` (matches the production ceremony delta, see the generator header) | `QueueStableBatch.t.sol` |
+| `genRedeployForkFixtures.test.ts` | `redeploy_*` (registrations, deposits, tree updates, honest spends, v2-hash cases, attack proofs) and `redeploy_results.json` | **production** (`mainnet-circuits-8a65d25`, `PROD_CIRCUITS`) | `RedeployForkSuite.t.sol` (HyperEVM 999 fork, `HYPEREVM_RPC_URL`) |
 
 ## How the attack transactions are built
 
@@ -66,6 +67,8 @@ POC_OUT=$OUT POC_PAYMASTER=0x000000000000000000000000000000000000fE01 \
   pnpm exec jest tests/genFeeFixtures.test.ts --forceExit
 POC_OUT=$OUT pnpm exec jest tests/genFieldAliasFixtures.test.ts --forceExit
 POC_OUT=$OUT pnpm exec jest tests/genQueueBatchFixtures.test.ts --forceExit
+POC_OUT=$OUT PROD_CIRCUITS=<path>/mainnet-circuits-8a65d25 \
+  pnpm exec jest tests/genRedeployForkFixtures.test.ts --forceExit
 ```
 
 `POC_PAYMASTER` must be the address `PaymasterFeeBacking.t.sol` deploys the Paymaster at
@@ -76,7 +79,13 @@ behave the same. Then run:
 
 ```bash
 forge test --match-path 'test/security/*'
+HYPEREVM_RPC_URL=https://rpc.hyperliquid.xyz/evm forge test --match-path test/security/RedeployForkSuite.t.sol -vv
 ```
+
+`genRedeployForkFixtures` signs every transaction over the v2 hash (`ShieldedTransactionLogic.hashV2`),
+computed from the transaction exactly as the pool receives it and bound to the fork suite's fixed pool
+address. An honest fixture that verifies on chain therefore also shows the TypeScript and Solidity hash
+agree. The circuit-level attacks that cannot produce a proof are listed in `redeploy_results.json`.
 
 ## Dev verifiers
 
