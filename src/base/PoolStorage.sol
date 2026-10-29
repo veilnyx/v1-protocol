@@ -65,4 +65,9 @@ abstract contract PoolStorage {
     /// @dev Address authorised to call `pause()`. Set by the owner via `setPauser`.
     ///      Defaults to address(0).
     address public pauser;
+
+    /// @dev Which transaction hash the Schnorr signature inside the proof covers:
+    ///      0 = legacy `ShieldedTransactionLogic.hash`, 2 = `hashV2`. Set by `enableTxHashV2`.
+    ///      Appended after every existing slot, so the layout of deployed proxies is unchanged.
+    uint8 public txHashVersion;
 }
