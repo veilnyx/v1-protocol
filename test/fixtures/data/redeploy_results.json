@@ -1,0 +1,124 @@
+{
+  "register_alice": {
+    "fixture": "redeploy_register_alice"
+  },
+  "register_bob": {
+    "fixture": "redeploy_register_bob"
+  },
+  "register_mallory": {
+    "fixture": "redeploy_register_mallory"
+  },
+  "register_mallory_second_account": {
+    "fixture": "redeploy_register_mallory_second_account"
+  },
+  "register_mallory_again": {
+    "fixture": "redeploy_register_mallory_again"
+  },
+  "register_alice_to_mallory_eoa": {
+    "fixture": "redeploy_register_alice_to_mallory_eoa"
+  },
+  "deposit_alice_100": {
+    "fixture": "redeploy_deposit_alice_100"
+  },
+  "tree_update_early": {
+    "fixture": "redeploy_tree_update_early"
+  },
+  "deposit_bob_50": {
+    "fixture": "redeploy_deposit_bob_50"
+  },
+  "tree_update_after_early": {
+    "fixture": "redeploy_tree_update_after_early"
+  },
+  "fee_mint_deposit": {
+    "fixture": "redeploy_fee_mint_deposit"
+  },
+  "deposit_aliased_commitment": {
+    "fixture": "redeploy_deposit_aliased_commitment"
+  },
+  "tree_update_1": {
+    "fixture": "redeploy_tree_update_1"
+  },
+  "withdraw_alice_40": {
+    "fixture": "redeploy_withdraw_alice_40"
+  },
+  "withdraw_alice_40_legacy_hash": {
+    "fixture": "redeploy_withdraw_alice_40_legacy_hash"
+  },
+  "withdraw_alice_40_other_pool": {
+    "fixture": "redeploy_withdraw_alice_40_other_pool"
+  },
+  "withdraw_alice_40_other_chain": {
+    "fixture": "redeploy_withdraw_alice_40_other_chain"
+  },
+  "l2_reprove_change_to_mallory": {
+    "fixture": "redeploy_l2_reprove_change_to_mallory",
+    "stage": "proof-produced",
+    "expect": "pool-rejects (hash mismatch)"
+  },
+  "double_spend_new_proof": {
+    "fixture": "redeploy_double_spend_new_proof"
+  },
+  "double_spend_aliased_nullifier": {
+    "fixture": "redeploy_double_spend_aliased_nullifier"
+  },
+  "steal_alice_note_with_mallory_key": {
+    "stage": "circuit-rejected",
+    "error": "Error: Assert Failed. Error in template Transact_345 line: 120\n"
+  },
+  "phantom_note_mallory_owner": {
+    "stage": "circuit-rejected",
+    "error": "Error: Assert Failed. Error in template MerkleProof_244 line: 36\nError in template Transact_345 line: 138\n"
+  },
+  "tree_update_2": {
+    "fixture": "redeploy_tree_update_2"
+  },
+  "transfer_bob_to_alice_20": {
+    "fixture": "redeploy_transfer_bob_to_alice_20"
+  },
+  "tree_update_3": {
+    "fixture": "redeploy_tree_update_3"
+  },
+  "sender_steals_sent_note": {
+    "stage": "circuit-rejected",
+    "error": "Error: Assert Failed. Error in template Transact_345 line: 120\n"
+  },
+  "third_party_steals_received_note": {
+    "stage": "circuit-rejected",
+    "error": "Error: Assert Failed. Error in template Transact_345 line: 120\n"
+  },
+  "same_note_twice_in_one_tx": {
+    "fixture": "redeploy_same_note_twice_in_one_tx",
+    "stage": "proof-produced",
+    "expect": "pool-rejects"
+  },
+  "inflate_change_note": {
+    "stage": "circuit-rejected",
+    "error": "Error: Assert Failed. Error in template ZeroSumFungible_253 line: 50\nError in template Transact_345 line: 189\n"
+  },
+  "field_wraparound_outputs": {
+    "stage": "sdk-rejected-before-proving",
+    "error": "Value 21888242871839275222246405745257275088548364400416034343698204186575708495617 must be 28 bytes max"
+  },
+  "asset_confusion_output": {
+    "stage": "circuit-rejected",
+    "error": "Error: Assert Failed. Error in template ZeroSumFungible_253 line: 50\nError in template Transact_345 line: 189\n"
+  },
+  "c2_withdraw_from_dummies": {
+    "stage": "circuit-rejected",
+    "error": "Error: Assert Failed. Error in template ZeroSumFungible_253 line: 50\nError in template Transact_345 line: 225\n"
+  },
+  "l1_fake_negative_input": {
+    "fixture": "redeploy_l1_fake_negative_input",
+    "stage": "proof-produced",
+    "expect": "pool-accepts-value-destroyed"
+  },
+  "withdraw_bob_10": {
+    "fixture": "redeploy_withdraw_bob_10"
+  },
+  "fee_mismatched_asset": {
+    "fixture": "redeploy_fee_mismatched_asset"
+  },
+  "fee_exceeds_value": {
+    "fixture": "redeploy_fee_exceeds_value"
+  }
+}
