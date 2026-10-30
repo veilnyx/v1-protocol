@@ -36,9 +36,10 @@
 import hre from "hardhat";
 import fs from "fs";
 import { assertRecordWritable, findRecord, writeRecord } from "./utils/deploymentRecord";
+import { getChainForCurrentNetwork } from "./utils/chainUtils";
 import {
     Abi, Hex, encodeFunctionData, getAddress, isAddressEqual, keccak256, toHex,
-    BaseError, ContractFunctionRevertedError, decodeErrorResult, pad,
+    BaseError, ContractFunctionRevertedError, decodeErrorResult, pad, Chain,
 } from "viem";
 
 type Addr = `0x${string}`;
@@ -72,6 +73,9 @@ const errorAbi = [
 
 let client: any;
 let chainId: number;
+// Passed to every hardhat-viem client: it cannot infer the chain when several viem chains
+// share an id, as 999 does (MultipleMatchingNetworksError).
+let chain: Chain;
 
 const isLocal = () => hre.network.name === "hardhat" || /127\.0\.0\.1|localhost/.test((hre.network.config as any).url ?? "");
 // Fork runs get their own file so a rehearsal can never be mistaken for the real deployment record.
@@ -333,18 +337,20 @@ const deploy = async () => {
     // Before anything is deployed: a missing purpose or an existing record must not cost gas.
     assertRecordWritable(recordTarget());
     const { impl, libs, snap, unmatched } = await plan();
-    const [wallet] = await hre.viem.getWalletClients();
+    const [wallet] = await hre.viem.getWalletClients({ chain });
     console.log("\nDeployer:", wallet.account.address);
+    const clients = { public: client, wallet };
 
     // Reused as-is (unchanged source): AssetLogic, MerkleTreeLogic, ShieldedAddressLogic.
-    const qmt = await hre.viem.deployContract("QueuedMerkleTreeLogic", []);
+    const qmt = await hre.viem.deployContract("QueuedMerkleTreeLogic", [], { client: clients });
     console.log("QueuedMerkleTreeLogic   :", qmt.address);
     const stl = await hre.viem.deployContract("ShieldedTransactionLogic", [], {
+        client: clients,
         libraries: { AssetLogic: libs.AssetLogic, MerkleTreeLogic: libs.MerkleTreeLogic, QueuedMerkleTreeLogic: qmt.address },
     });
     console.log("ShieldedTransactionLogic:", stl.address);
     const newLibs: Libs = { ...libs, QueuedMerkleTreeLogic: qmt.address, ShieldedTransactionLogic: stl.address };
-    const poolImpl = await hre.viem.deployContract("Pool", [], { libraries: newLibs });
+    const poolImpl = await hre.viem.deployContract("Pool", [], { client: clients, libraries: newLibs });
     console.log("Pool implementation     :", poolImpl.address);
 
     const owner = snap.owner as Addr;
@@ -374,10 +380,10 @@ const deploy = async () => {
                 throw new Error(`old Paymaster ${pm} is configured differently from ${template}`);
             }
         }
-        const pmC = await hre.viem.deployContract("Paymaster", [ep, gw, POOL_PROXY, th]);
+        const pmC = await hre.viem.deployContract("Paymaster", [ep, gw, POOL_PROXY, th], { client: clients });
         newPaymaster = pmC.address;
         console.log("New Paymaster           :", newPaymaster);
-        const pub = await hre.viem.getPublicClient();
+        const pub = await hre.viem.getPublicClient({ chain });
         for (const id of Object.keys(snap.assets)) {
             const feed = await read(template, "assetIdToChainlinkFeed", [Number(id)], paymasterAbi);
             const h = await wallet.writeContract({ address: newPaymaster, abi: paymasterAbi, functionName: "setChainlinkFeed", args: [Number(id), feed] });
@@ -510,11 +516,11 @@ const rehearse = async () => {
     const rec = await deploy();
 
     console.log("\n== Owner transactions (impersonated) ==");
-    const pub = await hre.viem.getPublicClient();
+    const pub = await hre.viem.getPublicClient({ chain });
     for (const t of rec.ownerTransactions) {
         await client.request({ method: "anvil_impersonateAccount", params: [t.from] });
         await client.request({ method: "anvil_setBalance", params: [t.from, toHex(100_000_000_000_000_000_000n)] });
-        const w = await hre.viem.getWalletClient(t.from);
+        const w = await hre.viem.getWalletClient(t.from, { chain });
         const h = await w.sendTransaction({ to: t.to, data: t.data, account: t.from, chain: w.chain });
         const r = await pub.waitForTransactionReceipt({ hash: h });
         console.log(`  ${r.status === "success" ? "OK " : "ERR"}  ${t.functionName}  gas=${r.gasUsed}`);
@@ -539,7 +545,8 @@ const rehearse = async () => {
 
 const main = async () => {
     if (!POOL_PROXY) throw new Error("POOL_PROXY is required");
-    client = await hre.viem.getPublicClient();
+    chain = await getChainForCurrentNetwork(hre);
+    client = await hre.viem.getPublicClient({ chain });
     chainId = await client.getChainId();
     console.log(`network=${hre.network.name} chainId=${chainId} step=${step}\n`);
     if (step === "plan") await plan();
