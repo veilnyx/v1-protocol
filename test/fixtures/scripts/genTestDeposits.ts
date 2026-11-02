@@ -8,6 +8,20 @@ const {
   sender: { account: senderAccount },
 } = fixture;
 
+// Spent by genTestWithdrawalsFromReentrantTokenDeposit (PoolReentrancy.t.sol).
+export const reqsReentrant = {
+  deposit_1000_reentrantToken_without_fee: {
+    type: TransactionType.DEPOSIT,
+    assetIds: [reentrantToken],
+    values: [parseEther("1000")],
+    feeAssetId: 0,
+    to: senderAccount.shieldedAddress.pack(),
+    viaBundler: false,
+    paymaster: zeroAddress,
+    revokerId: 0,
+  },
+};
+
 export const reqs = {
   deposit_pre_tx: {
     type: TransactionType.DEPOSIT,
@@ -160,7 +174,6 @@ revokerId: 0,
 // Two identical deposits that together supply 4 input notes (2 WETH + 2 USDC each)
 // for the transact42 (4-input 2-output) circuit test.
 export const reqs4x2: Record<string, any> = {
-  /**
   deposit_pre_tx_4x2_a: {
     type: TransactionType.DEPOSIT,
     assetIds: [weth, usdc],
@@ -171,7 +184,6 @@ export const reqs4x2: Record<string, any> = {
     paymaster: zeroAddress,
     revokerId: 0,
   },
-  */
   deposit_pre_tx_4x2_b: {
     type: TransactionType.DEPOSIT,
     assetIds: [weth, usdc],

@@ -85,7 +85,11 @@ contract PaymasterTest is PoolTest {
     function setUp() public {
         _setUp();
         feeAssetId = asset1.id;
-        entryPoint = address(new EntryPoint());
+        // CREATE2: a plain `new` lands wherever this contract's nonce points, which in CI was
+        // fixture.paymaster itself, so deployCodeTo below overwrote the EntryPoint and the
+        // Paymaster called itself for depositTo.
+        entryPoint = address(new EntryPoint{salt: keccak256("PaymasterTest.entryPoint")}());
+        require(entryPoint != fixture.paymaster, "EntryPoint collides with the paymaster fixture");
         gateway = new Gateway(
             IEntryPoint(entryPoint),
             IWToken(makeAddr("nativeWToken")),

@@ -9,82 +9,32 @@ const {
 	receiver: { account: receiverAccount },
 } = fixture;
 
+const transferReq = (values: bigint, feeAssetId: number) => ({
+	type: TransactionType.TRANSFER,
+	assetIds: [weth],
+	values: [values],
+	to: receiverAccount.shieldedAddress.pack(),
+	viaBundler: feeAssetId !== 0,
+	paymaster: (feeAssetId !== 0 ? PAYMASTER_ADDR_FIXTURE : zeroAddress) as `0x${string}`,
+	feeAssetId,
+	revokerId: 0,
+});
+
+// Spend the deposit_pre_tx notes (PoolTest setUp deposits that fixture first).
+// Used by PoolTransfer, PoolGuardrails, TvlGuard and PoolAdaptor.
 export const reqs = {
-	transfer_1000_weth_with_usdc_fee: {
-		type: TransactionType.TRANSFER,
-		assetIds: [weth],
-		values: [parseEther("1000")],
-		to: receiverAccount.shieldedAddress.pack(),
-		viaBundler: true,
-		paymaster: PAYMASTER_ADDR_FIXTURE as `0x${string}`,
-		feeAssetId: usdc,
-		revokerId: 0,
-	}
-	/**
-	transfer_20_weth_with_weth_fee: {
-		type: TransactionType.TRANSFER,
-		assetIds: [weth],
-		values: [parseEther("20")],
-		to: receiverAccount.shieldedAddress.pack(),
-		viaBundler: true,
-		paymaster: PAYMASTER_ADDR_FIXTURE as `0x${string}`,
-		feeAssetId: weth,
-		revokerId: 0,
-	},	
-	
-	transfer_20_weth_without_fee: {
-		type: TransactionType.TRANSFER,
-		assetIds: [weth],
-		values: [parseEther("20")],
-		feeAssetId: 0,
-		to: receiverAccount.shieldedAddress.pack(),
-		viaBundler: false,
-		paymaster: zeroAddress,
-		revokerId: 0,
-	}
-	transfer_500_weth_without_fee: {
-		type: TransactionType.TRANSFER,
-		assetIds: [weth],
-		values: [parseEther("500")],
-		feeAssetId: 0,
-		to: receiverAccount.shieldedAddress.pack(),
-		viaBundler: false,
-		paymaster: zeroAddress,
-		revokerId: 0,
-	},
-	transfer_500_weth_with_weth_fee: {
-		type: TransactionType.TRANSFER,
-		assetIds: [weth],
-		values: [parseEther("500")],
-		to: receiverAccount.shieldedAddress.pack(),
-		viaBundler: true,
-		paymaster: PAYMASTER_ADDR_FIXTURE as `0x${string}`,
-		feeAssetId: weth,
-		revokerId: 0,
-	},
-	/**
-	transfer_500_weth_with_usdc_fee: {
-		type: TransactionType.TRANSFER,
-		assetIds: [weth],
-		values: [parseEther("500")], // transfer partial WETH note to gen 3rd change note (USDC change + WETH change + WETH receiver = 3 outputs = transact24/transact44 circuits test)
-		to: receiverAccount.shieldedAddress.pack(),
-		viaBundler: true,
-		paymaster: PAYMASTER_ADDR_FIXTURE as `0x${string}`,
-		feeAssetId: usdc,
-		revokerId: 0,
-	},
-	/**
-	transfer_500_weth_without_fee: {
-		type: TransactionType.TRANSFER,
-		assetIds: [weth],
-		values: [parseEther("500")],
-		feeAssetId: 0,
-		to: receiverAccount.shieldedAddress.pack(),
-		viaBundler: false,
-		paymaster: zeroAddress,
-		revokerId: 0,
-	}
-	*/
+	transfer_20_weth_without_fee: transferReq(parseEther("20"), 0),
+	transfer_500_weth_without_fee: transferReq(parseEther("500"), 0),
+	transfer_500_weth_with_weth_fee: transferReq(parseEther("500"), weth),
+	// partial WETH note with a USDC fee: USDC change + WETH change + WETH receiver = 3 outputs
+	transfer_500_weth_with_usdc_fee: transferReq(parseEther("500"), usdc),
+	transfer_1000_weth_with_usdc_fee: transferReq(parseEther("1000"), usdc),
+};
+
+// Spends the deposit_weth_tx notes (ERC4337.t.sol deposits that fixture). Written together
+// with its packed UserOperation by genTransferPackedUserOp.
+export const reqsPackedUserOp = {
+	transfer_20_weth_with_weth_fee: transferReq(parseEther("20"), weth),
 };
 
 // 4-input 4-output transfer reusing the same 4x2 pre-deposits.
@@ -158,14 +108,14 @@ export const genTestTransfersWithOutsourceProofVerification = async (sdk: Core, 
 
 export const genTransferPackedUserOp = async (sdk: Core, nebraClient: any) => {
 	await mockNotes("deposit_weth_tx", sdk);
-	const [name, req] = Object.entries(reqs)[0];
+	const [name, req] = Object.entries(reqsPackedUserOp)[0];
 	console.log("req to userop:", req);
 	await generatePackedUserOps(name, req, sdk, false, nebraClient);
 }
 
 export const genTransferPackedUserOpPreVerified = async (sdk: Core, nebraClient: any) => {
 	await mockNotes("deposit_weth_tx", sdk);
-	const [name, req] = Object.entries(reqs)[0];
+	const [name, req] = Object.entries(reqsPackedUserOp)[0];
 	console.log("req to userop:", req);
 	await generatePackedUserOps(name, req, sdk, true, nebraClient);
 }
