@@ -169,6 +169,12 @@ contract QueueHarness {
     using QueuedMerkleTreeLogic for QueuedMerkleTree;
     QueuedMerkleTree internal tree;
 
+    /// queueLeaves enforces the tree's capacity, so give it the fields init() would set.
+    constructor() {
+        tree.capacity = uint32(1 << 25);
+        tree.queueSize = 10;
+    }
+
     function queue(uint256[] calldata leaves) external {
         tree.queueLeaves(leaves);
     }

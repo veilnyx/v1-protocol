@@ -1,15 +1,21 @@
 /**
- * Pool upgrade tooling, first written for the 2026-09 audit fixes — see
- * audit/pool-security-upgrade-2026-09.md.
+ * Pool upgrade tooling, first written for the 2026-09 audit fixes (see
+ * audit/pool-security-upgrade-2026-09.md) and used again for the 2026-11 pool hardening
+ * (test/security/PoolHardening.t.sol).
  *
  * Steps (UPGRADE_STEP):
- *   plan      read-only: current implementation, linked libraries, owner/pauser, stuck paymaster fees
- *   deploy    any funded EOA: deploys QueuedMerkleTreeLogic, ShieldedTransactionLogic, the Pool
- *             implementation and (if OLD_PAYMASTERS is set) a replacement Paymaster, then writes
+ *   plan      read-only: current implementation, which linked libraries this build can reuse and
+ *             which it must redeploy, owner/pauser, stuck paymaster fees
+ *   deploy    any funded EOA: deploys every library whose code differs from the live one (and
+ *             every library that links one of those), the Pool implementation and (if
+ *             OLD_PAYMASTERS is set) a replacement Paymaster, then writes
  *             deployments/<DEPLOYMENT_NAME>-<YYYY-MM-DD>.json with the owner transactions
  *   verify    read-only: checks deployed bytecode against this build, the proxy's implementation
  *             and version, preserved state, and probes the new checks with eth_call
  *   rehearse  local fork only: deploy + execute the owner transactions by impersonation + verify
+ *   enable-v2 prints the owner transaction that switches the pool to the v2 transaction hash
+ *             (`enableTxHashV2`, one-way). Only once every client signs v2; on a local fork it is
+ *             executed by impersonation and checked
  *
  * Env:
  *   POOL_PROXY      pool proxy address (required)
@@ -27,6 +33,8 @@
  *   PROBE_DEPOSIT_ASSET_ID / PROBE_DEPOSIT_AMOUNT
  *                   deposit used by the fee probe; must be within the pool's deposit USD bounds
  *                   (default 65538 / 20000000 = 20 USDC on Ethereum)
+ *   PROBE_ADAPTOR   an adaptor the pool supports, for the zero-refund-address probe (optional;
+ *                   the probe is skipped without it)
  *
  * Usage:
  *   UPGRADE_STEP=plan     POOL_PROXY=0x.. npx hardhat run script/upgradePoolSecurity.ts --network mainnet
@@ -37,6 +45,7 @@ import hre from "hardhat";
 import fs from "fs";
 import { assertRecordWritable, findRecord, writeRecord } from "./utils/deploymentRecord";
 import { getChainForCurrentNetwork } from "./utils/chainUtils";
+import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 import {
     Abi, Hex, encodeFunctionData, getAddress, isAddressEqual, keccak256, toHex,
     BaseError, ContractFunctionRevertedError, decodeErrorResult, pad, Chain,
@@ -48,7 +57,7 @@ const FIELD_SIZE = 2188824287183927522224640574525727508854836440041603434369820
 const IMPL_SLOT = "0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc";
 // OZ PausableUpgradeable ERC-7201 namespace ("openzeppelin.storage.Pausable")
 const PAUSABLE_SLOT = "0xcd5ed15c6e187e77e9aee88184c21f4f2182ab5827cb3b7e07fbedcd63f03300";
-const LIB_NAMES = ["AssetLogic", "MerkleTreeLogic", "QueuedMerkleTreeLogic", "ShieldedAddressLogic", "ShieldedTransactionLogic"] as const;
+const LIB_NAMES = ["AssetLogic", "BabyJubJubLogic", "MerkleTreeLogic", "QueuedMerkleTreeLogic", "ShieldedAddressLogic", "ShieldedTransactionLogic"] as const;
 type LibName = typeof LIB_NAMES[number];
 type Libs = Record<LibName, Addr>;
 
@@ -62,12 +71,25 @@ const DEPLOYMENT_PURPOSE = process.env.DEPLOYMENT_PURPOSE ?? "";
 
 const art = (name: string) => hre.artifacts.readArtifactSync(name);
 const poolAbi = art("Pool").abi as Abi;
+
+/** Libraries `name` links against, from this build's link references. */
+const libDeps = (name: string): LibName[] =>
+    Object.values(art(name).linkReferences as Record<string, Record<string, unknown>>)
+        .flatMap(file => Object.keys(file)) as LibName[];
+/** LIB_NAMES with every library after the libraries it links. */
+const LIB_ORDER: LibName[] = (() => {
+    const out: LibName[] = [];
+    const visit = (l: LibName) => { if (!out.includes(l)) { libDeps(l).forEach(visit); out.push(l); } };
+    LIB_NAMES.forEach(visit);
+    return out;
+})();
 const paymasterAbi = art("Paymaster").abi as Abi;
 // Library errors are not all in the Pool ABI; merge them so reverts decode.
 const errorAbi = [
     ...poolAbi,
     ...(art("QueuedMerkleTreeLogic").abi as Abi),
     ...(art("ShieldedTransactionLogic").abi as Abi),
+    ...(art("ShieldedAddressLogic").abi as Abi),
     ...(art("IScreener").abi as Abi),
 ].filter((x: any) => x.type === "error") as Abi;
 
@@ -236,12 +258,15 @@ const decodeRevert = (e: any): string => {
     return `unknown:${String(e?.shortMessage ?? e?.message ?? e).slice(0, 120)}`;
 };
 
-const callExpect = async (label: string, functionName: string, args: any[], expected: string, stateOverride?: any) => {
+const callExpect = async (
+    label: string, functionName: string, args: any[], expected: string, stateOverride?: any,
+    account: Addr = "0x000000000000000000000000000000000000dEaD",
+) => {
     let got: string;
     try {
         await client.simulateContract({
             address: POOL_PROXY, abi: [...poolAbi, ...errorAbi], functionName, args,
-            account: "0x000000000000000000000000000000000000dEaD", stateOverride,
+            account, stateOverride,
         });
         got = "success";
     } catch (e) {
@@ -303,7 +328,40 @@ const runProbes = async () => {
         await callExpect("withdrawPaymasterFeeFor exists and is owner-only", "withdrawPaymasterFeeFor",
             [pm, 65537, "0x000000000000000000000000000000000000dEaD"], "OwnableUnauthorizedAccount(0x000000000000000000000000000000000000dEaD)", stateOverride),
     ];
+    if (poolAbi.some((x: any) => x.name === "enableTxHashV2")) results.push(...await runHardeningProbes(base, stateOverride));
     return results.every(Boolean);
+};
+
+// BabyJubJub points: Base8 (prime-order subgroup) and a generator of the full group (order 8l).
+const B8 = [5299619240641551281634865583518297030282874472190772894086521144482721001553n,
+    16950150798460657717958625567821834550301663161624707787222815936182638968203n] as const;
+const G8 = [995203441582195749578291179787384436505546430278305826713579947235728471134n,
+    5472060717959818805561601436314318772137091100104008585924551046643952123905n] as const;
+
+/** The 2026-11 hardening (test/security/PoolHardening.t.sol). */
+const runHardeningProbes = async (base: any, stateOverride: any) => {
+    const owner = await read(POOL_PROXY, "owner") as Addr;
+    // Unregistered root address, then two keys: (1, 2) is not on the curve.
+    const offCurve = ("0x" + [123456789n, 1n, 2n, B8[0], B8[1]].map(x => x.toString(16).padStart(64, "0")).join("")) as Hex;
+    // registerAddress recovers the EIP-712 signer (for screening) before the key checks, so the
+    // probe needs a well-formed signature; any key over any hash does.
+    const anySig = await privateKeyToAccount(generatePrivateKey()).sign({ hash: keccak256("0x01") });
+    const results = [
+        await callExpect("enableTxHashV2 exists and is owner-only", "enableTxHashV2", [],
+            "OwnableUnauthorizedAccount(0x000000000000000000000000000000000000dEaD)", stateOverride),
+        await callExpect("revoker key outside the prime-order subgroup is rejected (owner call)", "registerRevoker",
+            [[G8[0], G8[1]], [B8[0], B8[1]], "0x"], `InvalidCurvePoint(${G8[0]},${G8[1]})`, stateOverride, owner),
+        await callExpect("registration with an off-curve key is rejected", "registerAddress",
+            [{ proof: "0x", shieldedAddress: offCurve, signature: anySig }], "InvalidCurvePoint(1,2)", stateOverride),
+    ];
+    const adaptor = process.env.PROBE_ADAPTOR as Addr | undefined;
+    if (adaptor) {
+        results.push(await callExpect("CALL_ADAPTOR with refundAddress 0 is rejected", "transact",
+            [{ ...base, txType: 3, targetData: adaptor.toLowerCase() as Hex }], "ZeroRefundAddress()", stateOverride));
+    } else {
+        console.log("  SKIP  CALL_ADAPTOR refund-address probe (set PROBE_ADAPTOR to a supported adaptor)");
+    }
+    return results;
 };
 
 // ---------------------------------------------------------------------------
@@ -316,41 +374,56 @@ const currentImpl = async (): Promise<Addr> =>
 const plan = async () => {
     const impl = await currentImpl();
     const { found, unmatched } = await identifyLinkedLibs(impl);
+    // A live library is reused only if its code is identical to this build AND every library it
+    // links is reused too: one that links a library being replaced must be redeployed against
+    // the new one, even though its own source did not change.
+    const libs: Partial<Libs> = {};
+    const toDeploy: LibName[] = [];
+    for (const l of LIB_ORDER) {
+        if (found[l] && libDeps(l).every(d => libs[d])) libs[l] = found[l];
+        else toDeploy.push(l);
+    }
     console.log("Pool proxy          :", POOL_PROXY);
     console.log("Current impl        :", impl);
-    console.log("Reused libraries (executable code identical to this build):", found);
-    console.log("Replaced libraries (old QueuedMerkleTreeLogic / ShieldedTransactionLogic):", unmatched);
-    for (const l of ["AssetLogic", "MerkleTreeLogic", "ShieldedAddressLogic"] as const) {
-        if (!found[l]) throw new Error(`could not identify the live ${l}; its source may differ from this build`);
-    }
-    const libs = found as Libs;
+    console.log("Reused libraries (executable code identical to this build):", libs);
+    console.log("Libraries to deploy (changed, new, or linking a changed one):", toDeploy);
+    console.log("Live libraries left behind:", unmatched);
     const snap = await snapshot(OLD_PAYMASTERS);
     console.log("State               :", JSON.stringify(snap, null, 2));
     for (const pm of OLD_PAYMASTERS) {
         console.log(`Old paymaster ${pm}: owner ${await read(pm, "owner", [], paymasterAbi)}, ` +
             `EntryPoint deposit ${await read(pm, "getEntryPointDeposit", [], paymasterAbi)} wei`);
     }
-    return { impl, libs, snap, unmatched };
+    return { impl, libs, toDeploy, snap, unmatched };
 };
 
 const deploy = async () => {
     // Before anything is deployed: a missing purpose or an existing record must not cost gas.
     assertRecordWritable(recordTarget());
-    const { impl, libs, snap, unmatched } = await plan();
+    const { impl, libs, toDeploy, snap, unmatched } = await plan();
     const [wallet] = await hre.viem.getWalletClients({ chain });
     console.log("\nDeployer:", wallet.account.address);
+    // HyperEVM small blocks cap a transaction at ~2M gas; the Pool implementation needs ~5M, so a
+    // live run without big blocks would stop after the libraries. Big blocks are switched on per
+    // account from HyperCore (evmUserModify { usingBigBlocks: true }, signed by the deployer,
+    // which must be a HyperCore user). Anvil forks have no such concept.
+    if (chainId === 999 && !isLocal()) {
+        const big = await client.request({ method: "eth_usingBigBlocks", params: [wallet.account.address] });
+        if (big !== true) {
+            throw new Error(`deployer ${wallet.account.address} does not have HyperEVM big blocks enabled; nothing was deployed`);
+        }
+    }
     const clients = { public: client, wallet };
 
-    // Reused as-is (unchanged source): AssetLogic, MerkleTreeLogic, ShieldedAddressLogic.
-    const qmt = await hre.viem.deployContract("QueuedMerkleTreeLogic", [], { client: clients });
-    console.log("QueuedMerkleTreeLogic   :", qmt.address);
-    const stl = await hre.viem.deployContract("ShieldedTransactionLogic", [], {
-        client: clients,
-        libraries: { AssetLogic: libs.AssetLogic, MerkleTreeLogic: libs.MerkleTreeLogic, QueuedMerkleTreeLogic: qmt.address },
-    });
-    console.log("ShieldedTransactionLogic:", stl.address);
-    const newLibs: Libs = { ...libs, QueuedMerkleTreeLogic: qmt.address, ShieldedTransactionLogic: stl.address };
-    const poolImpl = await hre.viem.deployContract("Pool", [], { client: clients, libraries: newLibs });
+    // In link order, so each library's own links already have addresses.
+    const newLibs: Partial<Libs> = { ...libs };
+    for (const l of toDeploy) {
+        const links = Object.fromEntries(libDeps(l).map(d => [d, newLibs[d]!]));
+        const c = await hre.viem.deployContract(l, [], { client: clients, libraries: links });
+        newLibs[l] = c.address;
+        console.log(`${l.padEnd(24)}:`, c.address);
+    }
+    const poolImpl = await hre.viem.deployContract("Pool", [], { client: clients, libraries: newLibs as Libs });
     console.log("Pool implementation     :", poolImpl.address);
 
     const owner = snap.owner as Addr;
@@ -419,7 +492,7 @@ const deploy = async () => {
 
     const record = {
         chainId, poolProxy: POOL_PROXY, previousImplementation: impl, previousLibraries: { reused: libs, replaced: unmatched },
-        newImplementation: poolImpl.address, newLibraries: newLibs,
+        newImplementation: poolImpl.address, newLibraries: newLibs, deployedLibraries: toDeploy,
         oldPaymasters: OLD_PAYMASTERS, newPaymaster: newPaymaster ?? null, newPaymasterOwner: newPaymasterOwner ?? null,
         expectedVersion: nextVersion.toString(), pause: PAUSE, preUpgradeState: snap, ownerTransactions: ownerTxs,
         deployedAt: new Date().toISOString(),
@@ -439,8 +512,9 @@ const verify = async () => {
     };
     console.log("Bytecode (on-chain vs this build):");
     const nl = rec.newLibraries as Libs;
-    check("QueuedMerkleTreeLogic", await matchesBuild(nl.QueuedMerkleTreeLogic, "QueuedMerkleTreeLogic", {}, "library"));
-    check("ShieldedTransactionLogic", await matchesBuild(nl.ShieldedTransactionLogic, "ShieldedTransactionLogic", nl, "library"));
+    // Records from before deployedLibraries existed deployed exactly these two.
+    const deployed: LibName[] = rec.deployedLibraries ?? ["QueuedMerkleTreeLogic", "ShieldedTransactionLogic"];
+    for (const l of deployed) check(l, await matchesBuild(nl[l], l, nl, "library"));
     check("Pool implementation", await matchesBuild(rec.newImplementation, "Pool", nl, "contract"));
     if (rec.newPaymaster) {
         const [ep, gw, pl] = await Promise.all(["entryPoint", "sender", "pool"].map(f => read(rec.newPaymaster, f, [], paymasterAbi)));
@@ -466,6 +540,11 @@ const verify = async () => {
     check("implementation slot", isAddressEqual(impl, rec.newImplementation), impl);
     const cur = await snapshot(rec.oldPaymasters);
     check("version", cur.version === rec.expectedVersion, cur.version);
+    if (poolAbi.some((x: any) => x.name === "txHashVersion")) {
+        const v = Number(await read(POOL_PROXY, "txHashVersion"));
+        // 0 until the owner runs UPGRADE_STEP=enable-v2; 2 after.
+        check("txHashVersion is legacy (0) or v2 (2)", v === 0 || v === 2, String(v));
+    }
 
     console.log("Preserved state:");
     const pre = rec.preUpgradeState;
@@ -509,7 +588,7 @@ const rehearse = async () => {
     if (!isLocal()) {
         throw new Error("rehearse impersonates the owner and only runs against a local fork");
     }
-    console.log("== Probes BEFORE the upgrade (expect FAILs: the old code does not have the checks) ==");
+    console.log("== Probes BEFORE the upgrade (the new checks FAIL here: the old code does not have them) ==");
     await runProbes();
 
     console.log("\n== Deploy ==");
@@ -543,6 +622,25 @@ const rehearse = async () => {
     return ok;
 };
 
+const enableV2 = async () => {
+    const owner = await read(POOL_PROXY, "owner") as Addr;
+    const before = Number(await read(POOL_PROXY, "txHashVersion"));
+    console.log(`txHashVersion now: ${before}  (0 = legacy, 2 = v2)`);
+    const data = encodeFunctionData({ abi: poolAbi, functionName: "enableTxHashV2", args: [] });
+    console.log("\nOne-way. Send ONLY once every client (SDK, app) signs with the v2 hash: legacy-signed\n" +
+        "transactions stop verifying the moment this lands.");
+    console.log(`\nfrom ${owner}\n    cast send ${POOL_PROXY} ${data} --ledger --rpc-url $RPC`);
+    if (!isLocal()) return;
+    await client.request({ method: "anvil_impersonateAccount", params: [owner] });
+    await client.request({ method: "anvil_setBalance", params: [owner, toHex(100_000_000_000_000_000_000n)] });
+    const w = await hre.viem.getWalletClient(owner, { chain });
+    const pub = await hre.viem.getPublicClient({ chain });
+    const r = await pub.waitForTransactionReceipt({ hash: await w.sendTransaction({ to: POOL_PROXY, data, account: owner, chain: w.chain }) });
+    const after = Number(await read(POOL_PROXY, "txHashVersion"));
+    console.log(`\n(local fork) enableTxHashV2 ${r.status}, txHashVersion now ${after}`);
+    if (r.status !== "success" || after !== 2) process.exitCode = 1;
+};
+
 const main = async () => {
     if (!POOL_PROXY) throw new Error("POOL_PROXY is required");
     chain = await getChainForCurrentNetwork(hre);
@@ -553,6 +651,7 @@ const main = async () => {
     else if (step === "deploy") await deploy();
     else if (step === "verify") await verify();
     else if (step === "rehearse") await rehearse();
+    else if (step === "enable-v2") await enableV2();
     else throw new Error(`unknown UPGRADE_STEP ${step}`);
 };
 

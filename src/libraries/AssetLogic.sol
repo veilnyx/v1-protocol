@@ -39,6 +39,8 @@ library AssetLogic {
 
     error ZeroAddress();
     error UnsupportedAssetType(uint24 assetId);
+    /// @notice The pool received a different amount than it pulled (fee-on-transfer or similar).
+    error ReceivedAmountMismatch(uint24 assetId, uint256 expected, uint256 received);
 
     function getAssetOrRevert(
         mapping(uint24 => Asset) storage assets,
@@ -190,7 +192,15 @@ library AssetLogic {
         address to,
         uint256 value
     ) internal {
-        IERC20(asset.assetAddress).safeTransferFrom(from, to, value);
+        // A note is minted for `value`, so the pool must hold exactly `value` more afterwards.
+        // Fee-on-transfer or otherwise non-standard tokens would leave the pool insolvent.
+        IERC20 token = IERC20(asset.assetAddress);
+        uint256 balanceBefore = token.balanceOf(to);
+        token.safeTransferFrom(from, to, value);
+        uint256 received = token.balanceOf(to) - balanceBefore;
+        if (received != value) {
+            revert ReceivedAmountMismatch(asset.id, value, received);
+        }
     }
 
     function _transferERC20(

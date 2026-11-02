@@ -103,6 +103,7 @@ interface IPool {
     event PriceFeedStalenessThresholdUpdated(uint256 threshold);
     event NativeWTokenUpdated(IWToken indexed nativeWToken);
     event PauserUpdated(address indexed oldPauser, address indexed newPauser);
+    event TxHashVersionUpdated(uint8 version);
     event PriceStalenessThresholdUpdated(uint256 threshold);
 
     /////////////////////////////////////////
@@ -182,6 +183,10 @@ interface IPool {
     /// @dev The circuit has no fee signal: the fee is only covered when it is carved out of
     ///      a public asset of the same id, and a deposit may not carry a fee at all.
     error UnbackedFee(uint24 feeAssetId, uint256 feeValue);
+
+    /// @notice A CALL_ADAPTOR transaction named no refund address. The adaptor's outputs are
+    ///         committed to `refundAddress`, so 0 would mint notes nobody can ever spend.
+    error ZeroRefundAddress();
 
     /////////////////////////////////////////
     //         ADMIN WRITE METHODS         //
@@ -286,6 +291,10 @@ interface IPool {
     /// @param nativeWToken The wrapped native token contract. Pass address(0) to
     ///        disable native ETH deposits via this Pool.
     function setNativeWToken(IWToken nativeWToken) external;
+
+    /// @notice One-way switch to the v2 transaction hash (chain id, pool address and every
+    ///         transaction field signed). See `ShieldedTransactionLogic.hashV2`.
+    function enableTxHashV2() external;
 
     /////////////////////////////////////////
     //        PUBLIC WRITE METHODS         //
