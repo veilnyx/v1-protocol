@@ -1,0 +1,88 @@
+{
+  "purpose": "HyperEVM 999 pool hardening upgrade (prime-order revoker keys, registration key checks, zero refund address, queue cap, exact deposit credit, opt-in v2 tx hash) plus the treeUpdate batch fix #40",
+  "chainId": 999,
+  "poolProxy": "0x25913fa4a703aff4b15b7bf00f9723dde0446917",
+  "previousImplementation": "0x8D7304FAC928E312F06535b93aBAA18afA44bE4C",
+  "previousLibraries": {
+    "reused": {
+      "MerkleTreeLogic": "0xc7f35aF6A145B4daac85257049716636AE996268"
+    },
+    "replaced": [
+      "0x6ee46C92f9828Fb2A83E8e8E6147bA4AeBAD3369",
+      "0xb0E0b5CA091c1Eb566cC11436F4bfC7556Dc6C8d",
+      "0xF6C1bFB915C729bE7aa5D8076d970F0388314c37",
+      "0x39a8d403E4C64e577374C88966e78f0DDB34B668"
+    ]
+  },
+  "newImplementation": "0x7b72b77f0d8a774b253415f21b180fade7278c00",
+  "newLibraries": {
+    "MerkleTreeLogic": "0xc7f35aF6A145B4daac85257049716636AE996268",
+    "AssetLogic": "0x372877cca63d5d0c23c1816fb675c464695a25ca",
+    "BabyJubJubLogic": "0xfc2855796845753a5efd6441c87cb3ec127bc715",
+    "QueuedMerkleTreeLogic": "0xa4f9a7b53228892ae35db2dae97c3afc2ec8d5c1",
+    "ShieldedAddressLogic": "0xdb12243562837d770ee8f0c5ee5ca0a448025169",
+    "ShieldedTransactionLogic": "0xce95305392e96e054f8497dd8f52daf58aeedc2a"
+  },
+  "deployedLibraries": [
+    "AssetLogic",
+    "BabyJubJubLogic",
+    "QueuedMerkleTreeLogic",
+    "ShieldedAddressLogic",
+    "ShieldedTransactionLogic"
+  ],
+  "oldPaymasters": [],
+  "newPaymaster": null,
+  "newPaymasterOwner": null,
+  "expectedVersion": "2",
+  "pause": false,
+  "preUpgradeState": {
+    "owner": "0xa285717BfD608468566bfBda742b56b1177494f7",
+    "pauser": "0x50887b9a36E734cF861FE236fA6b4bE68D205113",
+    "paused": false,
+    "version": "1",
+    "verifier": "0x17b46E30Bc7CDc63aAb9f7aB945a611bdd6c865c",
+    "commitmentTree": {
+      "root": "9056869874285436053531211767962577211673948439902548658565290389075025765550",
+      "rootIndex": 10,
+      "nextLeafIndex": 111,
+      "subtreesHash": "0xd8f4e77e50750b865f7a182e08f070014b1e092c3ca6293591649c8c40c033ff"
+    },
+    "addressTree": {
+      "root": "13023216324271343534500754652229314499987396869631375232088873035449165745485",
+      "rootIndex": 13,
+      "nextLeafIndex": 13
+    },
+    "revoker0": "{\"id\":0,\"isActive\":true,\"revokerPublicKey\":[\"19670944452806042525069794818829249411975318219685565589987272359777840230253\",\"5705876210490413354479267746861793442476799294826521514340924438581325830039\"],\"encryptionPublicKey\":[\"8415733266590874906051569398859887253801673499116319370506942542327247131378\",\"4303763666990812745724909494561603880133773663501392405214554054831058921986\"]}",
+    "assets": {
+      "65537": {
+        "address": "0x5555555555555555555555555555555555555555",
+        "active": true,
+        "balance": "0",
+        "withdrawFees": "0",
+        "paymasterFees": {}
+      },
+      "65538": {
+        "address": "0xb88339CB7199b77E23DB6E890353E22632Ba630f",
+        "active": true,
+        "balance": "102012743",
+        "withdrawFees": "0",
+        "paymasterFees": {}
+      }
+    }
+  },
+  "ownerTransactions": [
+    {
+      "note": "Upgrade to the fixed implementation and set version 2 in the same call.",
+      "from": "0xa285717BfD608468566bfBda742b56b1177494f7",
+      "to": "0x25913fa4a703aff4b15b7bf00f9723dde0446917",
+      "value": "0",
+      "functionName": "upgradeToAndCall",
+      "args": [
+        "0x7b72b77f0d8a774b253415f21b180fade7278c00",
+        "0xcf864d150000000000000000000000000000000000000000000000000000000000000002"
+      ],
+      "data": "0x4f1ef2860000000000000000000000007b72b77f0d8a774b253415f21b180fade7278c0000000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000000024cf864d15000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000"
+    }
+  ],
+  "deployedAt": "2026-11-03T00:10:02.591Z"
+}

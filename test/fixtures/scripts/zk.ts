@@ -8,10 +8,13 @@ import {
   ZTransaction,
 } from "@veilnyx-sdk/zk-prover";
 
-const circuitPathBase = path.resolve(
-  __dirname,
-  "../../../../v1-circuits/artifacts"
-);
+// The Foundry suite deploys src/verifiers, which embed the PRODUCTION ceremony keys
+// (mainnet-circuits-8a65d25). Fixtures proved with any other zkey fail with InvalidProof /
+// InvalidTransactionProof, so point FIXTURE_CIRCUITS at a directory of <circuit>/{keys.zkey,
+// circuit.wasm,vKey.json} built from those keys. The default is the dev build in v1-circuits.
+const circuitPathBase = process.env.FIXTURE_CIRCUITS
+  ? path.resolve(process.env.FIXTURE_CIRCUITS)
+  : path.resolve(__dirname, "../../../../v1-circuits/artifacts");
 
 export const getCircuitPath = (name: string) => {
   return {

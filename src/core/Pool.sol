@@ -18,8 +18,9 @@ import {IHasher} from "../interfaces/IHasher.sol";
 import {IWToken} from "../interfaces/IWToken.sol";
 import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {EIP712_DOMAIN_NAME, EIP712_DOMAIN_VERSION, MAX_WITHDRAW_FEE_BPS, MERKLE_TREE_DEPTH, COMMITMENT_TREE_DEPTH, TVL_USD_DECIMALS, MIN_PRICE_STALENESS_THRESHOLD, FIELD_SIZE, BABYJUBJUB_A, BABYJUBJUB_D} from "../base/Constants.sol";
+import {EIP712_DOMAIN_NAME, EIP712_DOMAIN_VERSION, MAX_WITHDRAW_FEE_BPS, MERKLE_TREE_DEPTH, COMMITMENT_TREE_DEPTH, TVL_USD_DECIMALS, MIN_PRICE_STALENESS_THRESHOLD, TX_HASH_VERSION_V2} from "../base/Constants.sol";
 import {PoolStorage} from "../base/PoolStorage.sol";
+import {BabyJubJubLogic} from "../libraries/BabyJubJubLogic.sol";
 import {Asset, AssetType, AssetLogic, AssetInitParams} from "../libraries/AssetLogic.sol";
 import {MerkleTree, MerkleTreeLogic} from "../libraries/MerkleTreeLogic.sol";
 import {QueuedMerkleTree, QueuedMerkleTreeLogic, TreeUpdateData} from "../libraries/QueuedMerkleTreeLogic.sol";
@@ -166,9 +167,11 @@ contract Pool is
         // revokerPublicKey = (0, y) every nullifier collapses to
         // Poseidon(leafIndex, commitment, 0), which is computable from public
         // chain data alone, silently destroying nullifier privacy for every note
-        // registered under this revoker. Validate before it can ever be selected.
-        _assertValidCurvePoint(revokerPublicKey);
-        _assertValidCurvePoint(encryptionPublicKey);
+        // registered under this revoker. A mixed-order point (subgroup point plus a
+        // low-order point) passes the circuit's ValidatePoint and leaks the low bits
+        // of every scalar multiplied by it, so require the prime-order subgroup.
+        _assertPrimeOrderPoint(revokerPublicKey);
+        _assertPrimeOrderPoint(encryptionPublicKey);
 
         uint16 id = _revokerCount;
         uint256 revokerPublicKeyHash = uint256(
@@ -242,6 +245,19 @@ contract Pool is
         }
         withdrawFeeBps = feeBps;
         emit WithdrawFeeUpdated(feeBps);
+    }
+
+    /// @notice Switches transaction signing to the v2 hash (`ShieldedTransactionLogic.hashV2`), which
+    ///         binds every field of the transaction plus `block.chainid` and this pool's address.
+    /// @dev    One-way. Every client must sign with the v2 hash from this point on, so call it on a
+    ///         fresh deployment before the first transaction, or on an existing pool only together
+    ///         with a client release that reads `txHashVersion()`. Proofs signed over the legacy
+    ///         hash stop verifying.
+    function enableTxHashV2() external onlyOwner {
+        if (txHashVersion != TX_HASH_VERSION_V2) {
+            txHashVersion = TX_HASH_VERSION_V2;
+            emit IPool.TxHashVersionUpdated(TX_HASH_VERSION_V2);
+        }
     }
 
     /// @notice Sets the protocol version number.
@@ -380,7 +396,8 @@ contract Pool is
             verifier: verifier,
             markedNullifiers: _markedNullifiers,
             supportedAdaptors: _adaptors,
-            revokerDataMap: _revokers
+            revokerDataMap: _revokers,
+            txHashVersion: txHashVersion
         });
 
         // Resolve the nativeWToken and its asset ID once; used for both DEPOSIT
@@ -897,30 +914,10 @@ contract Pool is
         }
     }
 
-    /// @dev Rejects points that are not on BabyJubJub, and the low-order points
-    ///      x == 0 (the identity and the order-2 point), which are the ones that
-    ///      collapse a scalar multiplication to a constant.
-    function _assertValidCurvePoint(
-        uint256[2] calldata point
-    ) private pure {
-        uint256 x = point[0];
-        uint256 y = point[1];
-
-        if (x == 0 || x >= FIELD_SIZE || y >= FIELD_SIZE) {
-            revert InvalidCurvePoint(x, y);
-        }
-
-        uint256 x2 = mulmod(x, x, FIELD_SIZE);
-        uint256 y2 = mulmod(y, y, FIELD_SIZE);
-        uint256 lhs = addmod(mulmod(BABYJUBJUB_A, x2, FIELD_SIZE), y2, FIELD_SIZE);
-        uint256 rhs = addmod(
-            1,
-            mulmod(BABYJUBJUB_D, mulmod(x2, y2, FIELD_SIZE), FIELD_SIZE),
-            FIELD_SIZE
-        );
-
-        if (lhs != rhs) {
-            revert InvalidCurvePoint(x, y);
+    /// @dev Rejects points that are not on BabyJubJub or not in its prime-order subgroup.
+    function _assertPrimeOrderPoint(uint256[2] calldata point) private pure {
+        if (!BabyJubJubLogic.isInPrimeSubgroup(point[0], point[1])) {
+            revert InvalidCurvePoint(point[0], point[1]);
         }
     }
 }
