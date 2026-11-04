@@ -1,0 +1,123 @@
+{
+  "purpose": "Ethereum mainnet pool hardening upgrade (prime-order revoker keys, registration key checks, zero refund address, queue cap, exact deposit credit, opt-in v2 tx hash)",
+  "chainId": 1,
+  "poolProxy": "0x4cEcb7F987d220fe2E8608149fa76ed6d021Ad11",
+  "previousImplementation": "0x934D10E93666481E25E2e6F77a7c3109a8502225",
+  "previousLibraries": {
+    "reused": {
+      "MerkleTreeLogic": "0xc5e8eD64A83B762E69C5C02C941D0F78046B9332"
+    },
+    "replaced": [
+      "0x2B556A0337f384B1Ff2509484a1bbA7686897fC9",
+      "0xdC2B542A221147c1223581aBa9d6B1e5E54b3Ab6",
+      "0x2fE20c2863dD838fBE4BE61941a60209A7599572",
+      "0x339aADA58B2e1e88Ad5c8CC8EDb998A33C686e56"
+    ]
+  },
+  "newImplementation": "0x5eb65c20ed22ed7f754b603e798f00dc06425f65",
+  "newLibraries": {
+    "MerkleTreeLogic": "0xc5e8eD64A83B762E69C5C02C941D0F78046B9332",
+    "AssetLogic": "0x8a32f154f9465cd6b3030888b4ab5ca9553b2939",
+    "BabyJubJubLogic": "0x6ca1795752bc216a54cd530b9c9bbbae16c18172",
+    "QueuedMerkleTreeLogic": "0xd276577d88b564ee53bf2722d02f979fec17924a",
+    "ShieldedAddressLogic": "0x82a9528ef49b95d4364741b96ced566b11715a1a",
+    "ShieldedTransactionLogic": "0x038d99c2fa9c59f521c9bac242edd32de51a1277"
+  },
+  "deployedLibraries": [
+    "AssetLogic",
+    "BabyJubJubLogic",
+    "QueuedMerkleTreeLogic",
+    "ShieldedAddressLogic",
+    "ShieldedTransactionLogic"
+  ],
+  "oldPaymasters": [],
+  "newPaymaster": null,
+  "newPaymasterOwner": null,
+  "expectedVersion": "4",
+  "pause": false,
+  "preUpgradeState": {
+    "owner": "0xa285717BfD608468566bfBda742b56b1177494f7",
+    "pauser": "0x50887b9a36E734cF861FE236fA6b4bE68D205113",
+    "paused": false,
+    "version": "3",
+    "verifier": "0xcf9F64c6b60beB11695fd33A5F69a7F5239eE464",
+    "commitmentTree": {
+      "root": "6341378374649660831373779527683653036914695721518352036266795477597260879437",
+      "rootIndex": 2,
+      "nextLeafIndex": 196,
+      "subtreesHash": "0x23a1586294d5a3d86a2853854323cf3271e39ce6dff54147ed7bf0eaea900c11"
+    },
+    "addressTree": {
+      "root": "16434689375059989008017730782130345180532933500634294980855944519222297954174",
+      "rootIndex": 16,
+      "nextLeafIndex": 16
+    },
+    "revoker0": "{\"id\":0,\"isActive\":true,\"revokerPublicKey\":[\"19670944452806042525069794818829249411975318219685565589987272359777840230253\",\"5705876210490413354479267746861793442476799294826521514340924438581325830039\"],\"encryptionPublicKey\":[\"8415733266590874906051569398859887253801673499116319370506942542327247131378\",\"4303763666990812745724909494561603880133773663501392405214554054831058921986\"]}",
+    "assets": {
+      "65537": {
+        "address": "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2",
+        "active": true,
+        "balance": "46927241523614399",
+        "withdrawFees": "0",
+        "paymasterFees": {}
+      },
+      "65538": {
+        "address": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+        "active": true,
+        "balance": "61708500",
+        "withdrawFees": "0",
+        "paymasterFees": {}
+      },
+      "65539": {
+        "address": "0x252231882FB38481497f3C767469106297c8d93b",
+        "active": true,
+        "balance": "933559042786595",
+        "withdrawFees": "0",
+        "paymasterFees": {}
+      },
+      "65540": {
+        "address": "0x73edDFa87C71ADdC275c2b9890f5c3a8480bC9E6",
+        "active": true,
+        "balance": "0",
+        "withdrawFees": "0",
+        "paymasterFees": {}
+      },
+      "65541": {
+        "address": "0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0",
+        "active": true,
+        "balance": "803634469164248",
+        "withdrawFees": "0",
+        "paymasterFees": {}
+      },
+      "65542": {
+        "address": "0x2371e134e3455e0593363cBF89d3b6cf53740618",
+        "active": true,
+        "balance": "9815020682959320",
+        "withdrawFees": "0",
+        "paymasterFees": {}
+      },
+      "65543": {
+        "address": "0xbeef088055857739C12CD3765F20b7679Def0f51",
+        "active": true,
+        "balance": "2896736111529136598",
+        "withdrawFees": "0",
+        "paymasterFees": {}
+      }
+    }
+  },
+  "ownerTransactions": [
+    {
+      "note": "Upgrade to the fixed implementation and set version 4 in the same call.",
+      "from": "0xa285717BfD608468566bfBda742b56b1177494f7",
+      "to": "0x4cEcb7F987d220fe2E8608149fa76ed6d021Ad11",
+      "value": "0",
+      "functionName": "upgradeToAndCall",
+      "args": [
+        "0x5eb65c20ed22ed7f754b603e798f00dc06425f65",
+        "0xcf864d150000000000000000000000000000000000000000000000000000000000000004"
+      ],
+      "data": "0x4f1ef2860000000000000000000000005eb65c20ed22ed7f754b603e798f00dc06425f6500000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000000024cf864d15000000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000"
+    }
+  ],
+  "deployedAt": "2026-11-04T08:18:39.291Z"
+}
