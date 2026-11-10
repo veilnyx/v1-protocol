@@ -29,6 +29,13 @@ import {
 import { assertOwnershipTransferred, transferOwnershipToOwner } from "./utils/ownership";
 import { deployErc4337Infra } from "./erc4337Infra";
 import { RecordTarget, assertRecordWritable, writeRecord } from "./utils/deploymentRecord";
+import {
+  VerifyResult,
+  VerifyTarget,
+  linkProxyOnEtherscan,
+  printVerifySummary,
+  verifyOnEtherscan,
+} from "./utils/etherscanVerify";
 
 const config = loadConfigs();
 
@@ -172,176 +179,76 @@ const deployRocketPool = async (rocketPoolParams: any, pool: any, deployConfig: 
   await addAssets(assets, assetsPrecision, assetsUsdPriceFeeds, 1, pool, deployConfig.client.wallet, deployConfig.client.public);
 }
 
-// Resolves the Etherscan API endpoint for the network the script is running against,
-// reusing the `etherscan.customChains` entry from hardhat.config.ts so the URL lives in
-// one place. Falls back to the Etherscan V2 unified endpoint for the current chain id.
-const getEtherscanApiUrl = (): string => {
-  const networkName = hre.network.name;
-  const chainId = hre.network.config.chainId;
-  const customChains = (hre.config as any).etherscan?.customChains ?? [];
-
-  const match = customChains.find(
-    (c: any) => c.network === networkName || c.chainId === chainId
-  );
-
-  if (match?.urls?.apiURL) return match.urls.apiURL;
-
-  console.warn(
-    `getEtherscanApiUrl: no customChains entry for ${networkName} (chainId: ${chainId}), falling back to the Etherscan V2 endpoint`
-  );
-  return `https://api.etherscan.io/v2/api?chainid=${chainId}`;
+// Deployment-record key -> artifact, for Etherscan verification. Every key the record can carry
+// needs an entry: an unmapped key is reported as a failure rather than silently left unverified.
+// The Poseidon libraries are circomlibjs bytecode with no Solidity source, so no explorer can
+// verify them.
+const RECORD_KEY_CONTRACTS: Record<string, string | null> = {
+  poolProxy: "PoolProxy",
+  poolImpl: "Pool",
+  verifier: "Verifier",
+  hasher: "Hasher",
+  adaptorHandler: "AdaptorHandler",
+  gateway: "Gateway",
+  paymaster: "Paymaster",
+  assetLogic: "AssetLogic",
+  babyJubJubLogic: "BabyJubJubLogic",
+  merkleTreeLogic: "MerkleTreeLogic",
+  queuedMerkleTreeLogic: "QueuedMerkleTreeLogic",
+  shieldedAddressLogic: "ShieldedAddressLogic",
+  shieldedTransactionLogic: "ShieldedTransactionLogic",
+  verifierRegister: "VerifierRegister",
+  verifierTreeUpdate: "VerifierTreeUpdate",
+  verifierTransact21: "VerifierTransact21",
+  verifierTransact22: "VerifierTransact22",
+  verifierTransact23: "VerifierTransact23",
+  verifierTransact42: "VerifierTransact42",
+  verifierTransact44: "VerifierTransact44",
+  verifierTransact82: "VerifierTransact82",
+  verifierTransact84: "VerifierTransact84",
+  // Adaptors (keys from deployAdaptors)
+  uniswap: "UniswapV3Adapter",
+  aave: "AaveV3Adaptor",
+  lido: "LidoAdaptor",
+  curve: "CurveNGAdaptor",
+  ethena: "EthenaAdaptor",
+  beefy: "BeefyV7Adaptor",
+  morpho: "MorphoVaultAdaptor",
+  oneInch: "OneInchAdaptor",
+  rocketPool: "RocketPoolAdaptor",
+  poseidonT3: null,
+  poseidonT4: null,
+  poseidonT5: null,
 };
 
-const verifyProxy = async (proxyAddress: string, implAddress: string) => {
-  const apiKey = process.env.ETHERSCAN_API_KEY;
-  if (!apiKey) {
-    logError("verifyProxy: ETHERSCAN_API_KEY not set, skipping proxy link");
-    return;
+// Verifies every contract in the deployment record on Etherscan, then links PoolProxy to the Pool
+// implementation. Constructor arguments come from the creation transactions (see
+// script/utils/etherscanVerify.ts), so nothing here has to mirror the deploy calls.
+const verifyAll = async (addresses: Record<string, Hex>) => {
+  // Library addresses by contract name; each target only uses the libraries its artifact links.
+  const byName: Record<string, Hex> = {};
+  for (const [key, address] of Object.entries(addresses)) {
+    const contract = RECORD_KEY_CONTRACTS[key];
+    if (contract && address) byName[contract] = address;
   }
 
-  const baseUrl = getEtherscanApiUrl();
-  console.log("verifyProxy: using Etherscan API:", baseUrl);
-
-  // Step 1: submit proxy verification
-  const submitBody = new URLSearchParams({
-    module: "contract",
-    action: "verifyproxycontract",
-    apikey: apiKey,
-    address: proxyAddress,
-    expectedimplementation: implAddress,
-  });
-  const submitRes = await fetch(baseUrl, {
-    method: "POST",
-    body: submitBody,
-  });
-  const submitJson = await submitRes.json() as any;
-
-  if (submitJson.status !== "1") {
-    logError("verifyProxy: proxy verification submission failed:", submitJson.result);
-    return;
-  }
-
-  const guid = submitJson.result;
-  console.log("verifyProxy: submitted, guid:", guid);
-
-  // Step 2: poll for result
-  for (let i = 0; i < 12; i++) {
-    await new Promise((r) => setTimeout(r, 5000));
-    const checkBody = new URLSearchParams({
-      module: "contract",
-      action: "checkproxyverification",
-      apikey: apiKey,
-      guid,
-    });
-    const checkRes = await fetch(baseUrl, { method: "POST", body: checkBody });
-    const checkJson = await checkRes.json() as any;
-
-    if (checkJson.result === "Pending in queue") {
-      console.log("verifyProxy: still pending...");
-      continue;
-    }
-    if (checkJson.status === "1" || checkJson.result?.toLowerCase().includes("already verified")) {
-      console.log("verifyProxy: proxy linked to implementation:", implAddress);
-      return;
-    }
-    logError("verifyProxy: failed:", checkJson.result);
-    return;
-  }
-
-  logError("verifyProxy: timed out waiting for result");
-};
-
-const verifyAll = async (contracts: {
-  asset: any;
-  merkleTree: any;
-  queuedMerkleTree: any;
-  shieldedAddress: any;
-  shieldedTransaction: any;
-  adaptorHandler: any;
-  poolImpl: any;
-  poolProxy: any;
-  initData: `0x${string}`;
-}) => {
-  const { asset, merkleTree, queuedMerkleTree, shieldedAddress, shieldedTransaction, adaptorHandler, poolImpl, poolProxy, initData } = contracts;
-
-  const verifications = [
-    { address: asset.address, constructorArguments: [] },
-    { address: merkleTree.address, constructorArguments: [] },
-    { address: queuedMerkleTree.address, constructorArguments: [] },
-    {
-      address: shieldedAddress.address,
-      constructorArguments: [],
-      libraries: { MerkleTreeLogic: merkleTree.address },
-    },
-    {
-      address: shieldedTransaction.address,
-      constructorArguments: [],
-      libraries: {
-        AssetLogic: asset.address,
-        MerkleTreeLogic: merkleTree.address,
-        QueuedMerkleTreeLogic: queuedMerkleTree.address,
-      },
-    },
-    { address: adaptorHandler.address, constructorArguments: [] },
-    {
-      address: poolImpl.address,
-      constructorArguments: [],
-      libraries: {
-        AssetLogic: asset.address,
-        MerkleTreeLogic: merkleTree.address,
-        QueuedMerkleTreeLogic: queuedMerkleTree.address,
-        ShieldedAddressLogic: shieldedAddress.address,
-        ShieldedTransactionLogic: shieldedTransaction.address,
-      },
-    },
-  ];
-
-  for (const v of verifications) {
-    try {
-      await hre.run("verify:verify", v);
-      console.log("Verified:", v.address);
-    } catch (e: any) {
-      if (e.message?.includes("Already Verified") || e.message?.includes("already verified")) {
-        console.log("Already verified:", v.address);
-      } else {
-        logError("Verification failed for", v.address, e.message);
-      }
-    }
-  }
-
-  // PoolProxy verification is split into two explicit steps because hardhat-verify
-  // has a bug when used with customChains URLs that already contain "?" — it tries
-  // to append query params and blows up before the proxy-link request is made.
-  //
-  // Step 1: Source submission via hre.run("verify:verify")
-  //   - Submits the PoolProxy Solidity source + compiler settings to Etherscan.
-  //   - Source IS submitted successfully before the URL bug triggers on the poll step.
-  //   - We tolerate the "Query params cannot be passed" error and move on.
-  //
-  // Step 2: Proxy-to-implementation linking via direct Etherscan V2 API (verifyProxy)
-  //   - Calls `verifyproxycontract` + `checkproxyverification` directly with fetch,
-  //     bypassing hardhat-verify entirely to avoid the URL construction bug.
-  //   - This registers PoolProxy as a proxy pointing to the Pool implementation.
-
-  // Step 1: submit source code
-  try {
-    await hre.run("verify:verify", {
-      address: poolProxy.address,
-      constructorArguments: [poolImpl.address, initData],
-    });
-    console.log("Verified (source):", poolProxy.address);
-  } catch (e: any) {
-    if (e.message?.includes("Already Verified") || e.message?.includes("already verified")) {
-      console.log("Already verified (source):", poolProxy.address);
-    } else if (e.message?.includes("Query params cannot be passed")) {
-      console.log("verifyAll: proxy source submit hit URL bug — source may still have been submitted. Proceeding to proxy link step.");
+  const targets: VerifyTarget[] = [];
+  const results: VerifyResult[] = [];
+  for (const [key, address] of Object.entries(addresses)) {
+    if (!address) continue;
+    const contract = RECORD_KEY_CONTRACTS[key];
+    if (contract === null) {
+      results.push({ label: key, address, status: "skipped", detail: "raw bytecode, no Solidity source" });
+    } else if (contract === undefined) {
+      results.push({ label: key, address, status: "failed", detail: "no artifact mapped in RECORD_KEY_CONTRACTS" });
     } else {
-      logError("Verification failed for", poolProxy.address, e.message);
+      targets.push({ label: key, address, contract, libraries: byName });
     }
   }
 
-  // Step 2: link proxy to implementation via direct Etherscan V2 API
-  await verifyProxy(poolProxy.address, poolImpl.address);
+  results.push(...(await verifyOnEtherscan(targets)));
+  results.push(await linkProxyOnEtherscan(addresses.poolProxy, addresses.poolImpl));
+  printVerifySummary(results);
 };
 
 // Sequential on purpose: every adaptor registers assets, and the ids they receive come from a
@@ -860,7 +767,7 @@ const main = async () => {
 
   // Record every deployed address before verification, so an aborted verify still leaves the
   // addresses on disk — on a real deploy they are not recoverable from anywhere else.
-  writeDeploymentRecord(chainId, dryRun, {
+  const deployedAddresses: Record<string, Hex> = {
     poolProxy: poolProxy.address,
     poolImpl: poolImpl.address,
     verifier,
@@ -880,12 +787,13 @@ const main = async () => {
     // hre.viem's artifact registry, so nothing else on disk holds their addresses.
     ...verifiers,
     ...adaptors,
-  });
+  };
+  writeDeploymentRecord(chainId, dryRun, deployedAddresses);
 
   if (dryRun) {
     console.log("Dry run: skipping Etherscan verification");
   } else {
-    await verifyAll({ asset, merkleTree, queuedMerkleTree, shieldedAddress, shieldedTransaction, adaptorHandler, poolImpl, poolProxy, initData });
+    await verifyAll(deployedAddresses);
   }
 
   // Fail the run (after verification, so it still happens) if anything is still deployer-owned

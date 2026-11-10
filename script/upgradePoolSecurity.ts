@@ -12,6 +12,11 @@
  *             deployments/<DEPLOYMENT_NAME>-<YYYY-MM-DD>.json with the owner transactions
  *   verify    read-only: checks deployed bytecode against this build, the proxy's implementation
  *             and version, preserved state, and probes the new checks with eth_call
+ *   etherscan verifies the source of everything `deploy` put on chain (the libraries it deployed, the
+ *             Pool implementation, a replacement Paymaster) on the network's Etherscan explorer,
+ *             and links the proxy to the new implementation once `upgradeToAndCall` has landed.
+ *             `deploy` runs it by itself on a real network; rerun it after the owner transactions
+ *             to add the proxy link, or to retry a failure (verified contracts are skipped)
  *   rehearse  local fork only: deploy + execute the owner transactions by impersonation + verify
  *   enable-v2 prints the owner transaction that switches the pool to the v2 transaction hash
  *             (`enableTxHashV2`, one-way). Only once every client signs v2; on a local fork it is
@@ -19,7 +24,7 @@
  *
  * Env:
  *   POOL_PROXY      pool proxy address (required)
- *   DEPLOYMENT_NAME     names the record, e.g. queue-stable-batch (required by deploy, verify, rehearse);
+ *   DEPLOYMENT_NAME     names the record, e.g. queue-stable-batch (required by deploy, verify, etherscan, rehearse);
  *                       see script/utils/deploymentRecord.ts
  *   DEPLOYMENT_PURPOSE  why this upgrade happens; the record's first key (required by deploy, rehearse)
  *   OLD_PAYMASTERS  comma-separated Paymasters the pool has credited fees to, CURRENT ONE FIRST
@@ -40,11 +45,13 @@
  *   UPGRADE_STEP=plan     POOL_PROXY=0x.. npx hardhat run script/upgradePoolSecurity.ts --network mainnet
  *   UPGRADE_STEP=rehearse POOL_PROXY=0x.. DEPLOYMENT_NAME=.. DEPLOYMENT_PURPOSE=".." \
  *                         npx hardhat run script/upgradePoolSecurity.ts --network mainnetFork
+ *   UPGRADE_STEP=etherscan POOL_PROXY=0x.. DEPLOYMENT_NAME=.. npx hardhat run script/upgradePoolSecurity.ts --network mainnet
  */
 import hre from "hardhat";
 import fs from "fs";
 import { assertRecordWritable, findRecord, writeRecord } from "./utils/deploymentRecord";
 import { getChainForCurrentNetwork } from "./utils/chainUtils";
+import { VerifyTarget, linkProxyOnEtherscan, printVerifySummary, verifyOnEtherscan } from "./utils/etherscanVerify";
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 import {
     Abi, Hex, encodeFunctionData, getAddress, isAddressEqual, keccak256, toHex,
@@ -511,9 +518,45 @@ const deploy = async () => {
         deployedAt: new Date().toISOString(),
     };
     console.log("\nWrote", writeRecord(recordTarget(), record));
+    // Before the owner transactions are printed, so they stay the last thing on screen. A failure
+    // here does not fail the deploy: the record is written, and `UPGRADE_STEP=etherscan` retries.
+    if (!isLocal()) {
+        console.log("");
+        await verifyOnExplorer(record);
+    }
     console.log("\nPrivileged transactions, in order (check `from` for each: pauser, pool owner, or an old Paymaster's owner):");
     ownerTxs.forEach((t, i) => console.log(`\n[${i + 1}] ${t.note}\n    from ${t.from}\n    cast send ${t.to} ${t.data} --ledger --rpc-url $RPC`));
     return record;
+};
+
+/**
+ * Etherscan source verification for what the record says `deploy` deployed, then the proxy link if
+ * the proxy already points at the new implementation. Returns how many failed.
+ */
+const verifyOnExplorer = async (rec: any): Promise<number> => {
+    const libs = rec.newLibraries as Libs;
+    // Records from before deployedLibraries existed deployed exactly these two.
+    const deployed: LibName[] = rec.deployedLibraries ?? ["QueuedMerkleTreeLogic", "ShieldedTransactionLogic"];
+    const targets: VerifyTarget[] = [
+        ...deployed.map((l) => ({ label: l, address: libs[l], contract: l, libraries: libs })),
+        { label: "Pool implementation", address: rec.newImplementation, contract: "Pool", libraries: libs },
+    ];
+    if (rec.newPaymaster) targets.push({ label: "Paymaster", address: rec.newPaymaster, contract: "Paymaster" });
+    const results = await verifyOnEtherscan(targets);
+
+    const impl = await currentImpl();
+    if (isAddressEqual(impl, rec.newImplementation)) {
+        results.push(await linkProxyOnEtherscan(POOL_PROXY, impl));
+    } else {
+        console.log(`\nProxy still points at ${impl}: rerun UPGRADE_STEP=etherscan after upgradeToAndCall to link it.`);
+    }
+    return printVerifySummary(results);
+};
+
+const etherscan = async () => {
+    if (isLocal()) throw new Error("etherscan verifies on a real network's explorer, not on a local fork");
+    const rec = JSON.parse(fs.readFileSync(findRecord(DEPLOYMENT_NAME), "utf8"));
+    if (await verifyOnExplorer(rec)) process.exitCode = 1;
 };
 
 const verify = async () => {
@@ -663,6 +706,7 @@ const main = async () => {
     if (step === "plan") await plan();
     else if (step === "deploy") await deploy();
     else if (step === "verify") await verify();
+    else if (step === "etherscan") await etherscan();
     else if (step === "rehearse") await rehearse();
     else if (step === "enable-v2") await enableV2();
     else throw new Error(`unknown UPGRADE_STEP ${step}`);
