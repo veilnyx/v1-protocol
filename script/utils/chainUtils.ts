@@ -1,4 +1,4 @@
-import { defineChain, Chain } from "viem";
+import { defineChain, Chain, Hash, TransactionReceiptNotFoundError } from "viem";
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 import { HttpNetworkConfig } from "hardhat/types";
 
@@ -44,8 +44,13 @@ export async function getChainForCurrentNetwork(hre: HardhatRuntimeEnvironment):
         throw new Error(`Chain ID not defined for network: ${networkName}`);
     }
 
+    // Chain ids viem's built-in list gets wrong for us. 999 is HyperEVM mainnet, but viem's
+    // bundled list maps it to Wanchain Testnet — a mis-labelled chain carrying another network's
+    // multicall3 address. Always build these from the network config instead.
+    const CUSTOM_ONLY_CHAIN_IDS = new Set([999]);
+
     // Try to import standard chain from viem/chains first
-    try {
+    if (!CUSTOM_ONLY_CHAIN_IDS.has(chainId)) try {
         // This is a dynamic import attempt to get built-in chain definition
         const viemChains = await import("viem/chains");
 
@@ -77,6 +82,12 @@ export async function getChainForCurrentNetwork(hre: HardhatRuntimeEnvironment):
         symbol: "ETH",
     };
 
+    if (chainId === 999) {
+        // HyperEVM mainnet: native gas token is HYPE (18 decimals)
+        nativeCurrency.name = "HYPE";
+        nativeCurrency.symbol = "HYPE";
+    }
+
     if (chainId === 5042002) {
         // Arc Testnet specific configuration
         nativeCurrency.decimals = 6;
@@ -99,3 +110,26 @@ export async function getChainForCurrentNetwork(hre: HardhatRuntimeEnvironment):
         },
     });
 }
+
+/**
+ * `client` with a waitForTransactionReceipt that polls getTransactionReceipt (every 2 s, up to
+ * 10 min) while the receipt is not found. HyperEVM RPCs can serve a transaction's block before
+ * its receipt, and viem's own waitForTransactionReceipt then rejects instead of waiting: a live
+ * 999 deploy died after its second library that way. hre.viem.deployContract waits through the
+ * public client it is given, so pass this one.
+ */
+export const withReceiptPolling = <T extends { getTransactionReceipt: (args: { hash: Hash }) => Promise<any> }>(
+    client: T
+): T => ({
+    ...client,
+    waitForTransactionReceipt: async ({ hash }: { hash: Hash }) => {
+        for (let i = 0; ; i++) {
+            try {
+                return await client.getTransactionReceipt({ hash });
+            } catch (e) {
+                if (!(e instanceof TransactionReceiptNotFoundError) || i >= 300) throw e;
+                await new Promise((r) => setTimeout(r, 2000));
+            }
+        }
+    },
+});

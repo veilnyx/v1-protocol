@@ -89,7 +89,7 @@ const config: HardhatUserConfig = {
       chainId: 1
     },
     // HyperEVM mainnet. The deployer must have big blocks enabled (checked by the HyperEVM
-    // preflight in deployCoreWithAdp.ts) — see docs/hyperevm-mainnet-deployment.md.
+    // preflight in deployCoreWithAdp.ts and by upgradePool.ts before they deploy).
     hyperevm: {
       url: rpcHyperEvmMainnet,
       accounts: privateKeys,
@@ -97,6 +97,7 @@ const config: HardhatUserConfig = {
     },
     // Dry runs against a local anvil fork of HyperEVM mainnet, same rules as mainnetFork above:
     //   pnpm fork:hyperevm                                                   (terminal 1)
+    //   pnpm deployCoreWithAdp:hyperevm:fork                                 (terminal 2)
     //   UPGRADE_STEP=rehearse ... hardhat run script/upgradePool.ts --network hyperevmFork
     hyperevmFork: {
       url: "http://127.0.0.1:8547",

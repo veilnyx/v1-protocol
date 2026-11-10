@@ -19,7 +19,8 @@ import {
 } from "./configs";
 import { deployHasher } from "./hasher";
 import { deployVerifier } from "./verifier";
-import { getChainForCurrentNetwork, isDevelopmentNode } from "./utils/chainUtils";
+import { getChainForCurrentNetwork, isDevelopmentNode, withReceiptPolling } from "./utils/chainUtils";
+import { assertHyperEvmReady, HYPEREVM_MAINNET_CHAIN_ID } from "./utils/hyperevmPreflight";
 import { assertVerifiersMatchCeremony } from "./utils/verifierProvenance";
 import {
   assertRevokerMetadata,
@@ -497,7 +498,8 @@ const main = async () => {
   // must fail here, while nothing has been spent.
   assertRecordWritable(deploymentRecordTarget(dryRun));
 
-  const client = await hre.viem.getPublicClient({ chain });
+  // Every receipt wait below (deployContract included) goes through this client.
+  const client = withReceiptPolling(await hre.viem.getPublicClient({ chain }));
 
   const chainId = await client.getChainId();
 
@@ -543,8 +545,10 @@ const main = async () => {
   // assets but no revoker — unusable and unrepairable. The gateway check that follows is advisory.
   assertRevokerMetadata(commonParams.revokers);
   await checkRevokerMetadataIsPinned(commonParams.revokers);
+  // A chain without an adaptorConfig.json entry deploys no adaptors (HyperEVM: none of the
+  // external DeFi protocols the adaptors wrap exist there).
   if (!adpParams) {
-    throw new Error(`adaptorConfig.json has no entry for chain ${chainId} — nothing has been deployed`);
+    console.warn(`⚠️  adaptorConfig.json has no entry for chain ${chainId}: no adaptors will be deployed`);
   }
 
   // A zero or unset hardwareWalletOwner is the documented way to retain deployer ownership for
@@ -588,6 +592,17 @@ const main = async () => {
         `floor. A run that stops midway leaves a pool that cannot be repaired in place.`
       );
     }
+  }
+
+  // HyperEVM-specific checks (screening decision, asset decimals, live price feeds, big blocks).
+  // Still before anything costs gas.
+  if (chainId === HYPEREVM_MAINNET_CHAIN_ID) {
+    await assertHyperEvmReady({
+      client,
+      chainParams,
+      deployer: wallets[0].account.address as Hex,
+      dryRun,
+    });
   }
 
   // Add assets
@@ -751,7 +766,7 @@ const main = async () => {
   await assertGasAssetRegistered(poolProxy.address, chainParams, client);
 
   // Deploy Adaptors (should be after base assets are added to maintain the expected ID order)
-  const adaptors = await deployAdaptors(poolProxy.address, adpParams, deployConfig);
+  const adaptors = adpParams ? await deployAdaptors(poolProxy.address, adpParams, deployConfig) : {};
 
   // Hand every Ownable contract over to the hardware wallet / multisig. Must stay after all
   // owner-gated setup above (setVersion, setVeilnyxPool, addAssets, registerRevoker,

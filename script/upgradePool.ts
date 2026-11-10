@@ -50,13 +50,12 @@
 import hre from "hardhat";
 import fs from "fs";
 import { assertRecordWritable, findRecord, writeRecord } from "./utils/deploymentRecord";
-import { getChainForCurrentNetwork } from "./utils/chainUtils";
+import { getChainForCurrentNetwork, withReceiptPolling } from "./utils/chainUtils";
 import { VerifyTarget, linkProxyOnEtherscan, printVerifySummary, verifyOnEtherscan } from "./utils/etherscanVerify";
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 import {
     Abi, Hex, encodeFunctionData, getAddress, isAddressEqual, keccak256, toHex,
     BaseError, ContractFunctionRevertedError, decodeErrorResult, pad, Chain,
-    TransactionReceiptNotFoundError,
 } from "viem";
 
 type Addr = `0x${string}`;
@@ -421,19 +420,8 @@ const deploy = async () => {
             throw new Error(`deployer ${wallet.account.address} does not have HyperEVM big blocks enabled; nothing was deployed`);
         }
     }
-    // HyperEVM RPCs can serve a transaction's block before its receipt, and viem's
-    // waitForTransactionReceipt then rejects instead of waiting: a live deploy died after its
-    // second library that way. deployContract waits through this client, so poll for the receipt.
-    const waitForReceipt = async ({ hash }: { hash: Hex }) => {
-        for (let i = 0; ; i++) {
-            try { return await client.getTransactionReceipt({ hash }); }
-            catch (e) {
-                if (!(e instanceof TransactionReceiptNotFoundError) || i >= 300) throw e;
-                await new Promise((r) => setTimeout(r, 2000));
-            }
-        }
-    };
-    const clients = { public: { ...client, waitForTransactionReceipt: waitForReceipt }, wallet };
+    // deployContract waits through this client; see withReceiptPolling for why it polls.
+    const clients = { public: withReceiptPolling(client), wallet };
 
     // In link order, so each library's own links already have addresses.
     const newLibs: Partial<Libs> = { ...libs };
