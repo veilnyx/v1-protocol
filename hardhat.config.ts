@@ -57,7 +57,7 @@ const config: HardhatUserConfig = {
   networks: {
     hardhat: {
       allowUnlimitedContractSize: false,
-      // Serves `deploy:test` / `upgrade:test` only. Mainnet dry-runs use the `mainnetFork` network
+      // Serves `deploy:test` only. Mainnet dry-runs use the `mainnetFork` network
       // below instead — Hardhat's in-process forking cannot fork current mainnet at all.
       forking: {
         url: rpcOptimismSepolia,
