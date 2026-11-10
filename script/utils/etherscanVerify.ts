@@ -252,8 +252,10 @@ const verifyOne = async (api: Api, target: VerifyTarget): Promise<VerifyResult> 
     const p = await prepareVerification(target, api);
 
     const failures: string[] = [];
-    for (const [i, input] of p.inputs.entries()) {
-      const r = await submit(api, target.address, p, input);
+    // An index loop on purpose: tsconfig sets no target, so ts-node compiles to ES5, where for...of
+    // over an iterator (`.entries()`, a Set) runs zero times without an error.
+    for (let i = 0; i < p.inputs.length; i++) {
+      const r = await submit(api, target.address, p, p.inputs[i]);
       if (r.status === "already-verified") return result("already-verified");
       if (r.status === "verified") {
         // Only the first input can reproduce the deployed metadata hash.
