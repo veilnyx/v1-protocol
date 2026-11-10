@@ -8,7 +8,7 @@ Runbook for upgrading a live Veilnyx pool to the fixes on `fix/pool-security-202
   in advance.
 
 - **Base:** `72cb8de`, which is what Ethereum mainnet runs. This branch is `72cb8de` plus the fixes below.
-- **Script:** [`script/upgradePoolSecurity.ts`](../script/upgradePoolSecurity.ts)
+- **Script:** [`script/upgradePool.ts`](../script/upgradePool.ts)
 - **Regression tests:** [`test/security/`](../test/security)
 - **Circuits, zkeys and verifiers:** unchanged. No ceremony is needed, and deployed verifiers are kept.
 - **Storage layout:** unchanged. See [§7](#7-how-this-was-tested).
@@ -144,7 +144,7 @@ the account is not at index 0.
 ```bash
 npm run fork:mainnet     # terminal 1: anvil fork on :8546 with chain id 1
 # terminal 2:
-UPGRADE_STEP=rehearse npx hardhat run script/upgradePoolSecurity.ts --network mainnetFork
+UPGRADE_STEP=rehearse npx hardhat run script/upgradePool.ts --network mainnetFork
 ```
 
 The rehearsal does the following:
@@ -161,7 +161,7 @@ It must end with `VERIFY OK`. Its output goes to
 ### Step 2 — Plan (read-only, mainnet)
 
 ```bash
-UPGRADE_STEP=plan npx hardhat run script/upgradePoolSecurity.ts --network mainnet
+UPGRADE_STEP=plan npx hardhat run script/upgradePool.ts --network mainnet
 ```
 
 Check the output:
@@ -180,7 +180,7 @@ If the plan cannot identify a reused library, **stop**. The live code is then no
 ### Step 3 — Deploy (deployer EOA)
 
 ```bash
-UPGRADE_STEP=deploy npx hardhat run script/upgradePoolSecurity.ts --network mainnet
+UPGRADE_STEP=deploy npx hardhat run script/upgradePool.ts --network mainnet
 ```
 
 This deploys:
@@ -223,7 +223,7 @@ npx hardhat verify --network mainnet <NewPaymaster> <entryPoint> <gateway> $POOL
 ### Step 4 — Pre-upgrade check (anyone; do this before signing)
 
 ```bash
-UPGRADE_STEP=verify npx hardhat run script/upgradePoolSecurity.ts --network mainnet
+UPGRADE_STEP=verify npx hardhat run script/upgradePool.ts --network mainnet
 ```
 
 At this point the proxy still points at the old implementation. `verify` checks that each newly
@@ -263,7 +263,7 @@ Until then the pool is paused and nothing is sponsored anyway.
 
 1. Run the full verification.
    ```bash
-   UPGRADE_STEP=verify npx hardhat run script/upgradePoolSecurity.ts --network mainnet
+   UPGRADE_STEP=verify npx hardhat run script/upgradePool.ts --network mainnet
    ```
    The pool is still paused here. The probes use an `eth_call` state override that unpauses the pool for the call only, and nothing is sent. The run must print `VERIFY OK`. It checks:
    - bytecode;

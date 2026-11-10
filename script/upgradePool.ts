@@ -42,10 +42,10 @@
  *                   the probe is skipped without it)
  *
  * Usage:
- *   UPGRADE_STEP=plan     POOL_PROXY=0x.. npx hardhat run script/upgradePoolSecurity.ts --network mainnet
+ *   UPGRADE_STEP=plan     POOL_PROXY=0x.. npx hardhat run script/upgradePool.ts --network mainnet
  *   UPGRADE_STEP=rehearse POOL_PROXY=0x.. DEPLOYMENT_NAME=.. DEPLOYMENT_PURPOSE=".." \
- *                         npx hardhat run script/upgradePoolSecurity.ts --network mainnetFork
- *   UPGRADE_STEP=etherscan POOL_PROXY=0x.. DEPLOYMENT_NAME=.. npx hardhat run script/upgradePoolSecurity.ts --network mainnet
+ *                         npx hardhat run script/upgradePool.ts --network mainnetFork
+ *   UPGRADE_STEP=etherscan POOL_PROXY=0x.. DEPLOYMENT_NAME=.. npx hardhat run script/upgradePool.ts --network mainnet
  */
 import hre from "hardhat";
 import fs from "fs";

@@ -97,7 +97,7 @@ const config: HardhatUserConfig = {
     },
     // Dry runs against a local anvil fork of HyperEVM mainnet, same rules as mainnetFork above:
     //   pnpm fork:hyperevm                                                   (terminal 1)
-    //   UPGRADE_STEP=rehearse ... hardhat run script/upgradePoolSecurity.ts --network hyperevmFork
+    //   UPGRADE_STEP=rehearse ... hardhat run script/upgradePool.ts --network hyperevmFork
     hyperevmFork: {
       url: "http://127.0.0.1:8547",
       chainId: 999

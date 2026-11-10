@@ -16,5 +16,5 @@ typechain-types/
 .claude/
 .vscode/
 
-# Fork rehearsals of script/upgradePoolSecurity.ts — never a real deployment record
+# Fork rehearsals of script/upgradePool.ts — never a real deployment record
 deployments/*-fork-rehearsal.json
