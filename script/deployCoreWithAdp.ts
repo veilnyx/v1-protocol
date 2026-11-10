@@ -633,6 +633,10 @@ const main = async () => {
   );
   console.log("ShieldedTransactionLogic deployed:", shieldedTransaction.address);
 
+  // External library Pool calls for the revoker-key subgroup check (registerRevoker).
+  const babyJubJub = await hre.viem.deployContract("BabyJubJubLogic", [], deployConfig);
+  console.log("BabyJubJubLogic deployed:", babyJubJub.address);
+
   const adaptorHandler = await hre.viem.deployContract("AdaptorHandler", [], deployConfig);
   console.log("AdaptorHandler deployed: ", adaptorHandler.address);
 
@@ -644,6 +648,7 @@ const main = async () => {
       QueuedMerkleTreeLogic: queuedMerkleTree.address,
       ShieldedAddressLogic: shieldedAddress.address,
       ShieldedTransactionLogic: shieldedTransaction.address,
+      BabyJubJubLogic: babyJubJub.address,
     },
   });
   console.log("Pool deployed:", poolImpl.address);
@@ -780,6 +785,7 @@ const main = async () => {
     queuedMerkleTreeLogic: queuedMerkleTree.address,
     shieldedAddressLogic: shieldedAddress.address,
     shieldedTransactionLogic: shieldedTransaction.address,
+    babyJubJubLogic: babyJubJub.address,
     poseidonT3,
     poseidonT4,
     poseidonT5,
