@@ -20,9 +20,12 @@ uint256 constant GROTH16_PROOF_LENGTH = 256;
 /// @dev Public-input counts declared by each circuit's `component main { public [...] }`.
 ///      These MUST match the deployed verifiers, whose IC point counts are
 ///      nPublicInputs + 1 (13 / 6 / 65 respectively).
-uint256 constant TRANSACTION_PUBLIC_INPUTS = 12;
-uint256 constant ADDRESS_PUBLIC_INPUTS = 6;
-uint256 constant TREE_UPDATE_PUBLIC_INPUTS = 64;
+// HyperEVM repriced the BN254 precompiles 10x (block 50,988,232), making each Groth16
+// public input cost ~61.5k gas. The circuits bind their statements through hashes instead:
+// transact (alpha, beta, gamma), register and tree update (one sha256 inputsHash each).
+uint256 constant TRANSACTION_PUBLIC_INPUTS = 3;
+uint256 constant ADDRESS_PUBLIC_INPUTS = 1;
+uint256 constant TREE_UPDATE_PUBLIC_INPUTS = 1;
 
 contract Verifier is IVerifier, Ownable {
     /**

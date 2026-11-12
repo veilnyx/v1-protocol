@@ -103,6 +103,7 @@ interface IPool {
     event PriceFeedStalenessThresholdUpdated(uint256 threshold);
     event NativeWTokenUpdated(IWToken indexed nativeWToken);
     event PauserUpdated(address indexed oldPauser, address indexed newPauser);
+    event VerifierUpdated(IVerifier indexed oldVerifier, IVerifier indexed newVerifier);
     event TxHashVersionUpdated(uint8 version);
     event PriceStalenessThresholdUpdated(uint256 threshold);
 
@@ -143,6 +144,7 @@ interface IPool {
     ///      An EOA screener would make every isSanctioned() call revert. The zero
     ///      address is still accepted — it is the kill-switch that disables screening.
     error InvalidScreenerAddress(address screener);
+    error InvalidVerifierAddress(address verifier);
 
     /// @dev msg.value was sent for a non-DEPOSIT transaction. Native ETH is only
     ///      accepted on DEPOSIT to be wrapped into the configured nativeWToken.
@@ -307,7 +309,7 @@ interface IPool {
         ShieldedAddressRegistrationData calldata addressRegData
     ) external;
 
-    /// @notice Updates the commitment tree with a queue of leaves. It uses zk proof under the hood to prove the `newRoot` and `newLevelSubtrees` are valid.
+    /// @notice Updates the commitment tree with a queue of leaves. It uses zk proof under the hood to prove the `newRoot` is valid.
     /// @param updatedCommitmentTreeInputs The inputs needed by the zk verifier to verify the authenticity of the queued merkle tree update.
     function updateCommitmentTree(
         TreeUpdateData memory updatedCommitmentTreeInputs

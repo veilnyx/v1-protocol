@@ -2,7 +2,7 @@
 pragma solidity 0.8.24;
 
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
-import {FIELD_SIZE, TX_HASH_V2_TAG, TX_HASH_VERSION_V2} from "../base/Constants.sol";
+import {FIELD_SIZE, TX_HASH_V2_TAG, TX_HASH_VERSION_V2, UHF_HEADER_LENGTH} from "../base/Constants.sol";
 import {ArrayUtils} from "./ArrayUtils.sol";
 import {Asset, AssetLogic} from "./AssetLogic.sol";
 import {MerkleTree, MerkleTreeLogic} from "./MerkleTreeLogic.sol";
@@ -107,6 +107,7 @@ struct MemoParams {
 }
 
 struct UHFArrays {
+    uint256[] header;
     uint256[] pubAssetIds;
     uint256[] pubValues;
     uint256[] nullifiers;
@@ -253,6 +254,14 @@ library ShieldedTransactionLogic {
             revert IPool.ZeroRefundAddress();
         }
 
+        // The revoker keys reach the proof only through the UHF header now (they used to be
+        // verifier public inputs, which snarkjs range-checks). The registry is owner-managed,
+        // but an alias k + p would still verify with a different alpha, so pin them here.
+        _requireCanonical(revokerData.revokerPublicKey[0]);
+        _requireCanonical(revokerData.revokerPublicKey[1]);
+        _requireCanonical(revokerData.encryptionPublicKey[0]);
+        _requireCanonical(revokerData.encryptionPublicKey[1]);
+
         // Both checks run before anything is marked and before the (expensive) proof check.
         _requireCanonicalFieldElements(stx);
         _requireBackedFee(stx);
@@ -393,41 +402,35 @@ library ShieldedTransactionLogic {
         RevokerData memory revokerData,
         uint256 txHash
     ) internal pure returns (bytes memory) {
-        bytes memory pubDataChunk1 = abi.encodePacked(
-            self.addressTreeRoot,
-            self.commitmentTreeRoot,
-            txHash,
-            self.txType == ShieldedTransactionType.DEPOSIT
-                ? uint256(0)
-                : uint256(1)
-        );
+        // The 9 values that used to be separate public inputs. They are private in the
+        // circuit and bound through the UHF instead (HyperEVM prices each public input at
+        // ~61.5k gas). Order must match transact.circom's `encryptedInputs` header. Each one
+        // enters both the sha256 alpha chain and gamma, and the circuit enforces that beta
+        // is the Poseidon chain over the same list.
+        uint256[] memory header = new uint256[](UHF_HEADER_LENGTH);
+        header[0] = self.addressTreeRoot;
+        header[1] = self.commitmentTreeRoot;
+        header[2] = txHash;
+        header[3] = self.txType == ShieldedTransactionType.DEPOSIT
+            ? uint256(0)
+            : uint256(1);
+        header[4] = revokerData.revokerPublicKey[0];
+        header[5] = revokerData.revokerPublicKey[1];
+        header[6] = self.refundAddress;
+        header[7] = revokerData.encryptionPublicKey[0];
+        header[8] = revokerData.encryptionPublicKey[1];
 
-        bytes memory pubDataChunk2 = abi.encodePacked(
-            revokerData.revokerPublicKey[0],
-            revokerData.revokerPublicKey[1],
-            self.refundAddress,
-            revokerData.encryptionPublicKey[0],
-            revokerData.encryptionPublicKey[1]
-        );
+        // Performing sequential hashing (sha256) of the header and the encrypted data
+        (uint256 alpha, uint256 gamma) = _computeAlphaGammaForUHF(self, header);
 
-        // Performing sequential hashing (sha256) of encrypted data derived from notesMemo
-        (uint256 alpha, uint256 gamma) = _computeAlphaGammaForUHF(self);
-
-        return
-            abi.encodePacked(
-                self.proof,
-                pubDataChunk1,
-                pubDataChunk2,
-                alpha,
-                self.betaUHF,
-                gamma
-            );
+        return abi.encodePacked(self.proof, alpha, self.betaUHF, gamma);
     }
 
     /// @dev Builds pubAsset/pubValue arrays padded to nOuts, then computes UHF (alpha, gamma).
     ///      Extracted to avoid stack-too-deep in toVerifierInput.
     function _computeAlphaGammaForUHF(
-        ShieldedTransaction calldata self
+        ShieldedTransaction calldata self,
+        uint256[] memory header
     ) internal pure returns (uint256 alpha, uint256 gamma) {
         uint256 nOuts = self.commitments.length;
         uint256 nPubs = self.pubAssets.length;
@@ -441,6 +444,7 @@ library ShieldedTransactionLogic {
         // remaining entries are already zero-initialised
 
         UHFArrays memory uhfArrays = UHFArrays({
+            header: header,
             pubAssetIds: pubAssetIds,
             pubValues: pubValues,
             nullifiers: self.nullifiers,
@@ -520,7 +524,7 @@ library ShieldedTransactionLogic {
         UHFArrays memory uhfArrays
     ) internal pure returns (uint256) {
         // Call _decomposeNotesMemo() to get the uhfArrays
-        uint256 currentHash = 0;
+        uint256 currentHash = _hashChunkUsingSha256(0, uhfArrays.header);
         if (uhfArrays.pubAssetIds.length != 0) {
             currentHash = _hashChunkUsingSha256(
                 currentHash,
@@ -595,6 +599,14 @@ library ShieldedTransactionLogic {
 
         uint256 coefficientPow = 1;
         uint256 accumulator = 0;
+
+        (accumulator, coefficientPow) = _addToUHFAccumulator(
+            uhfArrays.header,
+            alpha,
+            betaUHF,
+            coefficientPow,
+            accumulator
+        );
 
         (accumulator, coefficientPow) = _addToUHFAccumulator(
             uhfArrays.pubAssetIds,
@@ -823,9 +835,20 @@ library ShieldedTransactionLogic {
     ///        - notesMemo ciphertext words >= p verify but break revoker/recipient decryption.
     ///      Honest values are field elements already (Poseidon outputs, ciphertext elements),
     ///      so this rejects nothing the SDK produces.
+    function _requireCanonical(uint256 x) internal pure {
+        if (x >= FIELD_SIZE) {
+            revert IPool.NonCanonicalFieldElement(x);
+        }
+    }
+
     function _requireCanonicalFieldElements(
         ShieldedTransaction calldata stx
     ) internal pure {
+        // refundAddress was a verifier public input (range-checked by the verifier); it is a
+        // UHF header word now, so it needs the same check as the other bound words. The roots
+        // are canonical by `isKnownRoot`, `hash` is reduced mod p, pubFlow is 0 or 1.
+        _requireCanonical(stx.refundAddress);
+
         uint256 n = stx.nullifiers.length;
         for (uint256 i = 0; i < n; ++i) {
             if (stx.nullifiers[i] >= FIELD_SIZE) {

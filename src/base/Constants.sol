@@ -16,6 +16,10 @@ type FieldElement is uint256;
 
 uint256 constant ZERO_LEAF = uint256(keccak256("zero")) % FIELD_SIZE;
 
+/// @dev Number of plain values (roots, tx hash, pubFlow, revoker keys, refundAddress) that lead
+///      the transact UHF data list. They used to be separate verifier public inputs.
+uint256 constant UHF_HEADER_LENGTH = 9;
+
 string constant EIP712_DOMAIN_NAME = "Veilnyx";
 string constant EIP712_DOMAIN_VERSION = "1";
 bytes32 constant EIP712_TYPEHASH_REGISTER_ADDRESS = keccak256(

@@ -17,13 +17,16 @@ struct QueuedMerkleTree {
     mapping(uint32 => uint256) queuedLeaves;
     mapping(uint8 => uint256) roots;
     uint256[COMMITMENT_TREE_DEPTH] levelZeros;
+    /// @dev No longer written by `update`: the subtrees are a private witness of the
+    ///      tree-update proof, bound to the stored root through the frontier. The slot stays
+    ///      for storage-layout compatibility and holds the subtrees of the last update made
+    ///      before the public-input cut (or the initial zeros).
     uint256[COMMITMENT_TREE_DEPTH] levelSubtrees;
 }
 
 struct TreeUpdateData {
     uint256 newRoot;
     uint32 batchSize;
-    uint256[COMMITMENT_TREE_DEPTH] newLevelSubtrees;
     bytes proof;
 }
 
@@ -149,7 +152,6 @@ library QueuedMerkleTreeLogic {
             COMMITMENT_MERKLE_TREE_ROOT_HISTORY_SIZE;
         self.currentRootIndex = newRootIndex;
         self.roots[newRootIndex] = data.newRoot;
-        self.levelSubtrees = data.newLevelSubtrees;
 
         // `insertedLeaves` is bounded by `totalQueued` in _verifyUpdateProof, so this can
         // never advance past `queueEndIndex`.
@@ -192,25 +194,29 @@ library QueuedMerkleTreeLogic {
         // in-flight proof by queueing one more leaf, because that leaf would land in a
         // padding slot and change a public input.
         uint256[] memory leaves = peekQueuedLeaves(self, self.queueSize, data.batchSize);
-        // `lastSubtrees` and `lastRoot` MUST come from storage. The circuit only reads
-        // `lastRoot` when nothing is inserted, which batchSize >= 1 rules out, and never checks
-        // it against `lastSubtrees`: the new root's soundness rests on these subtrees being
-        // the ones this contract stored.
-        uint256[COMMITMENT_TREE_DEPTH] storage lastSubtrees = self
-            .levelSubtrees;
+        // `leafIndex` and `lastRoot` MUST come from storage. The subtrees are a private witness:
+        // the circuit binds them to `lastRoot` by recomputing the root of the frontier at
+        // `leafIndex`, so the new root's soundness rests on `lastRoot` being the stored root.
         uint256 lastRoot = self.roots[self.currentRootIndex];
         uint256 nZeroLeaves = self.queueSize - insertedLeaves;
 
-        bytes memory vParams = abi.encodePacked(
-            data.proof,
-            uint256(self.nextLeafIndex),
-            leaves,
-            lastRoot,
-            lastSubtrees,
-            data.newRoot,
-            data.newLevelSubtrees,
-            nZeroLeaves
-        );
+        // One public input (HyperEVM prices each one at ~61.5k gas):
+        //   sha256(leafIndex || leaves[queueSize] || lastRoot || newRoot || nZeroLeaves) mod p
+        // `newRoot` must be a canonical field element; a value >= p cannot be proven
+        // (Num2Bits_strict in the circuit), so a non-canonical root fails closed.
+        uint256 inputsHash = uint256(
+            sha256(
+                abi.encodePacked(
+                    uint256(self.nextLeafIndex),
+                    leaves,
+                    lastRoot,
+                    data.newRoot,
+                    nZeroLeaves
+                )
+            )
+        ) % FIELD_SIZE;
+
+        bytes memory vParams = abi.encodePacked(data.proof, inputsHash);
 
         valid = self.verifier.verifyTreeUpdateProof(vParams);
     }
@@ -258,7 +264,6 @@ library QueuedMerkleTreeLogic {
         view
         returns (
             uint256[] memory queuedLeaves,
-            uint256[COMMITMENT_TREE_DEPTH] memory subtrees,
             uint256 lastRoot,
             uint8 currentRootIdx,
             uint32 nextLeafIndex
@@ -274,7 +279,6 @@ library QueuedMerkleTreeLogic {
         // leaves are queued afterwards. Choosing `batchSize = min(totalQueued, queueSize)` at
         // proving time uses all the leaves that are pending then.
         queuedLeaves = _getQueuedLeaves(self);
-        subtrees = self.levelSubtrees;
         nextLeafIndex = self.nextLeafIndex;
         lastRoot = self.roots[self.currentRootIndex];
         currentRootIdx = self.currentRootIndex;

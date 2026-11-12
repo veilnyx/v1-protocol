@@ -115,7 +115,7 @@ library ShieldedAddressLogic {
         );
     }
 
-    /// @dev The register circuit declares `publicAddress` as a public input purely so
+    /// @dev The register circuit binds `publicAddress` (inside `inputsHash`) purely so
     ///      the proof is bound to one registrant. Without it the proof commits only to
     ///      the shielded address, and the EIP-712 struct names no signer either, so an
     ///      observer could re-sign the same shielded address with their own key and
@@ -128,12 +128,22 @@ library ShieldedAddressLogic {
         address verifier,
         address publicAddress
     ) internal view returns (bool) {
-        bytes memory vInp = abi.encodePacked(
-            self.proof,
-            self.shieldedAddress,
-            uint256(uint160(publicAddress))
-        );
-        return IVerifier(verifier).verifyAddressProof(vInp);
+        // One public input (HyperEVM prices each one at ~61.5k gas):
+        //   sha256(rootAddress || signPublicKey || viewPublicKey || publicAddress) mod p
+        // `shieldedAddress` is exactly those five words, unpacked. Every word must be a
+        // canonical field element for the proof to exist (Num2Bits_strict in the circuit).
+        uint256 inputsHash = uint256(
+            sha256(
+                abi.encodePacked(
+                    self.shieldedAddress,
+                    uint256(uint160(publicAddress))
+                )
+            )
+        ) % FIELD_SIZE;
+        return
+            IVerifier(verifier).verifyAddressProof(
+                abi.encodePacked(self.proof, inputsHash)
+            );
     }
 
     function pack(

@@ -129,6 +129,21 @@ contract Pool is
         _setPauser(newPauser);
     }
 
+    /// @notice Points the pool and its commitment tree at a new verifier router.
+    /// @dev The router's public-input counts are compile-time constants, so a circuit change
+    ///      that alters them (the HyperEVM public-input cut: 12/6/64 -> 3/1/1) needs a new
+    ///      router. Call it atomically with the implementation upgrade
+    ///      (`upgradeToAndCall(newImpl, abi.encodeCall(Pool.setVerifier, (router)))`) while the
+    ///      pool is paused, so no transaction is checked against a mismatched router.
+    function setVerifier(IVerifier newVerifier) external onlyOwner {
+        if (address(newVerifier).code.length == 0) {
+            revert IPool.InvalidVerifierAddress(address(newVerifier));
+        }
+        emit IPool.VerifierUpdated(verifier, newVerifier);
+        verifier = newVerifier;
+        _commitmentTree.verifier = newVerifier;
+    }
+
     function addAssets(
         AssetType assetType,
         AssetInitParams[] calldata initParams
@@ -571,7 +586,6 @@ contract Pool is
         view
         returns (
             uint256[] memory queuedLeaves,
-            uint256[COMMITMENT_TREE_DEPTH] memory lastSubtrees,
             uint256 lastRoot,
             uint8 currentRootIndex,
             uint32 nextLeafIndex
@@ -579,7 +593,6 @@ contract Pool is
     {
         (
             queuedLeaves,
-            lastSubtrees,
             lastRoot,
             currentRootIndex,
             nextLeafIndex
