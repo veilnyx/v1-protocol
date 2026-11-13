@@ -1,7 +1,7 @@
 import { parseEther, parseUnits, zeroAddress } from "viem";
 import { Core } from "@veilnyx-sdk/core";
 import { TransactionType } from "@veilnyx-sdk/shared-types";
-import { fixture, generateTestTransactions, generateTestTxsWithOutsourcedProofVerification, mockNotes, mockNotesWithOffset, generatePackedUserOps, PAYMASTER_ADDR_FIXTURE } from "./fixture";
+import { fixture, generateTestTransactions, mockNotes, mockNotesWithOffset, generatePackedUserOps, PAYMASTER_ADDR_FIXTURE } from "./fixture";
 
 const {
 	assets: { weth, usdc },
@@ -101,21 +101,9 @@ export const genTestTransfers = async (sdk: Core) => {
 	await generateTestTransactions(reqs, sdk);
 };
 
-export const genTestTransfersWithOutsourceProofVerification = async (sdk: Core, nebraClient: any) => {
-	await mockNotes("deposit_weth_tx", sdk);
-	await generateTestTxsWithOutsourcedProofVerification(reqs, sdk, nebraClient);
-}
-
-export const genTransferPackedUserOp = async (sdk: Core, nebraClient: any) => {
+export const genTransferPackedUserOp = async (sdk: Core) => {
 	await mockNotes("deposit_weth_tx", sdk);
 	const [name, req] = Object.entries(reqsPackedUserOp)[0];
 	console.log("req to userop:", req);
-	await generatePackedUserOps(name, req, sdk, false, nebraClient);
-}
-
-export const genTransferPackedUserOpPreVerified = async (sdk: Core, nebraClient: any) => {
-	await mockNotes("deposit_weth_tx", sdk);
-	const [name, req] = Object.entries(reqsPackedUserOp)[0];
-	console.log("req to userop:", req);
-	await generatePackedUserOps(name, req, sdk, true, nebraClient);
+	await generatePackedUserOps(name, req, sdk);
 }

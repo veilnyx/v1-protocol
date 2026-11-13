@@ -23,7 +23,6 @@ contract Config is Script {
     address public immutable paymaster;
     address public immutable nativeWToken;
     address public immutable sanctionsList;
-    address public immutable nebraVerifier;
 
     AssetType public immutable initAssetType;
     address[] internal _initAssetAddresses;
@@ -79,11 +78,6 @@ contract Config is Script {
         paymaster = vm.parseJsonAddress(
             configJson,
             string.concat(chainPrefix, ".paymaster")
-        );
-
-        nebraVerifier = vm.parseJsonAddress(
-            configJson,
-            string.concat(chainPrefix, ".nebraVerifier")
         );
 
         nativeWToken = vm.parseJsonAddress(

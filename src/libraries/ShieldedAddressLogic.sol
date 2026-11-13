@@ -17,7 +17,6 @@ struct ShieldedAddressRegistrationData {
 library ShieldedAddressLogic {
     using MerkleTreeLogic for MerkleTree;
 
-    error NotPreVerified();
     error ShieldedAddrIncorrectLength(uint8 givenLength, uint8 expectedLength);
     error ZeroRootAddress();
     error ExceededFieldSize();

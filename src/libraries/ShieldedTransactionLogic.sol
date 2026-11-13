@@ -11,7 +11,6 @@ import {IPool} from "../interfaces/IPool.sol";
 import {IVerifier} from "../interfaces/IVerifier.sol";
 import {IHasher} from "../interfaces/IHasher.sol";
 import {IAdaptorHandler} from "../interfaces/IAdaptorHandler.sol";
-import {INebraUpa} from "../interfaces/INebraUpa.sol";
 import {IWToken} from "../interfaces/IWToken.sol";
 
 /// @title ShieldedTransactionType enum representing types of shielded transactions
@@ -586,7 +585,7 @@ library ShieldedTransactionLogic {
         return (accumulator, coefficientPow);
     }
 
-    /// @dev Universal Hash Function (UHF) for reducing the encryted data public inputs (nIns + nOuts + 3 + 4 + nOuts * 4) to only 2 public inputs. This is done to reduce the number of public inputs to the circuit and be compatible with Nebra's requirement of a max of 16 PIs.
+    /// @dev Universal Hash Function (UHF) binding the header (9) and the encrypted data (nIns + nOuts + 3 + 4 + nOuts * 4) to the proof through the three public inputs alpha, beta, gamma.
     /// @dev The UHF is defined as follows:
     // β (accumulator) = UHF(D, a) = ∑i a^i⋅Di modp where D = [D1, D2, ..., Dn] is the list of encrypted data private inputs and a is the alpha value and p is the prime field modulus.
     /// @dev The onchain implementation of UHF processes each array of inputs being hashed seperately (unlike the TS implementation), due to the stack size limit of 16 in Solidity.

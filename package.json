@@ -30,8 +30,7 @@
     "transferOwnership": "forge script script/setup/TransferOwnership.s.sol:TransferOwnership --broadcast",
     "genPoseidon": "npx tsx script/genPoseidon.ts",
     "deployPaymaster:sepolia": "hardhat run script/deployPaymaster.ts --network sepolia",
-    "paymasterOps:sepolia": "source .env && forge script script/setup/PaymasterOps.s.sol:PaymasterOps --rpc-url $RPC_ETHEREUM_SEPOLIA --broadcast",
-    "registerCircuitNebra:ethSepolia": "hardhat run script/registerCircuitsOnNebra.ts --network sepolia"
+    "paymasterOps:sepolia": "source .env && forge script script/setup/PaymasterOps.s.sol:PaymasterOps --rpc-url $RPC_ETHEREUM_SEPOLIA --broadcast"
   },
   "keywords": [],
   "author": "Gelbfeld AG",
@@ -50,7 +49,6 @@
     "@veilnyx-sdk/transaction": "link:../v1-sdk/packages/transaction",
     "@veilnyx-sdk/utils": "link:../v1-sdk/packages/utils",
     "@veilnyx-sdk/zk-prover": "link:../v1-sdk/packages/zk-prover",
-    "@nebrazkp/upa": "^2.0.3",
     "@nomicfoundation/hardhat-ethers": "^3.0.8",
     "@nomicfoundation/hardhat-foundry": "^1.1.2",
     "@nomicfoundation/hardhat-ignition": "^0.15.5",

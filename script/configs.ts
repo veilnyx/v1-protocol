@@ -16,7 +16,6 @@ export type ChainParams = {
   initNativeGasTokenToAssetChainlinkFeeds: Hex[];
   initAssetToUSDChainlinkFeeds: Hex[];
   initAssetIdsVeilnyx: number[];
-  nebraVerifier: Hex;
 };
 
 export type AdaptorParams = {
@@ -238,7 +237,6 @@ export function loadConfigs() {
       initNativeGasTokenToAssetChainlinkFeeds,
       initAssetToUSDChainlinkFeeds,
       initAssetIdsVeilnyx,
-      nebraVerifier,
     } = params as ChainParams;
 
     chainParams[Number(chainId)] = {
@@ -253,7 +251,6 @@ export function loadConfigs() {
       initNativeGasTokenToAssetChainlinkFeeds: initNativeGasTokenToAssetChainlinkFeeds.map(getHex),
       initAssetToUSDChainlinkFeeds: initAssetToUSDChainlinkFeeds.map(getHex),
       initAssetIdsVeilnyx: initAssetIdsVeilnyx.map(assetId => Number(assetId)),
-      nebraVerifier: getHex(nebraVerifier),
     };
   }
 

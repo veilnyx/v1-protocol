@@ -21,8 +21,6 @@ const DEPLOYED_LIBS = {
     ShieldedTransactionLogic: `0xaaed44a5d1dec54e79ba1c666264f8e5ec6d576d` as `0x${string}`,
 };
 const verificationTrackerService = `0x${"75a4dA1697aF884c99724474d26F2EAe23cc58Bc"}` as `0x${string}`;
-const nebraVerifierSepolia = `0x${"3B946743DEB7B6C97F05B7a31B23562448047E3E"}` as `0x${string}`;
-
 let client: any;
 let chainId: number;
 let commonParams: CommonParams;

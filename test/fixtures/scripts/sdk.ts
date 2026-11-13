@@ -1,6 +1,5 @@
 //@ts-ignore
 import * as snarkJs from "snarkjs";
-import * as ethers from "ethers";
 import dotenv from 'dotenv';
 import path, { parse } from 'path';
 import {
@@ -19,7 +18,6 @@ import { foundry } from "viem/chains";
 import { Core, CoreOptions } from "@veilnyx-sdk/core";
 import MerkleTree from "fixed-merkle-tree";
 import { fp, poseidonHash } from "@veilnyx-sdk/babyjubjub";
-import { UpaClient, UpaInstanceDescriptor } from "@nebrazkp/upa/sdk";
 import { toBigInt } from "@veilnyx-sdk/utils";
 import {
   MockNotesSource,
@@ -85,23 +83,6 @@ export const getSDKInstance = async () => {
 
   const zkfi = new Core(coreOpt);
 
-  // Only the outsourced-verification (Nebra) generators need this client, and it needs a funded
-  // Sepolia key plus network access. Every other generator runs offline without it.
-  let nebraClient: UpaClient | undefined;
-  if (process.env.SEPOLIA_TEST_PRIV_KEY) {
-    const sepoliaProvider = new ethers.JsonRpcProvider(process.env.RPC_ETHEREUM_SEPOLIA);
-    const privateKey = process.env.SEPOLIA_TEST_PRIV_KEY.slice(2).padStart(64, '0');
-    const signer = new ethers.Wallet(privateKey).connect(sepoliaProvider);
-    console.log("Creating nebra client");
-    const upaInstanceDescriptor: UpaInstanceDescriptor = {
-      "verifier": "0x3B946743DEB7B6C97F05B7a31B23562448047E3E",
-      "deploymentBlockNumber": 6405136,
-      "deploymentTx": "0xa8626318b76b71cd21cdfb93ef67c9571d94e01383e852a3eb6dc5dc6188808e",
-      "chainId": "11155111"
-    };
-    nebraClient = await zkfi.generateNebraClient(signer, upaInstanceDescriptor);
-  }
-
   zkfi.getRevokerData = async () => ({
     id: 0,
     revokerPublicKey,
@@ -138,7 +119,6 @@ export const getSDKInstance = async () => {
 
   return {
     sdk: zkfi,
-    nebraClient
   };
 };
 

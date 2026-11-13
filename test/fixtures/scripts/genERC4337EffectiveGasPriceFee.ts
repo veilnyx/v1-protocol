@@ -11,7 +11,7 @@ import { getSDKInstance } from "./sdk";
 const FIXTURE_NAME = "transfer_20_weth_with_weth_fee_effective_gas_price";
 
 const main = async () => {
-    const { sdk, nebraClient } = await getSDKInstance();
+    const { sdk } = await getSDKInstance();
     const {
         assets: { weth },
         receiver: { account: receiverAccount },
@@ -31,8 +31,6 @@ const main = async () => {
             revokerId: 0,
         },
         sdk,
-        false,
-        nebraClient,
         {
             maxFeePerGas: parseUnits("100", 9),
             maxPriorityFeePerGas: parseUnits("2", 9),

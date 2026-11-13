@@ -3,7 +3,6 @@ pragma solidity ^0.8.24;
 
 import {PackedUserOperation} from "@account-abstraction/contracts/interfaces/PackedUserOperation.sol";
 import {Test} from "forge-std/Test.sol";
-import {MockNebraVerifier} from "test/mocks/MockNebraVerifier.sol";
 import {ShieldedTransactionType, ShieldedTransaction} from "src/libraries/ShieldedTransactionLogic.sol";
 import {ShieldedAddressRegistrationData} from "src/libraries/ShieldedAddressLogic.sol";
 import {TreeUpdateData} from "src/libraries/QueuedMerkleTreeLogic.sol";
@@ -22,7 +21,6 @@ abstract contract BaseTest is Test {
     MockERC20 public token1;
     MockERC20 public token2;
     MockERC20ForReentrancyTest public tokenReent;
-    MockNebraVerifier public mockNebraVerifier;
     Config public config;
     address VERIFICATION_TRACKER_SERVICE = makeAddr("tracker");
     address MOCK_GATEWAY = makeAddr("gateway");

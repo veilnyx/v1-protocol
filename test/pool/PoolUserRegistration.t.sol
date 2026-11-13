@@ -14,7 +14,6 @@ import {PoolBaseTest} from "test/fixtures/PoolBaseTest.sol";
 
 contract PoolUserRegistration is PoolBaseTest {
     ShieldedAddressRegistrationData addressRegistrationData;
-    ShieldedAddressRegistrationData addrRegDataWithProofVeriOutsourced;
     address senderAddr;
     uint256 senderPK;
     bytes shieldedAddress;
@@ -32,10 +31,6 @@ contract PoolUserRegistration is PoolBaseTest {
             "register_sender"
         );
 
-        // addrRegDataWithProofVeriOutsourced = _loadShieldedAddressRegistrationData(
-        //     "register_sender_proof_veri_outsourced"
-        // );
-
         shieldedAddress = bytes.concat(
             bytes32(fixture.sender.rootAddress),
             bytes32(fixture.sender.signPublicKey[0]),
@@ -49,7 +44,6 @@ contract PoolUserRegistration is PoolBaseTest {
             shieldedAddress
         );
         addressRegistrationData.signature = signature;
-        // addrRegDataWithProofVeriOutsourced.signature = signature;
     }
 
     function test_packShieldedAddress() public view {
@@ -77,24 +71,6 @@ contract PoolUserRegistration is PoolBaseTest {
 
         assertEq(addressRegistrationData.shieldedAddress, shieldedAddress);
     }
-
-    /**
-    function test_registerAddressWithProofVerificationOutsourced() public {
-        vm.expectEmit(true, true, false, false);
-        emit IPool.RegisterAddress(
-            senderAddr,
-            fixture.sender.rootAddress,
-            0,
-            shieldedAddress
-        );
-        pool.registerAddress(addrRegDataWithProofVeriOutsourced);
-
-        assertEq(
-            addrRegDataWithProofVeriOutsourced.shieldedAddress,
-            shieldedAddress
-        );
-    }
-     */
 
     function test_revertWhenShieldedAddrPacked() public {
         addressRegistrationData.shieldedAddress = fixture

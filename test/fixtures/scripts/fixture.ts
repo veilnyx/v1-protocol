@@ -155,43 +155,6 @@ export const generateTestTransaction = async (
   writeFileSync(`${dirFixtureData}/${name}.txt`, encoded);
 };
 
-export const generateTestTxsWithOutsourcedProofVerification = async (
-  reqs: Record<string, TransactionRequest & TransactionOptions>,
-  sdk: Core,
-  nebraClient: any
-) => {
-  const reqArr = Object.entries(reqs);
-  for (const [name, req] of reqArr) {
-    await generateTestTransactionWithOutsourcedProofVerification(name, req, sdk, nebraClient);
-  }
-};
-
-export const generateTestTransactionWithOutsourcedProofVerification = async (
-  name: string,
-  req: TransactionRequest & TransactionOptions,
-  sdk: Core,
-  nebraClient: any
-) => {
-  const opts = {
-    viaBundler: req.viaBundler,
-    paymaster: req.paymaster,
-    revokerId: req.revokerId,
-    userOpFeeQuoteEth: parseEther("0.00025")
-  };
-  const tx = await sdk.createTransaction(req, opts);
-  // console.log("TX: ", tx);
-  const signedTx = await sdk.signTransaction(tx);
-  const { ztx: preVerifiedTx, preVerification, nebraProofSubmissionObj } = await sdk.proveOutsourcedVerificationTx(signedTx, nebraClient);
-
-  console.log("ZTX:", preVerifiedTx);
-  const encoded = preVerifiedTx.encode();
-  console.log("ZTX Encoded");
-  writeFileSync(`${dirFixtureData}/${name}.txt`, encoded);
-
-  // const encodedPreVerification = preVerification.encode();
-  // writeFileSync(`${dirFixtureData}/${name}_preVerificationEncodedStruct.txt`, encodedPreVerification);
-};
-
 export const generateTestAddressRegistrations = async (
   reqs: Record<string, {}>,
   sdk: Core,
@@ -200,18 +163,6 @@ export const generateTestAddressRegistrations = async (
   const reqArr = Object.entries(reqs);
   for (const [name, req] of reqArr) {
     await generateTestAddressRegistration(name, sdk, publicAddress);
-  }
-};
-
-export const generateTestAddrRegWithOutsourceProofVerifications = async (
-  reqs: Record<string, {}>,
-  sdk: Core,
-  nebraClient: any,
-  publicAddress: Hex = REGISTER_SIGNER_ADDRESS
-) => {
-  const reqArr = Object.entries(reqs);
-  for (const [name, req] of reqArr) {
-    await generateTestAddrRegWithOutsourcedProofVerification(name, sdk, nebraClient, publicAddress);
   }
 };
 
@@ -225,19 +176,6 @@ const generateTestAddressRegistration = async (
   const zaddrReg = await sdk.proveAddress("0x", publicAddress);
   const encoded = zaddrReg.encode();
   writeFileSync(`${dirFixtureData}/${name}.txt`, encoded);
-};
-
-const generateTestAddrRegWithOutsourcedProofVerification = async (
-  name: string,
-  sdk: Core,
-  nebraClient: any,
-  publicAddress: Hex
-) => {
-  const zaddrReg = await sdk.proveAddressAndOutsourceVerification("0x", nebraClient, publicAddress);
-  console.log("zaddrReg obj returned after proof gen & submission to Nebra:", zaddrReg);
-  console.log("Encoding to gen fixture");
-  const encoded = zaddrReg.shieldedAddressRegistrationData.encode();
-  writeFileSync(`${dirFixtureData}/${name}_proof_veri_outsourced.txt`, encoded);
 };
 
 export const splitToChunks = (data: Hex, chunkSize: number) => {
@@ -378,8 +316,8 @@ export async function mockNotesWithOffset(depositName: string, sdk: Core, leafIn
   console.log("commit tree root after mockNotesWithOffset", sdk.commitmentTreeSource.root);
 }
 
-export const generatePackedUserOps = async (name: string, req: TransactionRequest & TransactionOptions, sdk: Core, isPreVerified: boolean, nebraClient: any) => {
-  return generatePackedUserOpsWithFeeQuote(name, req, sdk, isPreVerified, nebraClient, {
+export const generatePackedUserOps = async (name: string, req: TransactionRequest & TransactionOptions, sdk: Core) => {
+  return generatePackedUserOpsWithFeeQuote(name, req, sdk, {
     baseFeePerGas: BigInt(0),
   });
 }
@@ -395,8 +333,6 @@ export const generatePackedUserOpsWithFeeQuote = async (
   name: string,
   req: TransactionRequest & TransactionOptions,
   sdk: Core,
-  isPreVerified: boolean,
-  nebraClient: any,
   feeQuote: UserOpFeeQuoteOverrides,
 ) => {
 
@@ -458,8 +394,6 @@ export const generatePackedUserOpsWithFeeQuote = async (
   writeFileSync(`${dirFixtureData}/${name}.txt`, encodedZTx);
   console.log("ZTX fixture created");
 
-  // const encodedPreVerification = preVerification.encode();
-  // writeFileSync(`${dirFixtureData}/${name}_preVerificationEncodedStruct.txt`, encodedPreVerification);
 
   // Generating & Updating calldata in UserOp
   const gatewayAbi = JSON.parse(readFileSync("artifacts/src/core/Gateway.sol/Gateway.json", "utf-8")).abi;
@@ -517,9 +451,5 @@ export const generatePackedUserOpsWithFeeQuote = async (
   // @ts-ignore
   const encoded = encodeAbiParameters(packedUserOpAbi, [packedUserOpValueObj]);
 
-  if (isPreVerified) {
-    writeFileSync(`${dirFixtureData}/${name}_packed_userop_preVerified.txt`, encoded);
-  } else {
-    writeFileSync(`${dirFixtureData}/${name}_packed_userop.txt`, encoded);
-  }
+  writeFileSync(`${dirFixtureData}/${name}_packed_userop.txt`, encoded);
 }

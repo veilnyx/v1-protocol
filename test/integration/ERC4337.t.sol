@@ -23,7 +23,7 @@ contract ERC4337 is PoolTest {
     Gateway public gateway;
     uint24 feeAssetId;
     uint256 feeValue = 0.002 ether;
-    uint256 feeValueForOutsourcedVerification = 0.001 ether;
+    uint256 feeValueForUserOp = 0.001 ether;
     address public constant CHAINLINK_ETH_USDC_FEED_SEPOLIA =
         0x694AA1769357215DE4FAC081bf1f309aDC325306;
 
@@ -177,42 +177,6 @@ contract ERC4337 is PoolTest {
             effectiveFee
         );
     }
-
-    /**
-    // Since this tx will be preVerified, it will go to the mempool
-    function testHandleOpsForBundlerPreVerifiedTx() public {
-        PackedUserOperation[] memory ops = new PackedUserOperation[](1); // Entrypoint contract requires an array of ops
-        PackedUserOperation memory packedUserOp = _loadPackedUserOp(
-            "transfer_20_weth_with_weth_fee_packed_userop_preVerified"
-        );
-
-        ops[0] = packedUserOp;
-        entryPointContract.handleOps(ops, payable(address(this))); // add STX to Mempool
-
-        // exiting mempool for being processed by the Pool
-        ShieldedTransaction memory stx = _loadShieldedTransaction(
-            "transfer_20_weth_with_weth_fee"
-        );
-        PreVerificationDetails
-            memory preVerificationDetails = _loadPreVerificationDetails(
-                "transfer_20_weth_with_weth_fee_preVerificationEncodedStruct"
-            );
-        bytes32 proofId = keccak256(
-            abi.encodePacked(
-                preVerificationDetails.circuitId,
-                preVerificationDetails.publicInputs
-            )
-        );
-        console2.log("Transfer tx proofId");
-        console2.logBytes32(proofId);
-
-        mempool.exitSTXFromMempool(
-            ShieldedTransactionLogic.hash(stx),
-            stx,
-            proofId
-        );
-    }
-     */
 
     receive() external payable {
         // Handle received Ether

@@ -1,7 +1,7 @@
-import { genAddressRegistrations, genAddrRegWithOutsourceProofVerification } from "./genTestAddressRegistration";
+import { genAddressRegistrations } from "./genTestAddressRegistration";
 import { genTestDeposits, genTestDeposits4x2, reqsReentrant } from "./genTestDeposits";
 import { genTestWithdrawals, genTestWithdrawalsFromReentrantTokenDeposit } from "./genTestWithdrawals";
-import { genTestTransfers, genTestTransfersWith4Input2OutputNotes, genTestTransfersWith4Input4OutputNotes, genTestTransfersWithOutsourceProofVerification, genTransferPackedUserOp, genTransferPackedUserOpPreVerified } from "./genTestTransfers";
+import { genTestTransfers, genTestTransfersWith4Input2OutputNotes, genTestTransfersWith4Input4OutputNotes, genTransferPackedUserOp } from "./genTestTransfers";
 import { genTestCallAdaptors, genMorphoSupplyAdaptorTx, genMorphoWithdrawAdaptorTx } from './genTestCallAdaptor';
 
 import { generateTestTransactions } from "./fixture";
@@ -15,7 +15,7 @@ import {
 ///   FIXTURE_CIRCUITS=<prod circuits dir> pnpm test:prepare treeUpdate transfers
 /// Deposit fixtures are spent by later fixtures (their notes are decrypted from the deposit
 /// fixture), so regenerate a deposit only together with everything that spends it.
-const named: Record<string, (sdk: any, nebraClient: any) => Promise<void>> = {
+const named: Record<string, (sdk: any) => Promise<void>> = {
 	treeUpdate: async (sdk) => {
 		await genTreeUpdateData(sdk);
 		await genTreeUpdateDataWithPartialQueue(sdk);
@@ -30,13 +30,13 @@ const named: Record<string, (sdk: any, nebraClient: any) => Promise<void>> = {
 };
 
 const main = async () => {
-	const { sdk, nebraClient } = await getSDKInstance();
+	const { sdk } = await getSDKInstance();
 	const picked = process.argv.slice(2);
 	if (picked.length) {
 		for (const name of picked) {
 			if (!named[name]) throw new Error(`unknown generator ${name}; one of: ${Object.keys(named).join(", ")}`);
 			console.log(`== ${name}`);
-			await named[name](sdk, nebraClient);
+			await named[name](sdk);
 		}
 		return;
 	}
@@ -45,16 +45,11 @@ const main = async () => {
 	// await genTestDeposits(sdk); // already generated; transact21 wasm not compiled - only regenerate if assets change
 	// await genMorphoSupplyAdaptorTx(sdk);
 	// await genMorphoWithdrawAdaptorTx(sdk);
-	// await genTestDepositsWithOutsourceProofVerification(sdk, nebraClient);
 	// await genTestTransfers(sdk);
 	// await genTestDeposits4x2(sdk);
 	// await genTestTransfersWith4Input2OutputNotes(sdk);
 	// await genTestTransfersWith4Input4OutputNotes(sdk);
-	// await genTestTransfersWithOutsourceProofVerification(sdk, nebraClient);
-	// await genTransferPackedUserOp(sdk, nebraClient);
 	// await genAddressRegistrations(sdk);
-	// await genTestDepositsWithOutsourceProofVerification(sdk, nebraClient);
-	// await genTestTransfersWithOutsourceProofVerification(sdk, nebraClient);
 	await genTestWithdrawals(sdk);
 	// await genTestWithdrawalsFromPreTxDeposit(sdk);
 	// await genTestWithdrawalsFromReentrantTokenDeposit(sdk);

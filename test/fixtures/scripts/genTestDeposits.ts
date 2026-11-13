@@ -1,7 +1,7 @@
 import { parseEther, parseUnits, zeroAddress } from "viem";
 import { Core } from "@veilnyx-sdk/core";
 import { TransactionType } from "@veilnyx-sdk/shared-types";
-import { fixture, generateTestTransactions, generateTestTxsWithOutsourcedProofVerification } from "./fixture";
+import { fixture, generateTestTransactions } from "./fixture";
 
 const {
   assets: { weth, usdc, testnetWeth, testnetUsdc, reentrantToken, morphoVaultToken },
@@ -200,10 +200,6 @@ export const genTestDeposits = async (sdk: Core) => {
   console.log("depositing assets...");
   await generateTestTransactions(reqs, sdk);
 };
-
-export const genTestDepositsWithOutsourceProofVerification = async (sdk: Core, nebraClient: any) => {
-  await generateTestTxsWithOutsourcedProofVerification(reqs, sdk, nebraClient);
-}
 
 export const genTestDeposits4x2 = async (sdk: Core) => {
   console.log("depositing assets for transact42 (4-input 2-output) circuit test...");

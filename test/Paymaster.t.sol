@@ -45,7 +45,7 @@ contract PaymasterTest is PoolTest {
     // still pass feeValue as maxCostEth so Paymaster can recover the gas units
     // using `maxCostEth / MAX_FEE_PER_GAS`.
     uint256 feeValue = 0.002 ether;
-    uint256 feeValueForOutsourcedVerification = 0.001 ether;
+    uint256 feeValueForUserOp = 0.001 ether;
 
     ShieldedTransaction stx;
     PackedUserOperation userOp;
@@ -625,12 +625,12 @@ contract PaymasterTest is PoolTest {
         paymaster.validatePaymasterUserOp(userOp, bytes32(0), feeValue);
     }
 
-    function test_revertWhenPaymasterFeesInETHIsNotEnoughForPreVerifiedTx()
+    function test_revertWhenPaymasterFeesInETHIsNotEnoughForUserOp()
         public
         createPackedUserOps(address(gateway))
     {
-        uint256 lowFeeValue = feeValueForOutsourcedVerification - 0.00005 ether;
-        // feeding the required values for outsourced verification in userops.calldata
+        uint256 lowFeeValue = feeValueForUserOp - 0.00005 ether;
+        // feeding the required fee values in userops.calldata
         stx.feeData = uint256(
             bytes32(
                 bytes.concat(
@@ -648,13 +648,13 @@ contract PaymasterTest is PoolTest {
             abi.encodeWithSelector(
                 Paymaster.InsufficientFee.selector,
                 lowFeeValue,
-                feeValueForOutsourcedVerification
+                feeValueForUserOp
             )
         );
         paymaster.validatePaymasterUserOp(
             userOp,
             bytes32(0),
-            feeValueForOutsourcedVerification
+            feeValueForUserOp
         );
         vm.stopPrank();
     }
@@ -732,17 +732,17 @@ contract PaymasterTest is PoolTest {
         paymaster.validatePaymasterUserOp(userOp, bytes32(0), feeValue); // feeValue is maxCostEth
     }
 
-    function test_validatePaymasterUserOpForPreVerifiedTx()
+    function test_validatePaymasterUserOpWithFixedFee()
         public
         createPackedUserOps(address(gateway))
     {
-        // feeding the required values for outsourced verification in userops.calldata
+        // feeding the required fee values in userops.calldata
         stx.feeData = uint256(
             bytes32(
                 bytes.concat(
                     bytes20(address(paymaster)),
                     bytes3(uint24(feeAssetId)),
-                    bytes9(uint72(feeValueForOutsourcedVerification))
+                    bytes9(uint72(feeValueForUserOp))
                 )
             )
         );

@@ -1,5 +1,5 @@
 import { Core } from "@veilnyx-sdk/core";
-import { generateTestAddressRegistrations, generateTestAddrRegWithOutsourceProofVerifications } from "./fixture";
+import { generateTestAddressRegistrations } from "./fixture";
 
 const reqs = {
   register_sender: {},
@@ -7,8 +7,4 @@ const reqs = {
 
 export const genAddressRegistrations = async (sdk: Core) => {
   await generateTestAddressRegistrations(reqs, sdk);
-};
-
-export const genAddrRegWithOutsourceProofVerification = async (sdk: Core, nebraClient: any, registerCircuitId: `0x${string}`) => {
-  await generateTestAddrRegWithOutsourceProofVerifications(reqs, sdk, nebraClient);
 };
