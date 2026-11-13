@@ -1,0 +1,29 @@
+{
+  "chainId": 998,
+  "purpose": "HyperEVM public-input cut (3/1/1) testnet pool, deployed next to 0x775f14F0 without touching it. DEV KEYS (single contribution), not the ceremony.",
+  "source": "v1-protocol feat/hyperevm-input-cut, script/hyperliquid/DeployHyperEvmInputCut.s.sol",
+  "deployer": "0xd5182b47388e0ffe14781b9dBb7E9b699624cA96",
+  "clonedFrom": "0x775f14F0c514F757950053463904Db0793Fd6A3e",
+  "verifiers": {
+    "VerifierRegister": "0x6d617ce27f9327e0760ed03159546cf8a9d9ca92",
+    "VerifierTreeUpdate": "0x7aac99201797e387bb18dcfd44d28b6d4ed486d0",
+    "VerifierTransact21": "0xdf958d768a18baac8f8c0234ffa573d8a957d4e4",
+    "VerifierTransact22": "0xe0ff456f411dd481b8b3b22021538ef6d4b71ed9",
+    "VerifierTransact23": "0x09d5003cc3af84d841d27ab8539a10add3e5462e",
+    "VerifierTransact42": "0x360f1c3da8e3f4e8a3725aa0e26c75e2cba4b914",
+    "VerifierTransact44": "0xd0c8e8903c6c6f0a14e5fa5282b0921274da5c8c",
+    "VerifierTransact82": "0x72571c16cfad8e3f825a8aac1cbb0bdb1a45d9e8",
+    "VerifierTransact84": "0x58134466a77e0ce883c287639a8f8c433d18fe75"
+  },
+  "verifierRouter": "0xd3a6f943aed7439edc2f4bf95cb78aa29aff4c73",
+  "adaptorHandler": "0x95bae47db66b55138e88c425ee4d25a2a99437ce",
+  "poolImplementation": "0xa34cf9b2fca837a6ddd71c15d2426befbe1d71fd",
+  "poolProxy": "0x957abffb86128c382f2f7247441391423792cb73",
+  "deployedBlock": 69527335,
+  "poolProxyTx": "0xed91d3f20ec89eb9b1aab37331d197a6af6377290fa069c35aeb65bfeecb055e",
+  "gateway": "0xd5b9e20abb73739925782a1b7f644a4a3d1b202e",
+  "paymaster": "0xae51c21b7e3f43a44e1c548e35b952eeafe01268",
+  "hasher": "0xe1334b83972Fb6e551aFb874CCBc2485Ac36C415",
+  "screener": "0x13Dd9C75f1014D72AbCcAc88d7f56089516D6C10",
+  "totalGasUsed": 28908398
+}
