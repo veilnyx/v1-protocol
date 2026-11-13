@@ -1,8 +1,7 @@
 // The purpose of this script is to deploy the Veilnyx protocol core features focused on P-2-P transactions using Stable coins only.
 // This deploy script will skip:
-// 1. Proof aggregation features
-// 2. Integration adaptors
-// 3. Any tokens apart from gas and stable coins will be skipped
+// 1. Integration adaptors
+// 2. Any tokens apart from gas and stable coins will be skipped
 
 import hre from "hardhat";
 import {
