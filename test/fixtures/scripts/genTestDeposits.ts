@@ -196,9 +196,44 @@ export const reqs4x2: Record<string, any> = {
   },
 };
 
+// The deposits the local (non-fork) suite puts on chain. Each is independent: proven against
+// the empty commitment tree, which the pool always knows (roots[0]).
+export const reqsCore = {
+  deposit_pre_tx: {
+    type: TransactionType.DEPOSIT,
+    assetIds: [weth, usdc],
+    values: [parseEther("10000"), parseUnits("10000", 6)],
+    feeAssetId: 0,
+    to: senderAccount.shieldedAddress.pack(),
+    viaBundler: false,
+    paymaster: zeroAddress,
+    revokerId: 0,
+  },
+  deposit_weth_tx: {
+    type: TransactionType.DEPOSIT,
+    assetIds: [weth],
+    values: [parseEther("100")],
+    feeAssetId: 0,
+    to: senderAccount.shieldedAddress.pack(),
+    viaBundler: false,
+    paymaster: zeroAddress,
+    revokerId: 0,
+  },
+  deposit_2_testnet_weth: {
+    type: TransactionType.DEPOSIT,
+    assetIds: [testnetWeth],
+    values: [parseEther("2")],
+    feeAssetId: 0,
+    to: senderAccount.shieldedAddress.pack(),
+    viaBundler: false,
+    paymaster: zeroAddress,
+    revokerId: 0,
+  },
+};
+
 export const genTestDeposits = async (sdk: Core) => {
   console.log("depositing assets...");
-  await generateTestTransactions(reqs, sdk);
+  await generateTestTransactions(reqsCore, sdk);
 };
 
 export const genTestDeposits4x2 = async (sdk: Core) => {

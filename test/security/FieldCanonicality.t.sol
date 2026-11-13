@@ -145,7 +145,7 @@ contract FieldCanonicalityTest is PoolBaseTest {
     /// MEDIUM (fixed): a batchSize = 0 update is a provable no-op whose proof replays verbatim;
     /// 100 replays evicted every historic root and invalidated in-flight transactions.
     function test_zeroBatchUpdateRejected() public {
-        (, , uint256 r0, , ) = pool.getCommitmentTreeState();
+        (, uint256 r0, , ) = pool.getCommitmentTreeState();
         pool.transact(_loadShieldedTransaction("poc_deposit"));
         pool.updateCommitmentTree(_loadTreeUpdateData("poc_tree_update"));
 

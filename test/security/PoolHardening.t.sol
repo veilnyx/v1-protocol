@@ -204,7 +204,7 @@ contract PoolHardeningTest is PoolBaseTest {
         s.txType = ShieldedTransactionType.CALL_ADAPTOR;
         s.revokerId = 0;
         (, uint256 addrRoot, , ) = pool.getAddressTreeState();
-        (, , uint256 cmRoot, , ) = pool.getCommitmentTreeState();
+        (, uint256 cmRoot, , ) = pool.getCommitmentTreeState();
         s.addressTreeRoot = addrRoot;
         s.commitmentTreeRoot = cmRoot;
         s.targetData = abi.encodePacked(adaptor);

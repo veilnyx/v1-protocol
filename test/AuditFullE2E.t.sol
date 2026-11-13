@@ -57,10 +57,10 @@ contract AuditFullE2E is PoolTest {
         console2.log("deposit accepted, pool delta:", aft - before);
 
         // ---- flush the queue with the proved tree update ----
-        (, , uint256 rootBefore, , ) = pool.getCommitmentTreeState();
+        (, uint256 rootBefore, , ) = pool.getCommitmentTreeState();
         TreeUpdateData memory upd = _loadTreeUpdateData("audit_tree_update");
         pool.updateCommitmentTree(upd);
-        (, , uint256 rootAfter, , ) = pool.getCommitmentTreeState();
+        (, uint256 rootAfter, , ) = pool.getCommitmentTreeState();
 
         assertTrue(rootAfter != rootBefore, "commitment tree root did not advance");
         assertEq(rootAfter, upd.newRoot, "root does not match the proved newRoot");

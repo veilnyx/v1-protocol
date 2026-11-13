@@ -40,11 +40,13 @@ contract PoolTest is PoolBaseTest, BaseScript {
     Asset public asset1;
     Asset public asset2;
 
-    /// @dev Reference tree used to compute the correct newRoot and newLevelSubtrees for
-    ///      TreeUpdateData before calling pool.updateCommitmentTree(). Uses BinaryIMTData
+    /// @dev Reference tree used to compute the correct newRoot for TreeUpdateData before
+    ///      calling pool.updateCommitmentTree(). The pool no longer stores the subtrees, so
+    ///      this tree is kept across flushes (it mirrors every leaf the pool inserts). Uses BinaryIMTData
     ///      so the depth can be set to COMMITMENT_TREE_DEPTH (25) at runtime, matching
     ///      the on-chain QueuedMerkleTree (the fixed-depth MerkleTree only supports depth 20).
     BinaryIMTData internal _helperTree;
+    bool internal _helperTreeInitialized;
 
     /// Matches the production encoding: a single ABI-encoded IPFS CID, not a name/description
     /// pair. The pool only re-emits these bytes, but the two layouts are silently confusable —
@@ -53,7 +55,7 @@ contract PoolTest is PoolBaseTest, BaseScript {
         abi.encode("bafkreiazfa7ncz3236ixetvumpczv2cdktx7gyx2mifltjjgelpofy4kcq");
 
     modifier expectNullifiersMarked(ShieldedTransaction memory stx_) {
-        (, , , , uint32 nextLeafIndex) = pool.getCommitmentTreeState();
+        (, , , uint32 nextLeafIndex) = pool.getCommitmentTreeState();
         uint32 nullifierMarkLeafIndex = nextLeafIndex + 1;
 
         for (uint256 i = 0; i < stx_.nullifiers.length; i++) {
@@ -76,7 +78,7 @@ contract PoolTest is PoolBaseTest, BaseScript {
         // uint256 currentRootIndexBeforeDeposit = pool
         //     .getCommitmentTreeCurrentRootIndex();
 
-        (, , , , uint32 nextLeafIndex) = pool.getCommitmentTreeState();
+        (, , , uint32 nextLeafIndex) = pool.getCommitmentTreeState();
 
         for (uint256 i = 0; i < stx.commitments.length; ++i) {
             vm.expectEmit(true, true, true, true);
@@ -97,7 +99,7 @@ contract PoolTest is PoolBaseTest, BaseScript {
     }
 
     modifier expectReceipt(ShieldedTransaction memory stx) {
-        (, , , , uint32 nextLeafIndex) = pool.getCommitmentTreeState();
+        (, , , uint32 nextLeafIndex) = pool.getCommitmentTreeState();
         uint24 feeAssetId = 0;
         bytes memory assetsMemo = bytes("");
 
@@ -303,7 +305,6 @@ contract PoolTest is PoolBaseTest, BaseScript {
     function _processCommitmentTreeQueue() internal {
         (
             uint256[] memory queuedLeaves,
-            uint256[COMMITMENT_TREE_DEPTH] memory currentSubtrees,
             uint256 currentRoot,
             ,
             uint32 nextLeafIndex
@@ -312,35 +313,23 @@ contract PoolTest is PoolBaseTest, BaseScript {
         (uint32 startIdx, uint32 endIdx, , , ) = pool.getQueueRawState();
         uint32 actualBatchSize = endIdx - startIdx;
 
-        BinaryIMTLogic.init(_helperTree, COMMITMENT_TREE_DEPTH, ZERO_LEAF);
-
-        // Resume from the pool's stored subtree state.
-        // nextLeafIndex counts only real commitments, which is consistent with the
-        // stored levelSubtrees when only real leaves are inserted per flush.
-        _helperTree.root = currentRoot;
-        _helperTree.numberOfLeaves = nextLeafIndex;
-        for (uint256 i = 0; i < COMMITMENT_TREE_DEPTH; i++) {
-            _helperTree.lastSubtrees[i][0] = currentSubtrees[i];
+        if (!_helperTreeInitialized) {
+            BinaryIMTLogic.init(_helperTree, COMMITMENT_TREE_DEPTH, ZERO_LEAF);
+            _helperTreeInitialized = true;
         }
+        // The helper mirrors every leaf the pool has inserted (the pool keeps no subtrees).
+        assertEq(_helperTree.numberOfLeaves, nextLeafIndex, "helper tree out of sync");
+        assertEq(_helperTree.root, currentRoot, "helper tree root out of sync");
 
         // Insert only the real leaves — ZERO_LEAF pads are inert (they equal the
-        // implicit empty-slot value) so omitting them produces the same root while
-        // keeping levelSubtrees consistent with nextLeafIndex for subsequent flushes.
+        // implicit empty-slot value).
         for (uint256 i = 0; i < actualBatchSize; i++) {
             BinaryIMTLogic.insert(_helperTree, queuedLeaves[i]);
         }
 
-        uint256 newRoot = _helperTree.root;
-
-        uint256[COMMITMENT_TREE_DEPTH] memory newSubtrees;
-        for (uint256 i = 0; i < COMMITMENT_TREE_DEPTH; i++) {
-            newSubtrees[i] = _helperTree.lastSubtrees[i][0];
-        }
-
         TreeUpdateData memory treeUpdateData = TreeUpdateData({
-            newRoot: newRoot,
+            newRoot: _helperTree.root,
             batchSize: actualBatchSize,
-            newLevelSubtrees: newSubtrees,
             proof: bytes("")
         });
 

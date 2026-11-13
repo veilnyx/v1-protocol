@@ -3,7 +3,7 @@ pragma solidity ^0.8.24;
 
 import {IHasher} from "src/interfaces/IHasher.sol";
 import {QueuedMerkleTree, QueuedMerkleTreeLogic, TreeUpdateData} from "src/libraries/QueuedMerkleTreeLogic.sol";
-import {COMMITMENT_TREE_DEPTH} from "src/base/Constants.sol";
+import {COMMITMENT_TREE_DEPTH, FIELD_SIZE} from "src/base/Constants.sol";
 import {BaseTest} from "test/fixtures/BaseTest.sol";
 import {Verifier, TransactionVerifierInfo} from "src/core/Verifier.sol";
 import {VerifierTreeUpdate} from "src/verifiers/VerifierTreeUpdate.sol";
@@ -39,33 +39,30 @@ contract AuditTreeUpdateForgery is BaseTest {
         TreeUpdateData memory d = _loadTreeUpdateData("tree_update_data_1");
 
         // Rebuild the exact vParams _verifyUpdateProof would produce (honest case).
-        (
-            uint256[] memory leaves,
-            uint256[COMMITMENT_TREE_DEPTH] memory subtrees,
-            uint256 lastRoot,
-            ,
-
-        ) = qmt.getState();
+        (uint256[] memory leaves, uint256 lastRoot, , ) = qmt.getState();
 
         uint256 nZero = d.batchSize < qmt.queueSize
             ? qmt.queueSize - d.batchSize
             : 0;
 
-        bytes memory honest = abi.encodePacked(
-            d.proof,
-            uint256(qmt.nextLeafIndex),
-            leaves,
-            lastRoot,
-            subtrees,
-            d.newRoot,
-            d.newLevelSubtrees,
-            nZero
-        );
+        // The single public input, exactly as _verifyUpdateProof computes it.
+        uint256 inputsHash = uint256(
+            sha256(
+                abi.encodePacked(
+                    uint256(qmt.nextLeafIndex),
+                    leaves,
+                    lastRoot,
+                    d.newRoot,
+                    nZero
+                )
+            )
+        ) % FIELD_SIZE;
+        bytes memory honest = abi.encodePacked(d.proof, inputsHash);
         console2.log("honest vParams length:", honest.length);
         console2.log("proof length:", d.proof.length);
-        assertEq(honest.length, 256 + 64 * 32);
+        assertEq(honest.length, 256 + 1 * 32);
 
-        // Attacker: proof' := proof || honest 64 public signals; newRoot := anything.
+        // Attacker: proof' := proof || honest public signal; newRoot := anything.
         d.proof = honest;
         d.newRoot = uint256(keccak256("attacker controlled root"));
 
@@ -75,7 +72,7 @@ contract AuditTreeUpdateForgery is BaseTest {
 
         // The tree must be untouched by the rejected attempt: still the pre-update root,
         // and in particular NOT the attacker's chosen value.
-        (, , uint256 rootAfter, , ) = qmt.getState();
+        (, uint256 rootAfter, , ) = qmt.getState();
         assertEq(rootAfter, lastRoot, "root changed despite rejection");
         assertTrue(
             rootAfter != uint256(keccak256("attacker controlled root")),

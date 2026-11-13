@@ -1,6 +1,6 @@
 import { genAddressRegistrations } from "./genTestAddressRegistration";
 import { genTestDeposits, genTestDeposits4x2, reqsReentrant } from "./genTestDeposits";
-import { genTestWithdrawals, genTestWithdrawalsFromReentrantTokenDeposit } from "./genTestWithdrawals";
+import { genTestWithdrawals, genTestWithdrawalsFromReentrantTokenDeposit, genTestWithdrawalsFromPreTxDeposit, genTestWithdrawalsFromTestnetWethDeposit } from "./genTestWithdrawals";
 import { genTestTransfers, genTestTransfersWith4Input2OutputNotes, genTestTransfersWith4Input4OutputNotes, genTransferPackedUserOp } from "./genTestTransfers";
 import { genTestCallAdaptors, genMorphoSupplyAdaptorTx, genMorphoWithdrawAdaptorTx } from './genTestCallAdaptor';
 
@@ -27,6 +27,14 @@ const named: Record<string, (sdk: any) => Promise<void>> = {
 	transfers4x4: genTestTransfersWith4Input4OutputNotes, // spends deposits4x2
 	reentrantDeposit: (sdk) => generateTestTransactions(reqsReentrant, sdk),
 	reentrantWithdraw: genTestWithdrawalsFromReentrantTokenDeposit, // spends reentrantDeposit
+	deposits: genTestDeposits,
+	withdrawals: genTestWithdrawals, // spends deposit_pre_tx
+	withdrawalsFromPreTx: genTestWithdrawalsFromPreTxDeposit, // spends deposit_pre_tx
+	withdrawalsFromTestnetWeth: genTestWithdrawalsFromTestnetWethDeposit, // spends deposit_2_testnet_weth
+	callAdaptors: genTestCallAdaptors,
+	morphoSupply: genMorphoSupplyAdaptorTx,
+	morphoWithdraw: genMorphoWithdrawAdaptorTx,
+	register: genAddressRegistrations,
 };
 
 const main = async () => {

@@ -19,7 +19,7 @@ import { Note, Transaction } from '@veilnyx-sdk/transaction';
 import { TransactionType } from '@veilnyx-sdk/shared-types';
 import { Prover } from '../src/prover';
 import { ZTransaction } from '../src/ztx';
-import { hashEncryptedDataInputsSha256, hashEncryptedDataInputsPoseidon } from '../src/helpers';
+import { hashEncryptedDataInputsSha256, hashEncryptedDataInputsPoseidon, uhfHeader } from '../src/helpers';
 import { revokerData, receiver } from './helpers/tx';
 import { MockTreeSource, zeroElement } from './helpers/services';
 import { getCircuitPath } from './helpers/zk';
@@ -98,16 +98,27 @@ const proveRaw = async (
   const rawN = redN.map((x, i) => (aliasNullifier && i === 0 ? x + P : x));
   const rawC = redC.map((x, i) => (aliasCommitment && i === 0 ? x + P : x));
   const pubIds = inputs.pubAssetIds.map((n: any) => BigInt(n));
+  // The 9 former public inputs lead the UHF list (HyperEVM public-input cut); they are all
+  // canonical, so alpha and beta/gamma see the same header.
+  const header = uhfHeader({
+    addressTreeRoot: BigInt(inputs.addressTreeRoot),
+    commitmentTreeRoot: BigInt(inputs.commitmentTreeRoot),
+    hash: BigInt(inputs.hash),
+    pubFlow: inputs.pubFlow,
+    outRevokerPublicKey: inputs.outRevokerPublicKey,
+    refundAddress: BigInt(inputs.refundAddress),
+    keySeedEncryptionPublicKey: inputs.keySeedEncryptionPublicKey,
+  });
   const alpha = hashEncryptedDataInputsSha256(
-    pubIds, inputs.pubValues, rawN, rawC,
+    header, pubIds, inputs.pubValues, rawN, rawC,
     inputs.encryptedDataEncryptionKeySeed, inputs.encryptedRefundData, inputs.encryptedNoteData,
   );
   const beta = hashEncryptedDataInputsPoseidon(
-    pubIds, inputs.pubValues, redN, redC,
+    header, pubIds, inputs.pubValues, redN, redC,
     inputs.encryptedDataEncryptionKeySeed, inputs.encryptedRefundData, inputs.encryptedNoteData,
   );
   const all = [
-    ...pubIds, ...inputs.pubValues, ...redN, ...redC,
+    ...header, ...pubIds, ...inputs.pubValues, ...redN, ...redC,
     ...inputs.encryptedDataEncryptionKeySeed, ...inputs.encryptedRefundData,
     ...inputs.encryptedNoteData.flat(),
   ].map((x: any) => BigInt(x));

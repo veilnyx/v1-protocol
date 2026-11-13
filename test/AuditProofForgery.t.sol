@@ -24,7 +24,7 @@ contract AuditProofForgery is PoolTest {
     }
 
     /// Demonstrates that `stx.proof` length is unvalidated, so an attacker can
-    /// embed the 12 public signals of a *legitimate* proof inside the proof blob.
+    /// embed the public signals of a *legitimate* proof inside the proof blob.
     /// The contract's honestly-computed public inputs are appended AFTER and are
     /// silently ignored by the Solidity ABI decoder -> the verifier validates the
     /// attacker's chosen statement while the Pool acts on totally different data.
@@ -45,10 +45,10 @@ contract AuditProofForgery is PoolTest {
         console2.log("honest vInp length:", honestVInp.length);
         console2.log("original proof length:", stx.proof.length);
 
-        // honestVInp = proof(256) || 12 public signals (384) = 640
-        assertEq(honestVInp.length, 640, "expected 8+12 words");
+        // honestVInp = proof(256) || 3 public signals (alpha, beta, gamma: 96) = 352
+        assertEq(honestVInp.length, 352, "expected 8+3 words");
 
-        // 2. Attacker repackages: proof' := proof || realPublicSignals (640 bytes).
+        // 2. Attacker repackages: proof' := proof || realPublicSignals (352 bytes).
         bytes memory forgedProof = honestVInp;
 
         // 3. Attacker mutates every field the Pool acts on but which now no longer

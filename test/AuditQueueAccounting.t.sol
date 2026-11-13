@@ -45,11 +45,9 @@ contract AuditQueueAccounting is BaseTest {
         // ...but claim a full batch. leaves[] handed to the circuit is
         // [111,222,333, ZERO_LEAF x7]; inserting ZERO_LEAF is a no-op for the
         // root, so an HONEST prover can satisfy the circuit with nZeroLeaves=0.
-        uint256[COMMITMENT_TREE_DEPTH] memory subs;
         TreeUpdateData memory d = TreeUpdateData({
             newRoot: 12345,
             batchSize: qs, // == queueSize, so the `< queueSize` branch is skipped
-            newLevelSubtrees: subs,
             proof: bytes("")
         });
 
@@ -87,7 +85,6 @@ contract AuditQueueAccounting is BaseTest {
         TreeUpdateData memory d = TreeUpdateData({
             newRoot: uint256(keccak256("r")),
             batchSize: 3,
-            newLevelSubtrees: qmt.levelSubtrees,
             proof: bytes("")
         });
 

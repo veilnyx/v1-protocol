@@ -13,7 +13,7 @@ const {
 // produces a proof against a commitment tree root the Pool has never seen, which
 // surfaces as `UnknownCommitmentTreeRoot` at test time.
 
-// Spends notes from `deposit_2_testnet_weth`. Consumed by PoolDepositWithdraw.
+// Spends notes from `deposit_pre_tx`.
 export const reqs = {
   withdraw_10_weth_with_weth_fee: {
     type: TransactionType.WITHDRAW,
@@ -25,7 +25,10 @@ export const reqs = {
     paymaster: PAYMASTER_ADDR_FIXTURE as `0x${string}`,
     revokerId: 0
   }
-  /**
+};
+
+// Spends notes from `deposit_2_testnet_weth`. Consumed by PoolDepositWithdraw.
+export const reqsFromTestnetWethDeposit = {
   withdraw_1_testnet_weth_without_fee: {
     type: TransactionType.WITHDRAW,
     assetIds: [testnetWeth],
@@ -42,7 +45,6 @@ export const reqs = {
 // `_makePreDeposit()` puts on-chain. Consumed by PoolWithdraw, PoolGuardrails,
 // TvlGuard and Paymaster.
 export const reqsFromPreTxDeposit = {
-  /**
   withdraw_100_weth_without_fee: {
     type: TransactionType.WITHDRAW,
     assetIds: [weth],
@@ -53,8 +55,6 @@ export const reqsFromPreTxDeposit = {
     paymaster: zeroAddress,
     revokerId: 0,
   },
-  */
-  /**,
   withdraw_10_weth_with_usdc_fee: {
     type: TransactionType.WITHDRAW,
     assetIds: [weth],
@@ -65,7 +65,6 @@ export const reqsFromPreTxDeposit = {
     paymaster: PAYMASTER_ADDR_FIXTURE as `0x${string}`,
     revokerId: 0,
   },
-  /**
   withdraw_500_weth_without_fee: {
     type: TransactionType.WITHDRAW,
     assetIds: [weth],
@@ -76,7 +75,6 @@ export const reqsFromPreTxDeposit = {
     paymaster: zeroAddress,
     revokerId: 0,
   },
-  */
 };
 
 // Spends notes from `deposit_1000_reentrantToken_without_fee`. The `to` address
@@ -102,4 +100,14 @@ export const genTestWithdrawals = async (sdk: Core) => {
 export const genTestWithdrawalsFromReentrantTokenDeposit = async (sdk: Core) => {
   await mockNotes("deposit_1000_reentrantToken_without_fee", sdk);
   await generateTestTransactions(reqsFromReentrantTokenDeposit, sdk);
+};
+
+export const genTestWithdrawalsFromPreTxDeposit = async (sdk: Core) => {
+  await mockNotes("deposit_pre_tx", sdk);
+  await generateTestTransactions(reqsFromPreTxDeposit, sdk);
+};
+
+export const genTestWithdrawalsFromTestnetWethDeposit = async (sdk: Core) => {
+  await mockNotes("deposit_2_testnet_weth", sdk);
+  await generateTestTransactions(reqsFromTestnetWethDeposit, sdk);
 };

@@ -35,7 +35,8 @@ const SENDER_SEED = 199469708415994399978548843726072007254380131533562114379296
 const WETH = 65537;
 const USDC = 65538;
 const ATTACKER = '0x000000000000000000000000000000000000a77A';
-const MC = '../../../v1-interface/public/mainnet-circuits';
+// CIRCUITS_DIR: the keys behind src/verifiers (dev keys on feat/hyperevm-input-cut).
+const MC = process.env.CIRCUITS_DIR || '../../../v1-interface/public/mainnet-circuits';
 const cp = (n: string) => ({ zKey: `${MC}/${n}/keys.zkey`, wasm: `${MC}/${n}/circuit.wasm`, vKey: '' });
 const circuits = {
   transact21: cp('transact21'),

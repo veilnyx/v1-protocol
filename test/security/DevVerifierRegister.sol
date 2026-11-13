@@ -37,32 +37,17 @@ contract DevVerifierRegister {
     uint256 constant gammax2 = 10857046999023057135944570762232829481370756359578518086990519993285655852781;
     uint256 constant gammay1 = 4082367875863433681332203403145435568316851327593401208105741076214120093531;
     uint256 constant gammay2 = 8495653923123431417604973247489272438418190587263600148770280649306958101930;
-    uint256 constant deltax1 = 19487783962926691056268662305836115193899099528653568878877424593227152056788;
-    uint256 constant deltax2 = 8276104002327186344795661213186872427871046705389314373384536323876691397894;
-    uint256 constant deltay1 = 1558580506352427802556478510642685889426865300194876152358451708069096749440;
-    uint256 constant deltay2 = 21205454665357634986765645364858600596249162410387477203578639797308667402559;
+    uint256 constant deltax1 = 8293952404149690469144174063694667829727467303613598142434541877443628313618;
+    uint256 constant deltax2 = 9906453736810449097787222189863974046393231408695408686024717753229068787308;
+    uint256 constant deltay1 = 16524407880111938371808081933305398439208210496144049756061090894967099222653;
+    uint256 constant deltay2 = 15745946593973319287313957163202496939451644548358699667005460858609641625782;
 
     
-    uint256 constant IC0x = 10097489903547551709490123401258044034792963729620767586563006153288355446901;
-    uint256 constant IC0y = 10490013350079795497069772550835995294034791231023805812903640883147014624452;
+    uint256 constant IC0x = 13901126714011446621158928333183898358421364974657418897759486792920590028946;
+    uint256 constant IC0y = 665338020259478999181264215218636283759381319247509028355581659619585646405;
     
-    uint256 constant IC1x = 7885658969425047673780759206486348860974550639765975265655090370946511154321;
-    uint256 constant IC1y = 6321285411337012070107577729696195497381708354795294344960031304776676401409;
-    
-    uint256 constant IC2x = 7707573299276272139052531303408016581584753252401643501486349803898792666243;
-    uint256 constant IC2y = 16207370109622955790312194428052222955907509761405339805283221817387143945571;
-    
-    uint256 constant IC3x = 12686084362080258025356872586193166053865415895172327525394682995846762739232;
-    uint256 constant IC3y = 16430272413962603627110013560504868527729461741213032083701310251979807210291;
-    
-    uint256 constant IC4x = 242013588274208276596751757827620366355867032113794448927179074355085346902;
-    uint256 constant IC4y = 9450321489722323502880488235843503733927259003787903895711336539600250233708;
-    
-    uint256 constant IC5x = 20539619406107001387440411510175204125046078596941656707714055421765480503477;
-    uint256 constant IC5y = 15941035413791386588188651642136066827907610524448087217023378844882300629422;
-    
-    uint256 constant IC6x = 20601225713787418265561138321279725846595279550534536800384856294822271630260;
-    uint256 constant IC6y = 10545875913061234740278034711949391929203132304049572549122902682299251407436;
+    uint256 constant IC1x = 16655812172986148124344128148186938843068014568604567698517672637741122556559;
+    uint256 constant IC1y = 9494692057984776032717157744102314918307217648572103620184775801304251248875;
     
  
     // Memory data
@@ -71,7 +56,7 @@ contract DevVerifierRegister {
 
     uint16 constant pLastMem = 896;
 
-    function verifyProof(uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[6] calldata _pubSignals) public view returns (bool) {
+    function verifyProof(uint[2] calldata _pA, uint[2][2] calldata _pB, uint[2] calldata _pC, uint[1] calldata _pubSignals) public view returns (bool) {
         assembly {
             function checkField(v) {
                 if iszero(lt(v, r)) {
@@ -88,7 +73,7 @@ contract DevVerifierRegister {
                 mstore(add(mIn, 32), y)
                 mstore(add(mIn, 64), s)
 
-                success := staticcall(not(0), 7, mIn, 96, mIn, 64)
+                success := staticcall(sub(gas(), 2000), 7, mIn, 96, mIn, 64)
 
                 if iszero(success) {
                     mstore(0, 0)
@@ -98,7 +83,7 @@ contract DevVerifierRegister {
                 mstore(add(mIn, 64), mload(pR))
                 mstore(add(mIn, 96), mload(add(pR, 32)))
 
-                success := staticcall(not(0), 6, mIn, 128, pR, 64)
+                success := staticcall(sub(gas(), 2000), 6, mIn, 128, pR, 64)
 
                 if iszero(success) {
                     mstore(0, 0)
@@ -116,16 +101,6 @@ contract DevVerifierRegister {
                 // Compute the linear combination vk_x
                 
                 g1_mulAccC(_pVk, IC1x, IC1y, calldataload(add(pubSignals, 0)))
-                
-                g1_mulAccC(_pVk, IC2x, IC2y, calldataload(add(pubSignals, 32)))
-                
-                g1_mulAccC(_pVk, IC3x, IC3y, calldataload(add(pubSignals, 64)))
-                
-                g1_mulAccC(_pVk, IC4x, IC4y, calldataload(add(pubSignals, 96)))
-                
-                g1_mulAccC(_pVk, IC5x, IC5y, calldataload(add(pubSignals, 128)))
-                
-                g1_mulAccC(_pVk, IC6x, IC6y, calldataload(add(pubSignals, 160)))
                 
 
                 // -A
@@ -170,7 +145,7 @@ contract DevVerifierRegister {
                 mstore(add(_pPairing, 736), deltay2)
 
 
-                let success := staticcall(not(0), 8, _pPairing, 768, _pPairing, 0x20)
+                let success := staticcall(sub(gas(), 2000), 8, _pPairing, 768, _pPairing, 0x20)
 
                 isOk := and(success, mload(_pPairing))
             }
@@ -181,16 +156,6 @@ contract DevVerifierRegister {
             // Validate that all evaluations ∈ F
             
             checkField(calldataload(add(_pubSignals, 0)))
-            
-            checkField(calldataload(add(_pubSignals, 32)))
-            
-            checkField(calldataload(add(_pubSignals, 64)))
-            
-            checkField(calldataload(add(_pubSignals, 96)))
-            
-            checkField(calldataload(add(_pubSignals, 128)))
-            
-            checkField(calldataload(add(_pubSignals, 160)))
             
 
             // Validate all evaluations
