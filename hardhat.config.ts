@@ -102,6 +102,19 @@ const config: HardhatUserConfig = {
       url: "http://127.0.0.1:8547",
       chainId: 999
     },
+    // HyperEVM testnet. Same big-block rule as mainnet for contracts over ~2-3M gas.
+    hyperevmTestnet: {
+      url: process.env.RPC_HYPEREVM_TESTNET ?? "https://rpc.hyperliquid-testnet.xyz/evm",
+      accounts: privateKeys,
+      chainId: 998
+    },
+    // Dry runs against a local anvil fork of HyperEVM testnet:
+    //   pnpm fork:hyperevm-testnet                                          (terminal 1)
+    //   UPGRADE_STEP=rehearse ... hardhat run script/upgradePoolSecurity.ts --network hyperevmTestnetFork
+    hyperevmTestnetFork: {
+      url: "http://127.0.0.1:8548",
+      chainId: 998
+    },
     sepolia: {
       url: rpcEthereumSepolia,
       accounts: privateKeys,

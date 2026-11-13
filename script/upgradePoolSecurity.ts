@@ -35,6 +35,10 @@
  *                   (default 65538 / 20000000 = 20 USDC on Ethereum)
  *   PROBE_ADAPTOR   an adaptor the pool supports, for the zero-refund-address probe (optional;
  *                   the probe is skipped without it)
+ *   NEW_VERIFIER    "deploy": also deploy the verifiers + a new Verifier router built from this
+ *                   checkout (the HyperEVM public-input cut changes the router's compile-time
+ *                   input counts) and point the pool at it with Pool.setVerifier inside the
+ *                   upgrade call. VERIFIER_MANAGER sets the router's manager (default: pool owner)
  *
  * Usage:
  *   UPGRADE_STEP=plan     POOL_PROXY=0x.. npx hardhat run script/upgradePoolSecurity.ts --network mainnet
@@ -48,7 +52,7 @@ import { getChainForCurrentNetwork } from "./utils/chainUtils";
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 import {
     Abi, Hex, encodeFunctionData, getAddress, isAddressEqual, keccak256, toHex,
-    BaseError, ContractFunctionRevertedError, decodeErrorResult, pad, Chain,
+    BaseError, ContractFunctionRevertedError, decodeErrorResult, pad, Chain, toFunctionSelector,
     TransactionReceiptNotFoundError,
 } from "viem";
 
@@ -69,6 +73,12 @@ const OLD_PAYMASTERS = (process.env.OLD_PAYMASTERS ?? "").split(",").map(x => x.
 const PAUSE = (process.env.PAUSE ?? "true").toLowerCase() !== "false";
 const DEPLOYMENT_NAME = process.env.DEPLOYMENT_NAME ?? "";
 const DEPLOYMENT_PURPOSE = process.env.DEPLOYMENT_PURPOSE ?? "";
+const NEW_VERIFIER = (process.env.NEW_VERIFIER ?? "").toLowerCase() === "deploy";
+/** Transaction verifier ids (nIns * 10 + nOuts) and their contracts. */
+const TRANSACT_VERIFIERS: [number, string][] = [
+    [21, "VerifierTransact21"], [22, "VerifierTransact22"], [23, "VerifierTransact23"],
+    [42, "VerifierTransact42"], [44, "VerifierTransact44"], [82, "VerifierTransact82"], [84, "VerifierTransact84"],
+];
 
 const art = (name: string) => hre.artifacts.readArtifactSync(name);
 const poolAbi = art("Pool").abi as Abi;
@@ -201,8 +211,32 @@ const stripMetadata = (hex: string) => hex.slice(0, hex.length - (parseInt(hex.s
 // State snapshot
 // ---------------------------------------------------------------------------
 
+/**
+ * getCommitmentTreeState from either implementation: before the HyperEVM public-input cut it
+ * returned (leaves, subtrees[25], root, rootIndex, nextLeafIndex); after it the pool keeps no
+ * subtrees and returns (leaves, root, rootIndex, nextLeafIndex).
+ */
+const OLD_TREE_STATE_ABI = [{
+    type: "function", name: "getCommitmentTreeState", stateMutability: "view", inputs: [],
+    outputs: [{ type: "uint256[]" }, { type: "uint256[25]" }, { type: "uint256" }, { type: "uint8" }, { type: "uint32" }],
+}] as const;
+const commitmentTreeState = async () => {
+    try {
+        const [leaves, root, rootIndex, nextLeafIndex] = await read(POOL_PROXY, "getCommitmentTreeState");
+        // A 5-value return decodes as 4 garbage values without failing; reject that case.
+        if (BigInt(rootIndex) < 256n && BigInt(nextLeafIndex) < 2n ** 32n && BigInt(root) < FIELD_SIZE) {
+            const raw = await client.call({ to: POOL_PROXY, data: "0x" + keccak256(toHex("getCommitmentTreeState()")).slice(2, 10) });
+            if ((raw.data.length - 2) / 64 < 29) return { leaves, root, rootIndex, nextLeafIndex, subtrees: null as bigint[] | null };
+        }
+    } catch { /* old implementation */ }
+    const [leaves, subtrees, root, rootIndex, nextLeafIndex] = await client.readContract({
+        address: POOL_PROXY, abi: OLD_TREE_STATE_ABI, functionName: "getCommitmentTreeState",
+    });
+    return { leaves, root, rootIndex, nextLeafIndex, subtrees: [...subtrees] as bigint[] | null };
+};
+
 const snapshot = async (oldPaymasters: Addr[]) => {
-    const [, cmSubtrees, cmRoot, cmRootIdx, cmNext] = await read(POOL_PROXY, "getCommitmentTreeState");
+    const { root: cmRoot, rootIndex: cmRootIdx, nextLeafIndex: cmNext, subtrees: cmSubtrees } = await commitmentTreeState();
     const [, addrRoot, addrRootIdx, addrNext] = await read(POOL_PROXY, "getAddressTreeState");
     const assets: Record<string, any> = {};
     // Asset ids are assigned sequentially from 65537; stop after a run of empty ids.
@@ -230,10 +264,9 @@ const snapshot = async (oldPaymasters: Addr[]) => {
         paused: await read(POOL_PROXY, "paused"),
         version: (await read(POOL_PROXY, "version")).toString(),
         verifier: await read(POOL_PROXY, "verifier"),
-        commitmentTree: {
-            root: cmRoot.toString(), rootIndex: Number(cmRootIdx), nextLeafIndex: Number(cmNext),
-            subtreesHash: keccak256(toHex(JSON.stringify(cmSubtrees.map((x: bigint) => x.toString())))),
-        },
+        commitmentTree: { root: cmRoot.toString(), rootIndex: Number(cmRootIdx), nextLeafIndex: Number(cmNext) },
+        // Only the pre-cut implementation stores subtrees; informational, not compared.
+        commitmentSubtreesHash: cmSubtrees ? keccak256(toHex(JSON.stringify(cmSubtrees.map((x: bigint) => x.toString())))) : null,
         addressTree: { root: addrRoot.toString(), rootIndex: Number(addrRootIdx), nextLeafIndex: Number(addrNext) },
         revoker0: await read(POOL_PROXY, "getRevokerData", [0]).then((r: any) => JSON.stringify(r, (_, v) => typeof v === "bigint" ? v.toString() : v)),
         assets,
@@ -284,7 +317,7 @@ const runProbes = async () => {
     const stateOverride = paused ? [{ address: POOL_PROXY, stateDiff: [{ slot: PAUSABLE_SLOT, value: pad("0x0") }] }] : undefined;
     if (paused) console.log("  (pool is paused: probes run with an eth_call state override that unpauses)");
 
-    const [, , cmRoot] = await read(POOL_PROXY, "getCommitmentTreeState");
+    const { root: cmRoot } = await commitmentTreeState();
     const [, addrRoot] = await read(POOL_PROXY, "getAddressTreeState");
     let revokerId = -1;
     for (let i = 0; i < 16 && revokerId < 0; i++) {
@@ -303,8 +336,12 @@ const runProbes = async () => {
     // Default: 20 USDC on Ethereum (asset 65538), inside the $10..$250 bounds at any ETH price.
     const depositAsset = BigInt(process.env.PROBE_DEPOSIT_ASSET_ID ?? "65538");
     const depositAmount = BigInt(process.env.PROBE_DEPOSIT_AMOUNT ?? "20000000");
-    const depth = Number(((poolAbi.find((x: any) => x.name === "updateCommitmentTree") as any)
-        .inputs[0].components.find((c: any) => c.name === "newLevelSubtrees").type as string).match(/\[(\d+)\]/)![1]);
+    // TreeUpdateData lost newLevelSubtrees in the HyperEVM public-input cut.
+    const subtreesField = (poolAbi.find((x: any) => x.name === "updateCommitmentTree") as any)
+        .inputs[0].components.find((c: any) => c.name === "newLevelSubtrees");
+    const zeroBatch = subtreesField
+        ? { newRoot: 1n, batchSize: 0, newLevelSubtrees: Array(Number((subtreesField.type as string).match(/\[(\d+)\]/)![1])).fill(0n), proof: "0x" }
+        : { newRoot: 1n, batchSize: 0, proof: "0x" };
 
     const results = [
         await callExpect("nullifier n + p is rejected (double-spend fix)", "transact",
@@ -325,7 +362,7 @@ const runProbes = async () => {
                 feeData: (BigInt(pm) << 96n) | (depositAsset << 72n) | 1n,
             }], `UnbackedFee(${depositAsset},1)`, stateOverride),
         await callExpect("batchSize = 0 tree update is rejected (root-eviction fix)", "updateCommitmentTree",
-            [{ newRoot: 1n, batchSize: 0, newLevelSubtrees: Array(depth).fill(0n), proof: "0x" }], "InvalidBatchSize()", stateOverride),
+            [zeroBatch], "InvalidBatchSize()", stateOverride),
         await callExpect("withdrawPaymasterFeeFor exists and is owner-only", "withdrawPaymasterFeeFor",
             [pm, 65537, "0x000000000000000000000000000000000000dEaD"], "OwnableUnauthorizedAccount(0x000000000000000000000000000000000000dEaD)", stateOverride),
     ];
@@ -408,7 +445,7 @@ const deploy = async () => {
     // live run without big blocks would stop after the libraries. Big blocks are switched on per
     // account from HyperCore (evmUserModify { usingBigBlocks: true }, signed by the deployer,
     // which must be a HyperCore user). Anvil forks have no such concept.
-    if (chainId === 999 && !isLocal()) {
+    if ((chainId === 999 || chainId === 998) && !isLocal()) {
         const big = await client.request({ method: "eth_usingBigBlocks", params: [wallet.account.address] });
         if (big !== true) {
             throw new Error(`deployer ${wallet.account.address} does not have HyperEVM big blocks enabled; nothing was deployed`);
@@ -439,6 +476,32 @@ const deploy = async () => {
     const poolImpl = await hre.viem.deployContract("Pool", [], { client: clients, libraries: newLibs as Libs });
     console.log("Pool implementation     :", poolImpl.address);
 
+    // The router's public-input counts are compile-time constants, so a circuit change that
+    // alters them needs new verifiers AND a new router.
+    let newVerifierRouter: Addr | undefined;
+    const newVerifiers: Record<string, Addr> = {};
+    if (NEW_VERIFIER) {
+        for (const name of ["VerifierRegister", "VerifierTreeUpdate", ...TRANSACT_VERIFIERS.map(([, n]) => n)]) {
+            newVerifiers[name] = (await hre.viem.deployContract(name, [], { client: clients })).address;
+            console.log(`${name.padEnd(24)}:`, newVerifiers[name]);
+        }
+        const infos = TRANSACT_VERIFIERS.map(([id, name]) => ({
+            id, addr: newVerifiers[name],
+            selector: toFunctionSelector((art(name).abi as any[]).find((x: any) => x.name === "verifyProof")),
+        }));
+        const manager = (process.env.VERIFIER_MANAGER ?? snap.owner) as Addr;
+        const router = await hre.viem.deployContract("Verifier",
+            [infos, newVerifiers.VerifierRegister, newVerifiers.VerifierTreeUpdate, manager], { client: clients });
+        newVerifierRouter = router.address;
+        console.log("Verifier router         :", newVerifierRouter, "(manager", manager + ")");
+        if (!isAddressEqual(wallet.account.address, snap.owner as Addr)) {
+            const h = await wallet.writeContract({ address: newVerifierRouter, abi: art("Verifier").abi as Abi,
+                functionName: "transferOwnership", args: [snap.owner] });
+            await waitForReceipt({ hash: h });
+            console.log("Verifier router owner   :", snap.owner);
+        }
+    }
+
     const owner = snap.owner as Addr;
     const feeRecipient = (process.env.FEE_RECIPIENT ?? owner) as Addr;
     const nextVersion = BigInt(snap.version) + 1n;
@@ -449,9 +512,16 @@ const deploy = async () => {
     if (PAUSE) {
         ownerTxs.push(tx(POOL_PROXY, poolAbi, "pause", [], "Pause (pauser or owner). Skip if already paused.", snap.pauser as Addr));
     }
-    ownerTxs.push(tx(POOL_PROXY, poolAbi, "upgradeToAndCall",
-        [poolImpl.address, encodeFunctionData({ abi: poolAbi, functionName: "setVersion", args: [nextVersion] })],
-        `Upgrade to the fixed implementation and set version ${nextVersion} in the same call.`));
+    if (newVerifierRouter) {
+        ownerTxs.push(tx(POOL_PROXY, poolAbi, "upgradeToAndCall",
+            [poolImpl.address, encodeFunctionData({ abi: poolAbi, functionName: "setVerifier", args: [newVerifierRouter] })],
+            `Upgrade and point the pool and its commitment tree at the new verifier router ${newVerifierRouter} in the same call.`));
+        ownerTxs.push(tx(POOL_PROXY, poolAbi, "setVersion", [nextVersion], `Set version ${nextVersion}.`));
+    } else {
+        ownerTxs.push(tx(POOL_PROXY, poolAbi, "upgradeToAndCall",
+            [poolImpl.address, encodeFunctionData({ abi: poolAbi, functionName: "setVersion", args: [nextVersion] })],
+            `Upgrade to the fixed implementation and set version ${nextVersion} in the same call.`));
+    }
 
     let newPaymaster: Addr | undefined;
     let newPaymasterOwner: Addr | undefined;
@@ -507,6 +577,7 @@ const deploy = async () => {
         chainId, poolProxy: POOL_PROXY, previousImplementation: impl, previousLibraries: { reused: libs, replaced: unmatched },
         newImplementation: poolImpl.address, newLibraries: newLibs, deployedLibraries: toDeploy,
         oldPaymasters: OLD_PAYMASTERS, newPaymaster: newPaymaster ?? null, newPaymasterOwner: newPaymasterOwner ?? null,
+        newVerifierRouter: newVerifierRouter ?? null, newVerifiers,
         expectedVersion: nextVersion.toString(), pause: PAUSE, preUpgradeState: snap, ownerTransactions: ownerTxs,
         deployedAt: new Date().toISOString(),
     };
@@ -529,6 +600,9 @@ const verify = async () => {
     const deployed: LibName[] = rec.deployedLibraries ?? ["QueuedMerkleTreeLogic", "ShieldedTransactionLogic"];
     for (const l of deployed) check(l, await matchesBuild(nl[l], l, nl, "library"));
     check("Pool implementation", await matchesBuild(rec.newImplementation, "Pool", nl, "contract"));
+    for (const [name, addr] of Object.entries<Addr>(rec.newVerifiers ?? {})) {
+        check(name, await matchesBuild(addr, name, {}, "contract", false, []));
+    }
     if (rec.newPaymaster) {
         const [ep, gw, pl] = await Promise.all(["entryPoint", "sender", "pool"].map(f => read(rec.newPaymaster, f, [], paymasterAbi)));
         check("new Paymaster", await matchesBuild(rec.newPaymaster, "Paymaster", {}, "contract", false, [ep, gw, pl]));
@@ -563,7 +637,29 @@ const verify = async () => {
     const pre = rec.preUpgradeState;
     check("owner", cur.owner === pre.owner);
     check("pauser", cur.pauser === pre.pauser);
-    check("verifier", cur.verifier === pre.verifier);
+    if (rec.newVerifierRouter) {
+        check("verifier = new router", isAddressEqual(cur.verifier, rec.newVerifierRouter), cur.verifier);
+        const vAbi = art("Verifier").abi as Abi;
+        const routerCall = async (label: string, fn: string, args: any[], expect: string) => {
+            let got = "success";
+            try { await client.readContract({ address: rec.newVerifierRouter, abi: vAbi, functionName: fn, args }); }
+            catch (e: any) { got = String(e?.shortMessage ?? e?.message ?? e); }
+            const pass = got.includes(expect);
+            console.log(`  ${pass ? "PASS" : "FAIL"}  ${label}${pass ? "" : "  got: " + got.slice(0, 160)}`);
+            ok &&= pass;
+        };
+        // 256-byte proof + N words: the router enforces N exactly (3 / 1 / 1).
+        const zeros = (words: number) => ("0x" + "00".repeat(256 + 32 * words)) as Hex;
+        await routerCall("router rejects 12-input transact calldata", "verifyTransactionProof", [21, zeros(12)], "invalid proof length");
+        await routerCall("router rejects 6-input register calldata", "verifyAddressProof", [zeros(6)], "invalid proof length");
+        await routerCall("router rejects 64-input tree-update calldata", "verifyTreeUpdateProof", [zeros(64)], "invalid proof length");
+        for (const [id] of TRANSACT_VERIFIERS) {
+            const info: any = await client.readContract({ address: rec.newVerifierRouter, abi: vAbi, functionName: "getTransactionVerifier", args: [id] });
+            check(`router transact${id} -> new verifier`, isAddressEqual(info.addr, rec.newVerifiers[`VerifierTransact${id}`]));
+        }
+    } else {
+        check("verifier", cur.verifier === pre.verifier);
+    }
     // Tree and balances move with user activity if the pool was not paused — reported, not failed.
     const same = (a: any, b: any) => JSON.stringify(a) === JSON.stringify(b);
     // Records written before PAUSE existed have no `pause` field; they paused, so stay strict.

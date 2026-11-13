@@ -20,7 +20,6 @@
     "fork:hyperevm": "source .env && anvil --fork-url $RPC_HYPEREVM_MAINNET --chain-id 999 --port 8547 --gas-limit 30000000",
     "deployCoreWithAdp:mainnet:fork": "hardhat run script/deployCoreWithAdp.ts --network mainnetFork",
     "deployCoreWithAdp:mainnet": "hardhat run script/deployCoreWithAdp.ts --network mainnet",
-    "deployCoreWithProofAggrInfra:sepolia": "hardhat run script/deployCoreWithProofAggrInfra.ts --network sepolia",
     "deployP-2-P:veilnyx": "hardhat run script/deployP-2-P.ts --network veilnyxTestnet",
     "deployP-2-P:arc": "hardhat run script/deployP-2-P.ts --network arcTestnet",
     "upgrade:ethSepolia": "hardhat run script/upgradePool.ts --network sepolia",
@@ -30,7 +29,8 @@
     "transferOwnership": "forge script script/setup/TransferOwnership.s.sol:TransferOwnership --broadcast",
     "genPoseidon": "npx tsx script/genPoseidon.ts",
     "deployPaymaster:sepolia": "hardhat run script/deployPaymaster.ts --network sepolia",
-    "paymasterOps:sepolia": "source .env && forge script script/setup/PaymasterOps.s.sol:PaymasterOps --rpc-url $RPC_ETHEREUM_SEPOLIA --broadcast"
+    "paymasterOps:sepolia": "source .env && forge script script/setup/PaymasterOps.s.sol:PaymasterOps --rpc-url $RPC_ETHEREUM_SEPOLIA --broadcast",
+    "fork:hyperevm-testnet": "anvil --fork-url ${RPC_HYPEREVM_TESTNET:-https://rpc.hyperliquid-testnet.xyz/evm} --chain-id 998 --port 8548 --gas-limit 30000000"
   },
   "keywords": [],
   "author": "Gelbfeld AG",
