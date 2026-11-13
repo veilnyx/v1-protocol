@@ -52,7 +52,7 @@ import { getChainForCurrentNetwork } from "./utils/chainUtils";
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 import {
     Abi, Hex, encodeFunctionData, getAddress, isAddressEqual, keccak256, toHex,
-    BaseError, ContractFunctionRevertedError, decodeErrorResult, pad, Chain, toFunctionSelector,
+    BaseError, ContractFunctionRevertedError, decodeErrorResult, decodeFunctionResult, pad, Chain, toFunctionSelector,
     TransactionReceiptNotFoundError,
 } from "viem";
 
@@ -221,18 +221,20 @@ const OLD_TREE_STATE_ABI = [{
     outputs: [{ type: "uint256[]" }, { type: "uint256[25]" }, { type: "uint256" }, { type: "uint8" }, { type: "uint32" }],
 }] as const;
 const commitmentTreeState = async () => {
-    try {
-        const [leaves, root, rootIndex, nextLeafIndex] = await read(POOL_PROXY, "getCommitmentTreeState");
-        // A 5-value return decodes as 4 garbage values without failing; reject that case.
-        if (BigInt(rootIndex) < 256n && BigInt(nextLeafIndex) < 2n ** 32n && BigInt(root) < FIELD_SIZE) {
-            const raw = await client.call({ to: POOL_PROXY, data: "0x" + keccak256(toHex("getCommitmentTreeState()")).slice(2, 10) });
-            if ((raw.data.length - 2) / 64 < 29) return { leaves, root, rootIndex, nextLeafIndex, subtrees: null as bigint[] | null };
-        }
-    } catch { /* old implementation */ }
-    const [leaves, subtrees, root, rootIndex, nextLeafIndex] = await client.readContract({
-        address: POOL_PROXY, abi: OLD_TREE_STATE_ABI, functionName: "getCommitmentTreeState",
-    });
-    return { leaves, root, rootIndex, nextLeafIndex, subtrees: [...subtrees] as bigint[] | null };
+    // Decide by the size of the return data: the old head is 29 words (offset, 25 subtrees,
+    // root, rootIndex, nextLeafIndex), the new one 4.
+    const data = "0x" + keccak256(toHex("getCommitmentTreeState()")).slice(2, 10) as Hex;
+    const raw = (await client.call({ to: POOL_PROXY, data })).data as Hex;
+    if ((raw.length - 2) / 64 >= 29 + 1) {
+        const [leaves, subtrees, root, rootIndex, nextLeafIndex] = decodeFunctionResult({
+            abi: OLD_TREE_STATE_ABI, functionName: "getCommitmentTreeState", data: raw,
+        }) as any;
+        return { leaves, root, rootIndex, nextLeafIndex, subtrees: [...subtrees] as bigint[] | null };
+    }
+    const [leaves, root, rootIndex, nextLeafIndex] = decodeFunctionResult({
+        abi: poolAbi, functionName: "getCommitmentTreeState", data: raw,
+    }) as any;
+    return { leaves, root, rootIndex, nextLeafIndex, subtrees: null as bigint[] | null };
 };
 
 const snapshot = async (oldPaymasters: Addr[]) => {
