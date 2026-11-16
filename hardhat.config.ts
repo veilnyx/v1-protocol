@@ -21,6 +21,7 @@ const rpcVeilnyxTestnet = process.env.RPC_VEILNYX_TESTNET as string;
 const rpcArcTestnet = process.env.RPC_ARC_TESTNET as string;
 const rpcTenderlyMainnetCustomId = process.env.RPC_TENDERLY_MAINNET_CUSTOM_ID as string;
 const rpcHyperEvmMainnet = process.env.RPC_HYPEREVM_MAINNET as string;
+const rpcArbitrumMainnet = process.env.RPC_ARBITRUM_MAINNET as string;
 const privateKeys = [process.env.PRIVATE_KEY as string];
 const veilnyxPrivateKeys = [process.env.VEILNYX_TEST_PRIV_KEY as string];
 const forkEnabled = process.env.HARDHAT_FORK === "true";
@@ -102,6 +103,19 @@ const config: HardhatUserConfig = {
       url: "http://127.0.0.1:8547",
       chainId: 999
     },
+    // Arbitrum One. Same pool code and ceremony verifiers as Ethereum and HyperEVM mainnet.
+    arbitrum: {
+      url: rpcArbitrumMainnet,
+      accounts: privateKeys,
+      chainId: 42161
+    },
+    // Dry runs against a local anvil fork of Arbitrum One, same rules as mainnetFork above:
+    //   anvil --fork-url $RPC_ARBITRUM_MAINNET --chain-id 42161 --port 8548   (terminal 1)
+    //   hardhat run script/deployCoreWithAdp.ts --network arbitrumFork          (terminal 2)
+    arbitrumFork: {
+      url: "http://127.0.0.1:8548",
+      chainId: 42161
+    },
     sepolia: {
       url: rpcEthereumSepolia,
       accounts: privateKeys,
@@ -162,6 +176,14 @@ const config: HardhatUserConfig = {
         urls: {
           apiURL: "https://api.etherscan.io/v2/api?chainid=11155111",
           browserURL: "https://sepolia.etherscan.io",
+        },
+      },
+      {
+        network: "arbitrum",
+        chainId: 42161,
+        urls: {
+          apiURL: "https://api.etherscan.io/v2/api?chainid=42161",
+          browserURL: "https://arbiscan.io",
         },
       },
       {
