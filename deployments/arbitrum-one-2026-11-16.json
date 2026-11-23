@@ -30,5 +30,71 @@
     "verifierTransact44": "0x3a770669a0708068633b54213160505114d9f448",
     "verifierTransact82": "0xc839985931bdbcc9ac28f162aeb8d10fd5a0f4c7",
     "verifierTransact84": "0x81308737bab3e7f5a2aaa685660c9cd27ec9e52b"
-  }
+  },
+  "roles": {
+    "owner": "0xa285717BfD608468566bfBda742b56b1177494f7",
+    "ownerNote": "Hardware wallet, same owner as the Ethereum and HyperEVM 999 pools. The deployer holds no role.",
+    "pauser": "0x50887b9a36E734cF861FE236fA6b4bE68D205113",
+    "deployer": "0x2FacDB4594794F7286a0F5a00BFa32c42972770C"
+  },
+  "revokers": [
+    {
+      "id": 0,
+      "active": true,
+      "note": "Registered at deploy with the same keys as revoker 0 on the Ethereum and HyperEVM 999 pools (mainnet guardian committee). Used by transactions before 2026-11-20."
+    },
+    {
+      "id": 1,
+      "active": true,
+      "note": "Registered by the owner ~2026-11-20 (tx 0x817cf27e8ac71a97c641f950a4ce5b7a89c5aaf6ae4567d52a799e6b6f1aaffd), new keys; the app transacts under it since veilnyx-hyperliquid #118 and it is to replace revoker 0."
+    }
+  ],
+  "stateAt": {
+    "date": "2026-11-23",
+    "paused": false,
+    "version": "1",
+    "implementation": "0xde280c26f96667ec0d7703e59603986d5ab6af03",
+    "tvlLimitUsd": "5000000000",
+    "assets": {
+      "65538": {
+        "symbol": "USDC",
+        "address": "0xaf88d065e77c8cC2239327C5EDb3A432268e5831",
+        "note": "Circle native USDC"
+      }
+    }
+  },
+  "periphery": {
+    "note": "Deployed from veilnyx-hyperliquid/protocol (not this repo); listed here so all Arbitrum One addresses are in one place.",
+    "depositForwarder": {
+      "address": "0x27A1aAEc3baaacD9E1901CFa9dd80495DB5ed384",
+      "deployedAt": "2026-11-17",
+      "source": "veilnyx-hyperliquid/protocol/src/DepositForwarder.sol",
+      "note": "Gasless deposits: EIP-3009 USDC authorization + pool.transact in one call, submitted by the relayer. Immutable, no owner. feeRecipient = relayer 0x2FacDB45."
+    },
+    "cctpHyperCoreFundingAdaptor": {
+      "address": "0x17809ae17F654947DD2a5CaF58946ADd681255C8",
+      "deployedAt": "2026-11-17",
+      "source": "veilnyx-hyperliquid/protocol/src/CctpHyperCoreFundingAdaptor.sol",
+      "note": "CALL_ADAPTOR target: funds a HyperCore sub-account over Circle CCTP (emits SubAccountFunded from the AdaptorHandler). Enabled on the pool (isAdaptorSupported = true). Immutable, no owner."
+    },
+    "gasStationV2": {
+      "address": "0x4Fe33234F9a8A79969D4fD73946b4792ed48E308",
+      "deployedAt": "2026-11-16",
+      "source": "veilnyx-hyperliquid/protocol/src/GasStationV2.sol",
+      "note": "UNUSED since the DepositForwarder (2026-11-17). Owner = hardware wallet; holds a 0.003 ETH float only the owner can withdraw."
+    },
+    "relayer": {
+      "address": "0x2FacDB4594794F7286a0F5a00BFa32c42972770C",
+      "url": "https://trade.veilnyx.com/relayer-arbitrum",
+      "note": "Relayer and settle keeper (same key as the deployer)."
+    }
+  },
+  "external": {
+    "circleUsdc": "0xaf88d065e77c8cC2239327C5EDb3A432268e5831",
+    "hyperCoreCoreDepositWallet": "0x6B9E773128f453f5c2C60935Ee2DE2CBc5390A24"
+  },
+  "notes": [
+    "Pool, libraries and the nine verifiers are byte-identical to the build of v1-protocol main 09ea1cb (incl. metadata); verifiers are the Ethereum mainnet ceremony verifiers. Checked with script/arbitrum/verify-deployment.sh.",
+    "Arbiscan source verification is still pending (needs an Etherscan V2 API key)."
+  ]
 }
