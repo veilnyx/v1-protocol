@@ -1,7 +1,9 @@
 import hre from "hardhat";
 import { parseEther, parseUnits } from "viem";
 
-const PAYMASTER_FUNDING_AMT = parseEther("0.03");
+// ETH deposited into the EntryPoint for the Paymaster. PAYMASTER_FUNDING_ETH overrides it; "0" skips
+// the deposit for chains where transactions go through the relayer instead of ERC-4337 (Arbitrum).
+const PAYMASTER_FUNDING_AMT = parseEther(process.env.PAYMASTER_FUNDING_ETH ?? "0.03");
 const PRICEFEED_STALENESS_THRESHOLD = 24 * 60 * 60; // 1 DAY
 
 export const deployErc4337Infra = async (chainParams, poolAddress, deployConfig) => {
@@ -15,7 +17,11 @@ export const deployErc4337Infra = async (chainParams, poolAddress, deployConfig)
 
     const paymasterAddress = await deployPaymaster(chainParams.entryPoint, poolAddress, gateway.address, chainParams, deployConfig);
 
-    await fundPaymaster(paymasterAddress, deployConfig.client.wallet, deployConfig.client.public);
+    if (PAYMASTER_FUNDING_AMT === BigInt(0)) {
+        console.log("Paymaster: EntryPoint deposit skipped (PAYMASTER_FUNDING_ETH=0)");
+    } else {
+        await fundPaymaster(paymasterAddress, deployConfig.client.wallet, deployConfig.client.public);
+    }
 
     return {
         paymaster: paymasterAddress,

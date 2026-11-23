@@ -253,6 +253,7 @@ const verifyProxy = async (proxyAddress: string, implAddress: string) => {
 
 const verifyAll = async (contracts: {
   asset: any;
+  babyJubJub: any;
   merkleTree: any;
   queuedMerkleTree: any;
   shieldedAddress: any;
@@ -262,10 +263,11 @@ const verifyAll = async (contracts: {
   poolProxy: any;
   initData: `0x${string}`;
 }) => {
-  const { asset, merkleTree, queuedMerkleTree, shieldedAddress, shieldedTransaction, adaptorHandler, poolImpl, poolProxy, initData } = contracts;
+  const { asset, babyJubJub, merkleTree, queuedMerkleTree, shieldedAddress, shieldedTransaction, adaptorHandler, poolImpl, poolProxy, initData } = contracts;
 
   const verifications = [
     { address: asset.address, constructorArguments: [] },
+    { address: babyJubJub.address, constructorArguments: [] },
     { address: merkleTree.address, constructorArguments: [] },
     { address: queuedMerkleTree.address, constructorArguments: [] },
     {
@@ -288,6 +290,7 @@ const verifyAll = async (contracts: {
       constructorArguments: [],
       libraries: {
         AssetLogic: asset.address,
+        BabyJubJubLogic: babyJubJub.address,
         MerkleTreeLogic: merkleTree.address,
         QueuedMerkleTreeLogic: queuedMerkleTree.address,
         ShieldedAddressLogic: shieldedAddress.address,
@@ -347,7 +350,20 @@ const verifyAll = async (contracts: {
 // Sequential on purpose: every adaptor registers assets, and the ids they receive come from a
 // monotonic counter, so the enabled set and its order here decide the id of every adaptor asset.
 // Returns the addresses so the caller can record them without module-level state.
+// True when adaptorConfig.json configures at least one address for the chain. A chain whose entry
+// is all zero addresses (Arbitrum One: no Uniswap/Aave/Lido/Morpho adaptors are wanted there)
+// deploys no adaptors; deploying them anyway would register dead adaptors against zero-address
+// dependencies.
+const hasConfiguredAdaptor = (o: any): boolean =>
+  typeof o === "string"
+    ? o.startsWith("0x") && !isUnconfigured(o)
+    : o !== null && typeof o === "object" && Object.values(o).some(hasConfiguredAdaptor);
+
 const deployAdaptors = async (pool: any, adpParams: any, deployConfig: any): Promise<Record<string, Hex>> => {
+  if (!hasConfiguredAdaptor(adpParams)) {
+    console.log("No adaptors configured for this chain; skipping adaptor deployment");
+    return {};
+  }
   const { uniswap: uniswapParams, aave: aaveParams, lido: lidoParams, curve: curveParams, ethena: ethenaParams, beefy: beefyParams, morpho: morphoParams, rocketPool: rocketPoolParams, oneInch: oneInchParams } = adpParams;
 
   return {
@@ -726,6 +742,12 @@ const main = async () => {
   );
   console.log("ShieldedTransactionLogic deployed:", shieldedTransaction.address);
 
+  // Pool calls BabyJubJubLogic.isInPrimeSubgroup (external) when registering a revoker, so it is
+  // a linked library since the 2026-11 hardening (#43). ShieldedAddressLogic only uses its
+  // internal isOnCurve, which is inlined and needs no link.
+  const babyJubJub = await hre.viem.deployContract("BabyJubJubLogic", [], deployConfig);
+  console.log("BabyJubJubLogic deployed:", babyJubJub.address);
+
   const adaptorHandler = await hre.viem.deployContract("AdaptorHandler", [], deployConfig);
   console.log("AdaptorHandler deployed: ", adaptorHandler.address);
 
@@ -733,6 +755,7 @@ const main = async () => {
     client: deployConfig.client,
     libraries: {
       AssetLogic: asset.address,
+      BabyJubJubLogic: babyJubJub.address,
       MerkleTreeLogic: merkleTree.address,
       QueuedMerkleTreeLogic: queuedMerkleTree.address,
       ShieldedAddressLogic: shieldedAddress.address,
@@ -869,6 +892,7 @@ const main = async () => {
     gateway,
     paymaster,
     assetLogic: asset.address,
+    babyJubJubLogic: babyJubJub.address,
     merkleTreeLogic: merkleTree.address,
     queuedMerkleTreeLogic: queuedMerkleTree.address,
     shieldedAddressLogic: shieldedAddress.address,
@@ -885,7 +909,7 @@ const main = async () => {
   if (dryRun) {
     console.log("Dry run: skipping Etherscan verification");
   } else {
-    await verifyAll({ asset, merkleTree, queuedMerkleTree, shieldedAddress, shieldedTransaction, adaptorHandler, poolImpl, poolProxy, initData });
+    await verifyAll({ asset, babyJubJub, merkleTree, queuedMerkleTree, shieldedAddress, shieldedTransaction, adaptorHandler, poolImpl, poolProxy, initData });
   }
 
   // Fail the run (after verification, so it still happens) if anything is still deployer-owned
